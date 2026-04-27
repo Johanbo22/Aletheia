@@ -607,69 +607,50 @@ class DataMutator:
             method = FillMethod(raw_method) if isinstance(raw_method, str) else raw_method
         except ValueError:
             method = raw_method
-
+        
         column = kwargs.get("column", "All Columns")
-        fill_value = kwargs.get("value", None)
+        val = kwargs.get("value", None)
         group_by = kwargs.get("group_by", None)
-
-        if column == "All Columns" or column is None:
-            target_cols = df.columns
-        else:
-            target_cols = [column]
-
-        if group_by and group_by in df.columns:
-            for col in target_cols:
-                if col == group_by:
-                    continue
-                if method in [FillMethod.MEAN, FillMethod.MEDIAN] and not pd.api.types.is_numeric_dtype(df[col]):
-                    continue
-                if method == FillMethod.MEAN:
-                    df[col] = df[col].fillna(df.groupby(group_by)[col].transform("mean"))
-                elif method == FillMethod.MEDIAN:
-                    df[col] = df[col].fillna(df.groupby(group_by)[col].transform("median"))
-                elif method == FillMethod.MODE:
-                    df[col] = df.groupby(group_by)[col].transform(
-                        lambda x: x.fillna(x.mode().iloc[0] if not x.mode().empty else x)
-                    )
-                elif method == FillMethod.FFILL:
-                    df[col] = df.groupby(group_by)[col].ffill()
-                elif method == FillMethod.BFILL:
-                    df[col] = df.groupby(group_by)[col].bfill()
-        else:
+        
+        target_cols = [c for c in (df.columns if column in ("All Columns", None) else [column]) if c != group_by]
+        
+        if method == FillMethod.TIME and not isinstance(df.index, pd.DatetimeIndex):
+            raise ValueError("Time interpolation requires the dataframe to be a DatetimeIndex")
+        
+        is_grouped = bool(group_by and group_by in df.columns)
+        
+        for col in target_cols:
+            is_num = pd.api.types.is_numeric_dtype(df[col])
+            if method in (FillMethod.MEAN, FillMethod.MEDIAN, FillMethod.LINEAR, FillMethod.TIME) and not is_num:
+                continue
+        
+            obj = df.groupby(group_by)[col] if is_grouped else df[col]
+            
             if method == FillMethod.STATIC_VALUE:
-                for col in target_cols:
-                    val_to_use = fill_value
-                    if pd.api.types.is_numeric_dtype(df[col]) and isinstance(fill_value, str):
-                        try:
-                            val_to_use = float(fill_value) if "." in fill_value else int(fill_value)
-                        except ValueError:
-                            pass
-                    df[col] = df[col].fillna(val_to_use)
-            elif method in [FillMethod.MEAN, FillMethod.MEDIAN, FillMethod.MODE]:
-                for col in target_cols:
-                    if method in [FillMethod.MEAN, FillMethod.MEDIAN] and not pd.api.types.is_numeric_dtype(df[col]):
-                        continue
-                    if method == FillMethod.MEAN:
-                        fill_val = df[col].mean()
-                    elif method == FillMethod.MEDIAN:
-                        fill_val = df[col].median()
-                    else:
-                        modes = df[col].mode()
-                        fill_val = modes[0] if not modes.empty else None
-                    if fill_val is not None:
-                        df[col] = df[col].fillna(fill_val)
-            elif method in [FillMethod.FFILL, FillMethod.BFILL]:
-                for col in target_cols:
-                    df[col] = df[col].fillna(method=method.value)
-            elif method in [FillMethod.LINEAR, FillMethod.TIME]:
-                if method == FillMethod.TIME and not isinstance(df.index, pd.DatetimeIndex):
-                    raise ValueError(
-                        "Time interpolation requires the dataframe to be a DatetimeIndex"
-                    )
-                for col in target_cols:
-                    if pd.api.types.is_numeric_dtype(df[col]):
-                        df[col] = df[col].interpolate(method=method.value)
-
+                fill_val = val
+                if is_num and isinstance(val, str):
+                    try:
+                        fill_val = float(val) if "." in val else int(val)
+                    except ValueError:
+                        pass
+                df[col] = df[col].fillna(fill_val)
+            elif method in (FillMethod.MEAN, FillMethod.MEDIAN):
+                stat_name = "mean" if method == FillMethod.MEAN else "median"
+                stat = obj.transform(stat_name) if is_grouped else getattr(df[col], stat_name)()
+                df[col] = df[col].fillna(stat)
+            elif method == FillMethod.MODE:
+                if is_grouped:
+                    df[col] = obj.transform(lambda x: x.fillna(x.mode().iloc[0] if not x.mode().empty else x))
+                else:
+                    modes = df[col].mode()
+                    if not modes.empty:
+                        df[col] = df[col].fillna(modes.iloc[0])
+            elif method == FillMethod.FFILL:
+                df[col] = obj.ffill()
+            elif method == FillMethod.BFILL:
+                df[col] = obj.bfill()
+            elif method in (FillMethod.LINEAR, FillMethod.TIME):
+                df[col] = df[col].interpolate(method=method.value)
         return df, sort_state
 
     def _drop_column(self, df: pd.DataFrame, sort_state, **kwargs):
