@@ -6,8 +6,8 @@ def create_temp_csv_file(df: pd.DataFrame, source_name: str = "google_sheets") -
     """Creates a temporary CSV file from the dataframe when importing from google sheets"""
     try:
         # Create a temporary dir if it doesnt exists
-        temp_dir = Path(tempfile.gettempdir()) / "DataPlotStudio"
-        temp_dir.mkdir(exist_ok=True)
+        temp_dir_path: str = tempfile.mkdtemp(prefix="DataPlotStudio_")
+        temp_dir: Path = Path(temp_dir_path)
 
         #generate a filename
         timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
