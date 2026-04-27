@@ -158,7 +158,16 @@ class ProjectManager:
                 if "data.parquet" in file_list:
                     with zip_package.open("data.parquet") as data_file:
                         parquet_buffer = io.BytesIO(data_file.read())
-                        project_data["data"] = pd.read_parquet(parquet_buffer, engine="pyarrow")
+                        try:
+                            import geopandas as gpd
+                            try:
+                                project_data["data"] = gpd.read_parquet(parquet_buffer)
+                            except Exception:
+                                parquet_buffer.seek(0)
+                                project_data["data"] = pd.read_parquet(parquet_buffer, engine="pyarrow")
+                        except ImportError:
+                                project_data["data"] = pd.read_parquet(parquet_buffer, engine="pyarrow")
+
                 
                 if "plot_config.json" in file_list:
                     with zip_package.open("plot_config.json") as config_file:

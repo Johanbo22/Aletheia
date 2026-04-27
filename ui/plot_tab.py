@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidget
 from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
 from PyQt6.QtGui import QIcon, QColor, QCursor
 import json
+import threading
 from pathlib import Path
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
@@ -315,7 +316,7 @@ class PlotTab(PlotTabUI):
         self.view.bottom_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.left_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.right_spine_width_spin.valueChanged.connect(self.on_style_changed)
-        self.view.palette_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.palette_combo.currentTextChanged.connect(self._on_palette_changed)
     
     def _connect_axes_tab_signals(self) -> None:
         """Connect signals for the Axes tab"""
@@ -495,20 +496,20 @@ class PlotTab(PlotTabUI):
         self.view.geo_missing_color_btn.clicked.connect(self.choose_geo_missing_color)
         self.view.geo_edge_color_btn.clicked.connect(self.choose_geo_edge_color)
         
-        self.view.geo_scheme_combo.currentTextChanged.connect(self.on_data_changed)
-        self.view.geo_k_spin.valueChanged.connect(self.on_data_changed)
-        self.view.geo_legend_check.stateChanged.connect(self.on_data_changed)
-        self.view.geo_legend_loc_combo.currentTextChanged.connect(self.on_data_changed)
-        self.view.geo_use_divider_check.stateChanged.connect(self.on_data_changed)
-        self.view.geo_cax_check.stateChanged.connect(self.on_data_changed)
-        self.view.geo_axis_off_check.stateChanged.connect(self.on_data_changed)
-        self.view.geo_missing_label_input.textChanged.connect(self.on_data_changed)
-        self.view.geo_hatch_combo.currentTextChanged.connect(self.on_data_changed)
-        self.view.geo_boundary_check.stateChanged.connect(self.on_data_changed)
-        self.view.geo_linewidth_spin.valueChanged.connect(self.on_data_changed)
-        self.view.geo_target_crs_input.textChanged.connect(self.on_data_changed)
-        self.view.geo_basemap_check.stateChanged.connect(self.on_data_changed)
-        self.view.geo_basemap_style_combo.currentTextChanged.connect(self.on_data_changed)
+        self.view.geo_scheme_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_k_spin.valueChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_legend_check.stateChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_legend_loc_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_use_divider_check.stateChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_cax_check.stateChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_axis_off_check.stateChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_missing_label_input.textChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_hatch_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_boundary_check.stateChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_linewidth_spin.valueChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_target_crs_input.editingFinished.connect(self._on_geospatial_projection_changed)
+        self.view.geo_basemap_check.stateChanged.connect(self._on_geospatial_projection_changed)
+        self.view.geo_basemap_style_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
 
     def _connect_theme_controls(self) -> None:
         """Connect signals for Theme management"""
@@ -1012,7 +1013,7 @@ class PlotTab(PlotTabUI):
             self.geo_missing_color = color.name()
             self.view.geo_missing_color_label.setText(self.geo_missing_color)
             self.view.geo_missing_color_btn.updateColors(base_color_hex=self.geo_missing_color)
-            self.on_style_changed()
+            self._on_geospatial_projection_changed()
 
     def choose_geo_edge_color(self):
         color = QColorDialog.getColor()
@@ -1020,7 +1021,7 @@ class PlotTab(PlotTabUI):
             self.geo_edge_color = color.name()
             self.view.geo_edge_color_label.setText(self.geo_edge_color)
             self.view.geo_edge_color_btn.updateColors(base_color_hex=self.geo_edge_color)
-            self.on_style_changed()
+            self._on_geospatial_projection_changed()
     
     def toggle_auto_annotate(self):
         """Enable auto annotation controls"""
@@ -1916,6 +1917,17 @@ class PlotTab(PlotTabUI):
             self.status_bar.log(f"Plot type changed to: {plot_type}")
         
         self.view.custom_tabs.setTabVisible(6, plot_type == "GeoSpatial")
+        if plot_type == "GeoSpatial":
+            def _pre_import_geo_deps():
+                try:
+                    import mapclassify
+                except ImportError:
+                    pass
+                try:
+                    import contextily
+                except ImportError:
+                    pass
+            threading.Thread(target=_pre_import_geo_deps, daemon=True).start()
 
         self._update_customization_visibility(plot_type)
 
@@ -2043,6 +2055,18 @@ class PlotTab(PlotTabUI):
             self._update_bar_customization_live()
         if self.style_update_timer:
             self.style_update_timer.start()
+    
+    def _on_palette_changed(self, text: str) -> None:
+        if self._is_clearing:
+            return
+        self._last_data_signature = None
+        self.on_data_changed()
+    
+    def _on_geospatial_projection_changed(self, *args) -> None:
+        if self._is_clearing:
+            return
+        self._last_data_signature = None
+        self.on_data_changed()
 
     def _fast_render(self) -> None:
         if self._is_clearing:
