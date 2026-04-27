@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v0.1.3 [Prerelease]
+### Added
+- User settings (font family, size, theme) now persist across application restarts.
+
+### Fixed
+- Bug where autosaving was triggered every 30 seconds instead of 5 minutes
+- Prevented errors caused by attempting to zoom in or out via keyboard shortcuts while viewing the Data Explorer tab.
+- Fixed a rendering bug where checking "Flip Axes" required a manual clear and regenerate the plot before taking effect.
+- Fixed a bug in the Colormap Picker where toggling the "Reverse colormap" checkbox did not immediately update the visual preview
+- Fixed an issue where turning off minor ticks would not update the plot immediately
+- Fixed an issue where X-axis and Y-axis minor ticks could not be toggled independently.
+- Fixed an issue where checking "Invert X-axis", "Invert Y-axis", or "X-axis on Top" did not trigger an update of the plot.
+- Fixed older version of fillna() of pandas not updated correctly in 0.1.1
+- Improved initial loadtime of start-up by offloading tempfile removal to threads.
+- Fixed issues with redrawing GeoSpatial plots when changing parts of the plot.
+- Fixed a freezing issue when assigning a Classification Scheme to a GeoSpatial plot.
+- Fixed a bug where loading an autosave or project file containing GeoSpatial data would render geometry as raw bytes.
+
+### Removed
+- UI file-dialog calls in ProjectManager, moved to methods in UI
+
 ## v0.1.2 [Prerelease]
 ### Added
 - Search bar inside the Data Explorer
