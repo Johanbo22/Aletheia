@@ -1,31 +1,56 @@
 from PyQt6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextDocument
-from typing import List, Tuple, Pattern
+from typing import List, Tuple, Pattern, Dict
 import re
 from enum import Enum
 
-class HighlighterColor(str, Enum):
-    Keyword = "#ff79c6"
-    Builtin = "#8be9fd"
-    Self_Cls = "#ffb86c"
-    Decorator = "#ffb86c"
-    String = "#f1fa8c"
-    Docstring = "#6272a4"
-    Number = "#bd93f9"
-    Function = "#50fa7b"
-    ClassName = "#8be9fd"
-    MagicMethod = "#bd93f9"
-    Operator = "#ff79c6"
-    Comment = "#6272a4"
+class SyntaxCategory(str, Enum):
+    Keyword = "Keyword"
+    Builtin = "Builtin"
+    Self_Cls = "Self_Cls"
+    Decorator = "Decorator"
+    String = "String"
+    Docstring = "Docstring"
+    Number = "Number"
+    Function = "Function"
+    ClassName = "ClassName"
+    MagicMethod = "MagicMethod"
+    Operator = "Operator"
+    Comment = "Comment"
+
+DefaultColorScheme: Dict[SyntaxCategory, str] = {
+    SyntaxCategory.Keyword: "#ff79c6",
+    SyntaxCategory.Builtin: "#8be9fd",
+    SyntaxCategory.Self_Cls: "#ffb86c",
+    SyntaxCategory.Decorator: "#ffb86c",
+    SyntaxCategory.String: "#f1fa8c",
+    SyntaxCategory.Docstring: "#6272a4",
+    SyntaxCategory.Number: "#bd93f9",
+    SyntaxCategory.Function: "#50fa7b",
+    SyntaxCategory.ClassName: "#8be9fd",
+    SyntaxCategory.MagicMethod: "#bd93f9",
+    SyntaxCategory.Operator: "#ff79c6",
+    SyntaxCategory.Comment: "#6272a4"
+}
 
 class PythonHighlighter(QSyntaxHighlighter):
     """Simple syntax highligher for Python code"""
 
-    def __init__(self, document: QTextDocument) -> None:
+    def __init__(self, document: QTextDocument, color_scheme: Dict[SyntaxCategory, str] | None = None) -> None:
         super().__init__(document)
+        self.color_scheme: Dict[SyntaxCategory, str] = color_scheme or DefaultColorScheme
         self.highlighting_rules: List[Tuple[Pattern[str], QTextCharFormat]] = []
+        self._setup_rules()
+    
+    def set_color_scheme(self, color_scheme: Dict[SyntaxCategory, str]) -> None:
+        self.color_scheme = color_scheme
+        self._setup_rules()
+        self.rehighlight()
+    
+    def _setup_rules(self) -> None:
+        self.highlighting_rules.clear()
 
         #keywords
-        keyword_format = self._create_format(HighlighterColor.Keyword.value, is_bold=True)
+        keyword_format = self._create_format(self.color_scheme[SyntaxCategory.Keyword], is_bold=True)
         keywords = [
             "def", "class", "if", "else", "elif", "while", "for", "in",
             "return", "try", "except", "import", "from", "as", "True",
@@ -36,7 +61,7 @@ class PythonHighlighter(QSyntaxHighlighter):
         self.highlighting_rules.append((re.compile(r'\b(?:' + '|'.join(keywords) + r')\b'), 0, keyword_format))
         
         # Builtin functions
-        builtin_format = self._create_format(HighlighterColor.Builtin.value)
+        builtin_format = self._create_format(self.color_scheme[SyntaxCategory.Builtin])
         builtins = [
             "print", "range", "len", "list", "dict", "set", "str", "int",
             "float", "bool", "zip", "enumerate", "min", "max", "sum",
@@ -45,43 +70,43 @@ class PythonHighlighter(QSyntaxHighlighter):
         self.highlighting_rules.append((re.compile(r'\b(?:' + '|'.join(builtins) + r')\b'), 0, builtin_format))
 
         # self and cls
-        self_format = self._create_format(HighlighterColor.Self_Cls.value, is_italic=True)
+        self_format = self._create_format(self.color_scheme[SyntaxCategory.Self_Cls], is_italic=True)
         self.highlighting_rules.append((re.compile(r"\bself\b"), 0, self_format))
         self.highlighting_rules.append((re.compile(r"\bcls\b"), 0, self_format))
         
         # magic methods
-        magic_format = self._create_format(HighlighterColor.MagicMethod.value, is_italic=True)
+        magic_format = self._create_format(self.color_scheme[SyntaxCategory.MagicMethod], is_italic=True)
         self.highlighting_rules.append((re.compile(r"\b__\w+__\b"), 0, magic_format))
         
         # class names
-        class_format = self._create_format(HighlighterColor.ClassName.value, is_bold=True)
+        class_format = self._create_format(self.color_scheme[SyntaxCategory.ClassName], is_bold=True)
         self.highlighting_rules.append((re.compile(r"\bclass\s+(\w+)"), 1, class_format))
 
         # decorators
-        decorator_format = self._create_format(HighlighterColor.Decorator.value)
+        decorator_format = self._create_format(self.color_scheme[SyntaxCategory.Decorator])
         self.highlighting_rules.append((re.compile(r"@[A-Za-z0-9_\.]+"), 0, decorator_format))
         
         # functions
-        func_format = self._create_format(HighlighterColor.Function.value)
+        func_format = self._create_format(self.color_scheme[SyntaxCategory.Function])
         self.highlighting_rules.append((re.compile(r"\bdef\s+(\w+)"), 1, func_format))
         self.highlighting_rules.append((re.compile(r"\b[A-Za-z0-9_]+(?=\()"), 0, func_format))
         
         # numbers
-        number_format = self._create_format(HighlighterColor.Number.value)
+        number_format = self._create_format(self.color_scheme[SyntaxCategory.Number])
         self.highlighting_rules.append((re.compile(r"\b(?:0[xX][0-9A-Fa-f]+|0[bB][01]+|0[oO][0-7]+|[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\b"), 0, number_format))
 
         # strings
-        string_format = self._create_format(HighlighterColor.String.value)
+        string_format = self._create_format(self.color_scheme[SyntaxCategory.String])
         self.highlighting_rules.append((re.compile(r'"[^"\\]*(\\.[^"\\]*)*"'), 0, string_format))
         self.highlighting_rules.append((re.compile(r"'[^'\\]*(\\.[^'\\]*)*'"), 0, string_format))
         
         # multi line strings
-        self.multi_string_format = self._create_format(HighlighterColor.Docstring.value, is_italic=True)
+        self.multi_string_format = self._create_format(self.color_scheme[SyntaxCategory.Docstring], is_italic=True)
         self.double_multi_pattern = re.compile(r'"""')
         self.single_multi_pattern = re.compile(r"'''")
 
         # comment
-        comment_format = self._create_format(HighlighterColor.Comment.value, is_italic=True)
+        comment_format = self._create_format(self.color_scheme[SyntaxCategory.Comment], is_italic=True)
         self.highlighting_rules.append((re.compile(r"#[^\n]*"), 0, comment_format))
     
     def _create_format(self, color_hex: str, is_bold: bool = False, is_italic: bool = False) -> QTextCharFormat:

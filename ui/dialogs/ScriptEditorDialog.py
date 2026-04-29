@@ -278,6 +278,13 @@ class ScriptEditorDialog(QDialog):
         self.snippet_menu = QMenu(self)
         self.snippet_menu.setObjectName("script_snippet_menu")
         
+        self.theme_button = DataPlotStudioButton("Theme Settings", parent=self, typewriter_effect=True)
+        self.theme_button.setToolTip("Customize Python syntax highlighting colors")
+        self.theme_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.theme_button.setFixedWidth(130)
+        self.theme_button.clicked.connect(self.open_theme_settings)
+        toolbar.addWidget(self.theme_button)
+        
         categorized_snippets: dict[str, dict[str, str]] = {
             "Reference Lines": {
                 "Vertical Reference Line": "ax.axvline(x=0, color='red', linestyle='--', linewidth=1.5, label='Ref Line')\n",
@@ -329,7 +336,6 @@ class ScriptEditorDialog(QDialog):
         
         font_metrics = QFontMetrics(editor_font)
         self.editor.setTabStopDistance(font_metrics.horizontalAdvance(" ")*4)
-        self.editor.textChanged.connect(self.on_text_changed)
         
         self.comment_shortcut = QShortcut(QKeySequence("Ctrl+Shift+7"), self.editor)
         self.comment_shortcut.activated.connect(self.toggle_comments)
@@ -346,6 +352,7 @@ class ScriptEditorDialog(QDialog):
 
         # add python syntax highlighnign
         self.highlighter = PythonHighlighter(self.editor.document())
+        self._load_syntax_theme()
         layout.addWidget(self.editor, 3)
         
         # Splitter for variable panel and editor (left and right)
@@ -436,6 +443,8 @@ class ScriptEditorDialog(QDialog):
 
         layout.addLayout(button_layout)
         
+        self.editor.textChanged.connect(self.on_text_changed)
+        
         self._append_console_prompt()
         self.update_variable_explorer()
     
@@ -444,6 +453,29 @@ class ScriptEditorDialog(QDialog):
         cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(">>> ")
         self.console_output.setTextCursor(cursor)
+    
+    def _load_syntax_theme(self) -> None:
+        """Loads the custom syntax highlighting theme from QSettings"""
+        from ui.PythonHighlighter import SyntaxCategory, DefaultColorScheme
+        settings = QSettings("DataPlotStudio", "SyntaxHighlighting")
+        
+        saved_scheme: dict[SyntaxCategory, str] = {}
+        for category in SyntaxCategory:
+            color = settings.value(category.value, DefaultColorScheme[category])
+            saved_scheme[category] = color
+        
+        self.highlighter.set_color_scheme(saved_scheme)
+    
+    def open_theme_settings(self) -> None:
+        from ui.dialogs.SyntaxHighlightSettingsDialog import SyntaxHighlightSettingsDialog
+        dialog = SyntaxHighlightSettingsDialog(self.highlighter.color_scheme, self)
+        if dialog.exec():
+            new_scheme = dialog.get_color_scheme()
+            self.highlighter.set_color_scheme(new_scheme)
+            
+            settings = QSettings("DataPlotStudio", "SyntaxHighlighting")
+            for category, color in new_scheme.items():
+                settings.setValue(category.value, color)
         
     def create_variable_explorer(self) -> QTreeWidget:
         """
