@@ -3,7 +3,6 @@ import pandas as pd
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
-import os
 import shutil
 import tempfile
 import atexit
@@ -118,7 +117,10 @@ class SubsetManager:
         if name not in self.subsets:
             raise ValueError(f"Subset '{name}' does not exist")
         
-        cache_path = self._get_cache_path(name)
+        df_state_hash = hash(f"{df.shape}_{list(df.columns)}")
+        cache_key = f"{name}_{df_state_hash}"
+        cache_path = self._get_cache_path(cache_key)
+        
         if use_cache and cache_path.exists():
             try:
                 return pd.read_parquet(cache_path)
@@ -145,14 +147,11 @@ class SubsetManager:
             return df.copy()
         
         if logic == "COMPLEX":
-            if not filters:
-                return df
-            
             current_mask = self._get_filter_mask(df, filters[0])
             for i in range(1, len(filters)):
-                filter = filters[i]
-                next_mask = self._get_filter_mask(df, filter)
-                operator = filter.get("operator", "AND")
+                current_filter = filters[i]
+                next_mask = self._get_filter_mask(df, current_filter)
+                operator = current_filter.get("operator", "AND")
                 
                 if operator == "AND":
                     current_mask = current_mask & next_mask
@@ -163,14 +162,13 @@ class SubsetManager:
         if logic == "AND":
             # apply filters in sequence
             result = df.copy()
-            for f in filters:
-                result = self._apply_single_filter(result, f)
+            for filter in filters:
+                result = self._apply_single_filter(result, filter)
             return result
-        
-        else: #hanlde or logic
-            mask = pd.Series([False] * len(df))
-            for f in filters:
-                filtered = self._apply_single_filter(df, f)
+        else:
+            mask = pd.Series(False, index=df.index, dtype=bool)
+            for filter in filters:
+                filtered = self._apply_single_filter(df, filter)
                 mask = mask | df.index.isin(filtered.index)
             return df[mask]
     
@@ -195,7 +193,7 @@ class SubsetManager:
                     value = int(value)
                 elif pd.api.types.is_float_dtype(col_dtype):
                     value = float(value)
-            except:
+            except (TypeError, ValueError):
                 pass
         
         if condition == ">": return df[column] > value

@@ -2,7 +2,7 @@
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Deque
-from collections import deque
+from collections import deque, Counter
 import textwrap
 
 
@@ -170,8 +170,8 @@ class Logger:
     
     def data_melted(self, id_vars: List[str], value_vars: Optional[List[str]], rows_before: int, rows_after: int) -> None:
         """Log pivot/melt """
-        value_vars = str(value_vars) if value_vars else "All other columns"
-        message = f"Data melted: id_vars={id_vars}, value_vars={value_vars} | Rows: {rows_before:,} -> {rows_after:,}"
+        formatted_value_vars = str(value_vars) if value_vars else "All other columns"
+        message = f"Data melted: id_vars={id_vars}, value_vars={formatted_value_vars} | Rows: {rows_before:,} -> {rows_after:,}"
         self.success(message)
     
     def column_data_type_changed(self, column: str, old_data_type: str, new_data_type: str) -> None:
@@ -198,8 +198,8 @@ class Logger:
                 f.write(content)
             
             return str(path)
-        except Exception as ExportLogsError:
-            raise Exception(f"Error exporting logs: {str(ExportLogsError)}")
+        except OSError as os_error:
+            raise RuntimeError(f"Failed to export logs to {filepath}: {str(os_error)}") from os_error
     
     def _generate_log_report(self, detailed: bool = True) -> str:
         """Generate formatted log report"""
@@ -249,12 +249,10 @@ class Logger:
     
     def get_stats(self) -> Dict[str, Any]:
         """Get log statistics"""
-        levels: Dict[str, int] = {}
-        for entry in self.entries:
-            levels[entry.level] = levels.get(entry.level, 0) + 1
+        level_counts = dict(Counter(entry.level for entry in self.entries))
         
         return {
             'total_entries': len(self.entries),
-            'by_level': levels,
+            'by_level': level_counts,
             'session_duration': self._get_session_duration(),
         }

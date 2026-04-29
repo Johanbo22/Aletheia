@@ -50,7 +50,7 @@ class ProjectManager:
             self.current_project_path = filepath_obj
             return str(filepath_obj)
         except Exception as SaveProjectError:
-            raise Exception(f"Error packing project files: {str(SaveProjectError)}")
+            raise RuntimeError(f"Error packing project files: {str(SaveProjectError)}") from SaveProjectError
     
     def _create_dps_package(self, project_data: Dict[str, Any], filepath_obj: Path) -> None:
         """
@@ -125,7 +125,7 @@ class ProjectManager:
             return self.load_project(str(self.autosave_path))
         except Exception as RecoveryError:
             self.cleanup_autosave()
-            raise Exception(f"Auto-save file is corrupted and has bee deleted: {RecoveryError}")
+            raise RuntimeError(f"Auto-save file is corrupted and has been deleted: {RecoveryError}") from RecoveryError
 
     def cleanup_autosave(self) -> None:
         """
@@ -158,16 +158,19 @@ class ProjectManager:
                 if "data.parquet" in file_list:
                     with zip_package.open("data.parquet") as data_file:
                         parquet_buffer = io.BytesIO(data_file.read())
+                        loaded_dataframe: Optional[pd.DataFrame] = None
+                        
                         try:
                             import geopandas as gpd
                             try:
-                                project_data["data"] = gpd.read_parquet(parquet_buffer)
+                                loaded_dataframe = gpd.read_parquet(parquet_buffer)
                             except Exception:
                                 parquet_buffer.seek(0)
-                                project_data["data"] = pd.read_parquet(parquet_buffer, engine="pyarrow")
                         except ImportError:
-                                project_data["data"] = pd.read_parquet(parquet_buffer, engine="pyarrow")
-
+                            pass
+                        if loaded_dataframe is None:
+                            loaded_dataframe = pd.read_parquet(parquet_buffer, engine="pyarrow")
+                        project_data["data"] = loaded_dataframe
                 
                 if "plot_config.json" in file_list:
                     with zip_package.open("plot_config.json") as config_file:
@@ -198,7 +201,7 @@ class ProjectManager:
             return project_data
         
         except Exception as LoadProjectError:
-            raise Exception(f"Error extracting files to load project: {LoadProjectError}")
+            raise RuntimeError(f"Error extracting files to load project: {LoadProjectError}") from LoadProjectError
     
     def get_current_project_path(self) -> Optional[str]:
         return str(self.current_project_path) if self.current_project_path else None

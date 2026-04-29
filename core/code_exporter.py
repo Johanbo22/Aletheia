@@ -208,7 +208,7 @@ class CodeExporter:
                     ])
 
                     if cond == "contains":
-                        lines.append(f"    df_processed = df_processed[df_processed[{col}].astype(str).str.contains(str(filter_val), na=False)]")
+                        lines.append(f"    df_processed = df_processed[df_processed[{col}].astype(str).str.contains(str(filter_val), na=False, regex=False)]")
                     elif cond == "in":
                         val_list = [val] if not isinstance(val, (list, tuple, set)) else val
                         lines.append(f"    df_processed = df_processed[df_processed[{col}].isin({self._clean_value(val_list)})]")
@@ -222,8 +222,12 @@ class CodeExporter:
                     lines.append("    df_processed = df_processed.dropna()")
                 
                 elif op_type == "fill_missing":
-                    method = self._clean_value(op.get('method', 'ffill'))
-                    lines.append(f"    df_processed = df_processed.fillna(method={method})")
+                    method_raw = op.get('method', 'ffill')
+                    if method_raw in ['ffill', 'bfill']:
+                        lines.append(f"    df_processed = df_processed.{method_raw}()")
+                    else:
+                        method_str = self._clean_value(method_raw)
+                        lines.append(f"    df_processed = df_processed.fillna(value={method_str})")
                 
                 elif op_type == "drop_column":
                     col = self._clean_value(op['column'])
@@ -252,7 +256,7 @@ class CodeExporter:
                     group_by = op['group_by']
                     agg_cols = op['agg_columns']
                     agg_func = op['agg_func']
-                    agg_dict = ", ".join([f"{self._clean_value(c)}: ({self._clean_value(c)}, {self._clean_value(agg_func)})" for c in agg_cols])
+                    agg_dict = ", ".join([f"{self._clean_value(c)}: {self._clean_value(agg_func)}" for c in agg_cols])
                     lines.append(f"    df_processed = df_processed.groupby({self._clean_value(group_by)}).agg({{{agg_dict}}}).reset_index()")
             
             except Exception as e:
@@ -385,7 +389,9 @@ class CodeExporter:
         lines.extend([
             "    try:",
             f"        plt.style.use({style})",
-            "    except Exception: plt.style.use('default')"
+            "    except Exception as style_error:",
+            "        print(f'Warning: Failed to use style {style}: {style_error}')",
+            "        plt.style.use('default')"
         ])
 
         font_family = self._clean_value(self._get_cfg(config, 'appearance.font_family', 'Arial'))
@@ -1015,8 +1021,10 @@ class CodeExporter:
         lines.extend(self._generate_legend(plot_config))
 
         lines.extend([
-            "\n    try: fig.tight_layout()",
-            "    except: pass",
+            "\n    try:",
+            "        fig.tight_layout()",
+            "    except Exception as tight_layout_error:",
+            "        print(f'Warning: tight_layout failed: {tight_layout_error}')",
             "\n    return fig, ax"
         ])
         
@@ -1107,37 +1115,18 @@ class CodeExporter:
     def get_plot_script_only(self, df: pd.DataFrame, plot_config: Dict[str, Any]) -> str:
         """get the create_plot script for the script editor"""
         
-        imports = [
+        self._add_imports(plot_config)
+        
+        base_imports = [
             "import pandas as pd",
             "import numpy as np",
             "import matplotlib.pyplot as plt",
             "import seaborn as sns",
             "from matplotlib.ticker import MaxNLocator"
         ]
+        self.imports.update(base_imports)
 
-        if plot_config.get("axes", {}).get("datetime", {}).get("enabled"):
-            imports.append("import matplotlib.dates as mdates")
-        
-        scatter_analysis = plot_config.get("advanced", {}).get("scatter", {})
-        if any([
-            scatter_analysis.get("show_regression"),
-            scatter_analysis.get("show_ci"),
-            scatter_analysis.get("show_r2"),
-            scatter_analysis.get("show_rmse"),
-            scatter_analysis.get("show_equation"),
-            scatter_analysis.get("error_bars", "None") != "None"
-        ]):
-            imports.append("from scipy import stats")
-            if scatter_analysis.get("show_ci"):
-                imports.append("from scipy.stats import t as t_dist")
-        
-        hist_analysis = plot_config.get("advanced", {}).get("histogram", {})
-        if hist_analysis.get("show_normal"):
-            imports.append("from scipy.stats import norm")
-        if hist_analysis.get("show_kde") or plot_config.get("plot_type") == "KDE":
-            imports.append("from scipy.stats import gaussian_kde")
-
-        import_block = "\n".join(imports)
+        import_block = "\n".join(sorted(list(self.imports)))
         plot_func = self._generate_plot_code(df, plot_config)
 
         runner_comment = (

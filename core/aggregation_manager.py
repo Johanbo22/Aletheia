@@ -34,7 +34,7 @@ class SavedAggregation:
         created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.now()
         
         agg_config = data.get("agg_config")
-        if not agg_config:
+        if agg_config is None:
             cols = data.get("agg_columns", [])
             func = data.get("agg_func", "count")
             agg_config = {col: func for col in cols}
@@ -42,9 +42,9 @@ class SavedAggregation:
         return cls(
             name=data["name"],
             description=data.get("description", ""),
-            group_by=data.get("group_by", []),
-            agg_config=agg_config,
-            date_grouping=data.get("date_grouping"),
+            group_by=list(data.get("group_by", [])),
+            agg_config=dict(agg_config),
+            date_grouping=dict(data["date_grouping"]) if data.get("date_grouping") else None,
             created_at=created_at,
             row_count=data.get("row_count", 0)
         )
@@ -63,9 +63,9 @@ class AggregationManager:
         agg = SavedAggregation(
             name=name,
             description=description,
-            group_by=group_by,
-            agg_config=agg_config,
-            date_grouping=date_grouping,
+            group_by=list(group_by),
+            agg_config=dict(agg_config),
+            date_grouping=dict(date_grouping) if date_grouping else None,
             result_df=result_df.copy(),
             row_count=len(result_df)
         )
@@ -104,9 +104,13 @@ class AggregationManager:
             raise ValueError(f"Aggregation '{name}' requires at least one group_by column")
         
         # Fail if the required columns are missing in the new dataframe
-        missing_cols = [col for col in agg.group_by if col not in df.columns]
-        if missing_cols:
-            raise KeyError(f"Cannot reapply aggregation. Missing grouping columns: {missing_cols}")
+        missing_group_cols = [col for col in agg.group_by if col not in df.columns]
+        if missing_group_cols:
+            raise KeyError(f"Cannot reapply aggregation. Missing grouping columns: {missing_group_cols}")
+
+        missing_agg_cols = [col for col in agg.agg_config.keys() if col not in df.columns]
+        if missing_agg_cols:
+            raise KeyError(f"Cannot reapply aggregation. Missing aggregation columns: {missing_agg_cols}")
         
         try:
             # Apply standard pandas aggregation mapping

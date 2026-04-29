@@ -1,6 +1,4 @@
 # core/plot_engine.py
-from cProfile import label
-
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import matplotlib
@@ -321,14 +319,14 @@ class PlotEngine:
             self.current_ax._cax = None
         
         for coll in self.current_ax.collections:
-            if hasattr(self, "colobar") and coll.colorbar is not None:
+            if hasattr(coll, "colorbar") and coll.colorbar is not None:
                 try:
-                    coll.colarbar.remove()
+                    coll.colorbar.remove()
                 except Exception:
                     pass
         
         for img in self.current_ax.images:
-            if hasattr(self, "colorbar") and img.colobar is not None:
+            if hasattr(img, "colorbar") and img.colobar is not None:
                 try:
                     img.colorbar.remove()
                 except Exception:

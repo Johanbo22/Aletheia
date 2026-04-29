@@ -40,7 +40,7 @@ def parse_changelog(text: str, mode: ParseMode, application_version: str) -> str
         
         return html_output
     except Exception as error:
-        logging.error(f"Failed to parse changelog: {error}")
+        logging.error(f"Failed to parse changelog: {error}", exc_info=True)
         return "<p>Error parsing changelog data.</p>"
 
 def _parse_latest_fixes(latest_section: str, application_version: str) -> str:
@@ -52,7 +52,7 @@ def _parse_latest_fixes(latest_section: str, application_version: str) -> str:
     target_headers: list[str] = [section.value for section in ChangelogSection]
     
     for sub in sub_sections:
-        header_match = re.match(r'^([A-Za-z ]+)(?:\n|$)', sub)
+        header_match = re.match(r'^([A-Za-z ]+)\s*(?:\n|$)', sub)
         if header_match:
             header: str = header_match.group(1).strip()
             if header in target_headers:
@@ -84,7 +84,6 @@ def _parse_version_history(past_sections: list[str]) -> str:
         html_output += f"<hr><h3>{version_title}</h3>"
         
         body: str = "\n".join(lines[1:])
-        body = re.sub(r'### (.*?)\n', r'<h4>\1</h4>\n', body)
         html_output += _markdown_list_to_html(body)
     
     return html_output
@@ -97,27 +96,29 @@ def _markdown_list_to_html(text: str) -> str:
     
     for line in lines:
         stripped: str = line.strip()
-        if stripped.startswith("- ") or stripped.startswith("* "):
+        is_list_item: bool = stripped.startswith("- ") or stripped.startswith("* ")
+        
+        if not is_list_item and in_list:
+            html += "</ul>"
+            in_list = False
+        
+        if is_list_item:
             if not in_list:
                 html += "<ul>"
                 in_list = True
-                
+            
             content: str = stripped[2:]
             content = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', content)
             html += f"<li>{content}</li>"
             
+        elif stripped.startswith("### "):
+            header_text: str = stripped[4:].strip()
+            html += f"<h4>{header_text}</h4>"
         elif not stripped:
-            if in_list:
-                html += "</ul>"
-                in_list = False
-                
+            continue
         else:
-            if in_list:
-                html += "</ul>"
-                in_list = False
             html += f"<p>{stripped}</p>"
-    
     if in_list:
         html += "</ul>"
-        
+    
     return html
