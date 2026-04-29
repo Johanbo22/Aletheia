@@ -59,9 +59,11 @@ class DataTab(QWidget):
     """Tab for viewing and manipulating data"""
 
     request_open_project = pyqtSignal()
+    request_recent_project = pyqtSignal(str)
     request_import_file = pyqtSignal()
     request_import_sheets = pyqtSignal()
     request_import_db = pyqtSignal()
+    request_open_settings = pyqtSignal()
     request_quit = pyqtSignal()
     request_python_console = pyqtSignal()
     data_modified = pyqtSignal()
@@ -123,10 +125,12 @@ class DataTab(QWidget):
         # Landing page
         self.landing_page = LandingPage()
         self.landing_page.open_project_clicked.connect(self.request_open_project.emit)
+        self.landing_page.recent_project_clicked.connect(self.request_recent_project.emit)
         self.landing_page.import_file_clicked.connect(self.request_import_file.emit)
         self.landing_page.import_sheets_clicked.connect(self.request_import_sheets.emit)
         self.landing_page.import_db_clicked.connect(self.request_import_db.emit)
         self.landing_page.new_dataset_clicked.connect(self.controller.create_new_dataset)
+        self.landing_page.settings_clicked.connect(self.request_open_settings.emit)
         self.landing_page.quit_clicked.connect(self.request_quit.emit)
         self.left_stack.addWidget(self.landing_page)
 

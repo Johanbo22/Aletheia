@@ -150,6 +150,7 @@ class DataPlotStudio(QMainWindow):
         """Routing signals to the main widget"""
         self.main_widget.window_title_changed.connect(self.setWindowTitle)
         self.main_widget.data_tab.request_python_console.connect(self.main_widget.open_python_console)
+        self.main_widget.data_tab.request_open_settings.connect(self.open_settings)
         
         # Window state signals
         window_menu = self.menuBar().addMenu("&Window")

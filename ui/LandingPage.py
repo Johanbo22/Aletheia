@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea, QTextBrowser, QDialog, QDialogButtonBox, QGraphicsDropShadowEffect)
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QSettings
 from PyQt6.QtGui import QIcon, QAction, QColor, QPixmap
 from pathlib import Path
 import re
@@ -41,10 +41,12 @@ class ChangelogViewer(QDialog):
 class LandingPage(QWidget):
     """Welcome page when the application starts"""
     open_project_clicked = pyqtSignal()
+    recent_project_clicked = pyqtSignal(str)
     import_file_clicked = pyqtSignal()
     import_sheets_clicked = pyqtSignal()
     import_db_clicked = pyqtSignal()
     new_dataset_clicked = pyqtSignal()
+    settings_clicked = pyqtSignal()
     quit_clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -116,8 +118,13 @@ class LandingPage(QWidget):
         self.button_new.setIcon(IconBuilder.build(IconType.NewProject))
         self.button_new.setFixedWidth(button_width)
         self.button_new.clicked.connect(self.new_dataset_clicked.emit)
+        
+        self.button_settings = DataPlotStudioButton("Settings", base_color_hex=ThemeColors.ButtonDefaultColor, padding="12px", typewriter_effect=True)
+        self.button_settings.setIcon(IconBuilder.build(IconType.Settings)) 
+        self.button_settings.setFixedWidth(button_width)
+        self.button_settings.clicked.connect(self.settings_clicked.emit)
 
-        self.button_quit = DataPlotStudioButton("Quit DataPlotStudio", base_color_hex="#e0e0e0", text_color_hex="#555555", padding="12px",  typewriter_effect=True)
+        self.button_quit = DataPlotStudioButton("Quit", base_color_hex="#e0e0e0", text_color_hex="#555555", padding="12px",  typewriter_effect=True)
         self.button_quit.setIcon(IconBuilder.build(IconType.Quit))
         self.button_quit.setFixedWidth(button_width)
         self.button_quit.clicked.connect(self.quit_clicked.emit)
@@ -132,17 +139,51 @@ class LandingPage(QWidget):
 
         actions_layout.addSpacing(10)
         
-        actions_layout.addWidget(create_section_label("Start"))
-        actions_layout.addWidget(self.button_open)
-        actions_layout.addWidget(self.button_new)
-        actions_layout.addSpacing(15)
-        actions_layout.addWidget(create_section_label("Import Data"))
-        actions_layout.addWidget(self.button_import_file)
-        actions_layout.addWidget(self.button_import_sheet)
-        actions_layout.addWidget(self.button_import_db)
-        actions_layout.addSpacing(35)
-        actions_layout.addWidget(self.button_quit)
-
+        split_layout = QHBoxLayout()
+        split_layout.setSpacing(15)
+        
+        left_actions_layout = QVBoxLayout()
+        left_actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        left_actions_layout.addWidget(create_section_label("Start"))
+        left_actions_layout.addWidget(self.button_open)
+        left_actions_layout.addWidget(self.button_new)
+        
+        left_actions_layout.addSpacing(15)
+        left_actions_layout.addWidget(create_section_label("Import Data"))
+        left_actions_layout.addWidget(self.button_import_file)
+        left_actions_layout.addWidget(self.button_import_sheet)
+        left_actions_layout.addWidget(self.button_import_db)
+        
+        left_actions_layout.addSpacing(15)
+        left_actions_layout.addWidget(create_section_label("Application"))
+        left_actions_layout.addWidget(self.button_settings)
+        left_actions_layout.addWidget(self.button_quit)
+        
+        left_actions_layout.addStretch()
+        
+        right_recent_layout = QVBoxLayout()
+        right_recent_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        right_recent_layout.addWidget(create_section_label("Recent Projects"))
+        
+        self.recent_projects_layout = QVBoxLayout()
+        self.recent_projects_layout.setSpacing(5)
+        self.recent_projects_layout.setContentsMargins(0, 0, 0, 0)
+        right_recent_layout.addLayout(self.recent_projects_layout)
+        self._populate_recent_projects(button_width)
+        
+        right_recent_layout.addStretch()
+        
+        vertical_separator = QFrame()
+        vertical_separator.setObjectName("landing_vertical_separator")
+        vertical_separator.setFixedWidth(2)
+        
+        split_layout.addLayout(left_actions_layout)
+        split_layout.addWidget(vertical_separator)
+        split_layout.addLayout(right_recent_layout)
+        
+        actions_layout.addLayout(split_layout)
         actions_layout.addStretch()
 
         # Right side. a whats new panel/updates
@@ -221,8 +262,8 @@ class LandingPage(QWidget):
         right_layout.setContentsMargins(50, 60, 50, 60)
         right_layout.addWidget(whats_new_scroll_area)
 
-        layout.addWidget(actions_panel, 4)
-        layout.addWidget(right_panel, 6)
+        layout.addWidget(actions_panel, 5)
+        layout.addWidget(right_panel, 4)
         
     def handle_changelog_link(self, link: str) -> None:
         if link == "current_fixes":
@@ -246,3 +287,49 @@ class LandingPage(QWidget):
         
         dialog = ChangelogViewer(title, content, self)
         dialog.exec()
+        
+    def _populate_recent_projects(self, button_width: int) -> None:
+        settings = QSettings("DataPlotStudio", "RecentProjects")
+        recent_files = settings.value("recent_files", [])
+        
+        if isinstance(recent_files, str):
+            recent_files = [recent_files]
+        
+        valid_files = []
+        
+        while self.recent_projects_layout.count():
+            item = self.recent_projects_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        
+        if not recent_files:
+            no_recent_label = QLabel("No recent project found")
+            no_recent_label.setObjectName("no_recent_label")
+            no_recent_label.setFixedWidth(button_width)
+            no_recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.recent_projects_layout.addWidget(no_recent_label)
+            return
+        
+        for file_path_str in recent_files:
+            if len(valid_files) >= 4:
+                break
+            file_path = Path(file_path_str)
+            if file_path.exists():
+                valid_files.append(file_path_str)
+                btn = DataPlotStudioButton(
+                    file_path.name, 
+                    base_color_hex="#f8f9fa", 
+                    text_color_hex="#34495e", 
+                    padding="8px", 
+                    typewriter_effect=False
+                )
+                btn.setToolTip(str(file_path.absolute()))
+                btn.setIcon(IconBuilder.build(IconType.OpenProject))
+                btn.setFixedWidth(button_width)
+                
+                btn.clicked.connect(lambda checked, path=file_path_str: self.recent_project_clicked.emit(path))
+                self.recent_projects_layout.addWidget(btn)
+        
+        if len(valid_files) != len(recent_files):
+            settings.setValue("recent_files", valid_files)

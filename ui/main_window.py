@@ -1,6 +1,6 @@
 #ui/main_window.py
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QFileDialog, QMessageBox, QApplication, QTabWidget)
-from PyQt6.QtCore import QThreadPool, pyqtSlot, QTimer, pyqtSignal
+from PyQt6.QtCore import QThreadPool, pyqtSlot, QTimer, pyqtSignal, QSettings
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from pathlib import Path
 import traceback
@@ -75,6 +75,7 @@ class MainWindow(QWidget):
         # Welcome page signals
         self.data_tab.request_open_project.connect(self.open_project)
         self.data_tab.request_import_file.connect(self.import_file)
+        self.data_tab.request_recent_project.connect(self.open_recent_project)
         self.data_tab.request_import_sheets.connect(self.import_google_sheets)
         self.data_tab.request_import_db.connect(self.import_from_database)
         self.data_tab.request_quit.connect(QApplication.instance().quit)
@@ -190,6 +191,26 @@ class MainWindow(QWidget):
         top_level = self.window()
         if top_level and top_level != self:
             top_level.setWindowTitle(title)
+    
+    def _update_recent_projects(self, filepath: str) -> None:
+        if not filepath:
+            return
+        
+        settings = QSettings("DataPlotStudio", "RecentProjects")
+        recent_files = settings.value("recent_files", [])
+        
+        if isinstance(recent_files, str):
+            recent_files = [recent_files]
+        
+        standardized_path = str(Path(filepath).absolute())
+        
+        if standardized_path in recent_files:
+            recent_files.remove(standardized_path)
+        
+        recent_files.insert(0, standardized_path)
+        recent_files = recent_files[:10]
+        
+        settings.setValue("recent_files", recent_files)
 
     def new_project(self):
         """Creates a new project"""
@@ -212,20 +233,32 @@ class MainWindow(QWidget):
                 self,
                 "Open Project",
                 "",
-                f"DataPlotStudio Portable Files (*{self.project_manager.PROJECT_EXTENSION});;All Files (*)"
+                f"DataPlotStudio Portable Files (*{self.project_manager.PROJECT_EXTENSION})"
             )
             if filepath:
-                try:
-                    project = self.project_manager.load_project(filepath)
-                    self.load_project(project)
-                    self.status_bar.log(f"Project loaded: {filepath}")
+                self._load_project_from_path(filepath)
+    
+    def open_recent_project(self, filepath: str) -> None:
+        if self._confirm_discard_changes():
+            if Path(filepath).exists():
+                self._load_project_from_path(filepath)
+            else:
+                QMessageBox.warning(self, "File Not Found", f"The project file could not be found:\n{filepath}")
+    
+    def _load_project_from_path(self, filepath: str) -> None:
+        """Helper method to load project data and handle animations."""
+        try:
+            project = self.project_manager.load_project(filepath)
+            self.load_project(project)
+            self.status_bar.log(f"Project loaded: {filepath}")
+            self._update_recent_projects(filepath)
 
-                    self.open_project_animation = ProjectOpenAnimation(message="Project Opened")
-                    self.open_project_animation.start(target_widget=self)
-                
-                except Exception as LoadProjectError:
-                    QMessageBox.critical(self, "Error", f"Failed to load project: {str(LoadProjectError)}")
-                    traceback.print_exc()
+            self.open_project_animation = ProjectOpenAnimation(message="Project Opened")
+            self.open_project_animation.start(target_widget=self)
+        
+        except Exception as LoadProjectError:
+            QMessageBox.critical(self, "Error", f"Failed to load project: {str(LoadProjectError)}")
+            traceback.print_exc()
     
     def load_project(self, project_data: dict) -> None:
         """load project data into the UI"""
@@ -282,6 +315,7 @@ class MainWindow(QWidget):
                 self.project_manager.cleanup_autosave()
                 op_name = "save_project_as" if force_dialog else "save_project"
                 self.status_bar.log_action(f"Project Saved: {Path(saved_path).name}",details={"filepath": saved_path, "operation": op_name}, level="SUCCESS")
+                self._update_recent_projects(saved_path)
 
                 return True
             return False
