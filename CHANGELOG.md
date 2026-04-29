@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v0.1.4 [Prerelease]
+### Changed
+- Restructured `SubsetManager` cache keys to include underlying dataframe layout state, preventing incorrect cache returns when source data mutates.
+- Refactored ProjectManager.load_project to streamline the parquet data parsing.
+- `CodeExporter` now generates Pandas 2.0+ compliant code for missing value imputation (`.ffill()`/`.bfill()`) and aggregations.
+- `CodeExporter` data operation filters utilizing 'contains' now default to `regex=False` to prevent crashes when searching for special characters.
+
+### Fixed
+- Fixed a bug where colorbars were not being properly deleted upon axis clearing
+- Fixed an unhandled `KeyError` exception in `reapply_aggregation` when target aggregation columns are missing from the updated dataset.
+- Fixed incorrect fallback logic in `SavedAggregation.from_dict` that could override valid empty `agg_config` definitions.
+- Removed redundant validation checks inside `SubsetManager._apply_filters` processing logic.
+- Corrected typo in the recover_autosave message.
+- Fixed an issue where the script exporter generated invalid dictionary syntax for pandas grouped aggregations.
+- Double-negative formatting artifacts in the generated regression equations.
+- Unhandled `RuntimeError` exceptions when `scipy.optimize.curve_fit` fails to converge.
+
 ## v0.1.3 [Prerelease]
 ### Added
 - User settings (font family, size, theme) now persist across application restarts.
