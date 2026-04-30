@@ -333,8 +333,35 @@ QPushButton#HelpDialogInfoBtn:pressed {
 }
 
 /* Binning Dialog */
-QLabel#binning_hint_label {
+#binning_general_group,
+#binning_method_group,
+#binning_labeling_group,
+#binning_preview_group {
+    font-weight: bold;
+    padding-top: 18px;
+    margin-top: 12px;
+}
+
+#binning_advanced_group {
+    font-weight: bold;
+    padding-top: 18px;
+    margin-top: 12px;
+    background-color: rgba(128, 128, 128, 0.08);
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    border-radius: 4px;
+}
+
+#preview_empty_label {
+    color: rgba(128, 128, 128, 0.8);
     font-style: italic;
+    font-size: 13px;
+}
+
+#binning_hint_label {
+    font-size: 12px;
+    font-style: italic;
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 
 QLabel#binning_hint_label[status="success"] {

@@ -946,12 +946,13 @@ class DataTabController:
             return
         
         numeric_cols = self.data_handler.df.select_dtypes(include=["number"]).columns.tolist()
+        df = self.data_handler.df
         
         if not numeric_cols:
             QMessageBox.warning(self.view, "No Numeric Data", "This dataset contains no numeric columns suitable for binning.")
             return
         
-        dialog = BinningDialog(numeric_cols, parent=self.view)
+        dialog = BinningDialog(numeric_cols, df, parent=self.view)
         if dialog.exec():
             config = dialog.get_config()
             if config:
