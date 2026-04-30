@@ -1,33 +1,8 @@
 # ui/data_tab.py
-from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QMessageBox,
-    QTextEdit,
-    QInputDialog,
-    QListWidgetItem,
-    QTableView,
-    QHeaderView,
-    QGraphicsOpacityEffect,
-    QMenu,
-    QDialog,
-    QStackedWidget,
-    QApplication,
-    QTabWidget,
-    QLabel
-)
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QListWidgetItem, QTableView, QHeaderView, QGraphicsOpacityEffect, QMenu, QStackedWidget, QApplication, QTabWidget, QLabel
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import (
-    Qt,
-    QPropertyAnimation,
-    QEasingCurve,
-    pyqtSignal,
-    QSize,
-    QTimer
-)
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QSize, QTimer, QModelIndex
 from PyQt6.QtGui import QIcon, QFont, QAction, QPalette, QColor, QShortcut, QKeySequence
-import numpy as np
 
 from core.data_handler import DataHandler
 from core.resource_loader import get_resource_path
@@ -285,6 +260,9 @@ class DataTab(QWidget):
         # Data table context menu
         self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.data_table.customContextMenuRequested.connect(self.show_table_context_menu)
+        
+        self.data_table.horizontalHeader().sectionClicked.connect(self._on_horizontal_header_clicked)
+        self.data_table.verticalHeader().sectionClicked.connect(self._on_vertical_header_clicked)
 
         # Search functionality to data table
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
@@ -473,6 +451,22 @@ class DataTab(QWidget):
             self.data_table.setCurrentIndex(index)
             self.data_table.scrollTo(index, QTableView.ScrollHint.PositionAtCenter)
             self.data_table.setFocus()
+    
+    def _on_horizontal_header_clicked(self, logical_index: int) -> None:
+        """Handles horizontal header clicks for inserting columns"""
+        model = self.data_table.model()
+        if not isinstance(model, DataTableModel) or not model.editable or model._data is None:
+            return
+        if logical_index == model._data.shape[1]:
+            model.insert_empty_column()
+    
+    def _on_vertical_header_clicked(self, logical_index: int) -> None:
+        """Handles vertical header clicks to insert rows"""
+        model = self.data_table.model()
+        if not isinstance(model, DataTableModel) or not model.editable or model._data is None:
+            return
+        if logical_index == model._data.shape[0]:
+            model.insert_empty_row()
 
     def refresh_data_view(self, reload_model: bool = True):
         """Refresh the data table and statistics"""
@@ -527,6 +521,7 @@ class DataTab(QWidget):
         else:
             self.model = DataTableModel(self.data_handler, editable=self.is_editing, float_precision=self.current_precision, conditional_rules=self.current_formatting_rules)
             self.model.set_bool_render_style(getattr(self, "current_render_bools", True))
+            self.model.columnsInserted.connect(self._update_column_selectors)
             self.data_table.setSortingEnabled(False)
             self.data_table.setModel(self.model)
         

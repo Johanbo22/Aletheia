@@ -1861,6 +1861,12 @@ class PlotTab(PlotTabUI):
 
     def _apply_table(self):
         """Generate the table and add it to the plot"""
+        if self.plot_engine.current_ax:
+            for table in list(self.plot_engine.current_ax.tables):
+                try:
+                    table.remove()
+                except Exception:
+                    pass
         if not self.view.table_enable_check.isChecked():
             return
         

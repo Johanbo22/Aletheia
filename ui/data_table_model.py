@@ -173,17 +173,19 @@ class DataTableModel(QAbstractTableModel):
         self._update_column_alignments()
         self.endResetModel()
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Returns the number of rows in a dataframe"""
         if parent.isValid() or self._data is None:
             return 0
-        return self._data.shape[0]
+        base_count: int = self._data.shape[0]
+        return base_count + 1 if self.editable else base_count
     
-    def columnCount(self, parent=QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Returns the number of columns in the dataframe"""
         if parent.isValid() or self._data is None:
             return 0
-        return self._data.shape[1]
+        base_count: int = self._data.shape[1]
+        return base_count + 1 if self.editable else base_count
     
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Returns le data"""
@@ -205,6 +207,14 @@ class DataTableModel(QAbstractTableModel):
         
         row: int = index.row()
         col: int = index.column()
+        
+        is_insert_row: bool = self.editable and row == self._data.shape[0]
+        is_insert_col: bool = self.editable and col == self._data.shape[1]
+        
+        if is_insert_row and is_insert_col:
+            if role == Qt.ItemDataRole.BackgroundRole:
+                return QColor("#f8f9fa")
+            return None
         
         if role == Qt.ItemDataRole.BackgroundRole:
             if row in self.highlighted_rows:
@@ -360,9 +370,17 @@ class DataTableModel(QAbstractTableModel):
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
         
+        row: int = index.row()
+        col: int = index.column()
+        
+        is_insert_row: bool = self.editable and self._data is not None and row == self._data.shape[0]
+        is_insert_col: bool = self.editable and self._data is not None and col == self._data.shape[1]
+        
+        if is_insert_row or is_insert_col:
+            return Qt.ItemFlag.NoItemFlags
+        
         default_flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         
-        col = index.column()
         if self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool):
             if self._col_is_bool[col]:
                 default_flags |= Qt.ItemFlag.ItemIsUserCheckable
@@ -374,8 +392,38 @@ class DataTableModel(QAbstractTableModel):
     
     def set_editable(self, editable: bool) -> None:
         """Update the editable state of the table model"""
+        if self.editable == editable:
+            return
+        self.layoutAboutToBeChanged.emit()
         self.editable = editable
         self.layoutChanged.emit()
+    
+    def insert_empty_row(self) -> None:
+        """Inserts a new row with NaN values at the end of the DataFrame"""
+        if self._data is None:
+            return
+        
+        row_idx: int = self._data.shape[0]
+        self.beginInsertRows(QModelIndex(), row_idx, row_idx)
+        self.data_handler.df.loc[row_idx] = pd.NA
+        self._data = self.data_handler.df
+        
+        self.endInsertRows()
+    
+    def insert_empty_column(self) -> None:
+        """Append a new column with NaN values ath the of the DF"""
+        if self._data is None:
+            return
+        
+        col_idx: int = self._data.shape[1]
+        self.beginInsertColumns(QModelIndex(), col_idx, col_idx)
+        
+        new_col_name: str = f"Column_{col_idx + 1}"
+        self.data_handler.df[new_col_name] = pd.NA
+        self._data = self.data_handler.df
+        
+        self._update_column_alignments()
+        self.endInsertColumns()
     
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Returns the header of the data"""
@@ -385,8 +433,22 @@ class DataTableModel(QAbstractTableModel):
         is_display = (role == Qt.ItemDataRole.DisplayRole or role == 0)
         is_tooltip = (role == Qt.ItemDataRole.ToolTipRole or role == 3)
         is_alignment = (role == Qt.ItemDataRole.TextAlignmentRole or role == 7)
+        is_font = (role == Qt.ItemDataRole.FontRole or role == 6)
         
         if orientation == Qt.Orientation.Horizontal:
+            if self.editable and section == self._data.shape[1]:
+                if is_display:
+                    return "+"
+                elif is_tooltip:
+                    return "Add new column"
+                elif is_alignment:
+                    return Qt.AlignmentFlag.AlignCenter
+                elif is_font:
+                    handle_font = QFont()
+                    handle_font.setBold(True)
+                    handle_font.setPointSize(14)
+                    return handle_font
+                return None
             try:
                 if is_display:
                     return str(self._data.columns[section])
@@ -405,6 +467,19 @@ class DataTableModel(QAbstractTableModel):
                 pass
                 
         elif orientation == Qt.Orientation.Vertical:
+            if self.editable and section == self._data.shape[0]:
+                if is_display:
+                    return "+"
+                elif is_tooltip:
+                    return "Add new row"
+                elif is_alignment:
+                    return Qt.AlignmentFlag.AlignCenter
+                elif is_font:
+                    handle_font = QFont()
+                    handle_font.setBold(True)
+                    handle_font.setPointSize(14)
+                    return handle_font
+                return None
             if is_display:
                 try:
                     return str(self._data.index[section])
