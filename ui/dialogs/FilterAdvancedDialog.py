@@ -271,6 +271,7 @@ class FilterAdvancedDialog(QDialog):
                 row["logic"].setVisible(False)
             else:
                 row["logic"].setVisible(True)
+        self.update_preview()
     
     def update_row_ui(self, row: dict):
         """Update the input widget based on the datatype of selected column and the selected condition"""

@@ -3,3 +3,72 @@ QFrame#PanelFrame {
     border: 1px solid #E2E8F0;
     border-radius: 8px;
 }
+
+QLabel#SectionHeaderLabel {
+    font-weight: bold;
+    font-size: 14px;
+    color: #1E293B;
+    margin-bottom: 4px;
+}
+
+QTableWidget#CreateDatasetColumnTable {
+    border: 1px solid #E2E8F0;
+    border-radius: 4px;
+    background-color: #FFFFFF;
+    alternate-background-color: #F8FAFC;
+}
+
+QTableWidget#CreateDatasetColumnTable {
+    outline: none;
+}
+
+QTableWidget#CreateDatasetColumnTable::item:selected {
+    background-color: #E2E8F0;
+    color: #0F172A;
+}
+
+QTableWidget#CreateDatasetColumnTable QHeaderView::section:vertical {
+    background-color: #F1F5F9;
+    color: #64748B;
+    border: none;
+    border-right: 1px solid #E2E8F0;
+    border-bottom: 1px solid #E2E8F0;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+QTableWidget#CreateDatasetColumnTable QHeaderView::section:vertical:checked {
+    background-color: #CBD5E1;
+    color: #0F172A;
+    font-weight: bold;
+}
+
+QTableWidget#CreateDatasetColumnTable QHeaderView::section:horizontal {
+    background-color: #F8FAFC;
+    color: #1E293B;
+    font-weight: bold;
+    border: none;
+    border-bottom: 2px solid #E2E8F0;
+    border-right: 1px solid #E2E8F0;
+    padding: 6px;
+}
+
+QFrame#DialogSeparator {
+    color: #E2E8F0;
+    background-color: #E2E8F0;
+    border: none;
+    max-height: 1px;
+}
+
+QPushButton[styleClass="destructive"] {
+    color: #64748B;
+    /* Neutral resting state */
+}
+
+QPushButton[styleClass="destructive"]:hover {
+    color: #DC2626;
+    /* Deep red text on hover to signal danger */
+    background-color: #FEF2F2;
+    /* Soft red background */
+    border: 1px solid #FECACA;
+}
