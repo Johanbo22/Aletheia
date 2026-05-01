@@ -1,7 +1,7 @@
-from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QRadioButton, QButtonGroup, QListWidget, QAbstractItemView, QListWidgetItem, QMessageBox, QApplication, QWidget, QFrame
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QButtonGroup, QAbstractItemView, QListWidgetItem, QMessageBox, QApplication, QWidget, QFrame
+from PyQt6.QtCore import Qt, QTimer
 import pandas as pd
-import traceback
 from typing import Optional, List, Any, Dict
 from pathlib import Path
 
@@ -15,7 +15,7 @@ class ExportDialog(QDialog):
 
     def __init__(self, parent: Optional[QWidget] = None, data_handler=None, selected_rows=None, selected_columns=None):
         super().__init__(parent)
-        self.setWindowTitle("Export Data")
+        self.setWindowTitle("Export Data to file")
         self.setWindowIcon(IconBuilder.build(IconType.ExportFle))
         self.setModal(True)
         self.resize(700, 600)
@@ -39,33 +39,45 @@ class ExportDialog(QDialog):
     def init_ui(self):
         """Initialize dialog UI"""
         layout = QVBoxLayout(self)
-
-        # Export format selection
-        format_label = QLabel("Export Format:")
-        format_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        layout.addWidget(format_label)
-
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        # Format selection
+        format_layout = QHBoxLayout()
+        format_label = QLabel("&Export Format:")
+        format_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
+        format_layout.addWidget(format_label)
+        
         self.format_combo = DataPlotStudioComboBox()
-        self.format_combo.addItems(['CSV', 'XLSX', 'JSON'])
-        layout.addWidget(self.format_combo)
-
-        layout.addSpacing(10)
-
-        # Data selection options
+        self.format_combo.addItems(["CSV", "XLSX", "JSON"])
+        self.format_combo.setMinimumWidth(150)
+        format_label.setBuddy(self.format_combo)
+        format_layout.addWidget(self.format_combo)
+        format_layout.addStretch()
+        layout.addLayout(format_layout)
+        
+        # Data selection layout
         selection_group = DataPlotStudioGroupBox("Data Selection", parent=self)
         selection_layout = QVBoxLayout()
-
-        selection_layout.addWidget(QLabel("Rows:"))
+        selection_layout.setContentsMargins(15, 20, 15, 15)
+        selection_layout.setSpacing(12)
+        
+        rows_label = QLabel("Rows:")
+        rows_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+        selection_layout.addWidget(rows_label)
+        
+        rows_radio_layout = QHBoxLayout()
         self.rows_group = QButtonGroup(self)
-
+        
         self.rows_radio_all = DataPlotStudioRadioButton("All Rows")
         self.rows_radio_all.setChecked(True)
         self.rows_group.addButton(self.rows_radio_all)
-        selection_layout.addWidget(self.rows_radio_all)
-
+        rows_radio_layout.addWidget(self.rows_radio_all)
+        
         self.rows_radio_selected = DataPlotStudioRadioButton(f"Selected Rows Only: {len(self.selected_rows)}")
         self.rows_group.addButton(self.rows_radio_selected)
-        selection_layout.addWidget(self.rows_radio_selected)
+        rows_radio_layout.addWidget(self.rows_radio_selected)
+        rows_radio_layout.addStretch()
 
         if self.has_row_selection:
             self.rows_radio_selected.setChecked(True)
@@ -74,62 +86,85 @@ class ExportDialog(QDialog):
             self.rows_radio_selected.setEnabled(False)
             self.rows_radio_selected.setToolTip("No rows selected in the table")
         
-        selection_layout.addSpacing(10)
+        selection_layout.addLayout(rows_radio_layout)
+        
+        inner_separator = QFrame()
+        inner_separator.setFrameShape(QFrame.Shape.HLine)
+        inner_separator.setFrameShadow(QFrame.Shadow.Sunken)
+        inner_separator.setProperty("styleClass", "dialog_separator")
+        selection_layout.addWidget(inner_separator)
+        
+        cols_label = QLabel("Columns:")
+        cols_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+        selection_layout.addWidget(cols_label)
 
-        # Column seleciont
-        selection_layout.addWidget(QLabel("Columns"))
+        cols_radio_layout = QHBoxLayout()
         self.cols_group = QButtonGroup(self)
 
         self.cols_radio_all = DataPlotStudioRadioButton("All Columns")
         self.cols_radio_all.setChecked(True)
         self.cols_group.addButton(self.cols_radio_all)
-        selection_layout.addWidget(self.cols_radio_all)
+        cols_radio_layout.addWidget(self.cols_radio_all)
 
         self.cols_radio_specific = DataPlotStudioRadioButton("Specific Columns")
         self.cols_group.addButton(self.cols_radio_specific)
-        selection_layout.addWidget(self.cols_radio_specific)
+        cols_radio_layout.addWidget(self.cols_radio_specific)
+        cols_radio_layout.addStretch()
+        selection_layout.addLayout(cols_radio_layout)
         
         self.column_tools_widget = QWidget()
         column_tools_layout = QVBoxLayout(self.column_tools_widget)
-        column_tools_layout.setContentsMargins(0, 0, 0, 0)
+        column_tools_layout.setContentsMargins(0, 5, 0, 0)
+        column_tools_layout.setSpacing(8)
         
+        tools_row_layout = QHBoxLayout()
         self.column_filter_input = DataPlotStudioLineEdit()
         self.column_filter_input.setPlaceholderText("Filter columns...")
         self.column_filter_input.setClearButtonEnabled(True)
-        self.column_filter_input.textChanged.connect(self._filter_columns)
-        column_tools_layout.addWidget(self.column_filter_input)
         
-        quick_select_layout = QHBoxLayout()
+        self.filter_timer = QTimer(self)
+        self.filter_timer.setSingleShot(True)
+        self.filter_timer.setInterval(250)
+        self.filter_timer.timeout.connect(self._filter_columns)
+        
+        self.column_filter_input.textChanged.connect(self._apply_column_filter)
+        tools_row_layout.addWidget(self.column_filter_input, stretch=1)
+        
         self.select_alL_button = DataPlotStudioButton("Select all", parent=self)
         self.select_alL_button.clicked.connect(self._select_all_columns)
+        tools_row_layout.addWidget(self.select_alL_button)
+
         self.clear_selection_button = DataPlotStudioButton("Clear", parent=self)
         self.clear_selection_button.clicked.connect(self._clear_column_selection)
+        tools_row_layout.addWidget(self.clear_selection_button)
         
-        quick_select_layout.addWidget(self.select_alL_button)
-        quick_select_layout.addWidget(self.clear_selection_button)
-        quick_select_layout.addStretch()
-        column_tools_layout.addLayout(quick_select_layout)
+        column_tools_layout.addLayout(tools_row_layout)
 
         self.column_list = DataPlotStudioListWidget()
         self.column_list.setObjectName("export_column_list")
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        self.column_list.setMaximumHeight(300)
+        self.column_list.setMaximumHeight(250)
         column_tools_layout.addWidget(self.column_list)
         
         selection_layout.addWidget(self.column_tools_widget)
-
+        
         if self.available_columns:
             for col in self.available_columns:
                 item = QListWidgetItem(col)
-                self.column_list.addItem(item)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                
                 if self.has_col_selection and col in self.pre_selected_columns:
-                    item.setSelected(True)
+                    item.setCheckState(Qt.CheckState.Checked)
                 elif not self.has_col_selection:
-                    item.setSelected(True)
+                    item.setCheckState(Qt.CheckState.Checked)
                 else:
-                    item.setSelected(False)
+                    item.setCheckState(Qt.CheckState.Unchecked)
+                self.column_list.addItem(item)
         else:
-            self.column_list.addItem("No Columns available")
+            empty_item = QListWidgetItem("No Columns Available")
+            empty_item.setFlags(Qt.ItemFlag.NoItemFlags)
+            empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.column_list.addItem(empty_item)
             self.column_tools_widget.setEnabled(False)
             self.cols_radio_specific.setEnabled(False)
         
@@ -145,12 +180,11 @@ class ExportDialog(QDialog):
 
         selection_group.setLayout(selection_layout)
         layout.addWidget(selection_group)
-
-        layout.addSpacing(10)
-
-        # Options
+        
         options_group = DataPlotStudioGroupBox("Options", parent=self)
         options_layout = QVBoxLayout()
+        options_layout.setContentsMargins(15, 20, 15, 15)
+        options_layout.setSpacing(8)
 
         self.include_index_check = DataPlotStudioCheckBox("Include Index")
         self.include_index_check.setChecked(False)
@@ -159,42 +193,38 @@ class ExportDialog(QDialog):
         self.description_label = QLabel()
         self.description_label.setProperty("styleClass", "muted_text")
         self.description_label.setWordWrap(True)
+        self.description_label.setMinimumHeight(40)
         options_layout.addWidget(self.description_label)
 
         options_group.setLayout(options_layout)
         layout.addWidget(options_group)
 
-        self.format_combo.currentTextChanged.connect(self.update_format_info)
-        self.include_index_check.stateChanged.connect(self.update_format_info)
-
-        self.update_format_info()
-
+        
+        
         layout.addStretch()
+        
+        footer_layout = QVBoxLayout()
+        footer_layout.setSpacing(10)
         
         self.summary_label = QLabel("Calculating Summary...")
         self.summary_label.setProperty("styleClass", "muted_text")
-        layout.addWidget(self.summary_label)
+        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        footer_layout.addWidget(self.summary_label)
         
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         separator.setProperty("styleClass", "dialog_separator")
-        layout.addWidget(separator)
+        footer_layout.addWidget(separator)
         
-        layout.addSpacing(5)
-
-        # Button layout
         button_layout = QHBoxLayout()
-
-        # Copy to clipboard
+        
         self.clipboard_button = DataPlotStudioButton("Copy to clipboard", parent=self)
         self.clipboard_button.setIcon(IconBuilder.build(IconType.Copy))
         self.clipboard_button.setToolTip("Copy the data to system clipboard")
         self.clipboard_button.clicked.connect(self.on_clipboard_clicked)
         button_layout.addWidget(self.clipboard_button)
-
-        button_layout.addStretch()
-
+        
         self.export_button = DataPlotStudioButton("Export", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
         self.export_button.setIcon(IconBuilder.build(IconType.ExportFle))
         self.export_button.setMinimumWidth(100)
@@ -207,15 +237,19 @@ class ExportDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
 
-        layout.addLayout(button_layout)
+        footer_layout.addLayout(button_layout)
+        layout.addLayout(footer_layout)
 
         self.setLayout(layout)
         
-        self.column_list.itemSelectionChanged.connect(self._validate_selection)
+        self.column_list.itemChanged.connect(self._validate_selection)
         self.cols_radio_all.toggled.connect(self._validate_selection)
         self.cols_radio_specific.toggled.connect(self._validate_selection)
         self.rows_radio_all.toggled.connect(self._validate_selection)
         self.rows_radio_selected.toggled.connect(self._validate_selection)
+        self.format_combo.currentTextChanged.connect(self.update_format_info)
+        self.include_index_check.stateChanged.connect(self.update_format_info)
+        self.update_format_info()
         
         self._validate_selection()
     
@@ -223,31 +257,48 @@ class ExportDialog(QDialog):
         """toggle the column list"""
         is_specific = self.cols_radio_specific.isChecked()
         self.column_tools_widget.setEnabled(is_specific)
+        if is_specific:
+            self.column_filter_input.setFocus()
     
-    def _filter_columns(self, text: str) -> None:
+    def _filter_columns(self) -> None:
+        self.filter_timer.start()
+    
+    def _apply_column_filter(self) -> None:
         """
         Hide or show columns in the list based on search text
         """
-        search_text = text.lower()
+        search_text = self.column_filter_input.text().lower()
+        self.column_list.blockSignals(True)
         for index in range(self.column_list.count()):
             item = self.column_list.item(index)
             if item:
                 item_text = item.text().lower()
                 item.setHidden(search_text not in item_text)
+        self.column_list.blockSignals(False)
     
     def _select_all_columns(self) -> None:
+        self.column_list.blockSignals(True)
         for index in range(self.column_list.count()):
             item = self.column_list.item(index)
             if item and not item.isHidden():
-                item.setSelected(True)
+                item.setCheckState(Qt.CheckState.Checked)
+        self.column_list.blockSignals(False)
+        self._validate_selection()
 
     def _clear_column_selection(self) -> None:
-        self.column_list.clearSelection()
+        self.column_list.blockSignals(True)
+        for index in range(self.column_list.count()):
+            item = self.column_list.item(index)
+            if item and not item.isHidden():
+                item.setCheckState(Qt.CheckState.Unchecked)
+        self.column_list.blockSignals(False)
+        self._validate_selection()
         
     def _validate_selection(self) -> None:
         is_valid: bool = True
         if self.cols_radio_specific.isChecked():
-            if len(self.column_list.selectedItems()) == 0:
+            checked_count = sum(1 for i in range(self.column_list.count()) if self.column_list.item(i).checkState() == Qt.CheckState.Checked)
+            if checked_count == 0:
                 is_valid = False
         
         self.export_button.setEnabled(is_valid)
@@ -266,7 +317,7 @@ class ExportDialog(QDialog):
             rows = len(self.data_handler.df)
         
         if self.cols_radio_specific.isChecked():
-            cols = len(self.column_list.selectedItems())
+            cols = sum(1 for i in range(self.column_list.count()) if self.column_list.item(i).checkState() == Qt.CheckState.Checked)
         else:
             cols = len(self.available_columns)
         
@@ -275,17 +326,19 @@ class ExportDialog(QDialog):
 
     def update_format_info(self) -> None:
         """Update a description label based on selected format and current optins"""
-        format = self.format_combo.currentText()
+        format_selection = self.format_combo.currentText()
         include_index = self.include_index_check.isChecked()
+        
+        self.export_button.setText(f"Export to {format_selection}...")
 
-        if format == "JSON":
+        if format_selection == "JSON":
             if include_index:
                 self.description_label.setText("Export as a 'columns' oriented JSON.")
             else:
                 self.description_label.setText("Export as a 'records' oriented JSON.")
-        elif format == "CSV":
+        elif format_selection == "CSV":
             self.description_label.setText("Standard Comma Separated Values file.")
-        elif format == "XLSX":
+        elif format_selection == "XLSX":
             self.description_label.setText("Microsoft Excel Spreadsheet format.")
         else:
             self.description_label.setText("")
@@ -308,37 +361,47 @@ class ExportDialog(QDialog):
                 return None
         
         if self.cols_radio_specific.isChecked():
-            selected_cols = [item.text() for item in self.column_list.selectedItems()]
+            selected_cols = [self.column_list.item(i).text() for i in range(self.column_list.count()) if self.column_list.item(i).checkState() == Qt.CheckState.Checked]
             if not selected_cols:
                 QMessageBox.warning(self, "No Columns Selected", "Please select at least one column to export.")
                 return None
             df = df[selected_cols]
         return df
 
-    def on_clipboard_clicked(self):
+    def on_clipboard_clicked(self) -> None:
         """Copy to clipboard"""
         self.to_clipboard = True
-        if self.data_handler:
-            try:
-                df_to_export = self._get_export_data()
-                if df_to_export is not None:
-                    include_index = self.include_index_check.isChecked()
-
-                    df_to_export.to_clipboard(excel=True, index=include_index)
-                    rows, cols = df_to_export.shape
-
-                    QMessageBox.information(
-                        self,
-                        "Copied",
-                        f"Copied {rows} rows and {cols} columns to clipboard\n You can paste this into Excel or Google Sheets"
-                    )
-                    self.accept()
-                    return
-            except Exception as ClipboardError:
-                QMessageBox.critical(self, "Error", f"Failed to copy to clipboard: {str(ClipboardError)}")
-                return
+        if not self.data_handler:
+            self.accept()
+            return
         
-        self.accept()
+        success: bool = False
+        rows: int = 0
+        cols: int = 0
+        
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            df_to_export = self._get_export_data()
+            if df_to_export is not None:
+                include_index = self.include_index_check.isChecked()
+                df_to_export.to_clipboard(excel=True, index=include_index)
+                rows, cols = df_to_export.shape
+                success = True
+        except Exception as clipboard_error:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Error", f"Failed to copy to clipboard: {str(clipboard_error)}")
+            return
+        finally:
+            while QApplication.overrideCursor() is not None:
+                QApplication.restoreOverrideCursor()
+        
+        if success:
+            QMessageBox.information(
+                self,
+                "Copied",
+                f"Copied {rows:,} rows and {cols:,} columns to clipboard\nYou can paste this into Excel or Google Sheets"
+            )
+            self.accept()
 
     def on_export_clicked(self) -> None:
         """Handle export button click"""
@@ -365,28 +428,42 @@ class ExportDialog(QDialog):
             return
         filepath: Path = Path(file_path_string)
         self.filepath = str(filepath)
-        if self.data_handler:
-            try:
-                df_to_export = self._get_export_data()
-                if df_to_export is not None:
-                    include_index = self.include_index_check.isChecked()
+        success: bool = False
+        
+        if not self.data_handler:
+            return
+        
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            df_to_export = self._get_export_data()
+            if df_to_export is not None:
+                include_index = self.include_index_check.isChecked()
 
-                    if export_format == "CSV":
-                        df_to_export.to_csv(filepath, index=include_index)
-                    elif export_format == "XLSX":
-                        df_to_export.to_excel(filepath, index=include_index)
-                    elif export_format == "JSON":
-                        orient = "columns" if include_index else "records"
-                        df_to_export.to_json(filepath, orient=orient, indent=4)
-                        
-                    QMessageBox.information(self, "Success", f"Data exported to {filepath.name}")
-                    self.accept()
-            except Exception as Error:
-                QMessageBox.critical(self, "Export Error", f"Failed to export data: {str(Error)}")
-                return
+                if export_format == "CSV":
+                    df_to_export.to_csv(filepath, index=include_index)
+                elif export_format == "XLSX":
+                    df_to_export.to_excel(filepath, index=include_index)
+                elif export_format == "JSON":
+                    orient = "columns" if include_index else "records"
+                    df_to_export.to_json(filepath, orient=orient, indent=4)
+                
+                success = True
+        except Exception as error:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Export Error", f"Failed to export data: {str(error)}")
+            return
+        finally:
+            while QApplication.overrideCursor() is not None:
+                QApplication.restoreOverrideCursor()
+                
+        if success:
+            QMessageBox.information(self, "Success", f"Data exported to {filepath.name}")
+            self.accept()
 
-    def get_export_config(self):
+    def get_export_config(self) -> Dict[str, Any]:
         """Return export configuration"""
+        selected_columns = [self.column_list.item(i).text() for i in range(self.column_list.count()) if self.column_list.item(i).checkState() == Qt.CheckState.Checked]
+        
         config = {
             'format': self.format_combo.currentText().lower(),
             'filepath': self.filepath,
@@ -394,6 +471,6 @@ class ExportDialog(QDialog):
             'to_clipboard': self.to_clipboard,
             'selected_rows_only': self.rows_radio_selected.isChecked(),
             'specific_columns': self.cols_radio_specific.isChecked(),
-            'selected_columns': [item.text() for item in self.column_list.selectedItems()]
+            'selected_columns': selected_columns
         }
         return config

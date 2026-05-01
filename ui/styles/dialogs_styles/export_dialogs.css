@@ -9,6 +9,11 @@ DataPlotStudioListWidget#export_column_list:disabled {
     color: #888888;
 }
 
+QRadioButton:disabled,
+QCheckBox:disabled {
+    color: #999999;
+}
+
 QFrame[styleClass="dialog_separator"] {
     color: #e0e0e0;
     margin-top: 8px;
