@@ -1,0 +1,17 @@
+QLabel#update_notice_label {
+    background-color: rgba(231, 76, 60, 0.9);
+    color: white;
+    font-weight: bold;
+    padding: 10px 20px;
+    border: 2px solid #c0392b;
+    border-radius: 8px;
+    font-size: 12pt;
+}
+
+QLabel#subplot_overlay_label {
+    background-color: rgba(33, 150, 243, 0.8);
+    color: white;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}

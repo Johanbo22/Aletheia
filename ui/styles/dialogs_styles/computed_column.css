@@ -1,0 +1,31 @@
+QLabel#equals_label {
+    font-size: 14pt;
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+CodeEditor#computed_column_expression {
+    background-color: #282a36;
+    color: #f8f8f2;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+QLabel[styleClass="list_header_info"] {
+    color: #666;
+    font-weight: bold;
+    font-size: 9pt;
+}
+
+QLabel#validation_status_label {
+    font-weight: bold;
+    font-size: 9pt;
+}
+
+QLabel#validation_status_label[status="success"] {
+    color: #40c862;
+}
+
+QLabel#validation_status_label[status="error"] {
+    color: #ff5555;
+}

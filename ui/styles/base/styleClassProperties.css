@@ -1,0 +1,32 @@
+/* This css file governs the general styleClass property styling rules set for entire application. Individual dialog styleClasses are set in their own [name].css file */
+QLabel[styleClass="info_text"] {
+    color: #666666;
+    font-style: italic;
+    font-size: 9pt;
+}
+
+QLabel[styleClass="warning_info_text"] {
+    color: #ff6b35;
+    font-style: italic;
+    font-size: 9pt;
+}
+
+QLabel[styleClass="muted_text"] {
+    color: #7f8c8d;
+    font-size: 9pt;
+    font-style: italic;
+}
+
+QLabel[styleClass="help_box"] {
+    background-color: #f0f0f0;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+QLabel[styleClass="section_header"] {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 11pt;
+    margin-bottom: 5px;
+}

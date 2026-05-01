@@ -1,0 +1,44 @@
+/* Matplotlib navigation toolbar styling, thingy on the top of plot canvas*/
+#MatplotlibToolbar {
+    background-color: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-bottom: 2px solid #cecece;
+    border-radius: 8px;
+    padding: 5px;
+    spacing: 6px;
+}
+
+#MatplotlibToolbar QToolButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 6px;
+    margin: 1px;
+}
+
+#MatplotlibToolbar QToolButton:hover {
+    background-color: #f0f4f8;
+    border: 1px solid #0078d7;
+}
+
+#MatplotlibToolbar QToolButton:pressed {
+    background-color: #e1e7ed;
+}
+
+#MatplotlibToolbar QToolButton:checked {
+    background-color: #e6f2ff;
+    border: 1px solid #0078d7;
+}
+
+#MatplotlibToolbar::separator {
+    width: 1px;
+    background-color: #dcdcdc;
+    margin: 4px 6px;
+}
+
+#MatplotlibToolbar QLabel {
+    color: #555555;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10pt;
+    padding-left: 8px;
+}

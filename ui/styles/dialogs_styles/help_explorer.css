@@ -1,0 +1,120 @@
+#helpSplitter::handle {
+    background-color: transparent;
+    width: 8px;
+}
+
+#helpLeftPane {
+    background-color: #f8f9fa;
+    border: 1px solid #dcdcdc;
+    border-radius: 6px;
+}
+
+#helpSearchContainer {
+    background-color: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    margin: 12px;
+}
+
+#helpSearchContainer:hover {
+    border: 1px solid #a5b0b9;
+}
+
+#helpSearchInput {
+    background-color: transparent;
+    border: 2px solid #0078d7;
+    font-size: 13px;
+    color: #495057;
+    outline: none;
+}
+
+#helpSearchInput:focus {
+    border: 1px solid #0078d7;
+    outline: none;
+}
+
+#helpTopicTree {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+#helpTopicTree::item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f1f3f5;
+    color: #343a40;
+    font-size: 13px;
+}
+
+#helpTopicTree::item:hover {
+    background: rgba(0, 120, 215, 0.05);
+    color: #111;
+    border-bottom: 2px solid rgba(0, 120, 215, 0.3)
+}
+
+#helpTopicTree::item:selected,
+#helpTopicTree::item:selected:active,
+#helpTopicTree::item:selected,
+#helpTopicTree::item:pressed {
+    background: white;
+    color: #0078d7;
+    font-weight: bold;
+    border: 1px solid #dcdcdc;
+    border-bottom: 2px solid #0078d7;
+}
+
+#helpTopicTree::branch {
+    padding-left: 5px;
+}
+
+#helpRightPane {
+    background-color: #ffffff;
+    border: 1px solid #dcdcdc;
+    border-radius: 6px;
+}
+
+#helpContentBrowser {
+    background-color: transparent;
+    border: none;
+    line-height: 1.6;
+    color: #495057;
+    font-size: 14px;
+    selection-background-color: #b3d4fc;
+    selection-color: #000000;
+}
+
+#helpTitleLabel {
+    font-size: 24px;
+    font-weight: 600;
+    color: #2c3e50;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f1f3f5;
+}
+
+#helpExplorerDialog QScrollBar:vertical {
+    border: none;
+    background-color: transparent;
+    width: 8px;
+    margin: 0px;
+}
+
+#helpExplorerDialog QScrollBar::handle:vertical {
+    background-color: #c1c5c8;
+    min-height: 40px;
+    border-radius: 4px;
+}
+
+#helpExplorerDialog QScrollBar::handle:vertical:hover {
+    background-color: #a0a5a9;
+}
+
+#helpExplorerDialog QScrollBar::add-line:vertical,
+#helpExplorerDialog QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: none;
+}
+
+#helpExplorerDialog QScrollBar::add-page:vertical,
+#helpExplorerDialog QScrollBar::sub-page:vertical {
+    background: transparent;
+}

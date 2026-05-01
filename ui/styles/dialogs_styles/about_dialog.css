@@ -1,0 +1,55 @@
+#aboutDialog {
+    min-width: 450px;
+}
+
+#aboutHeaderLabel {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+#aboutVersionLabel {
+    font-size: 11px;
+    font-weight: bold;
+    color: #2980b9;
+    background-color: #ebf5fb;
+    padding: 4px 10px;
+    border-radius: 10px;
+}
+
+#aboutSubtitleLabel {
+    font-size: 13px;
+    font-weight: 400;
+    color: #7f8c8d;
+    padding-bottom: 8px;
+}
+
+#aboutDivider {
+    color: #e0e0e0;
+}
+
+#aboutFeaturesLabel {
+    font-size: 13px;
+    font-weight: 400;
+    color: #34495e;
+    padding: 8px 0px;
+}
+
+#aboutGithubLink,
+#aboutWebsiteLink {
+    font-size: 13px;
+    color: #2980b9;
+    text-decoration: none;
+}
+
+#aboutGithubLink:hover,
+#aboutWebsiteLink:hover {
+    text-decoration: underline;
+    color: #3498db;
+}
+
+#aboutCopyrightLabel {
+    font-size: 11px;
+    color: #95a5a6;
+    font-weight: 400;
+}

@@ -1,0 +1,73 @@
+#ContextualToolbar {
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    border-bottom: 2px solid #9ca3af;
+}
+
+#ContextualToolbar QLabel {
+    color: #374151;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+#ContextualToolbar QLineEdit {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 4px 6px;
+    color: #1f2937;
+    selection-background-color: #3b82f6;
+}
+
+#ContextualToolbar QLineEdit:focus {
+    border: 1px solid #3b82f6;
+    background-color: #ffffff;
+}
+
+#ContextualToolbar QSpinBox {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 4px;
+    color: #1f2937;
+    min-height: 20px;
+    selection-background-color: #3b82f6;
+}
+
+#ContextualToolbar QSpinBox:focus {
+    border: 1px solid #3b82f6;
+    background-color: #ffffff;
+}
+
+#ContextualToolbar QSpinBox::up-button,
+#ContextualToolbar QSpinBox::down-button {
+    width: 16px;
+    border: none;
+    background: transparent;
+}
+
+#ContextualToolbar QSpinBox::up-button:hover,
+#ContextualToolbar QSpinBox::down-button:hover {
+    background-color: #e5e7eb;
+    border-radius: 2px;
+}
+
+#ContextualToolbar QPushButton {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 4px 10px;
+    color: #374151;
+    font-weight: 500;
+}
+
+#ContextualToolbar QPushButton:hover {
+    background-color: #e5e7eb;
+    border-color: #d1d5db;
+}
+
+#ContextualToolbar QPushButton:pressed {
+    background-color: #d1d5db;
+    border-color: #9ca3af;
+}

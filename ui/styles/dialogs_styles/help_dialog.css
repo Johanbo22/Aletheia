@@ -1,0 +1,60 @@
+QDialog#HelpDialogMain {
+    background-color: var(--bg-primary, #1e1e1e);
+}
+
+QFrame#HelpDialogHeader {
+    background-color: var(--bg-secondary, #252526);
+    border-bottom: 1px solid var(--border-color, #333333);
+}
+
+QLabel#HelpDialogTitle {
+    font-size: 18pt;
+    font-weight: bold;
+    color: #4a90e2;
+    letter-spacing: 0.5px;
+}
+
+QFrame#HelpDialogContent {
+    background-color: transparent;
+}
+
+QWidget#HelpDialogScrollContent {
+    background-color: transparent;
+}
+
+QLabel[styleClass="help_description"] {
+    line-height: 1.6;
+    font-size: 11pt;
+    color: var(--text-primary, #d4d4d4);
+}
+
+QLabel#help_animation_placeholder {
+    border: 2px dashed #444;
+    border-radius: 8px;
+    color: #888;
+    background-color: var(--bg-secondary, #252526);
+    font-size: 12pt;
+    font-style: italic;
+}
+
+QFrame#HelpDialogSeparator {
+    background-color: var(--border-color, #333333);
+    max-height: 1px;
+}
+
+QPushButton#HelpDialogInfoBtn {
+    background-color: transparent;
+    color: #4a90e2;
+    border: 1px solid #4a90e2;
+    border-radius: 4px;
+    padding: 6px 16px;
+    font-weight: bold;
+}
+
+QPushButton#HelpDialogInfoBtn:hover {
+    background-color: rgba(74, 144, 226, 0.1);
+}
+
+QPushButton#HelpDialogInfoBtn:pressed {
+    background-color: rgba(74, 144, 226, 0.2);
+}

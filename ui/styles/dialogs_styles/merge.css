@@ -1,0 +1,10 @@
+QLabel#merge_file_label {
+    font-style: italic;
+    color: #666666;
+}
+
+QLabel#merge_file_label[status="selected"] {
+    font-style: normal;
+    font-weight: bold;
+    color: #000000;
+}

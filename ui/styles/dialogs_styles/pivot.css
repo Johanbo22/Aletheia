@@ -1,0 +1,17 @@
+QLabel#pivot_preview_label {
+    font-size: 10pt;
+}
+
+QLabel#pivot_preview_label[status="normal"] {
+    color: #333333;
+}
+
+QLabel#pivot_preview_label[status="success"] {
+    color: #333333;
+    font-weight: bold;
+}
+
+QLabel#pivot_preview_label[status="error"] {
+    color: #d9534f;
+    font-weight: bold;
+}

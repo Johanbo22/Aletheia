@@ -1,0 +1,61 @@
+#interactive_console_output {
+    background-color: #282a36;
+    color: #f8f8f2;
+    border: 1px solid #44475a;
+    border-radius: 6px;
+    padding: 8px;
+    selection-background-color: #44475a;
+    selection-color: #ffffff;
+}
+
+#interactive_console_output:focus {
+    border: 1px solid #6272a4;
+}
+
+#interactive_console_output QScrollBar:vertical {
+    background-color: #282a36;
+    width: 14px;
+    margin: 0px;
+    border-left: 1px solid #44475a;
+}
+
+#interactive_console_output QScrollBar::handle:vertical {
+    background-color: #44475a;
+    min-height: 30px;
+    border-radius: 6px;
+    margin: 2px;
+}
+
+#interactive_console_output QScrollBar::handle:vertical:hover {
+    background-color: #6272a4;
+}
+
+#interactive_console_output QScrollBar::add-line:vertical,
+#interactive_console_output QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+#interactive_console_output QScrollBar::add-page:vertical,
+#interactive_console_output QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+#interactive_console_popup {
+    background-color: #282a36;
+    color: #f8f8f2;
+    border: 1px solid #6272a4;
+    border-radius: 6px;
+    padding: 4px;
+    selection-background-color: #44475a;
+    selection-color: #8be9fd;
+    outline: none;
+}
+
+#interactive_console_popup::item {
+    padding: 4px;
+    border-radius: 4px;
+}
+
+#interactive_console_popup::item:hover {
+    background-color: #44475a;
+}

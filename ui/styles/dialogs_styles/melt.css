@@ -1,0 +1,22 @@
+QLabel#melt_preview_label {
+    padding: 5px;
+    border-radius: 4px;
+}
+
+QLabel#melt_preview_label[status="success"] {
+    color: #333333;
+    font-weight: bold;
+    background-color: #e0e0e0;
+}
+
+QLabel#melt_preview_label[status="warning"] {
+    color: #d32f2f;
+    font-weight: bold;
+    background-color: #ffebee;
+}
+
+QLabel#melt_preview_label[status="error"] {
+    color: #d9534f;
+    font-weight: bold;
+    background-color: transparent;
+}

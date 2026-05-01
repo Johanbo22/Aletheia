@@ -14,8 +14,10 @@ from PyQt6.QtGui import QCloseEvent, QFont, QIcon, QShortcut, QKeySequence, QAct
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QDockWidget, QPushButton, QTabBar
 from PyQt6.QtCore import Qt, QSettings
 from pathlib import Path
+from typing import Optional
 
 from resources.version import APPLICATION_VERSION
+from core.style_reloader import StyleReloader
 
 class DataPlotStudio(QMainWindow):
     """Main Application shell"""
@@ -26,6 +28,10 @@ class DataPlotStudio(QMainWindow):
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
         self.resize(1280, 720)
+        
+        # !FOR DEBUGGING ONLY
+        self._current_settings: dict = {}
+        self._style_reloader: Optional[StyleReloader] = None
 
         # Initialize the core managers
         self.project_manager = ProjectManager()
@@ -248,32 +254,54 @@ class DataPlotStudio(QMainWindow):
             application_version=self.project_manager.APPLICATION_VERSION
         )
     
-    def apply_settings(self, settings) -> None:
+    def apply_settings(self, settings: dict) -> None:
         """Apply the settings to main app loop"""
+        self._current_settings = settings
         font = QFont(settings["font_family"], settings["font_size"])
         QApplication.setFont(font)
 
+        base_css: str = ""
+        styles_dir: Path = Path(get_resource_path("ui/styles"))
+        
         if settings["dark_mode"]:
             base_css = self.get_dark_theme()
         else:
-            styles_dir = Path(get_resource_path("ui/styles"))
-            
-            light_stylesheets = ["ui/styles/style.css"]
-            if styles_dir.exists():
-                for css_file in styles_dir.glob("*.css"):
-                    if css_file.name not in ["style.css", "dark_theme.css"]:
-                        light_stylesheets.append(f"ui/styles/{css_file.name}")
-            base_css = self.load_stylesheets(light_stylesheets)
-        QApplication.instance().setStyleSheet(base_css)
+            light_stylesheet_paths: list[Path] = []
+            if styles_dir.exists() and styles_dir.is_dir():
+                for css_file in styles_dir.rglob("*.css"):
+                    if css_file.name != "dark_theme.css":
+                        light_stylesheet_paths.append(css_file)
+            base_css = self.load_stylesheets(light_stylesheet_paths)
+        
+        if QApplication.instance() is not None:
+            QApplication.instance().setStyleSheet(base_css)
+    
+    def enable_live_reloader(self) -> None:
+        styles_dir: Path = Path(get_resource_path("ui/styles"))
+        self._style_reloader = StyleReloader(
+            styles_dir=styles_dir,
+            reload_callback=self.reload_styles,
+            parent=self
+        )
+    
+    def reload_styles(self) -> None:
+        if not self._current_settings:
+            return
+        self.apply_settings(self._current_settings)
+        self.status_bar_widget.log("Styles reloaded", "INFO")
     
     def get_dark_theme(self):
-        return self.load_stylesheets("ui/styles/dark_theme.css")
+        dark_theme_path: Path = Path(get_resource_path("ui/styles/dark_theme.css"))
+        return self.load_stylesheets([dark_theme_path])
 
     @classmethod
-    def load_stylesheets(cls, relative_paths: list[str]) -> str:
-        combined_css = ""
-        for rel_path in relative_paths:
-            path = Path(get_resource_path(rel_path))
-            if path.exists():
-                combined_css += path.read_text(encoding="utf-8") + "\n"
+    def load_stylesheets(cls, absolute_paths: list[Path]) -> str:
+        combined_css: str = ""
+        for path in absolute_paths:
+            if path.exists() and path.is_file():
+                try:
+                    combined_css += path.read_text(encoding="utf-8") + "\n"
+                except Exception as err:
+                    print(f"Failed to read stylesheet {path.name}: {err}")
+        
         return combined_css

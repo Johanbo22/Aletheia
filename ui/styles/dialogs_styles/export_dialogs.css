@@ -1,0 +1,16 @@
+DataPlotStudioListWidget#export_column_list {
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+}
+
+DataPlotStudioListWidget#export_column_list:disabled {
+    background-color: #f0f0f0;
+    border: 1px solid #dddddd;
+    color: #888888;
+}
+
+QFrame[styleClass="dialog_separator"] {
+    color: #e0e0e0;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}

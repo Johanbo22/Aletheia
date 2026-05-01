@@ -1,0 +1,6 @@
+VennDiagramWidget {
+    qproperty-activeColor: #3498DB;
+    qproperty-inactiveColor: #ECF0F1;
+    qproperty-outlineColor: #7F8C8D;
+    qproperty-textColor: #2C3E50;
+}

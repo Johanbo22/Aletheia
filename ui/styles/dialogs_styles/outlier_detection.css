@@ -1,0 +1,21 @@
+QLabel#outlier_info_label {
+    font-weight: bold;
+    color: #e74c3c;
+}
+
+QWidget#outlier_canvas_container {
+    background-color: #2b2b2b;
+}
+
+QLabel#outlier_info_label[state="error"] {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+QLabel#outlier_info_label[state="warning"] {
+    color: #f39c12;
+}
+
+QLabel#outlier_info_label[state="success"] {
+    color: #40c862;
+}

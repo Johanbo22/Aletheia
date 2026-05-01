@@ -1,0 +1,43 @@
+#current_name_label,
+#new_name_label {
+    font-weight: bold;
+    padding-right: 8px;
+}
+
+#current_name_display {
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: #888888;
+}
+
+#new_name_input[inputState="error"] {
+    border: 1px solid #E74C3C;
+    background-color: rgba(231, 76, 60, 0.05);
+}
+
+#new_name_input[inputState="error"]:focus {
+    border: 2px solid #E74C3C;
+}
+
+#new_name_input[inputState="valid"] {
+    border: 1px solid #2ECC71;
+    background-color: rgba(46, 204, 113, 0.05);
+}
+
+#new_name_input[inputState="valid"]:focus {
+    border: 2px solid #2ECC71;
+}
+
+#rename_error_label {
+    color: #E74C3C;
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 4px;
+    padding-left: 2px;
+}
+
+#rename_submit_button:disabled {
+    background-color: #555555;
+    color: #999999;
+    border: 1px solid #444444;
+}

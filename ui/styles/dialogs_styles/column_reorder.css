@@ -1,0 +1,68 @@
+#ColumnReorderDialog {
+    background-color: var(--bg-primary, #ffffff);
+}
+
+#ColumnReorderInfoLabel {
+    padding: 0px;
+    background-color: transparent;
+    border-left: none;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#ColumnReorderMimicTable {
+    background-color: transparent;
+    alternate-background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+#ColumnReorderMimicTable::item {
+    padding: 6px 10px;
+    color: #64748b;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+#ColumnReorderMimicTable QHeaderView::section:horizontal {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-weight: 600;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom: 3px solid #cbd5e1;
+    margin-right: 2px;
+}
+
+#ColumnReorderMimicTable QHeaderView::section:horizontal:hover {
+    background-color: #f1f5f9;
+    border-bottom: 3px solid #3b82f6;
+    color: #1d4ed8;
+}
+
+#ColumnReorderMimicTable QHeaderView::section:horizontal:pressed {
+    background-color: #e2e8f0;
+    border-bottom: 3px solid #2563eb;
+    color: #1e3a8a;
+}
+
+#ColumnReorderResetBtn {
+    background-color: transparent;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-weight: 500;
+}
+
+#ColumnReorderResetBtn:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+#ColumnReorderResetBtn:pressed {
+    background-color: #e2e8f0;
+}

@@ -1,0 +1,30 @@
+QLabel#injection_status_label {
+    border-radius: 3px;
+    font-weight: bold;
+    padding: 5px;
+}
+
+QLabel#injection_status_label[statusState="success"] {
+    color: #27ae60;
+    background-color: #ecf0f1;
+}
+
+QLabel#injection_status_label[statusState="warning"] {
+    color: #e74c3c;
+    background-color: #ffe5e5;
+}
+
+QLabel[statusState="success"] {
+    color: #40c862;
+    font-weight: 500;
+}
+
+QLabel[statusState="error"] {
+    color: #ef4444;
+    font-weight: 500;
+}
+
+QLabel[statusState="warning"] {
+    color: #f59e0b;
+    font-weight: 500;
+}

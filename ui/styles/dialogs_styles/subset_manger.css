@@ -1,0 +1,33 @@
+QSplitter#subset_manager_splitter::handle {
+    background-color: #e0e0e0;
+    width: 4px;
+    margin: 0 4px;
+    border-radius: 2px;
+}
+
+QSplitter#subset_manager_splitter::handle:hover {
+    background-color: #bdc3c7;
+}
+
+DataPlotStudioListWidget#subset_manager_list {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QLabel#subset_name_label {
+    color: #333333;
+    margin-top: 5px;
+}
+
+QFrame#subset_details_separator {
+    color: #e0e0e0;
+}
+
+QTextEdit[styleClass="subset_details_text"] {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 6px;
+    color: #495057;
+}

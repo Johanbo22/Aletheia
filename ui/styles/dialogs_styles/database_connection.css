@@ -1,0 +1,16 @@
+QLabel#db_icon_label {
+    border: none;
+    background: transparent;
+}
+
+QLabel#query_status_label {
+    font-weight: bold;
+}
+
+QLabel#query_status_label[status="valid"] {
+    color: #388e3c;
+}
+
+QLabel#query_status_label[status="invalid"] {
+    color: #d32f2f;
+}

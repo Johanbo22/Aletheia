@@ -1,0 +1,66 @@
+QProgressBar#main_progress_bar {
+    border: 2px solid #3498db;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: bold;
+    background-color: #ecf0f1;
+}
+
+QProgressBar#main_progress_bar::chunk {
+    background-color: #3498db;
+    border-radius: 3px;
+}
+
+QDialog#progress_dialog_main {
+    background-color: #ffffff;
+}
+
+QLabel#progress_message_label {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+}
+
+QLabel#progress_status_label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+QProgressBar#main_progress_bar {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    background-color: #f3f4f6;
+    min-height: 24px;
+    max-height: 24px;
+}
+
+QProgressBar#main_progress_bar::chunk {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #3b82f6, stop: 1 #2563eb);
+    border-radius: 7px;
+}
+
+QPushButton#progress_cancel_button {
+    background-color: transparent;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 16px;
+}
+
+QPushButton#progress_cancel_button:hover {
+    background-color: #fef2f2;
+    color: #ef4444;
+    border-color: #fca5a5;
+}
+
+QPushButton#progress_cancel_button:pressed {
+    background-color: #fee2e2;
+    border-color: #ef4444;
+}

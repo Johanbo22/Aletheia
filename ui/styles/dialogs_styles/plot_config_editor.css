@@ -1,0 +1,46 @@
+CodeEditor#PlotConfigEditor {
+    background-color: #282a36;
+    color: #f8f8f2;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+CodeEditor#PlotConfigEditor[status="error"] {
+    border: 1px solid #ff5555;
+    background-color: #3a2a2a;
+}
+
+QLabel#PlotConfigValidationLabel {
+    font-size: 10pt;
+    font-weight: bold;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+QLabel#PlotConfigValidationLabel[status="valid"] {
+    color: #40c862;
+}
+
+QLabel#PlotConfigValidationLabel[status="error"] {
+    color: #ff5555;
+}
+
+QFrame#PlotConfigHeader {
+    background-color: #f0f4f8;
+    border: 1px solid #dcdcdc;
+    border-radius: 6px;
+}
+
+QFrame#PlotConfigHeader[protected="true"] {
+    background-color: #fff4e5;
+    border: 1px solid #ffe0b2;
+}
+
+QLabel#PlotConfigTitle {
+    font-size: 11pt;
+    color: #333333;
+}
+
+QFrame#PlotConfigHeader[protected="true"] QLabel#PlotConfigTitle {
+    color: #d84315;
+}

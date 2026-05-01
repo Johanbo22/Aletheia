@@ -1,13 +1,12 @@
+/* This css file will cover the general control elements*/
 QGroupBox,
 AnimatedGroupBox {
     font-size: 11pt;
-    /* Reduced from 14pt to match standard modern desktop typography */
     font-weight: bold;
     color: #222222;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     margin-top: 14px;
-    /* Creates vertical space for the title to sit on the border */
     background-color: #fcfcfc;
     padding-top: 12px;
 }
@@ -146,7 +145,6 @@ QToolTip {
     padding: 4px 8px;
     font-size: 10pt;
     opacity: 230;
-    /* Slightly softened from 200/pure black */
 }
 
 
@@ -160,8 +158,6 @@ QLabel {
     color: #333;
 }
 
-
-/* --- Radio Buttons --- */
 QRadioButton {
     spacing: 5px;
 }
@@ -193,7 +189,6 @@ QRadioButton:disabled {
     color: #a0a0a0;
 }
 
-
 QWidget#ScrollContent {
     background-color: white;
     border: none;
@@ -203,7 +198,6 @@ QScrollArea {
     border: none;
 }
 
-/* --- Scroll Bars --- */
 QScrollBar:vertical {
     border: none;
     background: transparent;
@@ -257,130 +251,16 @@ QScrollBar::sub-page:horizontal {
     background: none;
 }
 
-/* --- Dialogs --- */
 QDialog {
     background-color: #fdfdfd;
 }
 
-/* S */
 QDialogButtonBox {
-    /* Buttons are covered by QPushButton style */
     alignment: 'AlignRight';
 }
 
 DataPlotStudioToggleSwitch:disabled {
     color: #a0a0a0;
-}
-
-#layoutGridTable {
-    background-color: transparent;
-    border: 1px solid rgba(128, 128, 128, 0.3);
-    border-radius: 6px;
-    gridline-color: rgba(128, 128, 128, 0.2);
-}
-
-#layoutGridTable::item {
-    background-color: rgba(128, 128, 128, 0.05);
-    color: rgba(128, 128, 128, 0.9);
-    font-weight: normal;
-}
-
-#layoutGridTable::item:selected {
-    background-color: rgba(128, 128, 128, 0.2);
-    color: palette(text);
-    border: 2px solid #3A86FF;
-}
-
-#layoutGridTable::item:hover {
-    background-color: rgba(128, 128, 128, 0.15);
-    color: palette(text);
-}
-
-#layoutGridTable::item:selected:hover {
-    background-color: rgba(128, 128, 128, 0.3);
-}
-
-VennDiagramWidget {
-    qproperty-activeColor: #3498DB;
-    qproperty-inactiveColor: #ECF0F1;
-    qproperty-outlineColor: #7F8C8D;
-    qproperty-textColor: #2C3E50;
-}
-
-#MainDataHeader::section {
-    background-color: #f0f2f5;
-    color: #333333;
-    font-weight: bold;
-    border: none;
-    border-radius: 4px;
-    border-right: 1px solid #e5e5e5;
-    border-bottom: 2px solid #dcdcdc;
-    padding: 6px 8px;
-}
-
-#MainDataHeader::section:hover {
-    background-color: #e9ecef;
-    color: #111;
-}
-
-QTableCornerButton::section {
-    background-color: #f8f9fa;
-    border: none;
-    border-right: 1px solid #ebebeb;
-    border-bottom: 1px solid #dcdcdc;
-}
-
-#MainDataTable QScrollBar:vertical {
-    border: none;
-    background: transparent;
-    width: 14px;
-    margin: 0px;
-}
-
-#MainDataTable QScrollBar::handle:vertical {
-    background: rgba(128, 128, 128, 0.3);
-    min-height: 40px;
-    border-radius: 6px;
-    margin: 3px;
-}
-
-#MainDataTable QScrollBar::handle:vertical:hover {
-    background: rgba(128, 128, 128, 0.5);
-}
-
-#MainDataTable QScrollBar:horizontal {
-    border: none;
-    background: transparent;
-    height: 14px;
-    margin: 0px;
-}
-
-#MainDataTable QScrollBar::handle:horizontal {
-    background: rgba(128, 128, 128, 0.3);
-    min-width: 40px;
-    border-radius: 6px;
-    margin: 3px;
-}
-
-#MainDataTable QScrollBar::handle:horizontal:hover {
-    background: rgba(128, 128, 128, 0.5);
-}
-
-#MainDataTable QScrollBar::add-line:vertical,
-#MainDataTable QScrollBar::sub-line:vertical,
-#MainDataTable QScrollBar::add-line:horizontal,
-#MainDataTable QScrollBar::sub-line:horizontal {
-    height: 0px;
-    width: 0px;
-    border: none;
-    background: none;
-}
-
-#MainDataTable QScrollBar::add-page:vertical,
-#MainDataTable QScrollBar::sub-page:vertical,
-#MainDataTable QScrollBar::add-page:horizontal,
-#MainDataTable QScrollBar::sub-page:horizontal {
-    background: none;
 }
 
 QTabWidget:focus {
@@ -464,127 +344,18 @@ QTabBar QToolButton:pressed {
     background-color: #dae0e5;
 }
 
-/* Matplotlib navigation toolbar styling, thingy on the top of plot canvas*/
-#MatplotlibToolbar {
-    background-color: #ffffff;
-    border: 1px solid #dcdcdc;
-    border-bottom: 2px solid #cecece;
-    border-radius: 8px;
-    padding: 5px;
-    spacing: 6px;
-}
-
-#MatplotlibToolbar QToolButton {
-    background-color: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    padding: 6px;
-    margin: 1px;
-}
-
-#MatplotlibToolbar QToolButton:hover {
-    background-color: #f0f4f8;
-    border: 1px solid #0078d7;
-}
-
-#MatplotlibToolbar QToolButton:pressed {
-    background-color: #e1e7ed;
-}
-
-#MatplotlibToolbar QToolButton:checked {
-    background-color: #e6f2ff;
-    border: 1px solid #0078d7;
-}
-
-#MatplotlibToolbar::separator {
-    width: 1px;
-    background-color: #dcdcdc;
-    margin: 4px 6px;
-}
-
-#MatplotlibToolbar QLabel {
-    color: #555555;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 10pt;
-    padding-left: 8px;
-}
-
 #CanvasContainer {
     background-color: #ffffff;
     border: 1px solid #dcdcdc;
     border-radius: 8px;
 }
 
-#ContextualToolbar {
-    background-color: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    border-bottom: 2px solid #9ca3af;
-}
-
-#ContextualToolbar QLabel {
-    color: #374151;
-    font-weight: 600;
-    font-size: 11px;
-}
-
-#ContextualToolbar QLineEdit {
-    background-color: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 4px;
-    padding: 4px 6px;
-    color: #1f2937;
-    selection-background-color: #3b82f6;
-}
-
-#ContextualToolbar QLineEdit:focus {
-    border: 1px solid #3b82f6;
-    background-color: #ffffff;
-}
-
-#ContextualToolbar QSpinBox {
-    background-color: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 4px;
-    padding: 4px;
-    color: #1f2937;
-    min-height: 20px;
-    selection-background-color: #3b82f6;
-}
-
-#ContextualToolbar QSpinBox:focus {
-    border: 1px solid #3b82f6;
-    background-color: #ffffff;
-}
-
-#ContextualToolbar QSpinBox::up-button,
-#ContextualToolbar QSpinBox::down-button {
-    width: 16px;
+QWidget#TransparentScrollContent {
+    background-color: transparent;
     border: none;
-    background: transparent;
 }
 
-#ContextualToolbar QSpinBox::up-button:hover,
-#ContextualToolbar QSpinBox::down-button:hover {
-    background-color: #e5e7eb;
-    border-radius: 2px;
-}
-
-#ContextualToolbar QPushButton {
-    background-color: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    border-radius: 4px;
-    padding: 4px 10px;
-    color: #374151;
-    font-weight: 500;
-}
-
-#ContextualToolbar QPushButton:hover {
-    background-color: #e5e7eb;
-    border-color: #d1d5db;
-}
-
-#ContextualToolbar QPushButton:pressed {
-    background-color: #d1d5db;
-    border-color: #9ca3af;
+QScrollArea[styleClass="transparent_scroll_area"] {
+    background-color: transparent;
+    border: none;
 }

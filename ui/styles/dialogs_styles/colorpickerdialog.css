@@ -1,0 +1,23 @@
+#colormapPreviewContainer {
+    background-color: #f9f9f9;
+    border: 1px solid #dcdcdc;
+    border-radius: 6px;
+}
+
+#colormapDiscreteSpinBox {
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    padding: 2px;
+    color: #333333;
+}
+
+#colormapDiscreteSpinBox:disabled {
+    background-color: #f5f5f5;
+    color: #aaaaaa;
+    border: 1px solid #e0e0e0;
+}
+
+#colormapDiscreteSpinBox:focus {
+    border: 1px solid #0078d7;
+}

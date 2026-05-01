@@ -1,0 +1,27 @@
+#layoutGridTable {
+    background-color: transparent;
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    border-radius: 6px;
+    gridline-color: rgba(128, 128, 128, 0.2);
+}
+
+#layoutGridTable::item {
+    background-color: rgba(128, 128, 128, 0.05);
+    color: rgba(128, 128, 128, 0.9);
+    font-weight: normal;
+}
+
+#layoutGridTable::item:selected {
+    background-color: rgba(128, 128, 128, 0.2);
+    color: palette(text);
+    border: 2px solid #3A86FF;
+}
+
+#layoutGridTable::item:hover {
+    background-color: rgba(128, 128, 128, 0.15);
+    color: palette(text);
+}
+
+#layoutGridTable::item:selected:hover {
+    background-color: rgba(128, 128, 128, 0.3);
+}
