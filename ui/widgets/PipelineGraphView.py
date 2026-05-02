@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QGraphicsPathItem, QWidget, QGraphicsDropShadowEffect, QGraphicsObject
 from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QColor, QPen, QBrush, QPainterPath, QFont, QPainter, QFontMetrics, QKeyEvent, QWheelEvent, QMouseEvent
+from PyQt6.QtGui import QColor, QPen, QBrush, QPainterPath, QFont, QPainter, QFontMetrics, QKeyEvent, QWheelEvent, QMouseEvent, QPixmap
 
 from typing import List, Dict, Any, Callable, Optional
 
@@ -55,17 +55,27 @@ class GraphNode(QGraphicsObject):
         self.setAcceptHoverEvents(True)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        # Cache node rendering to prevent repaint during scrolling
+        self.setCacheMode(QGraphicsObject.CacheMode.DeviceCoordinateCache)
+        # Setting origin to center for better animation 
+        self.setTransformOriginPoint(self.width / 2.0, self.height / 2.0)
 
         if self.operation:
             details = "".join(f"<li><b>{k}</b>: {v}</li>" for k, v in self.operation.items() if k != "type")
             self.setToolTip(
                 f"<div style='padding: 4px; color: #F8FAFC;'>"
+                f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
                 f"<b>Operation Details:</b><br>"
                 f"<ul style='margin-top: 4px; margin-bottom: 0px;'>{details}</ul>"
                 f"</div>"
             )
         else:
-            self.setToolTip("<div style='color: #F8FAFC;'>Original imported data state</div>")
+            self.setToolTip(
+                f"<div style='color: #F8FAFC;'>"
+                f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
+                f"Original imported data state</div>"
+            )
 
         self.shadow = QGraphicsDropShadowEffect()
         self.shadow.setColor(QColor(0, 0, 0, 25))
@@ -126,10 +136,22 @@ class GraphNode(QGraphicsObject):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+            self.setScale(0.98)
+            if self.shadow.isEnabled():
+                self.shadow.setOffset(0, 1)
+                self.shadow.setBlurRadius(4)
+                self.update()
             self.clicked.emit(self.index)
             event.accept()
         else:
             super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setScale(1.0)
+            self._update_styling()
+            self.update()
+        super().mouseReleaseEvent(event)
 
     def paint(self, painter: QPainter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -182,9 +204,16 @@ class PipelineGraphView(QGraphicsView):
         
         self.setMouseTracking(True)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        self.setRenderHints(
+            QPainter.RenderHint.Antialiasing |
+            QPainter.RenderHint.TextAntialiasing |
+            QPainter.RenderHint.SmoothPixmapTransform
+        )
+        self.setCacheMode(QGraphicsView.CacheModeFlag.CacheBackground)
+        
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.SmartViewportUpdate)
+        self.setOptimizationFlag(QGraphicsView.OptimizationFlag.DontSavePainterState)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setObjectName("PipelineGraphView")
@@ -198,9 +227,33 @@ class PipelineGraphView(QGraphicsView):
         self._scroll_animation = None
         self._pill_animation = None
         
+        self._zoom_level: int = 0
+        self._zoom_min: int = -4
+        self._zoom_max: int = 6
+        
         self._is_middle_dragging: bool = False
         self._last_mouse_pos: Optional[QPointF] = None
         self._middle_click_pos: Optional[QPointF] = None
+        
+        self._background_brush: Optional[QBrush] = None
+        self._create_background_brush()
+    
+    def _create_background_brush(self) -> None:
+        """Generates a reusable brush for background rendering"""
+        grid_size = 20
+        dot_radius = 1.0
+        
+        pixmap = QPixmap(grid_size, grid_size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#CBD5E1"))
+        painter.drawEllipse(QPointF(grid_size / 2.0, grid_size / 2.0), dot_radius, dot_radius)
+        painter.end()
+        
+        self._background_brush = QBrush(pixmap)
     
     def _set_view_center(self, center: QPointF):
         self.centerOn(center)
@@ -221,35 +274,33 @@ class PipelineGraphView(QGraphicsView):
         self._scroll_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         self._scroll_animation.start()
     
-    def drawBackground(self, painter: QPainter, rect: QRectF):
+    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
+        """Paints the background using cached brush"""
         painter.fillRect(rect, QColor("#F8FAFC"))
-        
-        grid_size = 20
-        dot_color = QColor("#CBD5E1")
-        dot_radius = 1.0
-        
-        left = int(rect.left()) - (int(rect.left()) % grid_size)
-        top = int(rect.top()) - (int(rect.top()) % grid_size)
-        
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(dot_color)
-        
-        for x in range(left, int(rect.right()), grid_size):
-            for y in range(top, int(rect.bottom()), grid_size):
-                painter.drawEllipse(QPointF(x, y), dot_radius, dot_radius)
+        if self._background_brush:
+            painter.fillRect(rect, self._background_brush)
     
     def wheelEvent(self, event: QWheelEvent):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             zoom_in_factor = 1.15
             zoom_out_factor = 1.0 / zoom_in_factor
             
+            is_zooming_in = event.angleDelta().y() > 0
+            
+            if is_zooming_in and self._zoom_level >= self._zoom_max:
+                return
+            if not is_zooming_in and self._zoom_level <= self._zoom_min:
+                return
+            
             old_scene_pos = self.mapToScene(event.position().toPoint())
             
-            if event.angleDelta().y() > 0:
+            if is_zooming_in:
+                self._zoom_level += 1
                 self.scale(zoom_in_factor, zoom_in_factor)
             else:
+                self._zoom_level -= 1
                 self.scale(zoom_out_factor, zoom_out_factor)
-            
+                
             new_scene_pos = self.mapToScene(event.position().toPoint())
             delta = new_scene_pos - old_scene_pos
             self.translate(delta.x(), delta.y())
@@ -309,6 +360,24 @@ class PipelineGraphView(QGraphicsView):
         elif event.key() == Qt.Key.Key_Down:
             if self.current_index < self.max_index:
                 self._handle_node_clicked(self.current_index + 1)
+                event.accept()
+        elif event.key() == Qt.Key.Key_PageUp:
+            new_index = max(0, self.current_index - 5)
+            if self.current_index != new_index:
+                self._handle_node_clicked(new_index)
+                event.accept()
+        elif event.key() == Qt.Key.Key_PageDown:
+            new_index = min(self.max_index, self.current_index + 5)
+            if self.current_index != new_index:
+                self._handle_node_clicked(new_index)
+                event.accept()
+        elif event.key() == Qt.Key.Key_Home:
+            if self.current_index != 0:
+                self._handle_node_clicked(0)
+                event.accept()
+        elif event.key() == Qt.Key.Key_End:
+            if self.current_index != self.max_index:
+                self._handle_node_clicked(self.max_index)
                 event.accept()
         elif event.key() == Qt.Key.Key_F:
             scene_rect = self.graph_scene.itemsBoundingRect()
@@ -381,7 +450,10 @@ class PipelineGraphView(QGraphicsView):
             end_pt = QPointF(x_pos + node.width / 2, node.y())
             
             path.moveTo(start_pt)
-            path.lineTo(end_pt)
+            ctrl1 = QPointF(start_pt.x(), start_pt.y() + (vertical_spacing / 2))
+            ctrl2 = QPointF(end_pt.x(), end_pt.y() - (vertical_spacing / 2))
+            path.cubicTo(ctrl1, ctrl2, end_pt)
+            
             edge.setPath(path)
             
             # Color the edge blue if it leads to a done/active state, otherwise gray/dashed
@@ -451,7 +523,7 @@ class PipelineGraphView(QGraphicsView):
             self._pill_animation.setDuration(400)
             self._pill_animation.setStartValue(QPointF(self.focus_selector.x(), old_y))
             self._pill_animation.setEndValue(QPointF(self.focus_selector.x(), new_y))
-            self._pill_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+            self._pill_animation.setEasingCurve(QEasingCurve.Type.OutBack)
             self._pill_animation.start()
         
         if 0 <= new_index < len(self.nodes):
