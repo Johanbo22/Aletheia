@@ -3,9 +3,27 @@ from PyQt6.QtCore import pyqtSignal, Qt, QEvent, QPoint
 from PyQt6.QtGui import QKeyEvent, QColor, QBrush, QFont
 
 from typing import List, Tuple, Optional
+from dataclasses import dataclass
 
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioSpinBox, DataPlotStudioButton
+
+@dataclass
+class GridSpan:
+    row_start: int
+    row_end: int
+    col_start: int
+    col_end: int
+    
+    def overlaps_with(self, other: "GridSpan") -> bool:
+        """Determines if this span intersects with another span using AABB collison logic"""
+        return not (self.row_start >= other.row_end or 
+                    self.row_end <= other.row_start or
+                    self.col_start >= other.col_end or
+                    self.col_end <= other.col_start)
+    
+    def as_tuple(self) -> Tuple[int, int, int, int]:
+        return (self.row_start, self.row_end, self.col_start, self.col_end)
 
 class GridSpecDesignerWidget(QWidget):
     """
@@ -15,10 +33,19 @@ class GridSpecDesignerWidget(QWidget):
     
     layout_applied = pyqtSignal(int, int, list)
     
+    PLOT_PALETTE: List[QColor] = [
+        QColor(58, 134, 255, 40),  
+        QColor(46, 196, 182, 40),  
+        QColor(155, 93, 229, 40),  
+        QColor(243, 167, 18, 40), 
+        QColor(231, 29, 54, 40),   
+        QColor(0, 187, 249, 40)    
+    ]
+    
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setObjectName("GridSpecDesignerWidget")
-        self._defined_spans: List[Tuple[int, int, int, int]] = []
+        self._defined_spans: List[GridSpan] = []
         self._sharex: bool = False
         self._sharey: bool = False
         
@@ -57,7 +84,7 @@ class GridSpecDesignerWidget(QWidget):
         self.grid_table.setObjectName("layoutGridTable")
         self.grid_table.setSelectionMode(QTableWidget.SelectionMode.ContiguousSelection)
         self.grid_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.grid_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.grid_table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.grid_table.setShowGrid(True)
         self.grid_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.grid_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -79,7 +106,7 @@ class GridSpecDesignerWidget(QWidget):
         self.reset_grid_btn = DataPlotStudioButton("Reset Grid")
         self.reset_grid_btn.setObjectName("resetGridBtn")
         
-        self.apply_layout_btn = DataPlotStudioButton("Apply Layout", base_color_hex=ThemeColors.MainColor)
+        self.apply_layout_btn = DataPlotStudioButton("Apply Layout", base_color_hex=ThemeColors.MainColor, text_color_hex="white")
         self.apply_layout_btn.setObjectName("applyDashboardLayoutBtn")
         self.apply_layout_btn.setProperty("actionType", "primary")
 
@@ -100,7 +127,7 @@ class GridSpecDesignerWidget(QWidget):
         self.cols_spin.valueChanged.connect(self._update_grid_data)
         self.merge_cells_btn.clicked.connect(self._merge_selected)
         self.remove_cells_btn.clicked.connect(self._remove_selected)
-        self.reset_grid_btn.clicked.connect(self._update_grid_data)
+        self.reset_grid_btn.clicked.connect(self._confirm_reset_grid)
         self.apply_layout_btn.clicked.connect(self._emit_layout)
         
         self.grid_table.cellDoubleClicked.connect(self._handle_double_click)
@@ -110,14 +137,14 @@ class GridSpecDesignerWidget(QWidget):
         
     def eventFilter(self, source: QWidget, event: QEvent) -> bool:
         if source is self.grid_table and event.type() == QEvent.Type.KeyPress:
-            key_event = getattr(event, "key", lambda: None)()
-            
-            if key_event in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-                self._remove_selected()
-                return True
-            elif key_event in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                self._merge_selected()
-                return True
+            if isinstance(event, QKeyEvent):
+                key = event.key()
+                if key in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+                    self._remove_selected()
+                    return True
+                elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    self._merge_selected()
+                    return True
         return super().eventFilter(source, event)
     
     def _handle_double_click(self, row: int, col: int) -> None:
@@ -125,17 +152,19 @@ class GridSpecDesignerWidget(QWidget):
         Handles the double clicking on a cell to change 
         its state from empty to plot and vice-versa
         """
-        span_to_remove = None
+        target_point = GridSpan(row_start=row, row_end=row+1, col_start=col, col_end=col+1)
+        span_to_remove: Optional[GridSpan] = None
         
         for span in self._defined_spans:
-            r_start, r_end, c_start, c_end = span
-            if r_start <= row < r_end and c_start <= col < c_end:
+            if target_point.overlaps_with(span):
                 span_to_remove = span
                 break
+        
         if span_to_remove:
             self._defined_spans.remove(span_to_remove)
         else:
-            self._defined_spans.append((row, row + 1, col, col + 1))
+            self._defined_spans.append(target_point)
+        
         self._redraw_table()
         
     def _show_context_menu(self, position: QPoint) -> None:
@@ -145,6 +174,16 @@ class GridSpecDesignerWidget(QWidget):
         remove_action = menu.addAction("Remove Selected")
         menu.addSeparator()
         reset_action = menu.addAction("Reset Grid")
+        
+        target_span = self._get_selected_span()
+        has_selection = target_span is not None
+        
+        if has_selection:
+            overlaps_existing = any(span.overlaps_with(target_span) for span in self._defined_spans)
+            remove_action.setEnabled(overlaps_existing)
+        else:
+            merge_action.setEnabled(False)
+            remove_action.setEnabled(False)
         
         merge_action.triggered.connect(self._merge_selected)
         remove_action.triggered.connect(self._remove_selected)
@@ -162,8 +201,26 @@ class GridSpecDesignerWidget(QWidget):
         self._defined_spans.clear()
         for r in range(rows):
             for c in range(cols):
-                self._defined_spans.append((r, r + 1, c, c + 1))
+                self._defined_spans.append(GridSpan(row_start=r, row_end=r + 1, col_start=c, col_end=c +1))
         self._redraw_table()
+    
+    def _confirm_reset_grid(self) -> None:
+        """Prompts before destroying a customized layout"""
+        rows = self.rows_spin.value()
+        cols = self.cols_spin.value()
+        total_default_cells = rows * cols
+        
+        if len(self._defined_spans) != total_default_cells:
+            reply = QMessageBox.question(
+                self,
+                "Reset Grid Layout",
+                "Are you sure you want to reset the grid? This will discard all changes",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+        self._update_grid_data()
     
     def set_shared_axes(self, sharex: bool, sharey: bool) -> None:
         self._sharex = sharex
@@ -176,8 +233,23 @@ class GridSpecDesignerWidget(QWidget):
         
         self._redraw_table()
     
+    def _generate_plot_tooltip(self, index: int, row_span: int, col_span: int, has_x: bool, has_y: bool) -> str:
+        """Generates a tooltip for a plot cell indicating its span and active axes"""
+        span_description = f"{row_span}x{col_span} block" if (row_span > 1 or col_span > 1) else "1x1 blcok"
+        
+        axes_status: List[str] = []
+        if has_x:
+            axes_status.append("X")
+        if has_y:
+            axes_status.append("Y")
+        
+        axis_description = f"Active Axes: {' & '.join(axes_status)}" if axes_status else "Active Axes: None (Fully Shared)"
+        return f"Plot {index + 1} ({span_description})\n{axis_description}\nDouble-click to remove this plot"
+
     def _redraw_table(self) -> None:
-        """Paints the table using the internal span state, enforcing numeric ordering."""
+        """
+        Repaints the table using span state and numerical order
+        """
         rows = self.rows_spin.value()
         cols = self.cols_spin.value()
         
@@ -188,103 +260,83 @@ class GridSpecDesignerWidget(QWidget):
         
         for r in range(rows):
             for c in range(cols):
-                empty_item = QTableWidgetItem("Empty")
-                empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                empty_item.setToolTip(f"Empty Space.\nDouble click to add a new plot here")
+                empty_item = QTableWidgetItem()
                 self.grid_table.setItem(r, c, empty_item)
+                
+                empty_widget = QLabel("Empty Space")
+                empty_widget.setObjectName(f"emptyCellWidget_{r}_{c}")
+                empty_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                empty_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+                empty_widget.setProperty("styleClass", "empty_plot_cell")
+                
+                self.grid_table.setCellWidget(r, c, empty_widget)
 
-        self._defined_spans.sort(key=lambda x: (x[0], x[2]))
-        plot_palette = [
-            QColor(58, 134, 255, 40),  
-            QColor(46, 196, 182, 40),  
-            QColor(155, 93, 229, 40),  
-            QColor(243, 167, 18, 40), 
-            QColor(231, 29, 54, 40),   
-            QColor(0, 187, 249, 40)    
-        ]
-        bold_font = QFont()
-        bold_font.setBold(True)
+        self._defined_spans.sort(key=lambda span: (span.row_start, span.col_start))
 
-        for idx, (r_start, r_end, c_start, c_end) in enumerate(self._defined_spans):
-            has_x = not self._sharex or r_end == rows
-            has_y = not self._sharey or c_start == 0
+        for idx, span in enumerate(self._defined_spans):
+            has_x = not self._sharex or span.row_end == rows
+            has_y = not self._sharey or span.col_start == 0
             
             item = QTableWidgetItem()
-            bg_color = plot_palette[idx % len(plot_palette)]
+            bg_color = self.PLOT_PALETTE[idx % len(self.PLOT_PALETTE)]
             item.setBackground(QBrush(bg_color))
             
-            row_span = r_end - r_start
-            col_span = c_end - c_start
-            span_desc = f"{row_span}x{col_span} block" if (row_span > 1 or col_span > 1) else "1x1 block"
-            axis_desc = f"Active Axes: {'X ' if has_x else ''}{'& Y' if has_y else ''}{'None (Fully Shared)' if not has_x and not has_y else ''}"
-            item.setToolTip(f"Plot {idx + 1} ({span_desc})\n{axis_desc}\nDouble-click to remove this plot.")
+            row_span = span.row_end - span.row_start
+            col_span = span.col_end - span.col_start
             
-            self.grid_table.setItem(r_start, c_start, item)
+            item.setToolTip(self._generate_plot_tooltip(idx, row_span, col_span, has_x, has_y))
+            self.grid_table.setItem(span.row_start, span.col_start, item)
             
             cell_widget = QLabel(f"Plot {idx + 1}")
+            cell_widget.setObjectName(f"plotCellWidget_{idx}")
             cell_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
             cell_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             
-            border_css = []
-            if has_x:
-                border_css.append("border-bottom: 3px solid #88B6FF;")
-            if has_y:
-                border_css.append("border-left: 3px solid #88B6FF;")
-                
-            cell_widget.setStyleSheet(f"""
-                QLabel {{
-                    background: transparent;
-                    font-weight: bold;
-                    color: palette(text);
-                    {' '.join(border_css)}
-                }}
-            """)
-            self.grid_table.setCellWidget(r_start, c_start, cell_widget)
+            cell_widget.setProperty("styleClass", "plot_cell_label")
+            cell_widget.setProperty("has_x_axis", has_x)
+            cell_widget.setProperty("has_y_axis", has_y)
+            
+            cell_widget.style().unpolish(cell_widget)
+            cell_widget.style().polish(cell_widget)
+            
+            self.grid_table.setCellWidget(span.row_start, span.col_start, cell_widget)
                         
             if row_span > 1 or col_span > 1:
-                self.grid_table.setSpan(r_start, c_start, row_span, col_span)
+                self.grid_table.setSpan(span.row_start, span.col_start, row_span, col_span)
+    
+    def _get_selected_span(self) -> Optional[GridSpan]:
+        """Extracts the currently selected range as GridSpan"""
+        selected_ranges = self.grid_table.selectedRanges()
+        if not selected_ranges:
+            return None
+        
+        selection = selected_ranges[0]
+        return GridSpan(
+            row_start=selection.topRow(),
+            row_end=selection.bottomRow() +1,
+            col_start=selection.leftColumn(),
+            col_end=selection.rightColumn() +1
+        )
     
     def _merge_selected(self) -> None:
-        """Consumes selected cells and combines them into a single subplot block."""
-        selected_ranges = self.grid_table.selectedRanges()
-        if not selected_ranges:
+        """Consumes the selected cells and combines them into a single subplot block"""
+        target_span = self._get_selected_span()
+        if not target_span:
             return
         
-        selection = selected_ranges[0]
-        r_start = selection.topRow()
-        r_end = selection.bottomRow() + 1
-        c_start = selection.leftColumn()
-        c_end = selection.rightColumn() + 1
-        
-        new_spans = []
-        for span in self._defined_spans:
-            sr_start, sr_end, sc_start, sc_end = span
-            if not (sr_start >= r_end or sr_end <= r_start or sc_start >= c_end or sc_end <= c_start):
-                continue
-            new_spans.append(span)
-
-        new_spans.append((r_start, r_end, c_start, c_end))
-        self._defined_spans = new_spans
+        # Filter out any spans that overlap with new merged area
+        self._defined_spans = [span for span in self._defined_spans if not span.overlaps_with(target_span)]
+        self._defined_spans.append(target_span)
         self._redraw_table()
-    
+        
     def _remove_selected(self) -> None:
-        selected_ranges = self.grid_table.selectedRanges()
-        if not selected_ranges:
+        """Removes any spans that intersect with current selected spans"""
+        target_span = self._get_selected_span()
+        if not target_span:
             return
         
-        selection = selected_ranges[0]
-        r_start = selection.topRow()
-        r_end = selection.bottomRow() + 1
-        c_start = selection.leftColumn()
-        c_end = selection.rightColumn() + 1
-        
-        new_spans = []
-        for span in self._defined_spans:
-            sr_start, sr_end, sc_start, sc_end = span
-            if (sr_start >= r_end or sr_end <= r_start or sc_start >= c_end or sc_end <= c_start):
-                new_spans.append(span)
-        
-        self._defined_spans = new_spans
+        # Keep only the spans that do not overlap with the selection
+        self._defined_spans = [span for span in self._defined_spans if not span.overlaps_with(target_span)]
         self._redraw_table()
     
     def _emit_layout(self) -> None:
@@ -295,6 +347,10 @@ class GridSpecDesignerWidget(QWidget):
                 "Cannot apply an empty layout. Please ensure at least one plot is defined in the grid"
             )
             return
+        
         rows = self.rows_spin.value()
         cols = self.cols_spin.value()
-        self.layout_applied.emit(rows, cols, self._defined_spans.copy())
+        
+        tuple_spans = [span.as_tuple() for span in self._defined_spans]
+        self.layout_applied.emit(rows, cols, tuple_spans)
+        
