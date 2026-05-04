@@ -11,6 +11,16 @@ CodeEditor#computed_column_expression {
     border-radius: 4px;
 }
 
+DataPlotStudioLineEdit[validationState="error"] {
+    border: 1px solid #ff5555;
+    background-color: rgba(255, 85, 85, 0.05);
+}
+
+CodeEditor#computed_column_expression[validationState="error"] {
+    border: 2px solid #ff5555;
+    background-color: #282a36;
+}
+
 QLabel[styleClass="list_header_info"] {
     color: #666;
     font-weight: bold;
@@ -20,12 +30,46 @@ QLabel[styleClass="list_header_info"] {
 QLabel#validation_status_label {
     font-weight: bold;
     font-size: 9pt;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 5px;
+}
+
+QLabel#validation_status_label[status="idle"] {
+    background-color: transparent;
+    border: none;
 }
 
 QLabel#validation_status_label[status="success"] {
-    color: #40c862;
+    color: #50fa7b;
+    background-color: rgba(80, 250, 123, 0.1);
+    border: 1px solid rgba(80, 250, 123, 0.3);
+}
+
+QLabel[styleClass="no_results_label"] {
+    color: #888888;
+    font-style: italic;
+    padding: 15px;
 }
 
 QLabel#validation_status_label[status="error"] {
     color: #ff5555;
+    background-color: rgba(255, 85, 85, 0.1);
+    border: 1px solid rgba(255, 85, 85, 0.3);
+}
+
+DataPlotStudioListWidget::item:hover,
+QTreeWidget::item:hover {
+    background: rgba(0, 120, 215, 0.05);
+    color: #111;
+    border-bottom: 2px solid rgba(0, 120, 215, 0.3);
+}
+
+DataPlotStudioListWidget::item:selected,
+QTreeWidget::item:selected {
+    background: white;
+    color: #0078d7;
+    font-weight: bold;
+    border: 1px solid #dcdcdc;
+    border-bottom: 2px solid #0078d7;
 }
