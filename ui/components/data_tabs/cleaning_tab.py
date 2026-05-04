@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QLabel
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets import DataPlotStudioGroupBox
+from ui.widgets.ControlElements import DataPlotStudioGroupBox
 from ui.icons import IconType
 
 if TYPE_CHECKING:

@@ -7,9 +7,9 @@ from PyQt6.QtCore import Qt, QTimer, QRegularExpression
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 from ui.widgets.AnimatedButton import DataPlotStudioButton
-from ui.widgets.AnimatedCheckBox import DataPlotStudioCheckBox
-from ui.widgets.AnimatedGroupBox import DataPlotStudioGroupBox
-from ui.widgets.AnimatedSlider import DataPlotStudioSlider
+from ui.widgets.ControlElements import DataPlotStudioCheckBox
+from ui.widgets.ControlElements import DataPlotStudioGroupBox
+from ui.widgets.ControlElements import DataPlotStudioSlider
 from ui.dialogs import CodeEditor
 
 class JSONHighlighter(QSyntaxHighlighter):

@@ -1,7 +1,8 @@
-from ui.widgets import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioButton, DataPlotStudioListWidget
+from ui.widgets import DataPlotStudioButton
 from ui.dialogs import CreateSubsetDialog, SubsetDataViewer, ProgressDialog
 from core.data_handler import DataHandler
 from core.subset_manager import SubsetManager
+from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
 from ui.workers import AutoCreateSubsetsWorker
 
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QThreadPool

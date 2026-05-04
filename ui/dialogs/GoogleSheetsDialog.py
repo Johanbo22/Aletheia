@@ -5,10 +5,11 @@ from PyQt6.QtCore import QSettings, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QTabWidget, QFrame
 
-from ui.widgets import DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioComboBox
+from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
 from ui.icons import IconBuilder, IconType
 from core.resource_loader import get_resource_path
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 
 class GoogleSheetsImportConfig(NamedTuple):
     """Payload for Google Sheets import config"""

@@ -5,7 +5,8 @@ from typing import List, Dict, Any
 
 import pandas as pd
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioComboBox, DataPlotStudioListWidget
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioListWidget
 
 class PivotDialog(QDialog):
     """Dialog for performing pivot table operation"""

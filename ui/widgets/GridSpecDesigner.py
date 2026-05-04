@@ -6,7 +6,8 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioSpinBox, DataPlotStudioButton
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioSpinBox
 
 @dataclass
 class GridSpan:

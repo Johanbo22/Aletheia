@@ -3,9 +3,10 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayo
 from PyQt6.QtCore import Qt, QRegularExpression, QPoint, QEvent, QObject
 from PyQt6.QtGui import QFont, QColor, QRegularExpressionValidator, QKeyEvent
 
-from ui.widgets import DataPlotStudioSpinBox, DataPlotStudioButton, DataPlotStudioLineEdit, DataPlotStudioComboBox
+from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
 from ui.icons import IconBuilder, IconType
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class CreateDatasetDialog(QDialog):
     """

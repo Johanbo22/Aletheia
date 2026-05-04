@@ -2,8 +2,9 @@ from PyQt6.QtWidgets import QVBoxLayout, QLabel
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets import DataPlotStudioGroupBox, DataPlotStudioComboBox
+from ui.widgets.ControlElements import DataPlotStudioComboBox
 from ui.icons import IconType
+from ui.widgets.ControlElements import DataPlotStudioGroupBox
 
 if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController

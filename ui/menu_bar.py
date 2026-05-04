@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import QMenuBar, QWidget
 from PyQt6.QtGui import QAction, QIcon
 from core.resource_loader import get_resource_path
-from ui.widgets.AnimatedMenu import DataPlotStudioMenu
+from ui.widgets.ControlElements import DataPlotStudioMenu
 from ui.icons import IconBuilder, IconType
 
 class MenuBar(QMenuBar):

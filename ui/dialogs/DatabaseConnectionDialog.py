@@ -8,8 +8,9 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from core.resource_loader import get_resource_path
-from ui.widgets import DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioComboBox, DataPlotStudioRadioButton
+from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioRadioButton
 from ui.workers import TestConnectionWorker, FetchSchemaWorker
 
 class SQLSyntaxHighlighter(QSyntaxHighlighter):

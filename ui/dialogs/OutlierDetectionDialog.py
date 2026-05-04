@@ -4,10 +4,12 @@ from PyQt6.QtCore import Qt, QTimer
 
 from core.data_handler import DataHandler
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioSpinBox
+from ui.widgets import DataPlotStudioButton
 from ui.data_table_model import DataTableModel
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioSpinBox
 
 try:
     from scipy import stats

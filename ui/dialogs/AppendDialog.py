@@ -4,7 +4,8 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFileDial
 from PyQt6.QtCore import Qt
 from core.data_handler import DataHandler
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit, DataPlotStudioCheckBox
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioLineEdit
 
 class AppendDialog(QDialog):
     """

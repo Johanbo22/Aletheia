@@ -2,7 +2,8 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollAr
 from PyQt6.QtCore import Qt
 
 from ui.theme import ThemeColors
-from ui.widgets import AutoResizingStackedWidget, DataPlotStudioGroupBox, DataPlotStudioToggleSwitch, DataPlotStudioSpinBox, DataPlotStudioDoubleSpinBox, DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioSlider
+from ui.widgets import AutoResizingStackedWidget, DataPlotStudioToggleSwitch, DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioSlider, DataPlotStudioSpinBox
 
 class CustomizationSettingsTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:

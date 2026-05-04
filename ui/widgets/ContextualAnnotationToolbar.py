@@ -3,7 +3,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioSpinBox, DataPlotStudioButton
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioSpinBox
 
 class ContextualAnnotationToolbar(QWidget):
     """

@@ -4,7 +4,8 @@ import pandas as pd
 from typing import Dict, Any, List, Optional
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioDoubleSpinBox, DataPlotStudioCheckBox
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 
 
 class CreateSubsetDialog(QDialog):

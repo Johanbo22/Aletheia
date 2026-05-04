@@ -2,7 +2,8 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageB
 from typing import Optional
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit
 
 class RegexReplaceDialog(QDialog):
     """

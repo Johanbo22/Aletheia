@@ -3,7 +3,8 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 import shutil
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioGroupBox, DataPlotStudioToggleSwitch, DataPlotStudioSpinBox, DataPlotStudioDoubleSpinBox, DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioLineEdit, HelpIcon, ColormapButton
+from ui.widgets import DataPlotStudioToggleSwitch, DataPlotStudioButton, HelpIcon, ColormapButton
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class AppearanceSettingsTab(QWidget):
     help_requested = pyqtSignal(str)

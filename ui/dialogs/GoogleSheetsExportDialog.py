@@ -2,7 +2,8 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLab
 from PyQt6.QtGui import QFont
 from typing import Tuple
 
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 class GoogleSheetsExportDialog(QDialog):
     """Dialog for configuring and executing a Google Sheets export"""

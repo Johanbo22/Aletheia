@@ -9,8 +9,8 @@ import traceback
 
 from ui.dialogs.CodeEditor import CodeEditor
 from ui.widgets.AnimatedButton import DataPlotStudioButton
-from ui.widgets.AnimatedCheckBox import DataPlotStudioCheckBox
-from ui.widgets.AnimatedLineEdit import DataPlotStudioLineEdit
+from ui.widgets.ControlElements import DataPlotStudioCheckBox
+from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 class FindReplaceDialog(QDialog):
     """Floating dialog for find and replace"""

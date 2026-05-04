@@ -6,7 +6,8 @@ from PyQt6.QtCore import QSize, Qt, QSettings, QEvent
 from PyQt6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPixmap
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QVBoxLayout, QFrame, QSpinBox
 
-from ui.widgets import DataPlotStudioCheckBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
+from ui.widgets.ControlElements import DataPlotStudioCheckBox
+from ui.widgets.ControlElements import DataPlotStudioLineEdit, DataPlotStudioListWidget
 
 
 class ColormapPickerDialog(QDialog):

@@ -4,7 +4,8 @@ from typing import Optional, List, Tuple
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 
 class ValidationState(Enum):

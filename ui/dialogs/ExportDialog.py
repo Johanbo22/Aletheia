@@ -7,8 +7,9 @@ from pathlib import Path
 
 from core.data_handler import DataHandler
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioListWidget, DataPlotStudioRadioButton, DataPlotStudioCheckBox, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioRadioButton
 
 class ExportDialog(QDialog):
     """Dialog for exporting data"""

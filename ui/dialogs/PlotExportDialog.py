@@ -6,7 +6,8 @@ from pathlib import Path
 
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioSpinBox, DataPlotStudioCheckBox, DataPlotStudioDoubleSpinBox
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioSpinBox
 
 class PlotExportDialog(QDialog):
     """Dialog for exporting plots"""

@@ -14,7 +14,7 @@ from pathlib import Path
 from ui.data_table_model import DataTableModel
 from ui.theme import ThemeColors
 from ui.widgets import (
-    DataPlotStudioButton, DataPlotStudioLineEdit
+    DataPlotStudioButton
 )
 from ui.icons import IconBuilder, IconType
 from ui.components.data_operations_panel import DataOperationsPanel
@@ -27,6 +27,7 @@ from ui.animations import (
     EditModeToggleAnimation
 )
 from ui.controllers.data_tab_controller import DataTabController
+from ui.widgets.ControlElements import DataPlotStudioLineEdit, DataPlotStudioMenu
 from ui.workers import SearchWorker
 
 
@@ -854,7 +855,7 @@ class DataTab(QWidget):
         if self.data_handler.df is None:
             return
 
-        menu = QMenu()
+        menu = DataPlotStudioMenu()
 
         resize_cols_action = menu.addAction("Resize Columns to Contents")
         resize_rows_action = menu.addAction("Resize Rows to Contents")

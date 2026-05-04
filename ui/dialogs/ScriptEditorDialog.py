@@ -1,7 +1,7 @@
 from typing import Any
 
 from ui.theme import ThemeColors
-from ui.widgets.AnimatedCheckBox import DataPlotStudioCheckBox
+from ui.widgets.ControlElements import DataPlotStudioCheckBox
 from ui.dialogs import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
 
@@ -14,12 +14,14 @@ from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayo
 
 from datetime import datetime
 
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
 from ui.animations.PlotGeneratedAnimation import PlotGeneratedAnimation
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit
 
 class StreamRedirector:
     """Redirects stdout/stderr to a plain text widget from the code editor"""

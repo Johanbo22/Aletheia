@@ -5,8 +5,9 @@ import pandas as pd
 from typing import List, Dict, Any, Optional
 
 from ui.theme import ThemeColors
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 from ui.workers import FilterWorker
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioCheckBox
+from ui.widgets import DataPlotStudioButton
 
 
 class FilterAdvancedDialog(QDialog):

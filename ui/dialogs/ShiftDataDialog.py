@@ -5,8 +5,9 @@ import pandas as pd
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit, DataPlotStudioComboBox, DataPlotStudioSpinBox, DataPlotStudioGroupBox
+from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class ShiftDataDialog(QDialog):
     """

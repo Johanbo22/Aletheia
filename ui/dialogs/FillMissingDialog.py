@@ -1,5 +1,5 @@
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioButton, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 import pandas as pd
+
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioLineEdit
 
 class FillMissingDialog(QDialog):
     """Dialog for the user to manipulate their data using the fill missing tool"""

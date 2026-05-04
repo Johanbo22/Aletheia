@@ -37,7 +37,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.collections import PathCollection
 from typing import Optional
 
-from ui.widgets.AnimatedListWidget import DataPlotStudioListWidget
+from ui.widgets.ControlElements import DataPlotStudioListWidget
 from ui.widgets.ColorBlindnessEffect import ColorBlindnessEffect
 from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
 from ui.dialogs.PlotExportDialog import PlotExportDialog

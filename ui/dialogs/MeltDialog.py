@@ -6,7 +6,8 @@ from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioListWidget, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
 
 
 class MeltDialog(QDialog):

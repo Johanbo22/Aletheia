@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox
 from typing import Optional
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit
 
 class SplitColumnDialog(QDialog):
     """Dialog for splitting a string column into new colymns based on a delimiter"""

@@ -1,7 +1,8 @@
-from ui.widgets import DataPlotStudioToggleSwitch, DataPlotStudioSpinBox
+from ui.widgets import DataPlotStudioToggleSwitch
 from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayout, QLabel, QTabWidget, QVBoxLayout, QWidget
 from ui.icons import IconBuilder, IconType
+from ui.widgets.ControlElements import DataPlotStudioSpinBox
 
 
 class SettingsDialog(QDialog):

@@ -3,8 +3,9 @@ from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, QHeaderView, QAbstractItemView, QTableWidgetItem, QMenu, QSplitter, QWidget, QListWidgetItem
 from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioComboBox, DataPlotStudioListWidget
+from ui.widgets import DataPlotStudioButton
 import pandas as pd
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
 from ui.workers import AggregationWorker
 
 DIALOG_WIDTH: int = 1200

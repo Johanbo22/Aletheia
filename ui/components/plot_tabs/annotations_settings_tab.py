@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioGroupBox, DataPlotStudioToggleSwitch, DataPlotStudioSpinBox, DataPlotStudioDoubleSpinBox, DataPlotStudioButton, DataPlotStudioComboBox, DataPlotStudioLineEdit
-from ui.widgets.AnimatedListWidget import DataPlotStudioListWidget
+from ui.widgets import DataPlotStudioToggleSwitch, DataPlotStudioButton
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
+from ui.widgets.ControlElements import DataPlotStudioSpinBox
 
 class AnnotationsSettingsTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:

@@ -16,11 +16,9 @@ from core.resource_loader import get_resource_path
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 from ui.widgets import (
-    DataPlotStudioButton,
-    DataPlotStudioComboBox,
-    DataPlotStudioGroupBox,
-    DataPlotStudioLineEdit
+    DataPlotStudioButton
 )
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 from ui.widgets.VennDiagramWidget import VennDiagramWidget
 from core.data_handler import DataHandler
 

@@ -10,9 +10,10 @@ from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit, DataPlotStudioGroupBox, DataPlotStudioListWidget
+from ui.widgets import DataPlotStudioButton
 from ui.dialogs.CodeEditor import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
+from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
 
 class ValidationStatus(str, Enum):
     Idle = "idle"

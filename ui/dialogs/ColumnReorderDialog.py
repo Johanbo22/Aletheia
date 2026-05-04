@@ -7,8 +7,9 @@ from pygments import highlight
 
 from core.resource_loader import get_resource_path
 from ui.icons.icon_registry import IconBuilder, IconType
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit
+from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
+from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 class ColumnReorderDialog(QDialog):
     """

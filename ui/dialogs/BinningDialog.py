@@ -4,11 +4,13 @@ from PyQt6.QtGui import QRegularExpressionValidator
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton, DataPlotStudioLineEdit, DataPlotStudioComboBox, DataPlotStudioSpinBox, DataPlotStudioGroupBox, DataPlotStudioCheckBox
+from ui.widgets import DataPlotStudioButton
 
 import pandas as pd
 from typing import Any, Optional
 from enum import Enum
+
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class BinningPreviewWidget(QWidget):
     """Displays a vertical bar chart to represent bin distribution"""

@@ -7,7 +7,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFontDatabase, QFont
 
 from ui.PythonHighlighter import SyntaxCategory, DefaultColorScheme, PythonHighlighter
-from ui.widgets import DataPlotStudioComboBox, DataPlotStudioGroupBox
+from ui.widgets.ControlElements import DataPlotStudioComboBox
+from ui.widgets.ControlElements import DataPlotStudioGroupBox
 
 PREDEFINED_SCHEMES: Dict[str, Dict[SyntaxCategory, str]] = {
     "Default (Dracula)": DefaultColorScheme,

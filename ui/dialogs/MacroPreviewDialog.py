@@ -3,8 +3,9 @@ from pathlib import Path
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogButtonBox, QListWidgetItem, QWidget, QFrame, QHBoxLayout
 from PyQt6.QtCore import Qt, QSize
 
-from ui.widgets import DataPlotStudioListWidget, DataPlotStudioButton, DataPlotStudioToggleSwitch, DataPlotStudioCheckBox
+from ui.widgets import DataPlotStudioButton, DataPlotStudioToggleSwitch
 from ui.icons import IconBuilder, IconType
+from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioListWidget
 
 class MacroPreviewDialog(QDialog):
     """
