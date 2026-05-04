@@ -1,13 +1,21 @@
 /* Governs both the Google Sheets import and export dialog styling*/
 QLabel#google_sheets_info_label {
     font-size: 10pt;
-    font-weight: bold;
     margin-bottom: 5px;
 }
 
-QLabel[styleClass="blue_help_box"] {
-    color: #333333;
-    background-color: #e8f4f8;
-    padding: 12px;
+QMessageBox[styleClass="blue_help_box"] {
+    background-color: rgba(52, 152, 219, 0.1);
+    color: #2980b9;
+    border: 1px solid rgba(52, 152, 219, 0.2);
+    border-left: 4px solid #3498db;
+    padding: 12px 14px;
     border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+QFrame[styleClass="horizontal_divider"] {
+    border: none;
+    border-top: 1px solid #000000;
+    margin: 12px 0px;
 }

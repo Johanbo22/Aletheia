@@ -1,23 +1,42 @@
-from core.resource_loader import get_resource_path
-from ui.icons import IconBuilder, IconType
-from ui.widgets.AnimatedComboBox import DataPlotStudioComboBox
-
-
-from PyQt6.QtGui import QIcon, QPixmap, QFontDatabase, QIntValidator, QShortcut, QKeySequence
+from PyQt6.QtGui import QIcon, QPixmap, QFontDatabase, QIntValidator, QShortcut, QKeySequence, QSyntaxHighlighter, QTextCharFormat, QColor, QTextDocument, QFont
 from PyQt6.QtCore import Qt, QThreadPool, QSettings
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QTextEdit, QVBoxLayout, QWidget, QStyle, QTreeWidget, QTreeWidgetItem, QSplitter, QRadioButton, QButtonGroup, QInputDialog
 
-from ui.widgets.AnimatedRadioButton import DataPlotStudioRadioButton
-from ui.workers import TestConnectionWorker
 from pathlib import Path
 import re
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from ui.widgets.AnimatedButton import DataPlotStudioButton
-from ui.widgets.AnimatedGroupBox import DataPlotStudioGroupBox
-from ui.widgets.AnimatedLineEdit import DataPlotStudioLineEdit
+from core.resource_loader import get_resource_path
+from ui.widgets import DataPlotStudioButton, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioComboBox, DataPlotStudioRadioButton
+from ui.icons import IconBuilder, IconType
+from ui.workers import TestConnectionWorker, FetchSchemaWorker
 
+class SQLSyntaxHighlighter(QSyntaxHighlighter):
+    """Syntax highlighting for SQL syntax"""
+    def __init__(self, document: QTextDocument) -> None:
+        super().__init__(document)
+        self.keyword_format = QTextCharFormat()
+        self.keyword_format.setForeground(QColor("#c678dd"))
+        self.keyword_format.setFontWeight(QFont.Weight.Bold)
+        
+        self.string_format = QTextCharFormat()
+        self.string_format.setForeground(QColor("#98c379"))
+        
+        keywords = [
+            "SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "INNER", "LEFT", "RIGHT", 
+            "OUTER", "ON", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "AS", "WITH", "ASC", "DESC"
+        ]
+        self.keyword_patterns = [re.compile(fr'\b{word}\b', re.IGNORECASE) for word in keywords]
+        self.string_pattern = re.compile(r"'.*?'|\".*?\"")
+    
+    def highlightBlock(self, text: str) -> None:
+        for match in self.string_pattern.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), self.string_format)
+        
+        for pattern in self.keyword_patterns:
+            for match in pattern.finditer(text):
+                self.setFormat(match.start(), match.end() - match.start(), self.keyword_format)
 
 class DatabaseConnectionDialog(QDialog):
     """Dialog class for establishing a database connection and setup query"""
@@ -112,6 +131,10 @@ class DatabaseConnectionDialog(QDialog):
         self.password_label = QLabel("Password:")
         self.password_input = DataPlotStudioLineEdit()
         self.password_input.setEchoMode(DataPlotStudioLineEdit.EchoMode.Password)
+        
+        view_icon = IconBuilder.build(IconType.ViewItem)
+        self.toggle_password_action = self.password_input.addAction(view_icon, DataPlotStudioLineEdit.ActionPosition.TrailingPosition)
+        self.toggle_password_action.triggered.connect(self.toggle_password_visibility)
         self.connection_layout.addRow(self.password_label, self.password_input)
 
         self.dbname_label = QLabel("Database:")
@@ -150,6 +173,10 @@ class DatabaseConnectionDialog(QDialog):
         self.db_icon_label.setFixedHeight(24)
         self.db_icon_label.setObjectName("db_icon_label")
         test_connection_layout.addWidget(self.db_icon_label)
+        
+        self.connection_status_label = QLabel()
+        self.connection_status_label.setObjectName("query_status_label")
+        test_connection_layout.addWidget(self.connection_status_label)
 
         test_connection_layout.addStretch()
 
@@ -174,8 +201,12 @@ class DatabaseConnectionDialog(QDialog):
         self.info_label = QLabel(instructions)
         self.info_label.setWordWrap(True)
         query_layout.addWidget(self.info_label)
+        
         self.query_editor = QTextEdit()
         self.query_editor.setPlaceholderText("SELECT * FROM table_name ...")
+        
+        self.sql_highlighter = SQLSyntaxHighlighter(self.query_editor.document())
+        
         fixed_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         if fixed_font.pointSize() < 10:
             fixed_font.setPointSize(10)
@@ -207,11 +238,19 @@ class DatabaseConnectionDialog(QDialog):
         self.load_schema_button.setToolTip("Connect to the database and list all tables and columns")
         self.load_schema_button.clicked.connect(self.fetch_schema)
         schema_layout.addWidget(self.load_schema_button)
+        
+        # Search bar for schema tree
+        self.schema_search_input = DataPlotStudioLineEdit(parent=self)
+        self.schema_search_input.setPlaceholderText("Search tables and columns...")
+        self.schema_search_input.textChanged.connect(self.filter_schema_tree)
+        self.schema_search_input.setVisible(False)
+        schema_layout.addWidget(self.schema_search_input)
 
         self.schema_tree = QTreeWidget()
         self.schema_tree.setHeaderLabels(["Table / Column", "Type"])
         self.schema_tree.setAlternatingRowColors(True)
-        self.schema_tree.setToolTip("Double-click on an item to insert it into the query")
+        self.schema_tree.setDragEnabled(True)
+        self.schema_tree.setToolTip("Double-click or drag an item to insert it into the query")
         self.schema_tree.itemDoubleClicked.connect(self.on_schema_double_clicked)
         schema_layout.addWidget(self.schema_tree)
 
@@ -253,6 +292,11 @@ class DatabaseConnectionDialog(QDialog):
             self.test_connection_button.setEnabled(False)
             self.test_connection_button.setText("Testing...")
             self.db_icon_label.setText("Testing...")
+            
+            self.connection_status_label.setText("Connecting...")
+            self.connection_status_label.setProperty("status", "")
+            self.connection_status_label.style().unpolish(self.connection_status_label)
+            self.connection_status_label.style().polish(self.connection_status_label)
 
             connection_string = self._build_connection_string()
 
@@ -267,6 +311,7 @@ class DatabaseConnectionDialog(QDialog):
             self.test_connection_button.setEnabled(True)
             self.test_connection_button.setText("Test Connection")
             self.db_icon_label.clear()
+            self.connection_status_label.setText("")
             QMessageBox.warning(self, "Input Error", str(InputError))
 
     def on_test_connection_success(self) -> None:
@@ -274,80 +319,107 @@ class DatabaseConnectionDialog(QDialog):
         self.test_connection_button.setEnabled(True)
         self.test_connection_button.setText("Test Connection")
         self.db_icon_label.setToolTip("Connected")
-        QMessageBox.information(self, "Success", "Connection established")
+        
+        self.connection_status_label.setText("Connection successful")
+        self.connection_status_label.setProperty("status", "valid")
+        self.connection_status_label.style().unpolish(self.connection_status_label)
+        self.connection_status_label.style().polish(self.connection_status_label)
     
     def on_test_connection_error(self, error) -> None:
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self.test_connection_button.setEnabled(True)
         self.test_connection_button.setText("Test Connection")
+        
+        self.connection_status_label.setText("Connection failed")
+        self.connection_status_label.setProperty("status", "invalid")
+        self.connection_status_label.style().unpolish(self.connection_status_label)
+        self.connection_status_label.style().polish(self.connection_status_label)
+        
         QMessageBox.critical(self, "Connection Failed", f"Could not connect to the database:\n{str(error)}")
 
     def fetch_schema(self) -> None:
-        """Connects to the DB using the provided details and populates the schema tree with the tables and columns found in the db"""
-        engine = None
+        """Connects to the DB asynch and populates tree"""
         try:
+            connection_string = self._build_connection_string()
+            
             self.setCursor(Qt.CursorShape.WaitCursor)
             self.load_schema_button.setEnabled(False)
             self.load_schema_button.setText("Loading schema...")
-            connection_string = self._build_connection_string()
-
-            #Inspect
-            engine = create_engine(connection_string)
-            inspector = inspect(engine)
-
             self.schema_tree.clear()
-            table_names = inspector.get_table_names()
-
-            for table in table_names:
-                table_item = QTreeWidgetItem(self.schema_tree)
-                table_item.setText(0, table)
-                table_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
-
-                columns = []
-                try:
-                    #Use inspector first
-                    columns = inspector.get_columns(table)
-                except SQLAlchemyError as InspectorError:
-                    #Provide a fallback to sqlite
-                    if "sqlite" in connection_string.lower():
-                        try:
-                            with engine.connect() as conn:
-                                #Use PRAGMA
-                                result = conn.execute(text(f'PRAGMA table_info("{table}")'))
-                                columns = [{"name": row[1], "type": row[2]} for row in result]
-                        except SQLAlchemyError as FallbackError:
-                            print(f"Fallback inspection failed for {table}: {FallbackError}")
-                
-                if not columns:
-                    # If both methods have failed or the table is just empty
-                    err_item = QTreeWidgetItem(table_item)
-                    err_item.setText(0, "No columns found or an error has occurred during loading")
-                    continue
-
-                for col in columns:
-                    col_item = QTreeWidgetItem(table_item)
-                    #Get names and type
-                    col_name = col.get('name', 'Unknown')
-                    col_type = col.get('type', 'Unknown')
-
-                    col_item.setText(0, str(col_name))
-                    col_item.setText(1, str(col_type))
-                    col_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            self.schema_search_input.clear()
+            self.schema_search_input.setVisible(False)
             
-            if len(table_names) <= 15:
-                self.schema_tree.expandAll()
-        
+            worker = FetchSchemaWorker(connection_string=connection_string)
+            worker.signals.finished.connect(self.on_fetch_schema_success)
+            worker.signals.error.connect(self.on_fetch_schema_error)
+            
+            self.threadpool.start(worker)
         except ValueError as DatabaseValueError:
             QMessageBox.warning(self, "Input Error", str(DatabaseValueError))
-        except SQLAlchemyError as DatabaseError:
-            QMessageBox.critical(self, "Connection Error", f"Failed to fetch schema:\n{str(DatabaseError)}")
-            print(F"Connection Error: {str(DatabaseError)}")
-        finally:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            self.load_schema_button.setEnabled(True)
-            self.load_schema_button.setText("Load Tables and Columns")
-            if engine is not None:
-                engine.dispose()
+    
+    def on_fetch_schema_success(self, schema_data: list[dict]) -> None:
+        """Populates the schema tree with fetched data"""
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.load_schema_button.setEnabled(True)
+        self.load_schema_button.setText("Load Tables and Columns")
+        
+        self.schema_search_input.setVisible(True)
+        
+        for table_info in schema_data:
+            table = table_info["table"]
+            columns = table_info["columns"]
+            
+            table_item = QTreeWidgetItem(self.schema_tree)
+            table_item.setText(0, table)
+            table_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
+            
+            if not columns:
+                err_item = QTreeWidgetItem(table_item)
+                err_item.setText(0, "No columns found")
+                continue
+            
+            for col in columns:
+                col_item = QTreeWidgetItem(table_item)
+                col_name = col.get("name", "Unknown")
+                col_type = col.get("type", "Unknown")
+                
+                col_item.setText(0, str(col_name))
+                col_item.setText(1, str(col_type))
+                col_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+        
+        if len(schema_data) <= 15:
+            self.schema_tree.expandAll()
+    
+    def on_fetch_schema_error(self, error_message: str) -> None:
+        """Handles errors during asynch schema fetch"""
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.load_schema_button.setEnabled(True)
+        self.load_schema_button.setText("Load Tables and Columns")
+        QMessageBox.critical(self, "Connection Error", f"Failed to fetch schema:\n{error_message}")
+    
+    def filter_schema_tree(self, text: str) -> None:
+        """Filters the schema tree on a search query"""
+        search_term = text.lower().strip()
+        
+        for i in range(self.schema_tree.topLevelItemCount()):
+            table_item = self.schema_tree.topLevelItem(i)
+            table_match = search_term in table_item.text(0).lower()
+            
+            child_match = False
+            for j in range(table_item.childCount()):
+                col_item = table_item.child(j)
+                if search_term in col_item.text(0).lower():
+                    col_item.setHidden(False)
+                    child_match = True
+                else:
+                    col_item.setHidden(True)
+            
+            table_item.setHidden(not (table_match or child_match))
+            
+            if child_match and search_term:
+                table_item.setExpanded(True)
+            elif not search_term:
+                table_item.setExpanded(False)
     
     def on_schema_double_clicked(self, item: QTreeWidgetItem) -> None:
         """Insert the clicked ite text into the query"""
@@ -706,3 +778,10 @@ class DatabaseConnectionDialog(QDialog):
             self.settings.remove(name)
             self.settings.endGroup()
             self.populate_profiles()
+    
+    def toggle_password_visibility(self) -> None:
+        """Swaps the echo mode for passwords to view the password currently typed"""
+        if self.password_input.echoMode() == DataPlotStudioLineEdit.EchoMode.Password:
+            self.password_input.setEchoMode(DataPlotStudioLineEdit.EchoMode.Normal)
+        else:
+            self.password_input.setEchoMode(DataPlotStudioLineEdit.EchoMode.Password)

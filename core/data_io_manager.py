@@ -350,7 +350,7 @@ class DataIOManager:
                 f"- Try with Sheet1 first"
             )
     
-    def import_from_database(self, connection_string: str, query: str) -> tuple[pd.DataFrame, Path]:
+    def import_from_database(self, connection_string: str, query: str, max_rows: int = 1000000) -> tuple[pd.DataFrame, Path]:
         """
         Import data from a database using SQLAlchemy\n
         :param connection_string (str): The SQLAlchemy connection url
@@ -371,13 +371,28 @@ class DataIOManager:
             self.last_gsheet_name = None
             self.file_path = None
             self.is_temp_file = False
+            
+            chunks = []
+            total_rows = 0
+            chunk_size = 50000
+            hit_limit = False
 
             engine = create_engine(connection_string)
             with engine.connect() as connection:
-                df = pd.read_sql_query(text(query), connection)
-
-            if df is None or len(df) == 0:
+                for chunk in pd.read_sql_query(text(query), connection, chunksize=chunk_size):
+                    chunks.append(chunk)
+                    total_rows += len(chunk)
+                    
+                    if total_rows >= max_rows:
+                        hit_limit = True
+                        break
+            if not chunks:
                 raise ValueError("Query returned no data.")
+
+            df = pd.concat(chunks, ignore_index=True)
+            
+            if hit_limit:
+                print(f"Warning: Query truncated at {max_rows} rows to prevent memory exhaustion")
 
             df = self._attempt_datetime_conversion(df)
 

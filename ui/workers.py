@@ -4,7 +4,8 @@ import numpy as np
 
 
 from core.data_handler import DataHandler
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.exc import SQLAlchemyError
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.subset_manager import SubsetManager
@@ -143,6 +144,47 @@ class TestConnectionWorker(QRunnable):
             self.signals.finished.emit(True)
         except Exception as ConnectionError:
             self.signals.error.emit(ConnectionError)
+
+class FetchSchemaWorkerSignals(QObject):
+    """Signals for the FetchSchemaWorker"""
+    finished = pyqtSignal(list)
+    error = pyqtSignal(str)
+
+class FetchSchemaWorker(QRunnable):
+    """Worker thread to fetch database schema asynch"""
+    def __init__(self, connection_string: str) -> None:
+        super().__init__()
+        self.connection_string = connection_string
+        self.signals = FetchSchemaWorkerSignals()
+    
+    def run(self) -> None:
+        engine = None
+        try:
+            engine = create_engine(self.connection_string)
+            inspector = inspect(engine)
+            table_names = inspector.get_table_names()
+            schema_data = []
+            
+            for table in table_names:
+                columns = []
+                try:
+                    columns = inspector.get_columns(table)
+                except SQLAlchemyError as InspectorError:
+                    if "sqlite" in self.connection_string.lower():
+                        try:
+                            with engine.connect() as conn:
+                                result = conn.execute(text(f'PRAGMA table_info("{table}")'))
+                                columns = [{"name": row[1], "type": row[2]} for row in result]
+                        except SQLAlchemyError as FallbackError:
+                            print(f"Fallback inspection failed for {table}: {FallbackError}")
+                schema_data.append({"table": table, "columns": columns})
+            
+            self.signals.finished.emit(schema_data)
+        except Exception as err:
+            self.signals.error.emit(err)
+        finally:
+            if engine is not None:
+                engine.dispose()
 
 class AutoCreateSubsetsWorker(QRunnable):
     """Worker thread for auto-creating and applying subsets"""
