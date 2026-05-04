@@ -142,7 +142,6 @@ class ExportDialog(QDialog):
         column_tools_layout.addLayout(tools_row_layout)
 
         self.column_list = DataPlotStudioListWidget()
-        self.column_list.setObjectName("export_column_list")
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.column_list.setMaximumHeight(250)
         column_tools_layout.addWidget(self.column_list)

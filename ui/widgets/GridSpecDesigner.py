@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioSpinBox
+from ui.widgets.ControlElements import DataPlotStudioMenu, DataPlotStudioSpinBox
 
 @dataclass
 class GridSpan:
@@ -169,7 +169,7 @@ class GridSpecDesignerWidget(QWidget):
         self._redraw_table()
         
     def _show_context_menu(self, position: QPoint) -> None:
-        menu = QMenu(self)
+        menu = DataPlotStudioMenu(self)
         
         merge_action = menu.addAction("Add / Merge Selected")
         remove_action = menu.addAction("Remove Selected")

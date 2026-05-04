@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
 import pandas as pd
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioMenu
 from ui.workers import AggregationWorker
 
 DIALOG_WIDTH: int = 1200
@@ -344,7 +344,7 @@ class AggregationDialog(QDialog):
     
     def _show_available_list_context_menu(self, position: QPoint) -> None:
         """Display a right-click context menu for the available columns list."""
-        menu = QMenu(self)
+        menu = DataPlotStudioMenu(self)
         select_all_action = menu.addAction("Select All")
         
         action = menu.exec(self.available_list.viewport().mapToGlobal(position))
@@ -383,7 +383,7 @@ class AggregationDialog(QDialog):
     
     def _show_agg_table_context_menu(self, position: QPoint) -> None:
         """Display a right-click context menu for the aggregation table."""
-        menu = QMenu(self)
+        menu = DataPlotStudioMenu(self)
         
         remove_action = menu.addAction("Remove Selected")
         menu.addSeparator()

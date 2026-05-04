@@ -374,7 +374,7 @@ QScrollArea[styleClass="transparent_scroll_area"] {
 }
 
 #dpsListWidget::item:hover {
-    background-color: #f0f0f0;
+    background-color: rgba(0, 120, 215, 0.05);
 }
 
 #dpsListWidget::item:selected {
@@ -383,10 +383,6 @@ QScrollArea[styleClass="transparent_scroll_area"] {
     font-weight: bold;
     border: 1px solid #dcdcdc;
     border-bottom: 2px solid #0078d7;
-}
-
-#dpsListWidget::item:selected:hover {
-    background-color: #005fa3;
 }
 
 QLineEdit[styleClass="dpsLineEdit"] {

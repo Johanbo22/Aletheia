@@ -9,12 +9,6 @@ QSplitter#subset_manager_splitter::handle:hover {
     background-color: #bdc3c7;
 }
 
-DataPlotStudioListWidget#subset_manager_list {
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    background-color: #ffffff;
-}
-
 QLabel#subset_name_label {
     color: #333333;
     margin-top: 5px;

@@ -6,7 +6,7 @@ from PyQt6.QtGui import QFont, QColor, QRegularExpressionValidator, QKeyEvent
 from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioMenu, DataPlotStudioSpinBox
 
 class CreateDatasetDialog(QDialog):
     """
@@ -290,7 +290,7 @@ class CreateDatasetDialog(QDialog):
         self._validate_schema()
         
     def _show_table_context_menu(self, position: QPoint) -> None:
-        menu = QMenu(self.col_table)
+        menu = DataPlotStudioMenu(self.col_table)
         
         action_reset = menu.addAction("Reset Names to Prefix")
         action_reset.setIcon(IconBuilder.build(IconType.Redo))

@@ -1,8 +1,3 @@
-DataPlotStudioListWidget#export_column_list {
-    background-color: #ffffff;
-    border: 1px solid #cccccc;
-}
-
 DataPlotStudioListWidget#export_column_list:disabled {
     background-color: #f0f0f0;
     border: 1px solid #dddddd;

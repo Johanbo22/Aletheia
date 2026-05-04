@@ -2,7 +2,7 @@ from ui.widgets import DataPlotStudioButton
 from ui.dialogs import CreateSubsetDialog, SubsetDataViewer, ProgressDialog
 from core.data_handler import DataHandler
 from core.subset_manager import SubsetManager
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
+from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioMenu
 from ui.workers import AutoCreateSubsetsWorker
 
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QThreadPool
@@ -130,7 +130,6 @@ class SubsetManagerDialog(QDialog):
         self.clear_search_shortcut.activated.connect(self._clear_search_and_focus_list)
 
         self.subset_list = DataPlotStudioListWidget()
-        self.subset_list.setObjectName("subset_manager_list")
         self.subset_list.setAlternatingRowColors(True)
         self.subset_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.subset_list.customContextMenuRequested.connect(self.show_context_menu)
@@ -360,7 +359,7 @@ class SubsetManagerDialog(QDialog):
         self.subset_list.setCurrentItem(item)
         self.on_subset_selected(item)
         
-        menu = QMenu(self)
+        menu = DataPlotStudioMenu(self)
         view_action = menu.addAction("View Data")
         plot_action = menu.addAction("Plot Subset")
         export_action = menu.addAction("Export Subset")
