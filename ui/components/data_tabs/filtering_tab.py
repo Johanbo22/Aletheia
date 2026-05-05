@@ -1,10 +1,9 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QFormLayout
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets import DataPlotStudioButton
-from ui.icons import IconType, IconBuilder
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit
+from ui.icons import IconType
+from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioGroupBox
 
 if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController
@@ -17,40 +16,35 @@ class FilteringTab(BaseDataTab):
     def init_ui(self) -> None:
         layout = QVBoxLayout(self)
         
-        filter_info = QLabel("This tab has operations to help you filter your dataset based on own criteria. Use the 'Advanced Filter' dialog to apply more than one filter")
+        filter_info = QLabel("Filter your dataset by defining criteria. Use the Quick Filter for single conditions, or the Advanced Filter for complex, multi-conditional queries.")
         filter_info.setWordWrap(True)
         filter_info.setProperty("styleClass", "info_text")
         layout.addWidget(filter_info)
+        layout.addSpacing(10)
         
-        layout.addWidget(QLabel("Column:"))
-        filter_column_info = QLabel("Select the column you wish to apply a filter to")
-        filter_column_info.setWordWrap(True)
-        filter_column_info.setProperty("styleClass", "info_text")
-        layout.addWidget(filter_column_info)
+        quick_filter_group = DataPlotStudioGroupBox("Quick Filter")
+        quick_filter_layout = QVBoxLayout(quick_filter_group)
+        quick_filter_layout.setSpacing(12)
+        
+        form_layout = QFormLayout()
         
         self.filter_column = DataPlotStudioComboBox()
-        layout.addWidget(self.filter_column)
-        
-        layout.addWidget(QLabel("Condition:"))
-        filter_condition_info = QLabel("Select which conditional to apply to column. N.B. Uses Python Syntax")
-        filter_condition_info.setProperty("styleClass", "info_text")
-        filter_condition_info.setWordWrap(True)
-        layout.addWidget(filter_condition_info)
+        self.filter_column.setToolTip("Select the column you wish to apply a filter to")
+        form_layout.addRow(QLabel("Column:"), self.filter_column)
         
         self.filter_condition = DataPlotStudioComboBox()
         self.filter_condition.addItems(["==", "!=", ">", "<", ">=", "<=", "contains"])
-        layout.addWidget(self.filter_condition)
-        
-        layout.addWidget(QLabel("Value:"))
-        filter_value_info = QLabel("Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
-        filter_value_info.setWordWrap(True)
-        filter_value_info.setProperty("styleClass", "info_text")
-        layout.addWidget(filter_value_info)
+        self.filter_condition.setToolTip("Select which conditional to apply to column. N.B. Uses Python Syntax")
+        form_layout.addRow(QLabel("Condition:"), self.filter_condition)
         
         self.filter_value = DataPlotStudioLineEdit()
-        layout.addWidget(self.filter_value)
+        self.filter_value.setPlaceholderText("Enter evaluation value...")
+        self.filter_value.setToolTip("Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
+        form_layout.addRow(QLabel("Value:"), self.filter_value)
         
-        layout.addLayout(self._create_operation_row(
+        quick_filter_layout.addLayout(form_layout)
+        
+        quick_filter_layout.addLayout(self._create_operation_row(
             title="Apply Filter",
             tooltip="Apply the configured filter",
             callback=self.controller.apply_filter,
@@ -58,27 +52,28 @@ class FilteringTab(BaseDataTab):
             icon_type=IconType.Filter
         ))
         
-        clear_filter_layout = QHBoxLayout()
-        clear_filter_button = DataPlotStudioButton("Clear Filters", parent=self)
-        clear_filter_button.setToolTip("Reset the dataset to its original state and remove the filters")
-        clear_filter_button.setIcon(IconBuilder.build(IconType.ClearFilter))
-        clear_filter_button.clicked.connect(self.controller.clear_filters)
+        quick_filter_layout.addLayout(self._create_operation_row(
+            title="Clear Filters",
+            tooltip="Reset the dataset to its original state and remove the filters",
+            callback=self.controller.clear_filters,
+            help_id="",
+            icon_type=IconType.ClearFilter
+        ))
+        layout.addWidget(quick_filter_group)
         
-        placeholder = QWidget()
-        placeholder.setFixedSize(24, 24)
-        clear_filter_layout.addWidget(clear_filter_button)
-        clear_filter_layout.addWidget(placeholder)
-        layout.addLayout(clear_filter_layout)
+        advanced_filter_group = DataPlotStudioGroupBox("Advanced Filter")
+        advanced_filter_layout = QVBoxLayout(advanced_filter_group)
+        advanced_filter_layout.setSpacing(12)
         
-        layout.addSpacing(10)
-        
-        layout.addLayout(self._create_operation_row(
+        advanced_filter_layout.addLayout(self._create_operation_row(
             title="Advanced Filter",
             tooltip="Open the advanced multi-conditional filter to build more complex filters",
             callback=self.controller.open_advanced_filter,
-            help_id="apply_filter",
+            help_id="advanced_filter",
             icon_type=IconType.AdvancedFilter
         ))
+        layout.addWidget(advanced_filter_group)
+        
         layout.addStretch()
     
     def get_filter_parameters(self) -> tuple[str, str, str]:

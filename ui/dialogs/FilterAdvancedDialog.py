@@ -1,6 +1,6 @@
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QStackedWidget, QDateEdit, QSizePolicy, QWidget, QCompleter, QScrollArea, QPushButton
-from PyQt6.QtCore import QDate, QThreadPool, Qt
+from PyQt6.QtCore import QDate, QThreadPool, Qt, QTimer
 import pandas as pd
 from typing import List, Dict, Any, Optional
 
@@ -8,6 +8,7 @@ from ui.theme import ThemeColors
 from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 from ui.workers import FilterWorker
 from ui.widgets import DataPlotStudioButton
+from ui.icons import IconBuilder, IconType
 
 
 class FilterAdvancedDialog(QDialog):
@@ -44,11 +45,33 @@ class FilterAdvancedDialog(QDialog):
         self.columns = list(self.data_handler.df.columns) if self.data_handler.df is not None else []
         self.filters = []
         self.thread_pool = QThreadPool.globalInstance()
+        self._column_stats_cache: Dict[str, Dict[str, Any]] = {}
+        
+        # Timer for the preview_label to not lag
+        PREVIEW_TIMER_MS = 250
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.setInterval(PREVIEW_TIMER_MS)
+        self._preview_timer.timeout.connect(self._render_preview)
+        
         self.init_ui()
+    
+    @property
+    def _has_active_filters(self) -> bool:
+        """Determines if there are any configured filters based on widget states"""
+        if len(self.filter_rows) > 1:
+            return True
+        if self.filter_rows:
+            first_row = self.filter_rows[0]
+            val = self.get_current_value(first_row)
+            condition = first_row["condition"].currentText()
+            if val != "" or condition in ["Is Null", "Is Not Null"]:
+                return True
+        return False
         
     def reject(self) -> None:
         """Override of self.reject to prevent accidental data loss on Escape key or Cancel button."""
-        if hasattr(self, "preview_label") and "No filters active" not in self.preview_label.text():
+        if self._has_active_filters:
             reply = QMessageBox.question(
                 self, 'Cancel Filtering', 
                 'You have active filter configurations. Are you sure you want to cancel?',
@@ -75,10 +98,10 @@ class FilterAdvancedDialog(QDialog):
         self.preview_label.setWordWrap(True)
         self.preview_label.setObjectName("filter_preview_label")
         
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
-        scroll_area.setProperty("styleClass", "transparent_scroll_area")
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.scroll_area.setProperty("styleClass", "transparent_scroll_area")
         
         scroll_widget = QWidget()
         scroll_widget.setObjectName("TransparentScrollContent")
@@ -89,8 +112,8 @@ class FilterAdvancedDialog(QDialog):
         self.filter_rows = []
         
         self.add_filter_row()
-        scroll_area.setWidget(scroll_widget)
-        layout.addWidget(scroll_area, 1)
+        self.scroll_area.setWidget(scroll_widget)
+        layout.addWidget(self.scroll_area, 1)
         
         add_btn_layout = QHBoxLayout()
         self.add_filter_btn = DataPlotStudioButton("+ Add Filter", parent=self)
@@ -179,6 +202,7 @@ class FilterAdvancedDialog(QDialog):
         text_input = DataPlotStudioLineEdit()
         text_input.setPlaceholderText("Enter text...")
         text_input.setClearButtonEnabled(True)
+        text_input.returnPressed.connect(self.validate_and_accept)
         input_stack.addWidget(text_input)
         
         # Numerical inputs
@@ -210,7 +234,8 @@ class FilterAdvancedDialog(QDialog):
         filter_layout.addWidget(val_label)
         filter_layout.addWidget(input_stack, 2)
         
-        remove_btn = QPushButton("✕")
+        remove_btn = QPushButton()
+        remove_btn.setIcon(IconBuilder.build(IconType.Close))
         remove_btn.setToolTip("Remove this filter")
         remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         remove_btn.setFixedWidth(30)
@@ -252,6 +277,13 @@ class FilterAdvancedDialog(QDialog):
             column_combo.setFocus()
             
         self.update_preview()
+        QTimer.singleShot(10, self._scroll_to_bottom)
+    
+    def _scroll_to_bottom(self) -> None:
+        """Scrolls to the bottom of the filter list"""
+        if hasattr(self, "scroll_area"):
+            scrollbar = self.scroll_area.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
     
     def remove_filter_row(self, row_data: dict) -> None:
         """Remove a specific filter row and update UI"""
@@ -317,40 +349,83 @@ class FilterAdvancedDialog(QDialog):
         stack.setVisible(True)
         val_label.setVisible(True)
         
-        if pd.api.types.is_numeric_dtype(col_dtype):
-            stack.setCurrentIndex(1)
-            valid_numbers = df[col_name].dropna()
-            if not valid_numbers.empty:
-                min_val = float(valid_numbers.min())
-                max_val = float(valid_numbers.max())
+        if col_name not in self._column_stats_cache:
+            stats: Dict[str, Any] = {}
+            
+            if df is not None and col_name in df.columns:
+                col_data = df[col_name].dropna()
+            
+                if pd.api.types.is_numeric_dtype(col_dtype):
+                    if not col_data.empty:
+                        stats["min"] = float(col_data.min())
+                        stats["max"] = float(col_data.max())
+                    elif pd.api.types.is_datetime64_any_dtype(col_dtype):
+                        if not col_data.empty:
+                            stats["max_date"] = col_data.max()
+                    elif pd.api.types.is_object_dtype(col_dtype) or pd.api.types.is_categorical_dtype(col_dtype) or pd.api.types.is_string_dtype(col_dtype):
+                        unique_vals = col_data.unique()
+                        if len(unique_vals) < 1000:
+                            stats["unique"] = sorted([str(v) for v in unique_vals])
                 
+                self._column_stats_cache[col_name] = stats
+            
+        col_stats = self._column_stats_cache.get(col_name, {})
+        
+        if pd.api.types.is_numeric_dtype(col_dtype):
+            number_index = 1
+            stack.setCurrentIndex(number_index)
+            if "min" in col_stats and "max" in col_stats:
+                min_val = col_stats["min"]
+                max_val = col_stats["max"]
                 margin = abs(max_val - min_val) * 0.1 if max_val != min_val else 10.0
-                row["inputs"]["number"].setRange(min_val - margin, max_val + margin)
+                spinbox = row["inputs"]["number"]
+                spinbox.setRange(min_val - margin, max_val + margin)
+                
+                range_span = abs(max_val - min_val)
+                if range_span == 0:
+                    step_size = 1.0
+                elif range_span <= 10.0:
+                    step_size = 0.1
+                elif range_span <= 100.0:
+                    step_size = 1.0
+                else:
+                    step_size = round(range_span / 100.0)
+                
+                spinbox.setSingleStep(step_size)
+                
         elif pd.api.types.is_datetime64_any_dtype(col_dtype):
-            stack.setCurrentIndex(3)
-            valid_dates = df[col_name].dropna()
-            if not valid_dates.empty:
-                max_date = valid_dates.max()
+            datetime_index = 3
+            stack.setCurrentIndex(datetime_index)
+            if "max_date" in col_stats:
+                max_date = col_stats["max_date"]
                 try:
                     qdate = QDate(max_date.year, max_date.month, max_date.day)
                     if qdate.isValid():
                         row["inputs"]["date"].setDate(qdate)
                 except Exception:
                     pass
-        
         elif pd.api.types.is_object_dtype(col_dtype) or pd.api.types.is_categorical_dtype(col_dtype) or pd.api.types.is_string_dtype(col_dtype):
-            unique_values = df[col_name].dropna().unique()
-            if len(unique_values) < 1000:
-                stack.setCurrentIndex(2)
+            if "unique" in col_stats:
+                unique_vals_index = 2
+                stack.setCurrentIndex(unique_vals_index)
                 combo = row["inputs"]["category"]
-                                
-                sorted_vals = sorted([str(v) for v in unique_values])
+                
+                sorted_vals = col_stats["unique"]
                 current_vals = [combo.itemText(i) for i in range(combo.count())]
                 if current_vals != sorted_vals:
                     combo.clear()
                     combo.addItems(sorted_vals)
+                    if combo.lineEdit():
+                        combo.lineEdit().clear()
                 combo.setEditable(True)
                 combo.setInsertPolicy(DataPlotStudioComboBox.InsertPolicy.NoInsert)
+                if combo.lineEdit():
+                    combo.lineEdit().setPlaceholderText("Select or type...")
+                    try:
+                        combo.lineEdit().returnPressed.disconnect()
+                    except TypeError:
+                        pass
+                    combo.lineEdit().returnPressed.connect(self.validate_and_accept)
                 
                 completer = QCompleter(sorted_vals, combo)
                 completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -364,6 +439,10 @@ class FilterAdvancedDialog(QDialog):
             stack.setCurrentIndex(0)
             self._update_text_placeholder(row, condition)
         
+        active_widget = stack.currentWidget()
+        if active_widget.isVisible() and active_widget.isEnabled():
+            active_widget.setFocus()
+        
         self.update_preview()
     
     def _update_text_placeholder(self, row: dict, condition: str) -> None:
@@ -375,6 +454,45 @@ class FilterAdvancedDialog(QDialog):
             text_widget.setPlaceholderText("e.g. val1, val2, val3")
         else:
             text_widget.setPlaceholderText("Enter text...")
+            
+    def _update_condition_options(self, row: dict, col_name: str) -> None:
+        """Only show conditions that make sense for the columns datatype"""
+        if self.data_handler.df is None and col_name in self.data_handler.df.columns:
+            combo = row["condition"]
+            current_cond = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            
+            col_dtype = self.data_handler.df[col_name].dtype
+            
+            if pd.api.types.is_numeric_dtype(col_dtype):
+                options = ["Equals", "Not Equals", "Greather Than", "Less Than", "Is Null", "Is Not Null"]
+            elif pd.api.types.is_datetime64_any_dtype(col_dtype):
+                options = ["Equals", "Before", "After", "Is Null", "Is Not Null"]
+            else:
+                options = ["Equals", "Not Equals", "Contains Text", "Starts With", "Ends With", "In List", "Is Null", "Is Not Null"]
+            
+            combo.addItems(options)
+            
+            if current_cond in options:
+                combo.setCurrentText(current_cond)
+            
+            combo.blockSignals(False)
+            self._on_condition_changed(row, combo.currentText())
+    
+    def _on_condition_changed(self, row: dict, condition: str) -> None:
+        input_container = row.get("inputs")
+        if condition in ["Is Null", "Is Not Null"]:
+            if input_container:
+                input_container.setVisible(False)
+        else:
+            if input_container:
+                input_container.setVisible(True)
+            
+            active_widget = row["inputs"]["stack"].currentWidget()
+            if active_widget.isVisible() and active_widget.isEnabled():
+                active_widget.setFocus()
+        self.update_preview()
     
     def get_current_value(self, row):
         """Retrieve the value from the current active widget"""
@@ -394,7 +512,7 @@ class FilterAdvancedDialog(QDialog):
 
     def clear_fields(self):
         """Reset the filter fields to default"""
-        if "No filters active" not in self.preview_label.text():
+        if self._has_active_filters:
             reply = QMessageBox.question(
                 self, 'Clear Filters', 
                 'Are you sure you want to clear all filters?',
@@ -417,7 +535,14 @@ class FilterAdvancedDialog(QDialog):
 
         self.update_preview()
 
-    def update_preview(self):
+    def update_preview(self) -> None:
+        """Debounce the preview rendering from self.preview_timer"""
+        if hasattr(self, "_preview_timer"):
+            self._preview_timer.start()
+        else:
+            self._render_preview()
+    
+    def _render_preview(self):
         """update the filter preview"""
         preview_parts = []
         
@@ -474,7 +599,6 @@ class FilterAdvancedDialog(QDialog):
     def validate_and_accept(self):
         """Validate filters before accepting"""
         if not self.filter_rows:
-            QMessageBox.warning(self, "Validation Error", "Please create at least one filter")
             return
 
         for row in self.filter_rows:
@@ -483,7 +607,6 @@ class FilterAdvancedDialog(QDialog):
             val = self.get_current_value(row)
             if cond not in ["Is Null", "Is Not Null"]:
                 if isinstance(val, str) and not val.strip():
-                    QMessageBox.warning(self, "Validation Error", "Please enter a value for all filters")
                     return
         
         self.apply_button.setText("Applying...")
