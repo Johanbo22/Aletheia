@@ -567,7 +567,7 @@ class DataTab(QWidget):
         panel.datetime_tab.dt_end_combo.clear()
         panel.datetime_tab.dt_end_combo.addItems(columns)
         
-        if hasattr(panel, "sort_column_combo"):
+        if hasattr(panel, "transform_tab") and hasattr(panel.transform_tab, "sort_column_combo"):
             current_sort = panel.transform_tab.sort_column_combo.currentText()
             panel.transform_tab.sort_column_combo.clear()
             panel.transform_tab.sort_column_combo.addItems(columns)
@@ -575,8 +575,8 @@ class DataTab(QWidget):
                 panel.transform_tab.sort_column_combo.setCurrentText(current_sort)
             elif (self.data_handler.sort_state and self.data_handler.sort_state[0] in columns):
                 panel.transform_tab.sort_column_combo.setCurrentText(self.data_handler.sort_state[0])
-        
-        if hasattr(panel, "subset_column_combo"):
+                
+        if hasattr(panel, "subsets_tab") and hasattr(panel.subsets_tab, "subset_column_combo"):
             try:
                 panel.subsets_tab.subset_column_combo.clear()
                 panel.subsets_tab.subset_column_combo.addItems(columns)

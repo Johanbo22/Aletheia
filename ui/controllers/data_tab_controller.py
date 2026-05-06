@@ -1694,7 +1694,7 @@ class DataTabController:
 
             self.view.operations_panel.set_injection_status_ui(is_subset_active=True, subset_name=subset_name)
             self.view.operations_panel.restore_original_btn.setEnabled(True)
-            self.view.operations_panel.inject_subset_tbn.setEnabled(False)
+            self.view.operations_panel.inject_subset_btn.setEnabled(False)
 
             self.status_bar.log_action(
                 f"Inserted the subset: '{subset_name}' into the active DataFrame",

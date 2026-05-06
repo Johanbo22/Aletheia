@@ -25,8 +25,11 @@ class SubplotManager:
 
     def on_subplot_active(self) -> None:
         """Activates the subplot group for visibility"""
-        subplots_enabled = self.view.add_subplots_check.isChecked()
+        subplots_enabled: bool = self.view.add_subplots_check.isChecked()
         self.view.subplot_group.setVisible(subplots_enabled)
+        
+        if not subplots_enabled:
+            self.plot_tab.clear_plot()
 
     def apply_custom_grid_layout(self, rows: int, cols: int, custom_grid: list) -> None:
         """Apply custom GridSpec layout to the current subplot context"""

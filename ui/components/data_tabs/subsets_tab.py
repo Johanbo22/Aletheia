@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem
 from PyQt6.QtCore import Qt
 from typing import Optional, TYPE_CHECKING
 
@@ -35,10 +35,15 @@ class SubsetsTab(BaseDataTab):
 
         quick_subset_group = DataPlotStudioGroupBox("Quick Subset Creation")
         quick_subset_layout = QVBoxLayout()
-        quick_subset_layout.addWidget(QLabel("Split data by column values:"))
+
+        combo_layout = QHBoxLayout()
+        combo_label = QLabel("Split data by column values:")
+        combo_layout.addWidget(combo_label)
 
         self.subset_column_combo = DataPlotStudioComboBox()
-        quick_subset_layout.addWidget(self.subset_column_combo)
+        combo_layout.addWidget(self.subset_column_combo)
+
+        quick_subset_layout.addLayout(combo_layout)
 
         quick_subset_layout.addLayout(self._create_operation_row(
             title="Auto-Create Subsets",
@@ -59,6 +64,7 @@ class SubsetsTab(BaseDataTab):
         subset_list_layout.addWidget(self.active_subsets_list)
 
         subset_list_btns = QHBoxLayout()
+        subset_list_btns.addStretch()
         view_subset_btn = DataPlotStudioButton("View", parent=self)
         view_subset_btn.setIcon(IconBuilder.build(IconType.ViewItem))
         view_subset_btn.clicked.connect(self.controller.view_subset_quick)
@@ -71,7 +77,7 @@ class SubsetsTab(BaseDataTab):
         subset_list_layout.addLayout(subset_list_btns)
         subset_list_group.setLayout(subset_list_layout)
         layout.addWidget(subset_list_group)
-        layout.addStretch()
+        layout.addSpacing(10)
 
         inject_group = DataPlotStudioGroupBox("View Subset as Active DataFrame")
         inject_layout = QVBoxLayout()
@@ -82,7 +88,7 @@ class SubsetsTab(BaseDataTab):
         inject_layout.addWidget(inject_info)
         inject_layout.addSpacing(10)
 
-        self.inject_subset_tbn = DataPlotStudioButton(
+        self.inject_subset_btn = DataPlotStudioButton(
             "Insert Selected Subset",
             parent=self,
             base_color_hex=ThemeColors.MainColor,
@@ -90,12 +96,13 @@ class SubsetsTab(BaseDataTab):
             font_weight="bold",
             padding="8px",
         )
-        self.inject_subset_tbn.clicked.connect(self.controller.inject_subset_to_dataframe)
-        inject_layout.addWidget(self.inject_subset_tbn)
+        self.inject_subset_btn.clicked.connect(self.controller.inject_subset_to_dataframe)
+        inject_layout.addWidget(self.inject_subset_btn)
 
         self.injection_status_label = QLabel("Status: Working with original data")
         self.injection_status_label.setObjectName("injection_status_label")
         self.injection_status_label.setProperty("statusState", "success")
+        self.injection_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         inject_layout.addWidget(self.injection_status_label)
         inject_layout.addSpacing(10)
 
@@ -122,7 +129,6 @@ class SubsetsTab(BaseDataTab):
         return item.data(Qt.ItemDataRole.UserRole) if item else None
 
     def update_active_subsets_list(self, subsets: list[tuple[str, str]]) -> None:
-        from PyQt6.QtWidgets import QListWidgetItem
         self.active_subsets_list.clear()
         for name, row_text in subsets:
             item = QListWidgetItem(f"{name} ({row_text})")
@@ -134,12 +140,12 @@ class SubsetsTab(BaseDataTab):
             self.injection_status_label.setText(f"Status: Working with a subset: '{subset_name}'")
             self.injection_status_label.setProperty("statusState", "warning")
             self.restore_original_btn.setEnabled(True)
-            self.inject_subset_tbn.setEnabled(False)
+            self.inject_subset_btn.setEnabled(False)
         else:
             self.injection_status_label.setText("Status: Working with original data")
             self.injection_status_label.setProperty("statusState", "success")
             self.restore_original_btn.setEnabled(False)
-            self.inject_subset_tbn.setEnabled(True)
+            self.inject_subset_btn.setEnabled(True)
         
         self.injection_status_label.style().unpolish(self.injection_status_label)
         self.injection_status_label.style().polish(self.injection_status_label)

@@ -45,7 +45,8 @@ QPushButton:disabled {
 }
 
 QPushButton:focus {
-    border: 2px solid #0078d7;
+    border: 1px solid #0078d7;
+    padding: 8px;
 }
 
 QComboBox,
@@ -404,7 +405,7 @@ QLineEdit[styleClass="dpsLineEdit"]:focus {
 
 QComboBox[styleClass="dpsComboBox"] {
     border: 1.5px solid #bdc3c7;
-    border-radius: 3px;
+    border-radius: 3cqh;
     padding: 1px 35px 1px 3px;
     min-width: 6em;
     background-color: #ffffff;
@@ -592,8 +593,9 @@ QGroupBox[styleClass="dpsGroupBox"] {
     padding-top: 10px;
 }
 
+QGroupBox[styleClass="dpsGroupBox"]:focus,
 QGroupBox[styleClass="dpsGroupBox"]:hover {
-    border-color: #2563eb;
+    border: 1.5px solid #2563eb;
 }
 
 QGroupBox[styleClass="dpsGroupBox"]::title {
@@ -644,7 +646,7 @@ QRadioButton[styleClass="dpsRadioButton"]:disabled {
 QMenu[styleClass="dpsMenu"] {
     background-color: #ffffff;
     border: 1px solid #bdc3c7;
-    padding: 4px 0px;
+    padding: 6px 12px 6px 12px;
 }
 
 QMenu[styleClass="dpsMenu"]::item {
