@@ -23,6 +23,7 @@ from core.plot_strategies.stem_strategy import StemPlotStrategy
 from core.plot_strategies.trig_strategies import TricontourPlotStrategy, TricontourfPlotStrategy, TripcolorPlotStrategy, TriplotPlotStrategy
 from core.plot_strategies.vector_strategies import BarbsPlotStrategy, QuiverPlotStrategy, StreamplotPlotStrategy
 from core.plot_strategies.violin_strategy import ViolinPlotStrategy
+from core.plot_strategies.three_d_strategies import Line3DStrategy, Scatter3DStrategy, Surface3DStrategy
 
 
 class StrategyRegistry:
@@ -57,7 +58,10 @@ class StrategyRegistry:
         "Tricontourf": TricontourfPlotStrategy,
         "Tripcolor": TripcolorPlotStrategy,
         "Triplot": TriplotPlotStrategy,
-        "GeoSpatial": GeoSpatialPlotStrategy
+        "GeoSpatial": GeoSpatialPlotStrategy,
+        "3D Line": Line3DStrategy,
+        "3D Scatter": Scatter3DStrategy,
+        "3D Surface": Surface3DStrategy,
     }
     
     @classmethod

@@ -58,7 +58,10 @@ class PlotEngine:
         "Tricontourf": "plot_tricontourf",
         "Tripcolor": "plot_tripcolor",
         "Triplot": "plot_triplot",
-        "GeoSpatial": "plot_geospatial"
+        "GeoSpatial": "plot_geospatial",
+        "3D Scatter": "plot_scatter_3d",
+        "3D Line": "plot_line_3d",
+        "3D Surface": "plot_surface_3d",
     }
     
     PLOT_DESCRIPTIONS: Dict[str, str] = {
@@ -104,7 +107,10 @@ class PlotEngine:
         "Tricontourf": "A filled triangular contour plot. Like `contourf`, it fills the areas between the contour lines generated from an unstructured (x, y, z) dataset.",
         "Tripcolor": "Creates a pseudocolor plot from an unstructured (x, y, z) dataset. It triangulates the (x, y) points and colors each triangle based on its Z value.",
         "Triplot": "A simple plot that draws the underlying triangulation of an (x, y) dataset, showing the network of triangles used for other tri-plots.",
-        "GeoSpatial": "Visualizes geospatial data using GeoPandas. Requires a GeoDataFrame (imported from .shp, .geojson, etc.). The 'X Column' can be used to select a column for choropleth coloring (values determine color)."
+        "GeoSpatial": "Visualizes geospatial data using GeoPandas. Requires a GeoDataFrame (imported from .shp, .geojson, etc.). The 'X Column' can be used to select a column for choropleth coloring (values determine color).",
+        "3D Scatter": "A 3D scatter plot visualizes data points in a three-dimensional space. Requires X, Y, and Z columns mapped to respective dimensions.",
+        "3D Line": "A 3D line plot connects data points in a three-dimensional sequence. Requires X, Y, and Z columns.",
+        "3D Surface": "A 3D surface plot visualizes gridded data as a continuous surface. Requires X, Y, and Z columns mapped to a 2D grid."
     }
 
     def __init__(self):
@@ -148,6 +154,11 @@ class PlotEngine:
             self.current_ax.set_xlabel(xlabel, fontsize=12, picker=True)
         if ylabel:
             self.current_ax.set_ylabel(ylabel, fontsize=12, picker=True)
+        
+        zlabel = kwargs.get("zlabel", None)
+        if zlabel and hasattr(self.current_ax, "set_zlabel"):
+            self.current_ax.set_zlabel(zlabel, fontsize=12, picker=True)
+        
         if legend:
             self.current_ax.legend()
     
@@ -1591,11 +1602,149 @@ class PlotEngine:
                 for col in barcols:
                     if col is not None:
                         col.set_gid("error_bar")
-                
+    
+    def _ensure_projection(self, is_3d: bool) -> None:
+        """Replaces the current axis with 3D or 2D"""
+        if not self.current_ax or not self.current_figure:
+            return
+        
+        current_is_3d = hasattr(self.current_ax, "zaxis")
+        if current_is_3d == is_3d:
+            return
+        
+        geometry = self.current_ax.get_subplotspec()
+        try:
+            idx = self.axes_flat.index(self.current_ax)
+        except ValueError:
+            idx = -1
+        
+        self.current_figure.delaxes(self.current_ax)
+        
+        if is_3d:
+            self.current_ax = self.current_figure.add_subplot(geometry, projection="3d")
+        else:
+            self.current_ax = self.current_figure.add_subplot(geometry)
+        
+        if idx >= 0:
+            self.axes_flat[idx] = self.current_ax
+    
+    def _apply_camera_view(self, elevation=None, azimuth=None) -> None:
+        """Applies 3d camera angles"""
+        if elevation is not None or azimuth is not None:
+            self.current_ax.view_init(elev=elevation, azim=azimuth)
+    
+    def plot_scatter_3d(self, df: pd.DataFrame, x: str, y: str, z: str, **kwargs) -> None:
+        """Create a 3d scatter plot"""
+        self._clear_axes()
+        title = kwargs.pop("title", None)
+        xlabel = kwargs.pop("xlabel", None)
+        ylabel = kwargs.pop("ylabel", None)
+        zlabel = kwargs.pop("zlabel", None)
+        legend = kwargs.pop("legend", True)
+        hue = kwargs.pop("hue", None)
+        cmap_name = kwargs.pop("cmap", None)
+        
+        kwargs.pop("secondary_y", None)
+        kwargs.pop("secondary_plot_type", None)
+        elevation = kwargs.pop("elevation", None)
+        azimuth = kwargs.pop("azimuth", None)
+        
+        self._apply_camera_view(elevation, azimuth)
+        
+        mask = df[x].notna() & df[y].notna() & df[z].notna()
+        
+        if hue and hue in df.columns:
+            groups = df[hue].dropna().unique()
+            colors = self._get_colors_from_cmap(cmap_name, len(groups))
+            
+            for i, group in enumerate(groups):
+                group_mask = mask & (df[hue] == group)
+                c = colors[i] if colors else None
+                self.current_ax.scatter3D(
+                    df.loc[group_mask, x].to_numpy(),
+                    df.loc[group_mask, y].to_numpy(),
+                    df.loc[group_mask, z].to_numpy(),
+                    label=str(group), color=c, picker=5, **kwargs
+                )
+        else:
+            if cmap_name: kwargs["cmap"] = cmap_name
+            self.current_ax.scatter3D(df.loc[mask, x].to_numpy(), df.loc[mask, y].to_numpy(), df.loc[mask, z].to_numpy(), picker=5, **kwargs)
+        
+        self._set_labels(title, xlabel, ylabel, legend, zlabel=zlabel, **kwargs)
+    
+    def plot_line_3d(self, df: pd.DataFrame, x: str, y: str, z: str, **kwargs) -> None:
+        """Create a 3D line plot."""
+        self._clear_axes()
+        title = kwargs.pop('title', None)
+        xlabel = kwargs.pop('xlabel', None)
+        ylabel = kwargs.pop('ylabel', None)
+        zlabel = kwargs.pop('zlabel', None)
+        legend = kwargs.pop('legend', True)
+        hue = kwargs.pop('hue', None)
+        cmap_name = kwargs.pop("cmap", None)
+        
+        kwargs.pop("secondary_y", None)
+        kwargs.pop("secondary_plot_type", None)
+        elevation = kwargs.pop("elevation", None)
+        azimuth = kwargs.pop("azimuth", None)
+
+        self._apply_camera_view(elevation, azimuth)
+
+        mask = df[x].notna() & df[y].notna() & df[z].notna()
+
+        if hue and hue in df.columns:
+            groups = df[hue].dropna().unique()
+            colors = self._get_colors_from_cmap(cmap_name, len(groups))
+            
+            for i, group in enumerate(groups):
+                group_mask = mask & (df[hue] == group)
+                c = colors[i] if colors else None
+                self.current_ax.plot3D(
+                    df.loc[group_mask, x].to_numpy(), 
+                    df.loc[group_mask, y].to_numpy(), 
+                    df.loc[group_mask, z].to_numpy(), 
+                    label=str(group), color=c, picker=5, **kwargs
+                )
+        else:
+            colors = self._get_colors_from_cmap(cmap_name, 1)
+            c = colors[0] if colors else None
+            if c: kwargs["color"] = c
+            self.current_ax.plot3D(df.loc[mask, x].to_numpy(), df.loc[mask, y].to_numpy(), df.loc[mask, z].to_numpy(), label=f"{y} vs {z}", picker=5, **kwargs)
+        
+        self._set_labels(title, xlabel, ylabel, legend, zlabel=zlabel, **kwargs)
+
+    def plot_surface_3d(self, df: pd.DataFrame, x: str, y: str, z: str, **kwargs) -> None:
+        """Create a 3D surface plot from gridded data."""
+        self._clear_axes()
+        title = kwargs.pop('title', None)
+        xlabel = kwargs.pop('xlabel', None)
+        ylabel = kwargs.pop('ylabel', None)
+        zlabel = kwargs.pop('zlabel', None)
+        _ = kwargs.pop("legend", None)
+        cmap_name = kwargs.pop("cmap", "viridis")
+
+        kwargs.pop("secondary_y", None)
+        kwargs.pop("secondary_plot_type", None)
+        elevation = kwargs.pop("elevation", None)
+        azimuth = kwargs.pop("azimuth", None)
+
+        self._apply_camera_view(elevation, azimuth)
+
+        X, Y, Z = self._prepare_gridded_data(df, x, y, z)
+        X_grid, Y_grid = np.meshgrid(X, Y)
+
+        surf = self.current_ax.plot_surface(X_grid, Y_grid, Z, cmap=cmap_name, **kwargs)
+        self.current_figure.colorbar(surf, ax=self.current_ax, label=zlabel if zlabel else z)
+
+        self._set_labels(title, xlabel, ylabel, False, zlabel=zlabel, **kwargs)
+    
     # Plot strategies
     def execute_strategy(self, plot_type: str, plot_tab: "PlotTab", x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> Optional[str]:
         from core.plot_strategies.strat_registry import StrategyRegistry
         try:
+            is_3d_plot = plot_type in ["3D Scatter", "3D Line", "3D Surface"]
+            self._ensure_projection(is_3d_plot)
+            
             strategy = StrategyRegistry.get_strategy(plot_type)
             return strategy.execute(
                 engine=self,
