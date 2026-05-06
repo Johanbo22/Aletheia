@@ -50,25 +50,40 @@ class AnnotationManager:
         self.view.auto_annotate_weight_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
 
     def choose_annotation_color(self) -> None:
-        color = QColorDialog.getColor()
+        color = QColorDialog.getColor(
+            initial=QColor(self.annotation_color),
+            parent=self.plot_tab,
+            title="Select Text Color",
+            options=QColorDialog.ColorDialogOption.ShowAlphaChannel
+        )
         if color.isValid():
-            self.annotation_color = color.name()
+            self.annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.annotation_color_label.setText(self.annotation_color)
             self.view.annotation_color_button.updateColors(base_color_hex=self.annotation_color)
             self.plot_tab.on_style_changed()
 
     def choose_annotation_bg_color(self) -> None:
-        color = QColorDialog.getColor(QColor(self.annotation_bg_color), self.plot_tab)
+        color = QColorDialog.getColor(
+            initial=QColor(self.annotation_bg_color),
+            parent=self.plot_tab,
+            title="Select Background Color",
+            options=QColorDialog.ColorDialogOption.ShowAlphaChannel
+        )
         if color.isValid():
-            self.annotation_bg_color = color.name()
+            self.annotation_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
             self.view.annotation_bg_color_button.updateColors(base_color_hex=self.annotation_bg_color)
             self.plot_tab.on_style_changed()
 
     def choose_auto_annotate_color(self) -> None:
-        color = QColorDialog.getColor(QColor(self.auto_annotation_color), self.plot_tab)
+        color = QColorDialog.getColor(
+            initial=QColor(self.auto_annotation_color),
+            parent=self.plot_tab,
+            title="Select Auto-Annotation Color",
+            options=QColorDialog.ColorDialogOption.ShowAlphaChannel
+        )
         if color.isValid():
-            self.auto_annotation_color = color.name()
+            self.auto_annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.auto_annotate_color_label.setText(self.auto_annotation_color)
             self.view.auto_annotate_color_button.updateColors(base_color_hex=self.auto_annotation_color)
             self.plot_tab.on_style_changed()
@@ -134,10 +149,7 @@ class AnnotationManager:
         if 0 <= index < len(self.annotations):
             ann_data = self.annotations[index]
             self.context_toolbar.load_annotations(index, ann_data)
-            self.context_toolbar.move(global_pos)
-            self.context_toolbar.show()
-            self.context_toolbar.raise_()
-            self.context_toolbar.activateWindow()
+            self.context_toolbar.show_at_clamped(global_pos)
 
     def _update_annotations_from_toolbar(self, index: int, new_data: dict) -> None:
         """Updates the annotation data when using the toolbar"""
@@ -176,9 +188,12 @@ class AnnotationManager:
             self.plot_engine.current_ax.text(
                 ann["x"], ann["y"], ann["text"],
                 transform=self.plot_engine.current_ax.transAxes,
-                fontsize=ann["fontsize"], color=ann["color"],
+                fontsize=ann["fontsize"],
+                color=ann["color"],
+                fontweight=ann.get("fontweight", "normal"),
+                fontstyle=ann.get("fontstyle", "normal"),
                 ha="center", va="center",
-                bbox=dict(boxstyle="round", facecolor=ann.get("bg_color", "wheat"), alpha=0.5),
+                bbox=dict(boxstyle="round", facecolor=ann.get("bg_color", "wheat")),
                 picker=True, gid=f"annotation_{i}"
             )
 
