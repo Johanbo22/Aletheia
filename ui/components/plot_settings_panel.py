@@ -113,6 +113,8 @@ class PlotSettingsPanel(QWidget):
         self.multi_y_check = self.basic_tab.multi_y_check
         self.y_column = self.basic_tab.y_column
         self.y_columns_list = self.basic_tab.y_columns_list
+        self.z_column = self.basic_tab.z_column
+        self.z_column_widget = self.basic_tab.z_column_widget
         self.select_all_y_btn = self.basic_tab.select_all_y_btn
         self.clear_all_y_btn = self.basic_tab.clear_all_y_btn
         self.multi_y_info = self.basic_tab.multi_y_info
@@ -165,6 +167,12 @@ class PlotSettingsPanel(QWidget):
         self.ylabel_size_spin = app_tab.ylabel_size_spin
         self.ylabel_weight_combo = app_tab.ylabel_weight_combo
         
+        self.zlabel_widget = app_tab.z_label_widget
+        self.zlabel_check = app_tab.zlabel_check
+        self.zlabel_input = app_tab.zlabel_input
+        self.zlabel_size = app_tab.zlabel_size_spin
+        self.zlabel_weight = app_tab.zlabel_weight
+        
         # Spines
         self.all_spines_btn = app_tab.all_spines_btn
         self.box_only_btn = app_tab.box_only_btn
@@ -206,6 +214,11 @@ class PlotSettingsPanel(QWidget):
         self.face_color_button = app_tab.face_color_button
         self.face_color_label = app_tab.face_color_label
         self.palette_combo = app_tab.palette_combo
+        
+        # 3D Camera Group
+        self.camera_3d_group = app_tab.camera_3d_group
+        self.camera_elevation_spin = app_tab.camera_elevation_spin
+        self.camera_azimuth_spin = app_tab.camera_azimuth_spin
         
         # Accessibility and Style
         self.colorblind_check = app_tab.colorblind_check
@@ -254,6 +267,24 @@ class PlotSettingsPanel(QWidget):
         self.y_minor_tick_width_spin = axes_t.y_minor_tick_width_spin
         self.y_scale_combo = axes_t.y_scale_combo
         self.y_display_units_combo = axes_t.y_display_units_combo
+        
+        # Z-axis Options
+        self.axis_tab_widget = axes_t.axis_tab_widget
+        self.z_tab = axes_t.z_tab
+        self.z_auto_check = axes_t.z_auto_check
+        self.z_invert_axis_check = axes_t.z_invert_axis_check
+        self.z_min_spin = axes_t.z_min_spin
+        self.z_max_spin = axes_t.z_max_spin
+        self.ztick_label_size_spin = axes_t.ztick_label_size_spin
+        self.ztick_rotation_spin = axes_t.ztick_rotation_spin
+        self.z_max_ticks_spin = axes_t.z_max_ticks_spin
+        self.z_show_minor_ticks_check = axes_t.z_show_minor_ticks_check
+        self.z_major_tick_direction_combo = axes_t.z_major_tick_direction_combo
+        self.z_major_tick_width_spin = axes_t.z_major_tick_width_spin
+        self.z_minor_tick_direction_combo = axes_t.z_minor_tick_direction_combo
+        self.z_minor_tick_width_spin = axes_t.z_minor_tick_width_spin
+        self.z_scale_combo = axes_t.z_scale_combo
+        self.z_display_units_combo = axes_t.z_display_units_combo
 
         # Orientation
         self.flip_axes_check = axes_t.flip_axes_check

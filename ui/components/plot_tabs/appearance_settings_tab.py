@@ -34,6 +34,7 @@ class AppearanceSettingsTab(QWidget):
         self._setup_labels_group(scroll_layout)
         self._setup_spines_group(scroll_layout)
         self._setup_figure_group(scroll_layout)
+        self._setup_3d_camera_group(scroll_layout)
         self._setup_accessibility_group(scroll_layout)
         self._setup_layout_style_group(scroll_layout)
 
@@ -202,6 +203,33 @@ class AppearanceSettingsTab(QWidget):
         y_layout.addStretch()
         tab_widget.addTab(y_tab, "Y-Axis")
         
+        self.z_label_widget = QWidget()
+        z_layout = QVBoxLayout(self.z_label_widget)
+        
+        self.zlabel_check = DataPlotStudioToggleSwitch("Show Z Label")
+        self.zlabel_check.setChecked(True)
+        z_layout.addWidget(self.zlabel_check)
+
+        z_layout.addWidget(QLabel("Z Label:"))
+        self.zlabel_input = DataPlotStudioLineEdit()
+        self.zlabel_input.setPlaceholderText("Z axis label")
+        z_layout.addWidget(self.zlabel_input)
+        
+        z_layout.addWidget(QLabel("Z Label Font-size:"))
+        self.zlabel_size_spin = DataPlotStudioSpinBox()
+        self.zlabel_size_spin.setRange(6, 30)
+        self.zlabel_size_spin.setValue(12)
+        z_layout.addWidget(self.zlabel_size_spin)
+        
+        z_layout.addWidget(QLabel("Z Label Font Weight:"))
+        self.zlabel_weight = DataPlotStudioComboBox()
+        self.zlabel_weight.addItems(["normal", "bold", "italic", "heavy", "light"])
+        self.zlabel_weight.setCurrentText("normal")
+        z_layout.addWidget(self.zlabel_weight)
+        self.z_label_widget.setVisible(False)
+        
+        tab_widget.addTab(self.z_label_widget, "Z-Axis")
+        
         layout.addWidget(tab_widget)
         group.setLayout(layout)
         parent_layout.addWidget(group)
@@ -368,6 +396,26 @@ class AppearanceSettingsTab(QWidget):
 
         self.figure_size_group.setLayout(layout)
         parent_layout.addWidget(self.figure_size_group)
+    
+    def _setup_3d_camera_group(self, parent_layout: QVBoxLayout) -> None:
+        self.camera_3d_group = DataPlotStudioGroupBox("3D Viewing Angles")
+        layout = QVBoxLayout()
+        
+        layout.addWidget(QLabel("Elevation (degrees):"))
+        self.camera_elevation_spin = DataPlotStudioDoubleSpinBox()
+        self.camera_elevation_spin.setRange(-360.0, 360.0)
+        self.camera_elevation_spin.setValue(30.0)
+        layout.addWidget(self.camera_elevation_spin)
+        
+        layout.addWidget(QLabel("Azimuth (degrees):"))
+        self.camera_azimuth_spin = DataPlotStudioDoubleSpinBox()
+        self.camera_azimuth_spin.setRange(-360.0, 360.0)
+        self.camera_azimuth_spin.setValue(-60.0)
+        layout.addWidget(self.camera_azimuth_spin)
+        
+        self.camera_3d_group.setLayout(layout)
+        self.camera_3d_group.setVisible(False)
+        parent_layout.addWidget(self.camera_3d_group)
 
     def _setup_accessibility_group(self, parent_layout: QVBoxLayout) -> None:
         group = DataPlotStudioGroupBox("Accessibility")

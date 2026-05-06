@@ -37,7 +37,7 @@ class AxesSettingsTab(QWidget):
         group = DataPlotStudioGroupBox("Axis Options")
         layout = QVBoxLayout()
         
-        tab_widget = QTabWidget()
+        self.axis_tab_widget = QTabWidget()
 
         # X-Axi
         x_tab = QWidget()
@@ -139,7 +139,7 @@ class AxesSettingsTab(QWidget):
         x_layout.addWidget(self.x_display_units_combo)
         
         x_layout.addStretch()
-        tab_widget.addTab(x_tab, "X-Axis")
+        self.axis_tab_widget.addTab(x_tab, "X-Axis")
 
         # Y-Axis
         y_tab = QWidget()
@@ -236,9 +236,105 @@ class AxesSettingsTab(QWidget):
         y_layout.addWidget(self.y_display_units_combo)
         
         y_layout.addStretch()
-        tab_widget.addTab(y_tab, "Y-Axis")
+        self.axis_tab_widget.addTab(y_tab, "Y-Axis")
+        
+        # Z-Axis
+        self.z_tab = QWidget()
+        z_layout = QVBoxLayout(self.z_tab)
+        
+        z_layout.addWidget(QLabel("Z-axis - Auto Limit:"))
+        self.z_auto_check = DataPlotStudioToggleSwitch("Auto")
+        self.z_auto_check.setChecked(True)
+        z_layout.addWidget(self.z_auto_check)
 
-        layout.addWidget(tab_widget)
+        self.z_invert_axis_check = DataPlotStudioToggleSwitch("Invert Z-axis")
+        self.z_invert_axis_check.setChecked(False)
+        self.z_invert_axis_check.setToolTip("Reverses the direction of data on the z-axis")
+        z_layout.addWidget(self.z_invert_axis_check)
+
+        z_layout.addWidget(QLabel("Z Min:"))
+        self.z_min_spin = DataPlotStudioDoubleSpinBox()
+        self.z_min_spin.setRange(-1000000, 1000000)
+        self.z_min_spin.setEnabled(False)
+        z_layout.addWidget(self.z_min_spin)
+
+        z_layout.addWidget(QLabel("Z Max:"))
+        self.z_max_spin = DataPlotStudioDoubleSpinBox()
+        self.z_max_spin.setRange(-1000000, 1000000)
+        self.z_max_spin.setEnabled(False)
+        z_layout.addWidget(self.z_max_spin)
+
+        z_layout.addWidget(QLabel("Z-axis Tick Label Size:"))
+        self.ztick_label_size_spin = DataPlotStudioSpinBox()
+        self.ztick_label_size_spin.setRange(6, 20)
+        self.ztick_label_size_spin.setValue(10)
+        z_layout.addWidget(self.ztick_label_size_spin)
+
+        z_layout.addWidget(QLabel("Z-axis Tick Rotation:"))
+        self.ztick_rotation_spin = DataPlotStudioSpinBox()
+        self.ztick_rotation_spin.setRange(-90, 90)
+        self.ztick_rotation_spin.setValue(0)
+        z_layout.addWidget(self.ztick_rotation_spin)
+
+        z_layout.addWidget(QLabel("Max Number of Ticks"))
+        self.z_max_ticks_spin = DataPlotStudioSpinBox()
+        self.z_max_ticks_spin.setRange(3, 50)
+        self.z_max_ticks_spin.setValue(10)
+        self.z_max_ticks_spin.setToolTip("Maximum number of tick labels on the z-axis")
+        z_layout.addWidget(self.z_max_ticks_spin)
+
+        z_layout.addSpacing(5)
+        
+        self.z_show_minor_ticks_check = DataPlotStudioToggleSwitch("Show Z-axis Minor Ticks")
+        self.z_show_minor_ticks_check.setChecked(False)
+        self.z_show_minor_ticks_check.setToolTip("Display the minor tick marks and labels on the z-axis")
+        z_layout.addWidget(self.z_show_minor_ticks_check)
+
+        z_layout.addSpacing(5)
+
+        z_layout.addWidget(QLabel("Z-axis Major Tick Direction:"))
+        self.z_major_tick_direction_combo = DataPlotStudioComboBox()
+        self.z_major_tick_direction_combo.addItems(["out", "in", "inout"])
+        self.z_major_tick_direction_combo.setToolTip("Direction of the major tick marks on the Z-axis")
+        z_layout.addWidget(self.z_major_tick_direction_combo)
+
+        z_layout.addWidget(QLabel("Z-axis Major Tick Width:"))
+        self.z_major_tick_width_spin = DataPlotStudioDoubleSpinBox()
+        self.z_major_tick_width_spin.setRange(0.1, 5.0)
+        self.z_major_tick_width_spin.setValue(1.0)
+        self.z_major_tick_width_spin.setSingleStep(0.1)
+        self.z_major_tick_width_spin.setToolTip("Width/thickness of the major tick marks")
+        z_layout.addWidget(self.z_major_tick_width_spin)
+
+        z_layout.addWidget(QLabel("Z-axis Minor Tick Direction"))
+        self.z_minor_tick_direction_combo = DataPlotStudioComboBox()
+        self.z_minor_tick_direction_combo.addItems(["out", "in", "inout"])
+        self.z_minor_tick_direction_combo.setToolTip("Direction of the minor tick marks on the Z-axis")
+        z_layout.addWidget(self.z_minor_tick_direction_combo)
+
+        z_layout.addWidget(QLabel("Z-axis Minor Tick Width:"))
+        self.z_minor_tick_width_spin = DataPlotStudioDoubleSpinBox()
+        self.z_minor_tick_width_spin.setRange(0.1, 5.0)
+        self.z_minor_tick_width_spin.setValue(0.5)
+        self.z_minor_tick_width_spin.setSingleStep(0.1)
+        self.z_minor_tick_width_spin.setToolTip("Width/thickness of minor tick marks")
+        z_layout.addWidget(self.z_minor_tick_width_spin)
+
+        z_layout.addWidget(QLabel("Z Scale:"))
+        self.z_scale_combo = DataPlotStudioComboBox()
+        self.z_scale_combo.addItems(['linear', 'log', 'symlog'])
+        z_layout.addWidget(self.z_scale_combo)
+
+        z_layout.addSpacing(5)
+        z_layout.addWidget(QLabel("Z-axis Display Units"))
+        self.z_display_units_combo = DataPlotStudioComboBox()
+        self.z_display_units_combo.addItems(["None", "Hundreds (100s)", "Thousands", "Millions", "Billions"])
+        self.z_display_units_combo.setToolTip("Format axis labels to display in units")
+        z_layout.addWidget(self.z_display_units_combo)
+        
+        z_layout.addStretch()
+
+        layout.addWidget(self.axis_tab_widget)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 

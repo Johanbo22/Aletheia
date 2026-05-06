@@ -153,6 +153,15 @@ class GeneralSettingsTab(QWidget):
         self.multi_y_info.setProperty("styleClass", "muted_text")
         self.multi_y_info.setVisible(False)
         var_layout.addWidget(self.multi_y_info)
+        
+        self.z_column_widget = QWidget()
+        z_layout = QHBoxLayout(self.z_column_widget)
+        z_layout.setContentsMargins(0, 0, 0, 0)
+        z_layout.addWidget(QLabel("Z Column:"))
+        self.z_column = DataPlotStudioComboBox()
+        z_layout.addWidget(self.z_column, 1)
+        var_layout.addWidget(self.z_column_widget)
+        self.z_column_widget.setVisible(False)
 
         var_layout.addWidget(QLabel("Hue/Group:"))
         self.hue_column = DataPlotStudioComboBox()

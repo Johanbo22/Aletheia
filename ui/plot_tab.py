@@ -35,15 +35,16 @@ from matplotlib.lines import Line2D
 from matplotlib.text import Text
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PathCollection
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
+from ui.managers.theme_manager import ThemeManager
+from ui.managers.script_manager import ScriptManager
 from ui.widgets.ControlElements import DataPlotStudioListWidget
 from ui.widgets.ColorBlindnessEffect import ColorBlindnessEffect
 from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
 from ui.dialogs.PlotExportDialog import PlotExportDialog
 from ui.dialogs.PlotConfigEditorDialog import PlotConfigEditorDialog
 from core.plot_config_manager import PlotConfigManager
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
 
@@ -64,11 +65,8 @@ class PlotTab(PlotTabUI):
         self.plot_engine = PlotEngine()
         self.current_config = {}
         self.code_exporter = CodeExporter()
-        self.script_editor = None
-        self.script_sync_timer = QTimer()
-        self.script_sync_timer.setSingleShot(True)
-        self.script_sync_timer.setInterval(500)
-        self.script_sync_timer.timeout.connect(self._perform_script_sync)
+        self.script_manager = ScriptManager(self)
+
         self.current_plot_type_name = "Line"
         self.dragged_annotation = None
         self.ignore_next_click = False
@@ -129,7 +127,7 @@ class PlotTab(PlotTabUI):
         self.plot_categories = {
             "Basic and Relational": ["Line", "Scatter", "Bar", "Area", "Pie", "Stem", "Stairs"],
             "Distribution": ["Histogram", "Box", "Violin", "KDE", "ECDF", "Count Plot", "Eventplot"],
-            "2D, Gridded and 3D": ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Stackplot"],
+            "2D, Gridded and 3D": ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Stackplot", "3D Line", "3D Scatter", "3D Surface"],
             "Vector Fields": ["Barbs", "Quiver", "Streamplot"],
             "Triangulation": ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"],
             "Geospatial": ["GeoSpatial"]
@@ -162,12 +160,7 @@ class PlotTab(PlotTabUI):
         self.set_empty_state_greeting()
 
         # Initialize the themes
-        self.theme_dir = Path.cwd() / "resources" / "themes"
-        self.theme_dir.mkdir(parents=True, exist_ok=True)
-        self.default_theme_names = ["Dark_Mode", "Publication_Ready", "Presentation_Big", "Default"]
-        self.refresh_theme_list()
-        if hasattr(self, 'dpi_spin'):
-            self.view.dpi_spin.setVisible(False)
+        self.theme_manager = ThemeManager(self)
         
         # Caching
         self._last_data_signature = None
@@ -245,7 +238,7 @@ class PlotTab(PlotTabUI):
         """Connect the main action buttons and canvas events"""
         #  Main Buttons 
         self.plot_button.clicked.connect(self.generate_plot)
-        self.editor_button.clicked.connect(self.open_script_editor)
+        self.editor_button.clicked.connect(self.script_manager.open_script_editor)
         self.clear_button.clicked.connect(self.clear_plot)
         self.save_plot_button.clicked.connect(self.save_plot_image)
 
@@ -256,7 +249,7 @@ class PlotTab(PlotTabUI):
         self.canvas.mpl_connect("scroll_event", self.on_scroll)
 
         #editor sync
-        self.view.x_column.currentTextChanged.connect(self._sync_script_if_open)
+        self.view.x_column.currentTextChanged.connect(self.script_manager.sync_script_if_open)
     
     def _connect_basic_tab_signals(self) -> None:
         """Connect signals for the General tab """
@@ -270,6 +263,7 @@ class PlotTab(PlotTabUI):
         self.view.hue_column.currentTextChanged.connect(self.on_data_changed)
         self.view.subset_combo.currentIndexChanged.connect(self.on_data_changed)
         self.view.quick_filter_input.returnPressed.connect(self.on_data_changed)
+        self.view.z_column.currentTextChanged.connect(self.on_data_changed)
         
         self.view.grid_designer.layout_applied.connect(self._apply_custom_grid_layout)
         self.view.active_subplot_combo.currentIndexChanged.connect(self.on_active_subplot_changed)
@@ -301,14 +295,22 @@ class PlotTab(PlotTabUI):
         self.view.title_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.title_position_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.title_check.stateChanged.connect(self.on_style_changed)
+        
         self.view.xlabel_input.textChanged.connect(self.on_style_changed)
         self.view.xlabel_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.xlabel_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.xlabel_check.stateChanged.connect(self.on_style_changed)
+        
         self.view.ylabel_input.textChanged.connect(self.on_style_changed)
         self.view.ylabel_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.ylabel_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.ylabel_check.stateChanged.connect(self.on_style_changed)
+        
+        self.view.zlabel_check.stateChanged.connect(self.on_style_changed)
+        self.view.zlabel_input.textChanged.connect(self.on_style_changed)
+        self.view.zlabel_size.valueChanged.connect(self.on_style_changed)
+        self.view.zlabel_weight.currentTextChanged.connect(self.on_style_changed)
+        
         self.view.font_family_combo.currentFontChanged.connect(self.on_style_changed)
         self.view.style_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.global_spine_width_spin.valueChanged.connect(self.on_style_changed)
@@ -317,6 +319,9 @@ class PlotTab(PlotTabUI):
         self.view.left_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.right_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.palette_combo.currentTextChanged.connect(self._on_palette_changed)
+        
+        self.view.camera_elevation_spin.valueChanged.connect(self.on_style_changed)
+        self.view.camera_azimuth_spin.valueChanged.connect(self.on_style_changed)
     
     def _connect_axes_tab_signals(self) -> None:
         """Connect signals for the Axes tab"""
@@ -324,6 +329,8 @@ class PlotTab(PlotTabUI):
         self.view.x_auto_check.stateChanged.connect(lambda: self.view.x_max_spin.setEnabled(not self.view.x_auto_check.isChecked()))
         self.view.y_auto_check.stateChanged.connect(lambda: self.view.y_min_spin.setEnabled(not self.view.y_auto_check.isChecked()))
         self.view.y_auto_check.stateChanged.connect(lambda: self.view.y_max_spin.setEnabled(not self.view.y_auto_check.isChecked()))
+        self.view.z_auto_check.stateChanged.connect(lambda: self.view.z_min_spin.setEnabled(not self.view.z_auto_check.isChecked()))
+        self.view.z_auto_check.stateChanged.connect(lambda: self.view.z_max_spin.setEnabled(not self.view.z_auto_check.isChecked()))
         
         self.view.custom_datetime_check.stateChanged.connect(self.toggle_datetime_format)
         self.view.custom_datetime_check.stateChanged.connect(self.on_data_changed)
@@ -353,12 +360,26 @@ class PlotTab(PlotTabUI):
         self.view.y_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.x_scale_combo.currentTextChanged.connect(self.on_data_changed)
         self.view.y_scale_combo.currentTextChanged.connect(self.on_data_changed)
+        self.view.z_scale_combo.currentTextChanged.connect(self.on_data_changed)
         self.view.x_display_units_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.y_display_units_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.z_display_units_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.x_top_axis_check.stateChanged.connect(self.on_style_changed)
         self.view.x_invert_axis_check.stateChanged.connect(self.on_style_changed)
         self.view.y_invert_axis_check.stateChanged.connect(self.on_style_changed)
+        self.view.z_invert_axis_check.stateChanged.connect(self.on_style_changed)
         
+        self.view.z_auto_check.stateChanged.connect(self.on_style_changed)
+        self.view.z_min_spin.valueChanged.connect(self.on_style_changed)
+        self.view.z_max_spin.valueChanged.connect(self.on_style_changed)
+        self.view.ztick_label_size_spin.valueChanged.connect(self.on_style_changed)
+        self.view.ztick_rotation_spin.valueChanged.connect(self.on_style_changed)
+        self.view.z_max_ticks_spin.valueChanged.connect(self.on_style_changed)
+        self.view.z_show_minor_ticks_check.stateChanged.connect(self.on_style_changed)
+        self.view.z_major_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.z_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.z_minor_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.z_minor_tick_width_spin.valueChanged.connect(self.on_style_changed)
         
     def _connect_legend_grid_tab_signals(self) -> None:
         """Connect signals for the Legend and Grid tab"""
@@ -513,11 +534,7 @@ class PlotTab(PlotTabUI):
 
     def _connect_theme_controls(self) -> None:
         """Connect signals for Theme management"""
-        self.view.load_theme_button.clicked.connect(self.apply_selected_theme)
-        self.view.save_theme_button.clicked.connect(self.save_custom_theme)
-        self.view.edit_theme_button.clicked.connect(self.edit_custom_theme)
-        self.view.delete_theme_button.clicked.connect(self.delete_custom_theme)
-        self.refresh_theme_list()
+        self.theme_manager.connect_signals()
     
     def showEvent(self, event) -> None:
         """Triggered on tab visibility. Clears selectons from plot"""
@@ -584,7 +601,7 @@ class PlotTab(PlotTabUI):
         
         self.on_plot_type_changed(plot_type)
         self.on_data_changed()
-        self._sync_script_if_open()
+        self.script_manager.sync_script_if_open()
     
     def _select_plot_in_toolbox(self, plot_type_name):
         self.current_plot_type_name = plot_type_name
@@ -1772,6 +1789,7 @@ class PlotTab(PlotTabUI):
         # Preserve the current selection
         current_x = self.view.x_column.currentText()
         current_y = self.view.y_column.currentText()
+        current_z = self.view.z_column.currentText()
         current_hue = self.view.hue_column.currentText()
         current_secondary_y = self.view.secondary_y_column.currentText()
         current_auto_annoate = self.view.auto_annotate_col_combo.currentText()
@@ -1782,6 +1800,7 @@ class PlotTab(PlotTabUI):
         # Block signals to prevent triggering callbacks
         self.view.x_column.blockSignals(True)
         self.view.y_column.blockSignals(True)
+        self.view.z_column.blockSignals(True)
         self.view.hue_column.blockSignals(True)
         self.view.secondary_y_column.blockSignals(True)
         self.view.y_columns_list.blockSignals(True)
@@ -1798,6 +1817,12 @@ class PlotTab(PlotTabUI):
         self.view.y_column.addItems(columns)
         if current_y in columns:
             self.view.y_column.setCurrentText(current_y)
+        
+        # update zcol
+        self.view.z_column.clear()
+        self.view.z_column.addItems(columns)
+        if current_z in columns:
+            self.view.z_column.setCurrentText(current_z)
 
         #update secondary y col
         self.view.secondary_y_column.clear()
@@ -1835,6 +1860,7 @@ class PlotTab(PlotTabUI):
         # Unblock signals
         self.view.x_column.blockSignals(False)
         self.view.y_column.blockSignals(False)
+        self.view.z_column.blockSignals(False)
         self.view.hue_column.blockSignals(False)
         self.view.secondary_y_column.blockSignals(False)
         self.view.y_columns_list.blockSignals(False)
@@ -1974,7 +2000,7 @@ class PlotTab(PlotTabUI):
         incompatible_plots: list[str] = [
             "Histogram", "Pie", "Heatmap", "KDE", "Stackplot", "Eventplot",
             "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Barbs", "Quiver",
-            "Streamplot", "Tricontour", "Tricontourf", "Tripcolor", "Triplot", "2D Histogram", "ECDF", "GeoSpatial"
+            "Streamplot", "Tricontour", "Tricontourf", "Tripcolor", "Triplot", "2D Histogram", "ECDF", "GeoSpatial", "3D Scatter", "3D Line", "3D Surface"
         ]
         self.view.flip_axes_check.setEnabled(plot_type not in incompatible_plots)
         if plot_type in incompatible_plots:
@@ -1984,10 +2010,10 @@ class PlotTab(PlotTabUI):
         """
         Updates visibility of customization options based on active plot types
         """
-        line_plots = ["Line", "Area", "Step", "Stairs"]
+        line_plots = ["Line", "Area", "Step", "Stairs", "3D Line"]
         bar_plots = ["Bar", "Count Plot", "Stem"]
         hist_plots = ["Histogram", "Box", "Violin"]
-        scatter_plots = ["Scatter"]
+        scatter_plots = ["Scatter", "3D Scatter"]
         pie_plots = ["Pie"]
         
         active_plot_types = [primary_plot_type]
@@ -2007,7 +2033,8 @@ class PlotTab(PlotTabUI):
             if p_type in line_plots:
                 show_line = True
                 show_markers = True
-                show_error_bars = True
+                if p_type != "3D Line":
+                    show_error_bars = True
             elif p_type in hist_plots:
                 show_bar_hist = True
                 if p_type in ["Box", "Violin"]:
@@ -2018,7 +2045,8 @@ class PlotTab(PlotTabUI):
             elif p_type in scatter_plots:
                 show_scatter = True
                 show_markers = True
-                show_error_bars = True
+                if p_type != "3D Scatter":
+                    show_error_bars = True
             elif p_type in pie_plots:
                 show_pie = True
         
@@ -2030,6 +2058,37 @@ class PlotTab(PlotTabUI):
         
         self.view.marker_group.setVisible(show_markers)
         self.view.error_bars_group.setVisible(show_error_bars)
+        
+        # 3d settings
+        is_3d  = primary_plot_type in ["3D Scatter", "3D Line", "3D Surface"]
+        self.view.z_column_widget.setVisible(is_3d)
+        self.view.camera_3d_group.setVisible(is_3d)
+        self.view.zlabel_widget.setVisible(is_3d)
+        
+        z_tab_idx = self.view.axis_tab_widget.indexOf(self.view.z_tab)
+        if is_3d and z_tab_idx == -1:
+            self.view.axis_tab_widget.addTab(self.view.z_tab, "Z-Axis")
+        else:
+            self.view.axis_tab_widget.removeTab(z_tab_idx)
+        
+        # Tick formatting controls to be disabled at 3D plots
+        unsupported_3d_tick_controls: list[str] = [
+            "x_major_tick_direction_combo", "x_major_tick_width_spin",
+            "y_major_tick_direction_combo", "y_major_tick_width_spin",
+            "z_major_tick_direction_combo", "z_major_tick_width_spin",
+            "x_minor_tick_direction_combo", "x_minor_tick_width_spin",
+            "y_minor_tick_direction_combo", "y_minor_tick_width_spin",
+            "z_minor_tick_direction_combo", "z_minor_tick_width_spin"
+        ]
+        for control_name in unsupported_3d_tick_controls:
+            if hasattr(self.view, control_name):
+                control_widget = getattr(self.view, control_name)
+                control_widget.setEnabled(not is_3d)
+
+                if is_3d:
+                    control_widget.setToolTip("Tick direction and width customization are not supported in 3D rendered plots")
+                else:
+                    control_widget.setToolTip("")
 
     def on_data_changed(self):
         """Handle data column selection change"""
@@ -2441,7 +2500,7 @@ class PlotTab(PlotTabUI):
 
     def _build_general_kwargs(self, plot_type, x_col, y_cols, hue):
         """Build the general plotting kwargs"""
-        plots_supporting_hue = ["Scatter", "Line", "Bar", "Violin", "2D Density", "Box", "Count Plot", "Histogram"]
+        plots_supporting_hue = ["Scatter", "Line", "Bar", "Violin", "2D Density", "Box", "Count Plot", "Histogram", "3D Scatter", "3D Line"]
 
         y_label_text = self._determine_y_label(plot_type, y_cols)
 
@@ -2451,6 +2510,13 @@ class PlotTab(PlotTabUI):
             "ylabel": self.view.ylabel_input.text() or y_label_text,
             "legend": self.view.legend_check.isChecked()
         }
+        
+        if plot_type in ["3D Scatter", "3D Line", "3D Surface"]:
+            z_col_text = self.view.z_column.currentText()
+            general_kwargs["z_column"] = z_col_text
+            general_kwargs["zlabel"] = z_col_text
+            general_kwargs["elevation"] = self.view.camera_elevation_spin.value()
+            general_kwargs["azimuth"] = self.view.camera_azimuth_spin.value()
 
         # Add secondary y axis
         if self.view.secondary_y_check.isChecked() and self.view.secondary_y_check.isEnabled():
@@ -2585,6 +2651,12 @@ class PlotTab(PlotTabUI):
             self.plot_engine.current_ax.set_ylim(
                 self.view.y_min_spin.value(), self.view.y_max_spin.value()
             )
+            
+        if hasattr(self.plot_engine.current_ax, "zaxis") and not self.view.z_auto_check.isChecked():
+            self.plot_engine.current_ax.set_zlim(
+                self.view.z_min_spin.value(), self.view.z_max_spin.value()
+            )
+
         target_x_scale = self.view.x_scale_combo.currentText()
         if self.plot_engine.current_ax.get_xscale() != target_x_scale:
             self.plot_engine.current_ax.set_xscale(target_x_scale)
@@ -2592,6 +2664,13 @@ class PlotTab(PlotTabUI):
         target_y_scale = self.view.y_scale_combo.currentText()
         if self.plot_engine.current_ax.get_yscale() != target_y_scale:
             self.plot_engine.current_ax.set_yscale(target_y_scale)
+        
+        if hasattr(self.plot_engine.current_ax, "zaxis"):
+            target_z_scale = self.view.z_scale_combo.currentText()
+            try:
+                self.plot_engine.current_ax.set_zscale(target_z_scale)
+            except Exception as error:
+                self.status_bar.log(f"Z-Scale update ignore: {error}", "WARNING")
 
     def _execute_plot_strategy(self, plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs, general_kwargs):
         """Executes the correct plotting strategy"""
@@ -2631,8 +2710,13 @@ class PlotTab(PlotTabUI):
             y_locator_name = type(self.plot_engine.current_ax.yaxis.get_major_locator()).__name__
             if y_locator_name in allowed_locators:
                 self.plot_engine.current_ax.yaxis.set_major_locator(MaxNLocator(nbins=self.view.y_max_ticks_spin.value()))
+            
+            if hasattr(self.plot_engine.current_ax, "zaxis"):
+                z_locator_name = type(self.plot_engine.current_ax.zaxis.get_major_locator()).__name__
+                if z_locator_name in allowed_locators:
+                    self.plot_engine.current_ax.zaxis.set_major_locator(MaxNLocator(nbins=self.view.z_max_ticks_spin.value()))
         except Exception as TickError:
-            self.status_bar.log(f"Could not apply tick formatting: {str(tick_err)}", "WARNING")
+            self.status_bar.log(f"Could not apply tick formatting: {str(TickError)}", "WARNING")
 
         self._update_progress(progress_dialog, 70, "Applying formatting")
 
@@ -2697,7 +2781,7 @@ class PlotTab(PlotTabUI):
         if self.view.multibar_custom_check.isChecked():
             self.update_bar_selector(preserve_selection=True)
             
-        self._sync_script_if_open()
+        self.script_manager.sync_script_if_open()
 
     def _log_plot_message(self, plot_type, x_col, y_cols, hue, subset_name, active_df, quick_filter=""):
         """Log plot generation to log"""
@@ -2779,6 +2863,24 @@ class PlotTab(PlotTabUI):
             )
         else:
             self.plot_engine.current_ax.set_ylabel("")
+        
+        # zlabel
+        if hasattr(self.plot_engine.current_ax, "zaxis"):
+            if self.view.zlabel_check.isChecked():
+                zlabel_text = self.view.zlabel_input.text() or general_kwargs.get("zlabel", "")
+                self.plot_engine.current_ax.set_zlabel(
+                    zlabel_text,
+                    fontsize=self.view.zlabel_size.value(),
+                    fontweight=self.view.zlabel_weight.currentText(),
+                    fontfamily=font_family
+                )
+            else:
+                self.plot_engine.current_ax.set_zlabel("")
+            
+            elev = general_kwargs.get("elevation")
+            azim = general_kwargs.get("azimuth")
+            if elev is not None and azim is not None:
+                self.plot_engine.current_ax.view_init(elev=elev, azim=azim)
 
     
     def _apply_plot_customizations(self):
@@ -3160,6 +3262,15 @@ class PlotTab(PlotTabUI):
             width=self.view.y_major_tick_width_spin.value(),
             which="major"
         )
+        
+        if hasattr(self.plot_engine.current_ax, "zaxis"):
+            self.plot_engine.current_ax.tick_params(
+                axis="z",
+                labelsize=self.view.ztick_label_size_spin.value(),
+                direction=self.view.z_major_tick_direction_combo.currentText(),
+                width=self.view.z_major_tick_width_spin.value(),
+                which="major"
+            )
 
         #xaxis position
         if self.view.x_top_axis_check.isChecked():
@@ -3173,6 +3284,7 @@ class PlotTab(PlotTabUI):
         #minor tickmarks
         needs_x_minor = self.view.x_show_minor_ticks_check.isChecked()
         needs_y_minor = self.view.y_show_minor_ticks_check.isChecked()
+        needs_z_minor = hasattr(self.view, "z_show_minor_ticks_check") and self.view.z_show_minor_ticks_check.isChecked()
         
         if self.view.grid_check.isChecked():
             if self.view.independent_grid_check.isChecked():
@@ -3188,6 +3300,8 @@ class PlotTab(PlotTabUI):
                         needs_x_minor = True
                     if axis in ["y", "both"]: 
                         needs_y_minor = True
+                    if hasattr(self.plot_engine.current_ax, "zaxis") and axis == "both":
+                        needs_z_minor = True
 
         try:
             if needs_x_minor:
@@ -3201,9 +3315,15 @@ class PlotTab(PlotTabUI):
                     self.plot_engine.current_ax.yaxis.set_minor_locator(AutoMinorLocator())
             else:
                 self.plot_engine.current_ax.yaxis.set_minor_locator(NullLocator())
+
+            if hasattr(self.plot_engine.current_ax, "zaxis"):
+                if needs_z_minor:
+                    if type(self.plot_engine.current_ax.zaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
+                        self.plot_engine.current_ax.zaxis.set_minor_locator(AutoMinorLocator())
+                else:
+                    self.plot_engine.current_ax.zaxis.set_minor_locator(NullLocator())
         except Exception as LocatorErr:
             self.status_bar.log(f"Warning mapping minor locators: {str(LocatorErr)}", "WARNING")
-
         #minor tickmarks styling
         if self.view.x_show_minor_ticks_check.isChecked():
             self.plot_engine.current_ax.tick_params(
@@ -3229,6 +3349,17 @@ class PlotTab(PlotTabUI):
         else:
             self.plot_engine.current_ax.tick_params(axis="y", which="minor", left=False, right=False)
         
+        if hasattr(self.plot_engine.current_ax, "zaxis") and hasattr(self.view, "z_show_minor_ticks_check"):
+            if self.view.z_show_minor_ticks_check.isChecked():
+                self.plot_engine.current_ax.tick_params(
+                    axis="z", 
+                    which="minor",
+                    direction=self.view.z_minor_tick_direction_combo.currentText(),
+                    width=self.view.z_minor_tick_width_spin.value()
+                )
+            else:
+                self.plot_engine.current_ax.tick_params(axis="z", which="minor")
+        
         # add formatts if user specified
         try:
             x_unit_str = self.view.x_display_units_combo.currentText()
@@ -3242,6 +3373,13 @@ class PlotTab(PlotTabUI):
                 y_formatter = self._create_axis_formatter(y_unit_str)
                 if y_formatter:
                     self.plot_engine.current_ax.yaxis.set_major_formatter(y_formatter)
+                    
+            if hasattr(self.plot_engine.current_ax, "zaxis") and hasattr(self.view, "z_display_units_combo"):
+                z_unit_str = self.view.z_display_units_combo.currentText()
+                if z_unit_str != "None":
+                    z_formatter = self._create_axis_formatter(z_unit_str)
+                    if z_formatter:
+                        self.plot_engine.current_ax.zaxis.set_major_formatter(z_formatter)
         except Exception as ApplyDisplayUnitsError:
             self.status_bar.log(f"Failed to apply display units: {str(ApplyDisplayUnitsError)}", "WARNING")
 
@@ -3284,6 +3422,9 @@ class PlotTab(PlotTabUI):
         plt.setp(self.plot_engine.current_ax.get_xticklabels(), rotation=self.view.xtick_rotation_spin.value())
         plt.setp(self.plot_engine.current_ax.get_yticklabels(), rotation=self.view.ytick_rotation_spin.value())
 
+        if hasattr(self.plot_engine.current_ax, "zaxis"):
+            plt.setp(self.plot_engine.current_ax.get_zticklabels(), rotation=self.view.ztick_rotation_spin.value())
+            
         #axiss inversion
         if self.view.x_invert_axis_check.isChecked():
             if not self.plot_engine.current_ax.xaxis_inverted():
@@ -3298,6 +3439,14 @@ class PlotTab(PlotTabUI):
         else:
             if self.plot_engine.current_ax.yaxis_inverted():
                 self.plot_engine.current_ax.invert_yaxis()
+        
+        if hasattr(self.plot_engine.current_ax, "zaxis"):
+            if self.view.z_invert_axis_check.isChecked():
+                if not self.plot_engine.current_ax.zaxis_inverted():
+                    self.plot_engine.current_ax.invert_zaxis()
+            else:
+                if self.plot_engine.current_ax.zaxis_inverted():
+                    self.plot_engine.current_ax.invert_zaxis()
 
     def _apply_textbox(self):
         """Apply textbox"""
@@ -3540,325 +3689,6 @@ class PlotTab(PlotTabUI):
         self.view.title_input.blockSignals(False)
         self.view.xlabel_input.blockSignals(False)
         self.view.ylabel_input.blockSignals(False)
-    
-    def open_script_editor(self):
-        """Open the Python Script Editor"""
-        if self.data_handler.df is None:
-            QMessageBox.warning(self, "No Data", "Please load data first before opening the editor")
-            return
-        
-        #Start by generating the initialcode
-        config = self.get_config()
-        df = self.get_active_dataframe()
-        if df is None: return
-
-        code = self.code_exporter.get_plot_script_only(df, config)
-
-        #open dialog
-        if self.script_editor is None:
-            self.script_editor = ScriptEditorDialog(code, df=df, parent=self)
-            self.script_editor.run_script_signal.connect(self.run_custom_script)
-        
-        if not self.script_editor.isVisible():
-            self.script_editor.update_code(code)
-            self.script_editor.show()
-        else:
-            self.script_editor.raise_()
-            self.script_editor.activateWindow()
-            self._sync_script_if_open()
-    
-    def _sync_script_if_open(self):
-        """Regenerate the script and update the editor if it is open and autosync is enabled"""
-        if self.script_editor and self.script_editor.isVisible():
-            self.script_sync_timer.start()
-            config = self.get_config()
-            df = self.get_active_dataframe()
-            if df is not None:
-                code = self.code_exporter.get_plot_script_only(df, config)
-                self.script_editor.update_code(code)
-    
-    def _perform_script_sync(self):
-        config = self.get_config()
-        df = self.get_active_dataframe()
-        if df is not None:
-            code = self.code_exporter.get_plot_script_only(df, config)
-            self.script_editor.update_code(code)
-    
-    def run_custom_script(self, script_content: str):
-        """
-        Execute the script from the editor
-        Overrides the standard plot generatiom
-        """
-        self.status_bar.log("Running custom script...", "INFO")
-
-        try:
-            def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
-                allowed_modules = {
-                    "pandas", "numpy", "matplotlib", "seaborn", "scipy", "math", "datetime", "random", "re", "io", "typing", "collections", "itertools", "functools"
-                }
-
-                base_name = name.split(".")[0]
-                if base_name not in allowed_modules:
-                    raise ImportError(f"Import of module: '{name}' is restricted.")
-                
-                return __import__(name, globals, locals, fromlist, level)
-
-            safe_globals = {
-                "__builtins__": {
-                    "__import__": safe_import,
-                    "print": print,
-                    "range": range,
-                    "len": len,
-                    "list": list,
-                    "dict": dict,
-                    "set": set,
-                    "str": str,
-                    "int": int,
-                    "float": float,
-                    "bool": bool,
-                    "zip": zip,
-                    "enumerate": enumerate,
-                    "min": min,
-                    "max": max,
-                    "sum": sum,
-                    "abs": abs,
-                    "sorted": sorted,
-                    "tuple": tuple,
-                    "None": None,
-                    "True": True,
-                    "False": False,
-                    "hasattr": hasattr,
-                    "getattr": getattr,
-                    "isinstance": isinstance
-                },
-                "pd": pd,
-                "np": np,
-                "plt": plt,
-                "sns": sns,
-                "mdates": mdates,
-                "stats": stats,
-                "t_dist": t_dist,
-                "MaxNLocator": MaxNLocator
-            }
-
-            df_active = self.get_active_dataframe().copy()
-            local_vars = {"df": df_active}
-
-            exec(script_content, safe_globals, local_vars)
-
-            if "create_plot" not in local_vars:
-                raise ValueError("Script must define a function name 'create_plot' that returns (fix, ax).")
-            
-            create_plot_func = local_vars["create_plot"]
-
-            self.plot_engine.clear_plot()
-
-            fig_result, ax_result = create_plot_func(df_active)
-
-            old_fig = self.plot_engine.current_figure
-            # Closing the previous figure to prevent references to past figures.
-            if old_fig is not None:
-                plt.close(old_fig)
-            self.plot_engine.current_figure = fig_result
-            self.plot_engine.current_ax = ax_result
-
-            self.canvas.figure = fig_result
-            fig_result.set_canvas(self.canvas)
-            self.canvas.draw()
-
-            self._sync_gui_from_ax(ax_result)
-
-            self.status_bar.log("Script executed", "SUCCESS")
-        
-        except Exception as ExecuteScrptError:
-            QMessageBox.critical(self, "Script Error", f"An error occurred while running the script:\n{str(ExecuteScrptError)}")
-            self.status_bar.log(f"Script execution failed: {str(ExecuteScrptError)}", "ERROR")
-            traceback.print_exc()
-    
-    def _sync_gui_from_ax(self, ax):
-        """
-        Attempt to update basic GUI fields from the resulting plot
-        """
-        try:
-            title = ax.get_title()
-            if title:
-                self.view.title_input.setText(title)
-                self.view.title_check.setChecked(True)
-            
-            xlabel = ax.get_xlabel()
-            if xlabel:
-                self.view.xlabel_input.setText(xlabel)
-                self.view.xlabel_check.setChecked(True)
-            
-            ylabel = ax.get_ylabel()
-            if ylabel:
-                self.view.ylabel_input.setText(ylabel)
-                self.view.ylabel_check.setChecked(True)
-            
-        except Exception as GUISyncError:
-            print(f"Warning: Could not sync GUI from plot: {GUISyncError}")
-    
-    def refresh_theme_list(self):
-        """Scane the theme directory to update theme selection box"""
-        self.view.theme_combo.blockSignals(True)
-        self.view.theme_combo.clear()
-        self.view.theme_combo.addItem("Select a theme...")
-
-        if self.theme_dir.exists():
-            themes = [file.name for file in self.theme_dir.glob("*.json")]
-            for theme in sorted(themes):
-                self.view.theme_combo.addItem(theme.replace(".json", ""), userData=theme)
-        
-        self.view.theme_combo.blockSignals(False)
-    
-    def get_theme_config(self) -> Dict[str, Any]:
-        theme_data = {
-            "appearance": self.config_manager._get_appearance_config(),
-            "axes": self.config_manager._get_axes_config(),
-            "legend": self.config_manager._get_legend_config(),
-            "grid": self.config_manager._get_grid_config(),
-            "advanced": self.config_manager._get_advanced_config()
-        }
-
-        if "axes" in theme_data:
-            theme_data["axes"]["x_axis"]["auto_limits"] = True
-            theme_data["axes"]["y_axis"]["auto_limits"] = True
-            theme_data["axes"]["x_axis"]["min"] = 0
-            theme_data["axes"]["x_axis"]["max"] = 1
-            theme_data["axes"]["y_axis"]["min"] = 0
-            theme_data["axes"]["y_axis"]["max"] = 1
-        
-        return theme_data
-    
-    def save_custom_theme(self):
-        """Save the current visual settings to a JSON file"""
-        text, ok = QInputDialog.getText(self, "Save theme", "Enter theme name")
-        if ok and text:
-            if text in self.default_theme_names:
-                QMessageBox.warning(self, "Action Denied", f"'{text}' is the name of a default theme. Please choose another theme name")
-            filename = "".join(x for x in text if x.isalnum() or x in " _-") + ".json"
-            filepath = self.theme_dir / filename
-
-            theme_data = self.get_theme_config()
-
-            try:
-                with open(filepath, "w") as file:
-                    json.dump(theme_data, file, indent=4)
-                self.status_bar.log(f"Theme '{text}' saved", "SUCCESS")
-                self.refresh_theme_list()
-
-                # Automaticaly seltect the new created theme
-                index = self.view.theme_combo.findText(text)
-                if index >= 0:
-                    self.view.theme_combo.setCurrentIndex(index)
-            
-            except Exception as SaveThemeError:
-                self.status_bar.log(f"Failed to save theme: {SaveThemeError}", "ERROR")
-                QMessageBox.critical(self, "Error", f"Could not save theme: {str(SaveThemeError)}")
-    
-    def apply_selected_theme(self):
-        """Load and apply the selected theme"""
-        theme_file = self.view.theme_combo.currentData()
-        if not theme_file:
-            return
-        
-        filepath = self.theme_dir / theme_file
-        if not filepath.exists():
-            self.status_bar.log(f"Theme file not found: {filepath}", "ERROR")
-            return
-        
-        try:
-            with open(filepath, "r") as file:
-                theme_config = json.load(file)
-            
-            if "appearance" in theme_config: self.config_manager._load_appearance_config(theme_config["appearance"])
-            if "axes" in theme_config: self.config_manager._load_axes_config(theme_config["axes"])
-            if "legend" in theme_config: self.config_manager._load_legend_config(theme_config["legend"])
-            if "grid" in theme_config: self.config_manager._load_grid_config(theme_config["grid"])
-            if "advanced" in theme_config: self.config_manager._load_advanced_config(theme_config["advanced"])
-
-            self.status_bar.log(f"Theme '{self.view.theme_combo.currentText()}' applied", "SUCCESS")
-
-            # if data is present, create the plot again
-            if self.data_handler.df is not None:
-                self.generate_plot()
-        
-        except Exception as ApplyThemeError:
-            self.status_bar.log(f"Failed to load theme: {ApplyThemeError}", "ERROR")
-            QMessageBox.critical(self, "Error", f"Could not load theme: {str(ApplyThemeError)}")
-            traceback.print_exc()
-    
-    def delete_custom_theme(self):
-        """Delete the selected theme"""
-        theme_file = self.view.theme_combo.currentData()
-        theme_name = self.view.theme_combo.currentText()
-
-        if not theme_file or theme_name == "Select a theme...":
-            return
-        
-        clean_name = theme_file.replace(".json", "")
-        if clean_name in self.default_theme_names:
-            QMessageBox.warning(self, "Action Denied", f"'{theme_name}' is a default theme and cannot be deleted.")
-            return
-        
-        confirm = QMessageBox.question(
-            self, "Confrm Delete", f"Are you sure you want to delete theme '{theme_name}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-
-        if confirm == QMessageBox.StandardButton.Yes:
-            try:
-                filepath = self.theme_dir / theme_file
-                if filepath.exists():
-                    filepath.unlink()
-                    self.refresh_theme_list()
-                    self.status_bar.log(f"Theme '{theme_name}' deleted", "INFO")
-            except Exception as DeleteThemeError:
-                self.status_bar.log(f"Failed to delete theme: {DeleteThemeError}", "ERROR")
-    
-    def edit_custom_theme(self):
-        """Open JSON editor for the selected theme"""
-        theme_file = self.view.theme_combo.currentData()
-        theme_name = self.view.theme_combo.currentText()
-
-        if not theme_file or theme_name == "Select a theme...":
-            return
-        
-        filepath = self.theme_dir / theme_file
-        if not filepath.exists():
-            return
-        
-        try:
-            with open(filepath, "r") as file:
-                content = json.load(file)
-            
-            clean_name = theme_file.replace(".json", "")
-            is_protected = clean_name in self.default_theme_names
-
-            dialog = PlotConfigEditorDialog(theme_name, content, is_protected, self)
-            if dialog.exec():
-                new_content = dialog.final_content
-
-                if is_protected and dialog.new_theme_name:
-                    save_name = dialog.new_theme_name
-                    filename = "".join(x for x in save_name if x.isalnum() or x in " _-") + ".json"
-                    save_path = self.theme_dir / filename
-                else:
-                    save_name = theme_name
-                    save_path = filepath
-
-                with open(save_path, "w") as file:
-                    json.dump(new_content, file, indent=4)
-                
-                self.status_bar.log(f"Theme '{save_name}' updated", "SUCCESS")
-                self.refresh_theme_list()
-
-                index = self.view.theme_combo.findText(save_name)
-                if index >= 0:
-                    self.view.theme_combo.setCurrentIndex(index)
-        except Exception as EditThemeJSONError:
-            self.status_bar.log(f"Failed to edit theme: {EditThemeJSONError}", "ERROR")
-            QMessageBox.critical(self, "Error", f"Could not edit theme: {str(EditThemeJSONError)}")
 
     def set_empty_state_greeting(self) -> None:
         try:

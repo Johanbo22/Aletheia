@@ -401,7 +401,14 @@ class CodeExporter:
         height = self._get_cfg(config, 'appearance.figure.height', 6)
         dpi = self._get_cfg(config, 'appearance.figure.dpi', 100)
         
-        lines.append(f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi})")
+        plot_type = self._get_cfg(config, "plot_type")
+        is_3d_plot = plot_type in ["3D Scatter", "3D Line", "3D Surface"]
+        subplot_kwargs = "projection='3d'" if is_3d_plot else ""
+        
+        if subplot_kwargs:
+            lines.append(f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi}, subplot_kw={{{self._clean_value('projection')}: {self._clean_value('3d')}}})")
+        else:
+            lines.append(f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi})")
         
         bg_color = self._clean_value(self._get_cfg(config, 'appearance.figure.bg_color', 'white'))
         face_color = self._clean_value(self._get_cfg(config, 'appearance.figure.face_color', 'white'))
@@ -456,6 +463,7 @@ class CodeExporter:
             "y": self._clean_value(y_cols[0]) if y_cols else None,
             "ys": self._clean_value(y_cols),
             "y_list": y_cols,
+            "z": self._clean_value(self._get_cfg(config, "basic.z_column")),
             "hue": self._clean_value(hue) if hue and hue != "None" else "None",
             "palette": self._clean_value(palette),
             "alpha": alpha,
@@ -479,6 +487,9 @@ class CodeExporter:
         elif plot_type in ["Barbs", "Quiver", "Streamplot"]: lines.extend(self._generate_vector_plot(ctx, plot_type))
         elif plot_type in ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"]: lines.extend(self._generate_tri_plot(ctx, plot_type))
         elif plot_type == "GeoSpatial": lines.extend(self._generate_geospatial_plot(ctx))
+        elif plot_type == "3D Scatter": lines.extend(self._generate_3d_scatter(ctx))
+        elif plot_type == "3D Line": lines.extend(self._generate_3d_line(ctx))
+        elif plot_type == "3D Surface": lines.extend(self._generate_3d_surface(ctx))
         else:
             lines.append(f"    sns.scatterplot(data=df, x={ctx['x']}, y={ctx['y']}, alpha={alpha})")
         
@@ -821,6 +832,77 @@ class CodeExporter:
         ])
         return lines
     
+    def _generate_3d_scatter(self, ctx: Dict) -> List[str]:
+        lines = []
+        if ctx['z'] in ["'None'", "None"]: 
+            return ["    print('Error: Need Z column for 3D Scatter')"]
+        
+        g_marker = self._get_cfg(ctx['config'], "advanced.global_marker", {})
+        size = g_marker.get('size', 6)
+        kw_base = [f"s={size}**2", f"alpha={ctx['alpha']}"]
+        
+        marker = self._clean_value(g_marker.get('shape', 'o'))
+        if marker != "'None'": kw_base.append(f"marker={marker}")
+        
+        if ctx['hue'] != "None":
+            kw_base.append(f"cmap={ctx['palette']}")
+            lines.extend([
+                f"    groups = df[{ctx['hue']}].dropna().unique()",
+                "    for i, group in enumerate(groups):",
+                f"        mask = (df[{ctx['hue']}] == group) & df[{ctx['x']}].notna() & df[{ctx['y']}].notna() & df[{ctx['z']}].notna()",
+                f"        ax.scatter3D(df.loc[mask, {ctx['x']}], df.loc[mask, {ctx['y']}], df.loc[mask, {ctx['z']}], label=str(group), {', '.join(kw_base)})"
+            ])
+        else:
+            lines.append(f"    mask = df[{ctx['x']}].notna() & df[{ctx['y']}].notna() & df[{ctx['z']}].notna()")
+            lines.append(f"    ax.scatter3D(df.loc[mask, {ctx['x']}], df.loc[mask, {ctx['y']}], df.loc[mask, {ctx['z']}], {', '.join(kw_base)})")
+        return lines
+
+    def _generate_3d_line(self, ctx: Dict) -> List[str]:
+        lines = []
+        if ctx['z'] in ["'None'", "None"]: 
+            return ["    print('Error: Need Z column for 3D Line')"]
+            
+        g_line = self._get_cfg(ctx["config"], "advanced.global_line", {})
+        kw_base = [
+            f"linestyle={self._clean_value(g_line.get('style', '-'))}",
+            f"linewidth={g_line.get('width', 1.5)}",
+            f"alpha={ctx['alpha']}"
+        ]
+        
+        if ctx['hue'] != "None":
+            lines.extend([
+                f"    groups = df[{ctx['hue']}].dropna().unique()",
+                "    for i, group in enumerate(groups):",
+                f"        mask = (df[{ctx['hue']}] == group) & df[{ctx['x']}].notna() & df[{ctx['y']}].notna() & df[{ctx['z']}].notna()",
+                f"        ax.plot3D(df.loc[mask, {ctx['x']}], df.loc[mask, {ctx['y']}], df.loc[mask, {ctx['z']}], label=str(group), {', '.join(kw_base)})"
+            ])
+        else:
+            lines.append(f"    mask = df[{ctx['x']}].notna() & df[{ctx['y']}].notna() & df[{ctx['z']}].notna()")
+            lines.append(f"    ax.plot3D(df.loc[mask, {ctx['x']}], df.loc[mask, {ctx['y']}], df.loc[mask, {ctx['z']}], label=f'{{ {ctx['y']} }} vs {{ {ctx['z']} }}', {', '.join(kw_base)})")
+        return lines
+
+    def _generate_3d_surface(self, ctx: Dict) -> List[str]:
+        lines = []
+        if ctx['z'] in ["'None'", "None"]: 
+            return ["    print('Error: Need Z column for 3D Surface')"]
+            
+        lines.extend([
+            "    # Prepare Gridded Data for Surface",
+            "    try:",
+            f"        if df[[{ctx['x']}, {ctx['y']}]].duplicated().any():",
+            f"            df_agg = df.groupby([{ctx['x']}, {ctx['y']}])[{ctx['z']}].mean().reset_index()",
+            "        else:",
+            "            df_agg = df",
+            f"        piv = df_agg.pivot(index={ctx['y']}, columns={ctx['x']}, values={ctx['z']}).sort_index(axis=0).sort_index(axis=1)",
+            "        X_grid, Y_grid = np.meshgrid(piv.columns.values, piv.index.values)",
+            "        Z_grid = piv.values",
+            f"        surf = ax.plot_surface(X_grid, Y_grid, Z_grid, cmap={ctx['palette']}, alpha={ctx['alpha']})",
+            "        fig.colorbar(surf, ax=ax)",
+            "    except Exception as e:",
+            "        print(f'Failed to grid data for 3D Surface: {e}')"
+        ])
+        return lines
+    
     def _generate_appearance(self, config: Dict[str, Any], x_col: str, y_cols: List[str]) -> List[str]:
         """Generate the code used for axis labels, titles, spines etc"""
         lines = ["\n    # --- 4. Appearance & Labels ---"]
@@ -869,6 +951,23 @@ class CodeExporter:
              
         if self._get_cfg(config, "axes.x_axis.invert"): lines.append("    ax.invert_xaxis()")
         if self._get_cfg(config, "axes.y_axis.invert"): lines.append("    ax.invert_yaxis()")
+
+        plot_type = self._get_cfg(config, "plot_type")
+        is_3d = plot_type in ["3D Scatter", "3D Line", "3D Surface"]
+
+        if is_3d:
+            if not self._get_cfg(config, "axes.z_axis.auto_limits", True):
+                 lines.append(f"    ax.set_zlim({self._get_cfg(config, 'axes.z_axis.min')}, {self._get_cfg(config, 'axes.z_axis.max')})")
+            if self._get_cfg(config, "axes.z_axis.invert"): lines.append("    ax.invert_zaxis()")
+            
+            elev = self._get_cfg(config, "appearance.viewing_angles.elevation")
+            azim = self._get_cfg(config, "appearance.viewing_angles.azimuth")
+            if elev is not None or azim is not None:
+                lines.append(f"    ax.view_init(elev={elev}, azim={azim})")
+                
+            zlabel_text = self._clean_value(self._get_cfg(config, "basic.z_column", ""))
+            if zlabel_text not in ["'None'", "None", "''"]:
+                 lines.append(f"    ax.set_zlabel({zlabel_text})")
 
         if self._get_cfg(config, "grid.enabled"):
              which = self._clean_value(self._get_cfg(config, "grid.global.which", "major"))

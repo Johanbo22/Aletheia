@@ -75,6 +75,7 @@ class PlotConfigManager:
         return {
             "x_column": self.pt.x_column.currentText(),
             "y_columns": self.pt.get_selected_y_columns(),
+            "z_column": getattr(self.pt, "z_column", None) and self.pt.z_column.currentText(),
             "multi_y_checked": self.pt.multi_y_check.isChecked(),
             "hue_column": self.pt.hue_column.currentText(),
             "use_subset": self.pt.use_subset_check.isChecked(),
@@ -101,6 +102,10 @@ class PlotConfigManager:
                 "enabled": self.pt.colorblind_check.isChecked(),
                 "type": self.pt.colorblind_type_combo.currentText()
             },
+            "viewing_angles": {
+                "elevation": getattr(self.pt, "camera_elevation_spin", None) and self.pt.camera_elevation_spin.value(),
+                "azimuth": getattr(self.pt, "camera_azimuth_spin", None) and self.pt.camera_azimuth_spin.value(),
+            },
             "title": {
                 "enabled": self.pt.title_check.isChecked(),
                 "text": self.pt.title_input.text(),
@@ -119,6 +124,12 @@ class PlotConfigManager:
                 "text": self.pt.ylabel_input.text(),
                 "size": self.pt.ylabel_size_spin.value(),
                 "weight": self.pt.ylabel_weight_combo.currentText(),
+            },
+            "zlabel": {
+                "enabled": self.pt.zlabel_check.isChecked(),
+                "text": self.pt.zlabel_input.text(),
+                "size": self.pt.zlabel_size.value(),
+                "weight": self.pt.zlabel_weight.currentText(),
             },
             "spines": {
                 "individual": self.pt.individual_spines_check.isChecked(),
@@ -191,6 +202,22 @@ class PlotConfigManager:
                 "minor_tick_width": self.pt.y_minor_tick_width_spin.value(),
                 "scale": self.pt.y_scale_combo.currentText(),
                 "display_units": self.pt.y_display_units_combo.currentText()
+            },
+            "z_axis": {
+                "auto_limits": getattr(self.pt, "z_auto_check", None) and self.pt.z_auto_check.isChecked(),
+                "invert": getattr(self.pt, "z_invert_axis_check", None) and self.pt.z_invert_axis_check.isChecked(),
+                "min": getattr(self.pt, "z_min_spin", None) and self.pt.z_min_spin.value(),
+                "max": getattr(self.pt, "z_max_spin", None) and self.pt.z_max_spin.value(),
+                "tick_label_size": getattr(self.pt, "ztick_label_size_spin", None) and self.pt.ztick_label_size_spin.value(),
+                "tick_rotation": getattr(self.pt, "ztick_rotation_spin", None) and self.pt.ztick_rotation_spin.value(),
+                "max_ticks": getattr(self.pt, "z_max_ticks_spin", None) and self.pt.z_max_ticks_spin.value(),
+                "minor_ticks_enabled": getattr(self.pt, "z_show_minor_ticks_check", None) and self.pt.z_show_minor_ticks_check.isChecked(),
+                "major_tick_direction": getattr(self.pt, "z_major_tick_direction_combo", None) and self.pt.z_major_tick_direction_combo.currentText(),
+                "major_tick_width": getattr(self.pt, "z_major_tick_width_spin", None) and self.pt.z_major_tick_width_spin.value(),
+                "minor_tick_direction": getattr(self.pt, "z_minor_tick_direction_combo", None) and self.pt.z_minor_tick_direction_combo.currentText(),
+                "minor_tick_width": getattr(self.pt, "z_minor_tick_width_spin", None) and self.pt.z_minor_tick_width_spin.value(),
+                "scale": getattr(self.pt, "z_scale_combo", None) and self.pt.z_scale_combo.currentText(),
+                "display_units": getattr(self.pt, "z_display_units_combo", None) and self.pt.z_display_units_combo.currentText()
             },
             "flip_axes": self.pt.flip_axes_check.isChecked(),
             "datetime": {
@@ -377,6 +404,9 @@ class PlotConfigManager:
     def _load_basic_config(self, config: dict):
         self.pt.x_column.setCurrentText(config.get("x_column", ""))
         self.pt.quick_filter_input.setText(config.get("quick_filter", ""))
+        
+        if hasattr(self.pt, "z_column"):
+            self.pt.z_column.setCurrentText(config.get("z_column", ""))
 
         # Multi Y config
         multi_y = config.get("multi_y_checked", False)
@@ -427,6 +457,13 @@ class PlotConfigManager:
             self.pt.font_family_combo.setCurrentFont(QFont(config["font_family"]))
         self.pt.usetex_checkbox.setChecked(config.get("usetex", False))
 
+        # Viewing angles
+        viewing_angles = config.get("viewing_angles", {})
+        if hasattr(self.pt, "camera_elevation_spin") and "elevation" in viewing_angles:
+            self.pt.camera_elevation_spin.setValue(viewing_angles.get("elevation", 30))
+        if hasattr(self.pt, "camera_azimuth_spin") and "azimuth" in viewing_angles:
+            self.pt.camera_azimuth_spin.setValue(viewing_angles.get("azimuth", -60))
+        
         # Colorblind mode
         cb_conf = config.get("colorblind", {})
         self.pt.colorblind_check.setChecked(cb_conf.get("enabled", False))
@@ -452,6 +489,12 @@ class PlotConfigManager:
         self.pt.ylabel_input.setText(y_label_conf.get("text", ""))
         self.pt.ylabel_size_spin.setValue(y_label_conf.get("size", 10))
         self.pt.ylabel_weight_combo.setCurrentText(y_label_conf.get("weight", "normal"))
+        
+        z_label_conf = config.get("zlabel", {})
+        self.pt.zlabel_check.setChecked(z_label_conf.get("enabled", True))
+        self.pt.zlabel_input.setText(z_label_conf.get("text", ""))
+        self.pt.zlabel_size.setValue(z_label_conf.get("size", 10))
+        self.pt.zlabel_weight.setCurrentText(z_label_conf.get("weight", "normal"))
 
         # Spines
         spines = config.get("spines", {})
@@ -533,6 +576,24 @@ class PlotConfigManager:
         self.pt.y_minor_tick_width_spin.setValue(y_conf.get("minor_tick_width", 0.6))
         self.pt.y_scale_combo.setCurrentText(y_conf.get("scale", "linear"))
         self.pt.y_display_units_combo.setCurrentText(y_conf.get("display_units", "None"))
+        
+        # Z-axis
+        z_conf = config.get("z_axis", {})
+        if hasattr(self.pt, "z_auto_check"):
+            self.pt.z_auto_check.setChecked(z_conf.get("auto_limits", True))
+            self.pt.z_invert_axis_check.setChecked(z_conf.get("invert", False))
+            self.pt.z_min_spin.setValue(z_conf.get("min", 0.0))
+            self.pt.z_max_spin.setValue(z_conf.get("max", 1.0))
+            self.pt.ztick_label_size_spin.setValue(z_conf.get("tick_label_size", 10))
+            self.pt.ztick_rotation_spin.setValue(z_conf.get("tick_rotation", 0))
+            self.pt.z_max_ticks_spin.setValue(z_conf.get("max_ticks", 10))
+            self.pt.z_show_minor_ticks_check.setChecked(z_conf.get("minor_ticks_enabled", False))
+            self.pt.z_major_tick_direction_combo.setCurrentText(z_conf.get("major_tick_direction", "out"))
+            self.pt.z_major_tick_width_spin.setValue(z_conf.get("major_tick_width", 0.8))
+            self.pt.z_minor_tick_direction_combo.setCurrentText(z_conf.get("minor_tick_direction", "out"))
+            self.pt.z_minor_tick_width_spin.setValue(z_conf.get("minor_tick_width", 0.6))
+            self.pt.z_scale_combo.setCurrentText(z_conf.get("scale", "linear"))
+            self.pt.z_display_units_combo.setCurrentText(z_conf.get("display_units", "None"))
 
         self.pt.flip_axes_check.setChecked(config.get("flip_axes", False))
 
