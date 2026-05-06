@@ -1,8 +1,7 @@
 # ui/plot_tab.py
-from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem, QInputDialog, QToolTip
+from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem, QToolTip
 from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
 from PyQt6.QtGui import QIcon, QColor, QCursor
-import json
 import threading
 from pathlib import Path
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -16,34 +15,29 @@ from ui.animations import SavePlotAnimation
 from ui.components.plot_settings_panel import PlotSettingsPanel
 from ui.status_bar import StatusBar
 from core.code_exporter import CodeExporter
-from ui.dialogs import ProgressDialog, ScriptEditorDialog
+from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI 
 from ui.animations.PlotGeneratedAnimation import PlotGeneratedAnimation
 from ui.animations.PlotClearedAnimation import PlotClearedAnimation
 import pandas as pd
 import numpy as np
-from scipy import stats
-from scipy.stats import t as t_dist
 import matplotlib.dates as mdates
 from matplotlib.ticker import MaxNLocator, FuncFormatter, AutoMinorLocator, NullLocator
-import seaborn as sns
 import matplotlib.pyplot as plt
 import traceback
 from matplotlib.colors import to_hex
 from typing import Dict, Any
 from matplotlib.lines import Line2D
-from matplotlib.text import Text
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PathCollection
 from typing import Optional, TYPE_CHECKING
 
-from ui.managers.theme_manager import ThemeManager
-from ui.managers.script_manager import ScriptManager
-from ui.widgets.ControlElements import DataPlotStudioListWidget
-from ui.widgets.ColorBlindnessEffect import ColorBlindnessEffect
-from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
+from ui.managers.plot_tab_managers.theme_manager import ThemeManager
+from ui.managers.plot_tab_managers.script_manager import ScriptManager
+from ui.managers.plot_tab_managers.subplot_manager import SubplotManager
+from ui.managers.plot_tab_managers.annotation_manager import AnnotationManager
+from ui.widgets import DataPlotStudioListWidget, ColorBlindnessEffect
 from ui.dialogs.PlotExportDialog import PlotExportDialog
-from ui.dialogs.PlotConfigEditorDialog import PlotConfigEditorDialog
 from core.plot_config_manager import PlotConfigManager
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
@@ -116,12 +110,6 @@ class PlotTab(PlotTabUI):
 
         self.line_customizations = {}
         self.bar_customizations = {}
-        self.annotations = []
-        self.context_toolbar = ContextualAnnotationToolbar(self)
-        self.context_toolbar.styleChanged.connect(self._update_annotations_from_toolbar)
-        self.context_toolbar.deleteRequested.connect(self._delete_annotation_from_toolbar)
-        
-        self.subplot_data_configs = {}
         
         # Categories
         self.plot_categories = {
@@ -159,8 +147,10 @@ class PlotTab(PlotTabUI):
         
         self.set_empty_state_greeting()
 
-        # Initialize the themes
+        # Initialize the plot tab managers
         self.theme_manager = ThemeManager(self)
+        self.subplot_manager = SubplotManager(self)
+        self.annotation_manager = AnnotationManager(self)
         
         # Caching
         self._last_data_signature = None
@@ -264,10 +254,9 @@ class PlotTab(PlotTabUI):
         self.view.subset_combo.currentIndexChanged.connect(self.on_data_changed)
         self.view.quick_filter_input.returnPressed.connect(self.on_data_changed)
         self.view.z_column.currentTextChanged.connect(self.on_data_changed)
-        
-        self.view.grid_designer.layout_applied.connect(self._apply_custom_grid_layout)
-        self.view.active_subplot_combo.currentIndexChanged.connect(self.on_active_subplot_changed)
-        self.view.add_subplots_check.stateChanged.connect(self.on_subplot_active)
+
+        self.subplot_manager.connect_signals()
+
         self.view.use_subset_check.stateChanged.connect(self.use_subset)
         self.view.secondary_y_check.stateChanged.connect(lambda state: self._toggle_secondary_input(bool(state)))
         self.view.secondary_plot_type_combo.currentTextChanged.connect(lambda _: self._update_customization_visibility(self.current_plot_type_name))
@@ -485,26 +474,7 @@ class PlotTab(PlotTabUI):
         
     def _connect_annotation_tab_signals(self) -> None:
         """Connect signals for the Annotations tab"""
-        self.view.annotation_color_button.clicked.connect(self.choose_annotation_color)
-        self.view.annotation_bg_color_button.clicked.connect(self.choose_annotation_bg_color)
-        self.view.auto_annotate_check.clicked.connect(self.toggle_auto_annotate)
-        self.view.auto_annotate_fontsize_spin.valueChanged.connect(self.on_style_changed)
-        self.view.auto_annotate_weight_combo.currentTextChanged.connect(self.on_style_changed)
-        self.view.auto_annotate_color_button.clicked.connect(self.choose_auto_annotate_color)
-        self.view.auto_annotate_x_offset_spin.valueChanged.connect(self.on_style_changed)
-        self.view.auto_annotate_y_offset_spin.valueChanged.connect(self.on_style_changed)
-        self.view.auto_annotate_rotation_spin.valueChanged.connect(self.on_style_changed)
-        self.view.add_annotation_button.clicked.connect(self.add_annotation)
-        self.view.textbox_bg_button.clicked.connect(self.choose_textbox_bg_color)
-        self.view.annotations_list.itemClicked.connect(self.on_annotation_selected)
-        self.view.clear_annotations_button.clicked.connect(self.clear_annotations)
-        self.view.table_enable_check.stateChanged.connect(self.toggle_table_controls)
-        self.view.table_auto_font_size_check.stateChanged.connect(self.toggle_table_font_controls)
-        
-        self.view.textbox_enable_check.stateChanged.connect(self.on_style_changed)
-        self.view.textbox_content.textChanged.connect(self.on_style_changed)
-        self.view.textbox_position_combo.currentTextChanged.connect(self.on_style_changed)
-        self.view.textbox_style_combo.currentTextChanged.connect(self.on_style_changed)
+        self.annotation_manager.connect_signals()
         self.view.table_enable_check.stateChanged.connect(self.on_style_changed)
         self.view.table_type_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.table_location_combo.currentTextChanged.connect(self.on_style_changed)
@@ -636,67 +606,12 @@ class PlotTab(PlotTabUI):
             self.view.global_spine_color_button.updateColors(base_color_hex=self.global_spine_color)
             self.on_style_changed()
     
-    def on_subplot_active(self):
-        """Activate subplot group for visibility"""
-        subplots_enabled = self.view.add_subplots_check.isChecked()
-
-        self.view.subplot_group.setVisible(subplots_enabled)
-    
     def use_subset(self):
         """Active subset on change"""
         subset_enabled = self.view.use_subset_check.isChecked()
     
-    def _apply_custom_grid_layout(self, rows: int, cols: int, custom_grid: list) -> None:
-        """Apply custom GridSpec layout spanning complex structures to the current subplot context"""
-        sharex = self.settings_panel.subplot_sharex_check.isChecked()
-        sharey = self.settings_panel.subplot_sharey_check.isChecked()
-
-        confirmation = QMessageBox.question(
-            self, "Update Layout",
-            "Updating subplot layout will clear all existing plots on the canvas.\nContinue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if confirmation == QMessageBox.StandardButton.Yes:
-            try:
-                self.plot_engine.setup_layout(rows=rows, cols=cols, sharex=sharex, sharey=sharey, custom_grid=custom_grid)
-
-                max_plots = len(custom_grid)
-                self.view.active_subplot_combo.blockSignals(True)
-                self.view.active_subplot_combo.clear()
-
-                for i in range(max_plots):
-                    self.view.active_subplot_combo.addItem(f"Plot {i + 1}")
-                self.view.active_subplot_combo.blockSignals(False)
-
-                self.subplot_data_configs.clear()
-                self.canvas.draw()
-
-                # trigger overlay
-                self.on_active_subplot_changed(0)
-
-                self.status_bar.log(f"Subplot layout updated to {rows}x{cols} with {max_plots} plots", "INFO")
-            except Exception as layout_err:
-                self.status_bar.log(f"Failed to apply custom grid layout: {str(layout_err)}", "ERROR")
-    
-    def on_active_subplot_changed(self, index):
-        """Change index for active subplot"""
-        if index >= 0:
-            self.plot_engine.set_active_subplot(index)
-            self._update_overlay()
-            self.status_bar.log(f"Active subplot set to: {index + 1}", "INFO")
-    
-    def _update_overlay(self, is_resize: bool = False):
-        """Recalculate geometry and overlay widgets"""
-        geometry = self.plot_engine.get_active_axis_geometry()
-
-        if geometry:
-            x, y, w, h = geometry
-            current_text = self.view.active_subplot_combo.currentText()
-            self.selection_overlay.update_info(current_text, (x, y, w, h), is_resize=is_resize)
-    
     def on_canvas_resize(self, event):
-        self._update_overlay(is_resize=True)
+        self.subplot_manager.update_overlay(is_resize=True)
         self._setup_plot_figure(clear=False)
         self.canvas.draw_idle()
 
@@ -762,45 +677,17 @@ class PlotTab(PlotTabUI):
         """Handles the pick events from the main canvas"""
         artist = event.artist
 
-        if isinstance(artist, Text):
-            gid = artist.get_gid()
-            if gid and str(gid).startswith("annotation_"):
-                self.dragged_annotation = artist
-                self.ignore_next_click = True
-                
-                if self.style_update_timer.isActive():
-                    self.style_update_timer.stop()
-                
-                self.dragged_annotation.set_animated(True)
-                self.canvas.draw()
-                if self.plot_engine.current_ax:
-                    self._bg_cache = self.canvas.copy_from_bbox(self.plot_engine.current_ax.bbox)
-                    self.plot_engine.current_ax.draw_artist(self.dragged_annotation)
-                    self.canvas.blit(self.plot_engine.current_ax.bbox)
-                
-                self.custom_tabs.setCurrentIndex(5)
-                try:
-                    idx = int(gid.split("_")[1])
-                    if idx < self.view.annotations_list.count():
-                        self.view.annotations_list.setCurrentRow(idx)
-                        self.on_annotation_selected(self.view.annotations_list.item(idx))
-                        self.status_bar.log(f"Selected annotation: {artist.get_text()}", "INFO")
-                        
-                        if hasattr(event, "guiEvent") and event.guiEvent is not None:
-                            global_pos = event.guiEvent.globalPosition().toPoint()
-                            global_pos.setY(global_pos.y() - 50)
-                            self.show_annotation_toolbar(idx, global_pos)
-                except ValueError:
-                    pass
-                return
-            self.custom_tabs.setCurrentIndex(1)
-            if artist == self.plot_engine.current_ax.get_title():
-                self.view.title_input.setFocus()
-            elif artist == self.plot_engine.current_ax.xaxis.get_label():
-                self.view.xlabel_input.setFocus()
-            elif artist == self.plot_engine.current_ax.yaxis.get_label():
-                self.view.ylabel_input.setFocus()
-            
+        if self.annotation_manager.handle_pick_event(artist, event):
+            return
+
+        self.custom_tabs.setCurrentIndex(1)
+        if artist == self.plot_engine.current_ax.get_title():
+            self.view.title_input.setFocus()
+        elif artist == self.plot_engine.current_ax.xaxis.get_label():
+            self.view.xlabel_input.setFocus()
+        elif artist == self.plot_engine.current_ax.yaxis.get_label():
+            self.view.ylabel_input.setFocus()
+
             self.status_bar.log(f"Selected text element: {artist.get_text()}", "INFO")
         
         elif isinstance(artist, Line2D):
@@ -938,28 +825,7 @@ class PlotTab(PlotTabUI):
             self.canvas.draw_idle()
             return
         
-        if getattr(self, "dragged_annotation", None):
-            ax = self.plot_engine.current_ax
-            inv = ax.transAxes.inverted()
-            x, y = inv.transform((event.x, event.y))
-            
-            self.dragged_annotation.set_position((x, y))
-            
-            if getattr(self, "_bg_cache", None) and ax:
-                if self.dragged_annotation.figure is None:
-                    self.dragged_annotation.set_figure(self.plot_engine.current_figure)
-                self.canvas.restore_region(self._bg_cache)
-                ax.draw_artist(self.dragged_annotation)
-                self.canvas.blit(ax.bbox)
-            else:
-                self.canvas.draw_idle()
-            
-            self.view.annotation_x_spin.blockSignals(True)
-            self.view.annotation_y_spin.blockSignals(True)
-            self.view.annotation_x_spin.setValue(x)
-            self.view.annotation_y_spin.setValue(y)
-            self.view.annotation_x_spin.blockSignals(False)
-            self.view.annotation_y_spin.blockSignals(False)
+        if self.annotation_manager.handle_mouse_move(event):
             return
 
         # Tooltips
@@ -999,30 +865,8 @@ class PlotTab(PlotTabUI):
             self._pan_start_xlim = None
             self._pan_start_ylim = None
             return
-        if self.dragged_annotation:
-            gid = self.dragged_annotation.get_gid()
-            if gid and gid.startswith("annotation_"):
-                try:
-                    idx = int(gid.split("_")[1])
-                    if 0 <= idx < len(self.annotations):
-                        pos = self.dragged_annotation.get_position()
-                        self.annotations[idx]["x"] = pos[0]
-                        self.annotations[idx]["y"] = pos[1]
 
-                        #update the widget
-                        if idx < self.view.annotations_list.count():
-                            item = self.view.annotations_list.item(idx)
-                            item.setText(f"{self.annotations[idx]["text"]} @ ({pos[0]:.2f}, {pos[1]:.2f})")
-                        
-                        self.status_bar.log(f"Moved annotation to ({pos[0]:.2f}, {pos[1]:.2f})", "INFO")
-                except ValueError:
-                    pass
-            
-            self.dragged_annotation.set_animated(False)
-            self._bg_cache = None
-            self.dragged_annotation = None
-            self.canvas.draw_idle()
-            self.on_style_changed()
+        self.annotation_manager.handle_mouse_relase(event)
 
     def choose_geo_missing_color(self):
         color = QColorDialog.getColor()
@@ -1039,18 +883,6 @@ class PlotTab(PlotTabUI):
             self.view.geo_edge_color_label.setText(self.geo_edge_color)
             self.view.geo_edge_color_btn.updateColors(base_color_hex=self.geo_edge_color)
             self._on_geospatial_projection_changed()
-    
-    def toggle_auto_annotate(self):
-        """Enable auto annotation controls"""
-        is_enabled = self.view.auto_annotate_check.isChecked()
-        self.view.auto_annotate_col_combo.setEnabled(is_enabled)
-        self.view.auto_annotate_fontsize_spin.setEnabled(is_enabled)
-        self.view.auto_annotate_weight_combo.setEnabled(is_enabled)
-        self.view.auto_annotate_color_button.setEnabled(is_enabled)
-        self.view.auto_annotate_x_offset_spin.setEnabled(is_enabled)
-        self.view.auto_annotate_y_offset_spin.setEnabled(is_enabled)
-        self.view.auto_annotate_rotation_spin.setEnabled(is_enabled)
-        self.on_style_changed()
 
     def activate_subset(self, subset_name: str):
         """Activates the 'Use Subset' checkbox and selects the selected subset"""
@@ -1641,31 +1473,6 @@ class PlotTab(PlotTabUI):
             self._update_bar_customization_live()
             self.on_style_changed()
     
-    def choose_annotation_color(self):
-        """Open color picker for annotation color"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.annotation_color = color.name()
-            self.view.annotation_color_label.setText(self.annotation_color)
-            self.view.annotation_color_button.updateColors(base_color_hex=self.annotation_color)
-            self.on_style_changed()
-    
-    def choose_annotation_bg_color(self) -> None:
-        color = QColorDialog.getColor(QColor(self.annotation_bg_color), self)
-        if color.isValid():
-            self.annotation_bg_color = color.name()
-            self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            self.view.annotation_bg_color_button.updateColors(base_color_hex=self.annotation_bg_color)
-            self.on_style_changed()
-    
-    def choose_auto_annotate_color(self):
-        color = QColorDialog.getColor(QColor(self.auto_annotation_color), self)
-        if color.isValid():
-            self.auto_annotation_color = color.name()
-            self.view.auto_annotate_color_label.setText(self.auto_annotation_color)
-            self.view.auto_annotate_color_button.updateColors(base_color_hex=self.auto_annotation_color)
-            self.on_style_changed()
-    
     def choose_error_bar_color(self):
         """Open color picker for error bar color"""
         color = QColorDialog.getColor(QColor(self.error_bar_color), self)
@@ -1700,82 +1507,6 @@ class PlotTab(PlotTabUI):
             self.legend_edge_color = color.name()
             self.view.legend_edge_label.setText(self.legend_edge_color)
             self.view.legend_edge_button.updateColors(base_color_hex=self.legend_edge_color)
-            self.on_style_changed()
-    
-    def add_annotation(self):
-        """Add text annotation to plot"""
-        text = self.view.annotation_text.text().strip()
-        if not text:
-            QMessageBox.warning(self, "Warning", "Please enter annotation text")
-            return
-        
-        annotation = {
-            'text': text,
-            'x': self.view.annotation_x_spin.value(),
-            'y': self.view.annotation_y_spin.value(),
-            'fontsize': self.view.annotation_fontsize_spin.value(),
-            'color': self.annotation_color,
-            'bg_color': self.annotation_bg_color
-        }
-        
-        self.annotations.append(annotation)
-        self.view.annotations_list.addItem(f"{text} @ ({annotation['x']:.2f}, {annotation['y']:.2f})")
-        self.view.annotation_text.clear()
-        self.status_bar.log(f"Added annotation: {text}")
-        self.on_style_changed()
-    
-    def on_annotation_selected(self, item):
-        """Handle annotation selection"""
-        index = self.view.annotations_list.row(item)
-        if 0 <= index < len(self.annotations):
-            ann = self.annotations[index]
-            self.view.annotation_text.setText(ann['text'])
-            self.view.annotation_x_spin.setValue(ann['x'])
-            self.view.annotation_y_spin.setValue(ann['y'])
-            self.view.annotation_fontsize_spin.setValue(ann['fontsize'])
-            self.annotation_color = ann['color']
-            self.view.annotation_color_label.setText(self.annotation_color)
-            self.annotation_bg_color = ann["bg_color"]
-            self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            self.view.annotation_bg_color_button.updateColors(base_color_hex=self.annotation_bg_color)
-            self.on_style_changed()
-    
-    def clear_annotations(self):
-        """Clear all annotations"""
-        self.annotations.clear()
-        self.view.annotations_list.clear()
-        self.view.annotation_text.clear()
-        self.status_bar.log("Cleared all annotations")
-        self.on_style_changed()
-        
-    def show_annotation_toolbar(self, index: int, global_pos) -> None:
-        if 0 <= index < len(self.annotations):
-            ann_data = self.annotations[index]
-            self.context_toolbar.load_annotations(index, ann_data)
-            self.context_toolbar.move(global_pos)
-            self.context_toolbar.show()
-            self.context_toolbar.raise_()
-            self.context_toolbar.activateWindow()
-    
-    def _update_annotations_from_toolbar(self, index: int, new_data: dict) -> None:
-        if 0 <= index < len(self.annotations):
-            self.annotations[index].update(new_data)
-            
-            if index < self.view.annotations_list.count():
-                item = self.view.annotations_list.item(index)
-                x, y = self.annotations[index]["x"], self.annotations[index]["y"]
-                item.setText(f"{new_data["text"]} @ ({x:.2f}, {y:.2f})")
-            
-            self.on_style_changed()
-    
-    def _delete_annotation_from_toolbar(self, index: int) -> None:
-        if 0 <= index < len(self.annotations):
-            del self.annotations[index]
-            
-            item = self.view.annotations_list.takeItem(index)
-            del item
-            
-            self.view.annotation_text.clear()
             self.on_style_changed()
     
     def update_column_combo(self):
@@ -2315,8 +2046,7 @@ class PlotTab(PlotTabUI):
 
         frozen_config = None
         if self.view.freeze_data_check.isChecked() and self.view.add_subplots_check.isChecked():
-            if current_subplot_index in self.subplot_data_configs:
-                frozen_config = self.subplot_data_configs[current_subplot_index]
+            frozen_config = self.subplot_manager.get_config(current_subplot_index)
 
         return current_subplot_index, frozen_config
 
@@ -2765,16 +2495,16 @@ class PlotTab(PlotTabUI):
             self.canvas_stack.setCurrentWidget(self.canvas)
 
         if not is_fast_render:
-            self._update_overlay()  
+            self.subplot_manager.update_overlay()
 
         if self.view.add_subplots_check.isChecked():
-            self.subplot_data_configs[current_subplot_index] = {
+            self.subplot_manager.save_config(current_subplot_index, {
             "x_col": x_col,
             "y_cols": y_cols,
             "hue": hue,
             "subset_name": subset_name,
             "quick_filter": quick_filter
-        }
+        })
         
         if self.view.multiline_custom_check.isChecked():
             self.update_line_selector(preserve_selection=True)
@@ -3078,91 +2808,7 @@ class PlotTab(PlotTabUI):
 
     def _apply_annotations(self, df=None, x_col=None, y_cols=None):
         """Apply text annotations"""
-
-        if self.plot_engine.current_ax:
-            texts_to_remove = []
-            for text in self.plot_engine.current_ax.texts:
-                gid = text.get_gid()
-                if gid and (str(gid).startswith("annotation_") or gid == "auto_annotation"):
-                    texts_to_remove.append(text)
-            
-            for text in texts_to_remove:
-                try:
-                    text.remove()
-                except ValueError:
-                    pass
-
-        #manual annotations
-        for i, ann in enumerate(self.annotations):
-            self.plot_engine.current_ax.text(
-                ann["x"], ann["y"], ann["text"],
-                transform=self.plot_engine.current_ax.transAxes,
-                fontsize=ann["fontsize"],
-                color=ann["color"],
-                ha="center", va="center",
-                bbox=dict(boxstyle="round", facecolor=ann.get("bg_color", "wheat"), alpha=0.5),
-                picker=True,
-                gid=f"annotation_{i}"
-            )
-        
-        #auto annotations based on datapoints
-        if self.view.auto_annotate_check.isChecked() and df is not None and x_col and y_cols:
-            try:
-                label_choice = self.view.auto_annotate_col_combo.currentText()
-                is_flipped = self.view.flip_axes_check.isChecked()
-
-                MAX_POINTS = 2000
-                if len(df) > MAX_POINTS:
-                    self.status_bar.log(f"Auto-annotations is limited to first {MAX_POINTS} points for performance")
-                    df_to_annotate = df.iloc[:MAX_POINTS]
-                else:
-                    df_to_annotate = df
-
-                y_col_target = y_cols[0]
-                font_size = self.view.auto_annotate_fontsize_spin.value()
-                font_weight = self.view.auto_annotate_weight_combo.currentText()
-                font_color = getattr(self, "auto_annotation_color", "black")
-                x_offset = self.view.auto_annotate_x_offset_spin.value()
-                y_offset = self.view.auto_annotate_y_offset_spin.value()
-                rotation = self.view.auto_annotate_rotation_spin.value()
-
-                for idx, row in df_to_annotate.iterrows():
-                    x_val = row[x_col]
-                    y_val = row[y_col_target]
-
-                    if label_choice == "Default (Y-value)":
-                        text = f"{y_val:.2f}" if isinstance(y_val, (int, float)) else str(y_val)
-                    else:
-                        text = str(row[label_choice])
-                    
-                    #apply
-                    if is_flipped:
-                        self.plot_engine.current_ax.annotate(
-                            text,
-                            (y_val, x_val),
-                            xytext=(x_offset, y_offset),
-                            textcoords="offset points",
-                            fontsize=font_size,
-                            fontweight=font_weight,
-                            color=font_color,
-                            rotation=rotation,
-                            gid="auto_annotation"
-                        )
-                    else:
-                        self.plot_engine.current_ax.annotate(
-                            text,
-                            (x_val, y_val),
-                            xytext=(x_offset, y_offset),
-                            textcoords="offset points",
-                            fontsize=font_size,
-                            fontweight=font_weight,
-                            color=font_color,
-                            rotation=rotation,
-                            gid="auto_annotation"
-                        )
-            except Exception as ApplyAnnotationsError:
-                self.status_bar.log(f"Error applying annotations to data points: {str(ApplyAnnotationsError)}", "ERROR")
-                print(f"Auto-annotation error: {str(ApplyAnnotationsError)}")
+        self.annotation_manager.apply_annotations(df, x_col, y_cols)
 
     def _apply_gridlines_customizations(self) -> None:
         """Apply gridlines customizations"""
@@ -3630,17 +3276,8 @@ class PlotTab(PlotTabUI):
         else:
             self.bar_customizations = {}
 
-        if self.annotations is not None:
-            self.annotations.clear()
-        else:
-            self.annotations = []
-            
-        self.view.annotations_list.clear()
-        
-        if self.subplot_data_configs is not None:
-            self.subplot_data_configs.clear()
-        else:
-            self.subplot_data_configs = {}
+        self.annotation_manager.clear_annotations()
+        self.subplot_manager.clear_configs()
 
         self.plot_clear_animation = PlotClearedAnimation(parent=None, message="Plot Cleared")
         self.plot_clear_animation.start(target_widget=self)
