@@ -1,44 +1,30 @@
 # ui/plot_tab.py
-from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem, QToolTip
-from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
-from PyQt6.QtGui import QIcon, QColor, QCursor
 import threading
+import traceback
 from pathlib import Path
+from typing import Dict, Any, Optional, TYPE_CHECKING
+
+import pandas as pd
+import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.widgets import SpanSelector
+from matplotlib.colors import to_hex
+from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem
+from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
+from PyQt6.QtGui import QColor, QIcon
+
 from core.plot_engine import PlotEngine
 from core.data_handler import DataHandler
 from core.resource_loader import get_resource_path
-from ui.SubplotOverlay import SubplotOverlay
-from ui.animations import SavePlotAnimation
-from ui.components.plot_settings_panel import PlotSettingsPanel
-from ui.status_bar import StatusBar
 from core.code_exporter import CodeExporter
-from ui.dialogs import ProgressDialog
-from ui.plot_tab_ui import PlotTabUI 
-from ui.animations.PlotGeneratedAnimation import PlotGeneratedAnimation
-from ui.animations.PlotClearedAnimation import PlotClearedAnimation
-import pandas as pd
-import numpy as np
-import matplotlib.dates as mdates
-from matplotlib.ticker import MaxNLocator, FuncFormatter, AutoMinorLocator, NullLocator
-import matplotlib.pyplot as plt
-import traceback
-from matplotlib.colors import to_hex
-from typing import Dict, Any
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
-from matplotlib.collections import PathCollection
-from typing import Optional, TYPE_CHECKING
-
-from ui.managers.plot_tab_managers.theme_manager import ThemeManager
-from ui.managers.plot_tab_managers.script_manager import ScriptManager
-from ui.managers.plot_tab_managers.subplot_manager import SubplotManager
-from ui.managers.plot_tab_managers.annotation_manager import AnnotationManager
-from ui.widgets import DataPlotStudioListWidget, ColorBlindnessEffect
-from ui.dialogs.PlotExportDialog import PlotExportDialog
 from core.plot_config_manager import PlotConfigManager
+from ui.SubplotOverlay import SubplotOverlay
+from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotClearedAnimation
+from ui.status_bar import StatusBar
+from ui.dialogs import ProgressDialog, PlotExportDialog
+from ui.plot_tab_ui import PlotTabUI
+from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager
+from ui.widgets import DataPlotStudioListWidget, ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
 
@@ -50,7 +36,7 @@ class PlotTab(PlotTabUI):
     def __init__(self, data_handler: DataHandler, status_bar: StatusBar, subset_manager=None) -> None:
         super().__init__()
         
-        self.view: PlotSettingsPanel = None
+        self.view: PlotSettingsPanel | None = None
         self.data_handler: DataHandler = data_handler
         self.status_bar: StatusBar = status_bar
         self.subset_manager = subset_manager
@@ -134,11 +120,8 @@ class PlotTab(PlotTabUI):
         #
         self._populate_plot_toolbox()
 
-
         self.selection_overlay = SubplotOverlay(self.canvas)
         self.canvas.mpl_connect("resize_event", self.on_canvas_resize)
-        self.canvas.mpl_connect("pick_event", self.on_pick)
-        self.canvas.mpl_connect("draw_event", self._on_draw_event)
         
         # Load initial data
         self.update_column_combo()
@@ -151,6 +134,8 @@ class PlotTab(PlotTabUI):
         self.theme_manager = ThemeManager(self)
         self.subplot_manager = SubplotManager(self)
         self.annotation_manager = AnnotationManager(self)
+        self.canvas_interaction_manager = CanvasInteractionManager(self)
+        self.formatting_manager = PlotFormattingManager(self)
         
         # Caching
         self._last_data_signature = None
@@ -159,58 +144,6 @@ class PlotTab(PlotTabUI):
         
         # Connect all signals to their logic methods
         self._connect_signals()
-    
-    def _on_draw_event(self, event) -> None:
-        """Handle canvas draw to link data points """
-        if not self.plot_engine.current_ax:
-            return
-        
-        if getattr(self, "span_selector", None) is not None:
-            if self.span_selector.ax == self.plot_engine.current_ax:
-                return
-            else:
-                self.span_selector = None
-        
-        self._setup_brush_and_link()
-    
-    def _setup_brush_and_link(self) -> None:
-        """Sets up the Matplotlib SpanSelector"""
-        if not self.plot_engine.current_ax:
-            return
-        
-        # Only supported plots for now:
-        supported_plots = ["Histogram", "Scatter", "Line", "Stem", "Stairs"]
-        if self.current_plot_type_name not in supported_plots:
-            self.span_selector = None
-            return
-        
-        def on_select(xmin: float, xmax: float) -> None:
-            self._handle_brush_selection(xmin, xmax)
-        
-        self.span_selector = SpanSelector(
-            self.plot_engine.current_ax,
-            on_select,
-            "horizontal",
-            useblit=True,
-            props=dict(alpha=0.3, facecolor="#e74c3c"),
-            interactive=True,
-            button=3
-        )
-    
-    def _handle_brush_selection(self, xmin: float, xmax: float) -> None:
-        """Filters and highlights rows based on selection"""
-        df = self.get_active_dataframe()
-        x_col = self.view.x_column.currentText()
-        
-        if not x_col or x_col not in df.columns:
-            return
-        
-        mask = (df[x_col] >= xmin) & (df[x_col] <= xmax)
-        selected_indices = set(df[mask].index)
-        
-        if selected_indices:
-            self.brush_selection_made.emit(selected_indices)
-            self.status_bar.log(f"Selected {len(selected_indices)} points. Switching to Data Explorer to view", "INFO")
 
     def _connect_signals(self) -> None:
         """Connect all UI widget signals to their logic"""
@@ -231,12 +164,6 @@ class PlotTab(PlotTabUI):
         self.editor_button.clicked.connect(self.script_manager.open_script_editor)
         self.clear_button.clicked.connect(self.clear_plot)
         self.save_plot_button.clicked.connect(self.save_plot_image)
-
-        # Connection of canvas events for anotations
-        self.canvas.mpl_connect("button_press_event", self.on_mouse_press)
-        self.canvas.mpl_connect("motion_notify_event", self.on_mouse_move)
-        self.canvas.mpl_connect("button_release_event", self.on_mouse_release)
-        self.canvas.mpl_connect("scroll_event", self.on_scroll)
 
         #editor sync
         self.view.x_column.currentTextChanged.connect(self.script_manager.sync_script_if_open)
@@ -274,8 +201,8 @@ class PlotTab(PlotTabUI):
         self.view.no_spines_btn.clicked.connect(self.preset_no_spines)
         self.view.bg_color_button.clicked.connect(self.choose_bg_color)
         self.view.face_color_button.clicked.connect(self.choose_face_color)
-        self.view.width_spin.valueChanged.connect(lambda: self._setup_plot_figure(clear=False))
-        self.view.height_spin.valueChanged.connect(lambda: self._setup_plot_figure(clear=False))
+        self.view.width_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
+        self.view.height_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
         self.view.colorblind_check.stateChanged.connect(self.update_colorblind_simulation)
         self.view.colorblind_type_combo.currentTextChanged.connect(self.update_colorblind_simulation)
         
@@ -516,12 +443,12 @@ class PlotTab(PlotTabUI):
                 self.style_update_timer.start()
             elif hasattr(self, "selection_overlay"):
                 self.selection_overlay.show_update_required(True)
-        
-        if getattr(self, "span_selector", None) is not None:
-            if hasattr(self.span_selector, "clear"):
-                self.span_selector.clear()
-            elif hasattr(self.span_selector, "set_visible"):
-                self.span_selector.set_visible(False)
+
+        if self.canvas_interaction_manager.span_selector is not None:
+            if hasattr(self.canvas_interaction_manager.span_selector, "clear"):
+                self.canvas_interaction_manager.span_selector.clear()
+            elif hasattr(self.canvas_interaction_manager.span_selector, "set_visible"):
+                self.canvas_interaction_manager.span_selector.set_visible(False)
             
             if hasattr(self, "canvas") and self.canvas is not None:
                 self.canvas.draw_idle()
@@ -612,7 +539,7 @@ class PlotTab(PlotTabUI):
     
     def on_canvas_resize(self, event):
         self.subplot_manager.update_overlay(is_resize=True)
-        self._setup_plot_figure(clear=False)
+        self.formatting_manager.setup_plot_figure(clear=False)
         self.canvas.draw_idle()
 
     def save_plot_image(self) -> None:
@@ -672,201 +599,6 @@ class PlotTab(PlotTabUI):
             self.status_bar.log(f"Failed to save plot: {str(ExportPlotAsImageError)}", "ERROR")
             QMessageBox.critical(self, "Save Error", f"Could not save plot:\n{str(ExportPlotAsImageError)}")
             traceback.print_exc()
-    
-    def on_pick(self, event):
-        """Handles the pick events from the main canvas"""
-        artist = event.artist
-
-        if self.annotation_manager.handle_pick_event(artist, event):
-            return
-
-        self.custom_tabs.setCurrentIndex(1)
-        if artist == self.plot_engine.current_ax.get_title():
-            self.view.title_input.setFocus()
-        elif artist == self.plot_engine.current_ax.xaxis.get_label():
-            self.view.xlabel_input.setFocus()
-        elif artist == self.plot_engine.current_ax.yaxis.get_label():
-            self.view.ylabel_input.setFocus()
-
-            self.status_bar.log(f"Selected text element: {artist.get_text()}", "INFO")
-        
-        elif isinstance(artist, Line2D):
-            if artist.get_gid() in ["regression_line", "confidence_interval", "error_bar"]:
-                return
-            
-            self.custom_tabs.setCurrentIndex(4)
-
-            if not self.view.multiline_custom_check.isChecked():
-                self.view.multiline_custom_check.setChecked(True)
-
-            label = artist.get_label()
-            if label:
-                index = self.view.line_selector_combo.findText(label)
-                if index >= 0:
-                    self.view.line_selector_combo.setCurrentIndex(index)
-                    self.status_bar.log(f"Selected line: {label}", "INFO")
-                else:
-                    lines = [l for l in self.plot_engine.current_ax.get_lines() if l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-                    if artist in lines:
-                        idx = lines.index(artist)
-                        if idx < self.view.line_selector_combo.count():
-                            self.view.line_selector_combo.setCurrentIndex(idx)
-                            self.status_bar.log(f"Selected line index: {idx}", "INFO")
-        
-        elif isinstance(artist, Rectangle):
-            found_container = None
-            if self.plot_engine.current_ax and self.plot_engine.current_ax.containers:
-                for container in self.plot_engine.current_ax.containers:
-                    if artist in container:
-                        found_container = container
-                        break
-            
-            if found_container:
-                if hasattr(self, 'custom_tabs'):
-                    self.custom_tabs.setCurrentIndex(4)
-                
-                if not self.view.multibar_custom_check.isChecked():
-                    self.view.multibar_custom_check.setChecked(True)
-                
-                for i in range(self.view.bar_selector_combo.count()):
-                    if self.view.bar_selector_combo.itemData(i) == found_container:
-                        self.view.bar_selector_combo.setCurrentIndex(i)
-                        label = self.view.bar_selector_combo.itemText(i)
-                        self.status_bar.log(f"Selected bar series: {label}", "INFO")
-                        break
-        
-        elif isinstance(artist, PathCollection):
-            self.custom_tabs.setCurrentIndex(4)
-            self.status_bar.log("Selected scatter points", "INFO")
-    
-    def on_scroll(self, event) -> None:
-        if not event.inaxes:
-            return
-        
-        ax = event.inaxes
-        base_scale = 1.15
-        
-        cur_xlim = ax.get_xlim()
-        cur_ylim = ax.get_ylim()
-        
-        xdata = event.xdata
-        ydata = event.ydata
-        
-        if event.button == "up":
-            scale_factor = 1 / base_scale
-        elif event.button == "down":
-            scale_factor = base_scale
-        else:
-            scale_factor = 1
-            
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
-        
-        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
-        
-        ax.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
-        ax.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
-        
-        self.canvas.draw_idle()
-    
-    def on_mouse_press(self, event):
-        """Handle mouse pressing events on canvas"""
-        if not event.inaxes:
-            return
-        
-        right_mouse_click = 3
-        if event.button == right_mouse_click:
-            if event.inaxes in self.plot_engine.axes_flat:
-                idx = self.plot_engine.axes_flat.index(event.inaxes)
-                self.view.active_subplot_combo.setCurrentIndex(idx)
-                self.status_bar.log(f"Active subplot changed to Plot {idx + 1}.", "INFO")
-            return
-
-        middle_click = 2
-        if event.button == middle_click:
-            self._pan_axes = event.inaxes
-            self._pan_start = (event.x, event.y)
-            self._pan_start_xlim = self._pan_axes.get_xlim()
-            self._pan_start_ylim = self._pan_axes.get_ylim()
-        
-        left_click = 1
-        if event.button != left_click:
-            return
-        
-        if self.custom_tabs.currentIndex() == 5:
-            ax = self.plot_engine.current_ax
-            if ax:
-                inv = ax.transAxes.inverted()
-                x, y = inv.transform((event.x, event.y))
-                
-                x = max(0.0, min(1.0, x))
-                y = max(0.0, min(1.0, y))
-
-                self.view.annotation_x_spin.setValue(x)
-                self.view.annotation_y_spin.setValue(y)
-    
-    def on_mouse_move(self, event):
-        """Handle mouse movement for dragging an annotation"""
-        if not event.inaxes:
-            QToolTip.hideText()
-            return
-        
-        if getattr(self, "_pan_axes", None) and getattr(self, "_pan_start", None) and event.inaxes == self._pan_axes:
-            inv = self._pan_axes.transData.inverted()
-            start_data = inv.transform(self._pan_start)
-            current_data = inv.transform((event.x, event.y))
-            
-            dx_data = current_data[0] - start_data[0]
-            dy_data = current_data[1] - start_data[1]
-            
-            self._pan_axes.set_xlim(self._pan_start_xlim[0] - dx_data, self._pan_start_xlim[1] - dx_data)
-            self._pan_axes.set_ylim(self._pan_start_ylim[0] - dy_data, self._pan_start_ylim[1] - dy_data)
-            self.canvas.draw_idle()
-            return
-        
-        if self.annotation_manager.handle_mouse_move(event):
-            return
-
-        # Tooltips
-        found_point = False
-        for line in event.inaxes.get_lines():
-            cont, ind = line.contains(event)
-            if cont and len(ind.get("ind", [])) > 0:
-                idx = ind["ind"][0]
-                x_val = line.get_xdata()[idx]
-                y_val = line.get_ydata()[idx]
-                text = f"X: {x_val:.4g}\nY: {y_val:.4g}" if isinstance(x_val, (int, float)) else f"X: {x_val}\nY: {y_val:.4g}"
-                QToolTip.showText(QCursor.pos(), text, self.canvas)
-                found_point = True
-                break
-        
-        if not found_point:
-            for collection in event.inaxes.collections:
-                cont, ind = collection.contains(event)
-                if cont and len(ind.get('ind', [])) > 0:
-                    idx = ind['ind'][0]
-                    offsets = collection.get_offsets()[idx]
-                    x_val, y_val = offsets[0], offsets[1]
-                    text = f"X: {x_val:.4g}\nY: {y_val:.4g}"
-                    QToolTip.showText(QCursor.pos(), text, self.canvas)
-                    found_point = True
-                    break
-        
-        if not found_point:
-            QToolTip.hideText()
-        
-    
-    def on_mouse_release(self, event):
-        """Handle mouse release to stop draggng event"""
-        if event.button == 2:
-            self._pan_axes = None
-            self._pan_start = None
-            self._pan_start_xlim = None
-            self._pan_start_ylim = None
-            return
-
-        self.annotation_manager.handle_mouse_relase(event)
 
     def choose_geo_missing_color(self):
         color = QColorDialog.getColor()
@@ -2106,30 +1838,30 @@ class PlotTab(PlotTabUI):
             if not keep_data:
                 if not self._validate_plot_requirements(plot_type, x_col, y_cols):
                     return
-            
-                self._update_progress(progress_dialog, 10, "Preparing data")
+
+                self._update_progress(progress_dialog, 10, "Preparing Data")
 
             #Build config
             axes_flipped = self.view.flip_axes_check.isChecked()
-            font_family = self.view.font_family_combo.currentFont().family()
+            font_family = self.view.font_family_combo.currentText()
 
-            self._update_progress(progress_dialog, 20, "Building plot configurations")
+            self._update_progress(progress_dialog, 20, "Building Plot Configuration")
 
-            general_kwargs = self._build_general_kwargs(plot_type, x_col, y_cols, hue)
-            plot_kwargs = self._build_plot_specific_kwargs(plot_type)
+            general_kwargs = self.formatting_manager.build_general_kwargs(plot_type, x_col, y_cols, hue)
+            plot_kwargs = self.formatting_manager.build_plot_specific_kwargs(plot_type)
 
             # Setup plot
             if not keep_data:
-                self._update_progress(progress_dialog, 30, "Clearing previous plot")
-                self._setup_plot_figure(clear=True)
+                self._update_progress(progress_dialog, 30, "Clearing Previous plot")
+                self.formatting_manager.setup_plot_figure(clear=True)
             else:
-                self._setup_plot_figure(clear=False)
+                self.formatting_manager.setup_plot_figure(clear=False)
 
             self._update_progress(progress_dialog, 35, "Setting plot style")
-            self._apply_plot_style()
-            self._set_axis_limits_and_scales()
+            self.formatting_manager.apply_plot_style()
+            self.formatting_manager.set_axis_limit_and_scales()
 
-            #Create
+            # Create
             if not keep_data:
                 self._update_progress(progress_dialog, 40, f"Creating {plot_type} plot")
 
@@ -2137,29 +1869,24 @@ class PlotTab(PlotTabUI):
                     if progress_dialog:
                         progress_dialog.accept()
                     return
-            
+
             # Apply formatting and customizations
-            self._apply_plot_formatting(progress_dialog, x_col, y_cols, axes_flipped, font_family, general_kwargs, active_df)
+            self.formatting_manager.apply_plot_formatting(progress_dialog, x_col, y_cols, axes_flipped, font_family, general_kwargs, active_df)
 
             # Finalize
-            self._update_progress(progress_dialog, 98, "Finising up")
+            self._update_progress(progress_dialog, 98, "Finishing up")
             self._finalize_plot(current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter, is_fast_render=keep_data)
 
             # Log
             if not keep_data:
-                self._log_plot_message(
-                    plot_type, x_col, y_cols, hue, subset_name, active_df, quick_filter
-                )
-
+                self._log_plot_message(plot_type, x_col, y_cols, hue, subset_name, active_df, quick_filter)
             self._update_progress(progress_dialog, 100, "Complete")
             if progress_dialog:
                 QTimer.singleShot(300, progress_dialog.accept)
             self._is_data_dirty = False
 
             if animate:
-                self.plot_animation = PlotGeneratedAnimation(parent=self, message="Plot Generated")
-                self.plot_animation.start(target_widget=self)
-        
+                PlotGeneratedAnimation(parent=self, message="Plot Generated").start(target_widget=self)
         except Exception as CreateMainPlotError:
             if progress_dialog:
                 progress_dialog.accept()
@@ -2169,6 +1896,7 @@ class PlotTab(PlotTabUI):
         finally:
             if progress_dialog and progress_dialog.isVisible():
                 progress_dialog.accept()
+
     
     def _init_progress_dialog(self, show_progress, data_size):
         """Initizalixze the progress dialog"""
@@ -2228,180 +1956,6 @@ class PlotTab(PlotTabUI):
         
         return True
 
-    def _build_general_kwargs(self, plot_type, x_col, y_cols, hue):
-        """Build the general plotting kwargs"""
-        plots_supporting_hue = ["Scatter", "Line", "Bar", "Violin", "2D Density", "Box", "Count Plot", "Histogram", "3D Scatter", "3D Line"]
-
-        y_label_text = self._determine_y_label(plot_type, y_cols)
-
-        general_kwargs = {
-            "title": self.view.title_input.text() or plot_type,
-            "xlabel": self.view.xlabel_input.text() or x_col,
-            "ylabel": self.view.ylabel_input.text() or y_label_text,
-            "legend": self.view.legend_check.isChecked()
-        }
-        
-        if plot_type in ["3D Scatter", "3D Line", "3D Surface"]:
-            z_col_text = self.view.z_column.currentText()
-            general_kwargs["z_column"] = z_col_text
-            general_kwargs["zlabel"] = z_col_text
-            general_kwargs["elevation"] = self.view.camera_elevation_spin.value()
-            general_kwargs["azimuth"] = self.view.camera_azimuth_spin.value()
-
-        # Add secondary y axis
-        if self.view.secondary_y_check.isChecked() and self.view.secondary_y_check.isEnabled():
-            general_kwargs["secondary_y"] = self.view.secondary_y_column.currentText()
-            general_kwargs["secondary_plot_type"] = self.view.secondary_plot_type_combo.currentText()
-        
-        cmap = self.view.palette_combo.currentText()
-        if cmap and cmap != "None":
-            if plot_type in ["Bar", "Box", "Violin", "Count Plot"]:
-                general_kwargs["palette"] = cmap
-            else:
-                general_kwargs["cmap"] = cmap
-
-        if hue and plot_type in plots_supporting_hue:
-            general_kwargs["hue"] = hue
-        
-        return general_kwargs
-
-    def _determine_y_label(self, plot_type, y_cols):
-        """Determine the correct ylabel based on type"""
-        plots_gridded = ["Image Show (imshow)", "pcolormesh", "Contour", "Contourf"]
-        plots_vector = ["Barbs", "Quiver", "Streamplot"]
-        plots_triangulation = [
-            "Tricontour", "Tricontourf", "Tripcolor", "Triplot"
-        ]
-        plots_no_x = [
-            "Box", "Histogram", "KDE", "Heatmap", "Pie", 
-            "ECDF", "Eventplot", "GeoSpatial"
-        ]
-
-        if plot_type in plots_gridded or plot_type in plots_vector or plot_type in plots_triangulation:
-            return y_cols[0] if y_cols else "Value"
-        elif plot_type in plots_no_x:
-            return y_cols[0] if y_cols else "Value"
-        elif len(y_cols) == 1:
-            return y_cols[0]
-        else:
-            return str(y_cols)
-    
-    def _build_plot_specific_kwargs(self, plot_type):
-        """Build plots specific kwargs"""
-
-        plot_kwargs = {}
-        if plot_type == "GeoSpatial":
-            plot_kwargs = self._build_geospatial_kwargs()
-        
-        return plot_kwargs
-    
-    def _build_geospatial_kwargs(self):
-        """Builds kwargs specific to the Geospatial plotting routine"""
-        scheme_text = self.view.geo_scheme_combo.currentText()
-        hatch_text = self.view.geo_hatch_combo.currentText()
-
-        target_crs_input = getattr(self, "geo_target_crs_input", None)
-        target_crs = target_crs_input.text() if target_crs_input else None
-
-        basemap_check = getattr(self, "geo_basemap_check", None)
-        add_basemap = basemap_check.isChecked() if basemap_check else False
-
-        basemap_combo = getattr(self, "geo_basemap_style_combo", None)
-        basemap_source = basemap_combo.currentText() if basemap_combo else "OpenStreetMap"
-
-        kwargs = {
-            "scheme": scheme_text if scheme_text != "None" else None,
-            "k": self.view.geo_k_spin.value(),
-            "cmap": self.view.palette_combo.currentText(),
-            "legend": self.view.geo_legend_check.isChecked(),
-            "legend_kwds": {
-                "loc": "best",
-                "orientation": self.view.geo_legend_loc_combo.currentText()
-            },
-            "use_divider": self.view.geo_use_divider_check.isChecked(),
-            "cax_enabled": self.view.geo_cax_check.isChecked(),
-            "axis_off": self.view.geo_axis_off_check.isChecked(),
-            "missing_kwds": {
-                "color": self.geo_missing_color,
-                "label": self.view.geo_missing_label_input.text(),
-                "hatch": hatch_text if hatch_text != "None" else None
-            },
-            "edgecolor": self.geo_edge_color,
-            "linewidth": self.view.geo_linewidth_spin.value(),
-            "target_crs": target_crs,
-            "add_basemap": add_basemap,
-            "basemap_source": basemap_source
-        }
-        if self.view.geo_boundary_check.isChecked():
-            kwargs["facecolor"] = "none"
-        
-        return kwargs
-    
-    def _setup_plot_figure(self, clear: bool = True):
-        """Setup plot figure with current settings"""
-        if clear:
-            self.plot_engine.clear_current_axis()
-
-        target_width_inch = self.view.width_spin.value()
-        target_height_inch = self.view.height_spin.value()
-
-        canvas_width = self.canvas.width()
-        canvas_height = self.canvas.height()
-
-        if canvas_width <= 0: canvas_width = 800
-        if canvas_height <= 0: canvas_height = 600
-
-        dpi_w = canvas_width / target_width_inch
-        dpi_h = canvas_height / target_height_inch
-        
-        calculated_dpi = min(dpi_w, dpi_h)
-        calculated_dpi = max(calculated_dpi, 10)
-
-        self.plot_engine.current_figure.set_size_inches(target_width_inch, target_height_inch)
-        self.plot_engine.current_figure.set_dpi(calculated_dpi)
-        self.plot_engine.current_figure.set_facecolor(self.bg_color)
-
-    def _apply_plot_style(self):
-        """Apply plotting style"""
-        try:
-            plt.style.use(self.view.style_combo.currentText())
-            self.plot_engine.current_figure.set_facecolor(self.bg_color)
-            self.plot_engine.current_ax.set_facecolor(self.face_color)
-        except Exception as ApplyPlotStyleError:
-            self.status_bar.log(f"Could not apply plotting style. {str(ApplyPlotStyleError)}", "WARNING")
-            self.plot_engine.current_ax.set_facecolor(self.face_color)
-    
-    def _set_axis_limits_and_scales(self):
-        """Set axis limits and scales"""
-        if not self.view.x_auto_check.isChecked():
-            self.plot_engine.current_ax.set_xlim(
-                self.view.x_min_spin.value(), self.view.x_max_spin.value()
-            )
-        if not self.view.y_auto_check.isChecked():
-            self.plot_engine.current_ax.set_ylim(
-                self.view.y_min_spin.value(), self.view.y_max_spin.value()
-            )
-            
-        if hasattr(self.plot_engine.current_ax, "zaxis") and not self.view.z_auto_check.isChecked():
-            self.plot_engine.current_ax.set_zlim(
-                self.view.z_min_spin.value(), self.view.z_max_spin.value()
-            )
-
-        target_x_scale = self.view.x_scale_combo.currentText()
-        if self.plot_engine.current_ax.get_xscale() != target_x_scale:
-            self.plot_engine.current_ax.set_xscale(target_x_scale)
-        
-        target_y_scale = self.view.y_scale_combo.currentText()
-        if self.plot_engine.current_ax.get_yscale() != target_y_scale:
-            self.plot_engine.current_ax.set_yscale(target_y_scale)
-        
-        if hasattr(self.plot_engine.current_ax, "zaxis"):
-            target_z_scale = self.view.z_scale_combo.currentText()
-            try:
-                self.plot_engine.current_ax.set_zscale(target_z_scale)
-            except Exception as error:
-                self.status_bar.log(f"Z-Scale update ignore: {error}", "WARNING")
-
     def _execute_plot_strategy(self, plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs, general_kwargs):
         """Executes the correct plotting strategy"""
         
@@ -2427,59 +1981,6 @@ class PlotTab(PlotTabUI):
             return True
         finally:
             self.data_handler.df = original_df
-    
-    def _apply_plot_formatting(self, progress_dialog, x_col, y_cols, axes_flipped, font_family, general_kwargs, active_df):
-        """Apply formatting """
-        # Tick marks
-        try:
-            allowed_locators = ["AutoLocator", "MaxNLocator", "LinearLocator", "MultipleLocator"]
-            x_locator_name = type(self.plot_engine.current_ax.xaxis.get_major_locator()).__name__
-            if x_locator_name in allowed_locators:
-                self.plot_engine.current_ax.xaxis.set_major_locator(MaxNLocator(nbins=self.view.x_max_ticks_spin.value()))
-                
-            y_locator_name = type(self.plot_engine.current_ax.yaxis.get_major_locator()).__name__
-            if y_locator_name in allowed_locators:
-                self.plot_engine.current_ax.yaxis.set_major_locator(MaxNLocator(nbins=self.view.y_max_ticks_spin.value()))
-            
-            if hasattr(self.plot_engine.current_ax, "zaxis"):
-                z_locator_name = type(self.plot_engine.current_ax.zaxis.get_major_locator()).__name__
-                if z_locator_name in allowed_locators:
-                    self.plot_engine.current_ax.zaxis.set_major_locator(MaxNLocator(nbins=self.view.z_max_ticks_spin.value()))
-        except Exception as TickError:
-            self.status_bar.log(f"Could not apply tick formatting: {str(TickError)}", "WARNING")
-
-        self._update_progress(progress_dialog, 70, "Applying formatting")
-
-        if not axes_flipped:
-            self._apply_plot_appearance(x_col, y_cols, font_family, general_kwargs)
-        
-        self._update_progress(progress_dialog, 75, "Applying customizations")
-        self._apply_plot_customizations()
-        
-        self._update_progress(progress_dialog, 80, "Adding legend and gridlines")
-        self._apply_legend_and_grid(general_kwargs, font_family)
-        self._apply_spines_customization()
-        
-        self._update_progress(progress_dialog, 85, "Adding annotations")
-        self._apply_annotations(active_df, x_col, y_cols)
-        
-        self._apply_tick_customization()
-        self._apply_textbox()
-        
-        self._update_progress(progress_dialog, 95, "Adding data table")
-        self._apply_table()
-
-    def _apply_legend_and_grid(self, general_kwargs: dict, font_family):
-        """Apply legend and gridlines"""
-        if general_kwargs.get("legend", True):
-            self._apply_legend(font_family)
-        elif self.plot_engine.current_ax.get_legend():
-            self.plot_engine.current_ax.get_legend().set_visible(False)
-        
-        if self.view.grid_check.isChecked():
-            self._apply_gridlines_customizations()
-        else:
-            self.plot_engine.current_ax.grid(False)
     
     def _finalize_plot(self, current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter, is_fast_render=False) -> None:
         """Finalize plot and save configs"""
@@ -2537,707 +2038,14 @@ class PlotTab(PlotTabUI):
         status_message = f"{plot_type} plot created"
         if self.view.use_subset_check.isChecked() and subset_name:
             status_message += f" (Subset: {subset_name})"
-        if len(self.annotations) > 0:
-            status_message += f" with {len(self.annotations)} annotations"
+        if len(self.annotation_manager.annotations) > 0:
+            status_message += f" with {len(self.annotation_manager.annotations)} annotations"
         
         self.status_bar.log_action(status_message, details=plot_details, level="SUCCESS")
-                
-    def _apply_plot_appearance(self, x_col, y_cols, font_family, general_kwargs):
-        """Apply title, fonts, and labels settings from the Appearance Tab"""
-        # apply fonts to ticks
-        for label in self.plot_engine.current_ax.get_xticklabels():
-            label.set_fontfamily(font_family)
-        for label in self.plot_engine.current_ax.get_yticklabels():
-            label.set_fontfamily(font_family)
-
-        # title
-        if self.view.title_check.isChecked():
-            self.plot_engine.current_ax.set_title("", loc='left')
-            self.plot_engine.current_ax.set_title("", loc='center')
-            self.plot_engine.current_ax.set_title("", loc='right')
-
-            title_text = self.view.title_input.text() or general_kwargs.get("title", "Plot")
-            self.plot_engine.current_ax.set_title(
-                title_text, 
-                fontsize=self.view.title_size_spin.value(), 
-                fontweight=self.view.title_weight_combo.currentText(), 
-                fontfamily=font_family,
-                loc=self.view.title_position_combo.currentText()
-            )
-        else:
-            #clear title
-            self.plot_engine.current_ax.set_title("")
-            self.plot_engine.current_ax.set_title("", loc='left')
-            self.plot_engine.current_ax.set_title("", loc='right')
-        
-        #xlabel
-        if self.view.xlabel_check.isChecked():
-            xlabel_text = self.view.xlabel_input.text() or general_kwargs.get("xlabel", "")
-            self.plot_engine.current_ax.set_xlabel(
-                xlabel_text, 
-                fontsize=self.view.xlabel_size_spin.value(), 
-                fontweight=self.view.xlabel_weight_combo.currentText(), 
-                fontfamily=font_family
-            )
-        else:
-            self.plot_engine.current_ax.set_xlabel("")
-        
-        # ylabel
-        if self.view.ylabel_check.isChecked():
-            ylabel_text = self.view.ylabel_input.text() or general_kwargs.get("ylabel", "")
-            self.plot_engine.current_ax.set_ylabel(
-                ylabel_text, 
-                fontsize=self.view.ylabel_size_spin.value(), 
-                fontweight=self.view.ylabel_weight_combo.currentText(), 
-                fontfamily=font_family
-            )
-        else:
-            self.plot_engine.current_ax.set_ylabel("")
-        
-        # zlabel
-        if hasattr(self.plot_engine.current_ax, "zaxis"):
-            if self.view.zlabel_check.isChecked():
-                zlabel_text = self.view.zlabel_input.text() or general_kwargs.get("zlabel", "")
-                self.plot_engine.current_ax.set_zlabel(
-                    zlabel_text,
-                    fontsize=self.view.zlabel_size.value(),
-                    fontweight=self.view.zlabel_weight.currentText(),
-                    fontfamily=font_family
-                )
-            else:
-                self.plot_engine.current_ax.set_zlabel("")
-            
-            elev = general_kwargs.get("elevation")
-            azim = general_kwargs.get("azimuth")
-            if elev is not None and azim is not None:
-                self.plot_engine.current_ax.view_init(elev=elev, azim=azim)
-
-    
-    def _apply_plot_customizations(self):
-        """Apply customizations to lines, markers, bars etc"""
-        #globals
-        alpha = self.view.alpha_slider.value() / 100.0
-        linewidth = self.view.linewidth_spin.value()
-        linestyle = self.view.linestyle_combo.currentText()
-        marker = self.view.marker_combo.currentText()
-        marker_size = self.view.marker_size_spin.value()
-        line_color = self.line_color
-        marker_color = self.marker_color
-        marker_edge_color = self.marker_edge_color
-        marker_edge_width = self.view.marker_edge_width_spin.value()
-        bar_color = self.bar_color
-        bar_edge_color = self.bar_edge_color
-        bar_edge_width = self.view.bar_edge_width_spin.value()
-
-        linestyle_map = {'Solid': '-', 'Dashed': '--', 'Dash-dot': '-.', 'Dotted': ':'}
-        linestyle_val = linestyle_map.get(linestyle, linestyle)
-        marker_val = "None" if marker == "None" else marker
-
-        # customize lines
-        if self.view.multiline_custom_check.isChecked():
-            lines = [l for l in self.plot_engine.current_ax.get_lines() if l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-            for i, line in enumerate(lines):
-                line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i+1}"
-                if line_name in self.line_customizations:
-                    custom = self.line_customizations[line_name]
-                    if "linestyle" in custom and custom["linestyle"] != "None":
-                        line.set_linestyle(custom["linestyle"])
-                    if "linewidth" in custom:
-                        line.set_linewidth(custom["linewidth"])
-                    if "color" in custom and custom["color"]:
-                        line.set_color(custom["color"])
-                    if "marker" in custom and custom["marker"] != "None":
-                        line.set_marker(custom["marker"])
-                        if "markersize" in custom:
-                            line.set_markersize(custom["markersize"])
-                        if "markerfacecolor" in custom and custom["markerfacecolor"]:
-                            line.set_markerfacecolor(custom["markerfacecolor"])
-                        if "markeredgecolor" in custom and custom["markeredgecolor"]:
-                            line.set_markeredgecolor(custom["markeredgecolor"])
-                        if "markeredgewidth" in custom:
-                            line.set_markeredgewidth(custom["markeredgewidth"])
-                    if "alpha" in custom:
-                        line.set_alpha(custom["alpha"])
-                else:
-                    if linestyle_val != "None":
-                        line.set_linestyle(linestyle_val)
-                    line.set_linewidth(linewidth)
-                    if line_color:
-                        line.set_color(line_color)
-                    if marker_val != "None":
-                        line.set_marker(marker_val)
-                        line.set_markersize(marker_size)
-                        if marker_color:
-                            line.set_markerfacecolor(marker_color)
-                        if marker_edge_color:
-                            line.set_markeredgecolor(marker_edge_color)
-                        line.set_markeredgewidth(marker_edge_width)
-                    line.set_alpha(alpha)
-        else:
-            for line in self.plot_engine.current_ax.get_lines():
-                if line.get_gid() in ["regression_line", "confidence_interval", "error_bar"]:
-                    continue
-
-                if linestyle_val != "None":
-                    line.set_linestyle(linestyle_val)
-                    line.set_linewidth(linewidth)
-                if line_color:
-                    line.set_color(line_color)
-                if marker_val != "None":
-                    line.set_marker(marker_val)
-                    line.set_markersize(marker_size)
-                    if marker_color:
-                        line.set_markerfacecolor(marker_color)
-                    if marker_edge_color:
-                        line.set_markeredgecolor(marker_edge_color)
-                        line.set_markeredgewidth(marker_edge_width)
-                line.set_alpha(alpha)
-        
-        # apply to collections (e.g., scatter plots)
-        for collection in self.plot_engine.current_ax.collections:
-            if collection.get_gid() in ["confidence_interval", "error_bar"]:
-                continue
-            collection.set_alpha(alpha)
-            if marker_color:
-                collection.set_facecolor(marker_color)
-            if marker_edge_color:
-                collection.set_edgecolor(marker_edge_color)
-        
-        #apply to patches (e.g., bar plots, histograms)
-        if self.view.multibar_custom_check.isChecked():
-            if self.plot_engine.current_ax and self.plot_engine.current_ax.containers:
-                for i, container in enumerate(self.plot_engine.current_ax.containers):
-                    if not hasattr(container, "patches") or not container.patches:
-                        continue
-                    
-                    label = container.get_label()
-                    if not label or label.startswith("_"):
-                        handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                        label = labels[i] if i < len(labels) else f"Bar Series {i+1}"
-                    
-                    if label in self.bar_customizations:
-                        custom = self.bar_customizations[label]
-
-                        for patch in container.patches:
-                            if "facecolor" in custom and custom["facecolor"]:
-                                patch.set_facecolor(custom["facecolor"])
-                            if "edgecolor" in custom and custom["edgecolor"]:
-                                patch.set_edgecolor(custom["edgecolor"])
-                            if "linewidth" in custom:
-                                patch.set_linewidth(custom["linewidth"])
-                            if "alpha" in custom:
-                                patch.set_alpha(custom["alpha"])
-                            else:
-                                patch.set_alpha(alpha)
-                    else:
-                        for patch in container.patches:
-                            patch.set_alpha(alpha)
-                            if bar_color:
-                                patch.set_facecolor(bar_color)
-                            if bar_edge_color:
-                                patch.set_edgecolor(bar_edge_color)
-                            patch.set_linewidth(bar_edge_width)
-            
-        else:
-            #set globals
-            for patch in self.plot_engine.current_ax.patches:
-                patch.set_alpha(alpha)
-                if bar_color:
-                    patch.set_facecolor(bar_color)
-                if bar_edge_color:
-                    patch.set_edgecolor(bar_edge_color)
-                patch.set_linewidth(bar_edge_width)
-
-    def _apply_legend(self, font_family) -> None:
-        """Apply legend"""
-        if not self.view.legend_check.isChecked():
-            if self.plot_engine.current_ax.get_legend():
-                self.plot_engine.current_ax.get_legend().set_visible(False)
-            return
-            
-        # Check if there's anything to make a legend for
-        handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-        if self.plot_engine.secondary_ax:
-            handles2, labels2 = self.plot_engine.secondary_ax.get_legend_handles_labels()
-            handles.extend(handles2)
-            labels.extend(labels2)
-        
-        if not handles:
-            return
-        
-        custom_labels_str = self.view.legend_labels_input.text().strip()
-        if custom_labels_str:
-            custom_labels = [l.strip() for l in custom_labels_str.split(",")]
-            for i in range(min(len(labels), len(custom_labels))):
-                if custom_labels[i]:
-                    labels[i] = custom_labels[i]
-
-        legend_kwargs = {
-            "loc": self.view.legend_loc_combo.currentText(),
-            "fontsize": self.view.legend_size_spin.value(),
-            "title_fontsize": self.view.legend_title_size_spin.value(),
-            "ncol": self.view.legend_columns_spin.value(),
-            "columnspacing": self.view.legend_colspace_spin.value(),
-            "frameon": self.view.legend_frame_check.isChecked(),
-            "fancybox": self.view.legend_fancybox_check.isChecked(),
-            "shadow": self.view.legend_shadow_check.isChecked(),
-            "framealpha": self.view.legend_alpha_slider.value() / 100.0,
-            "facecolor": self.legend_bg_color,
-            "edgecolor": self.legend_edge_color
-        }
-
-        try:
-            legend = self.plot_engine.current_ax.legend(handles, labels, **legend_kwargs)
-
-            # set edge width
-            if legend and legend.get_frame():
-                legend.get_frame().set_linewidth(self.view.legend_edge_width_spin.value())
-            
-            #set title
-            if self.view.legend_title_input.text().strip():
-                legend.set_title(self.view.legend_title_input.text().strip())
-            
-            # apply font
-            for text in legend.get_texts():
-                text.set_fontfamily(font_family)
-            
-            if legend.get_title():
-                legend.get_title().set_fontfamily(font_family)
-        except Exception as ApplyLegendError:
-            self.status_bar.log(f"Failed to apply legend: {ApplyLegendError}", "WARNING")
 
     def _apply_annotations(self, df=None, x_col=None, y_cols=None):
         """Apply text annotations"""
         self.annotation_manager.apply_annotations(df, x_col, y_cols)
-
-    def _apply_gridlines_customizations(self) -> None:
-        """Apply gridlines customizations"""
-        if not self.view.grid_check.isChecked():
-            self.plot_engine.current_ax.grid(False)
-            return
-        
-        # Ensure grid is on, but we'll style it below
-        self.plot_engine.current_ax.grid(True)
-        
-        if self.view.independent_grid_check.isChecked():
-            #  INDEPENDENT 
-            
-            # Helper to map text to symbol
-            grid_style_map = {
-                "Solid (-)": "-",
-                "Dashed (--)": "--",
-                "Dash-dot (-.)": "-.",
-                "Dotted (:)": ":"
-            }
-            
-            # X-Axis Major
-            style = grid_style_map.get(self.view.x_major_grid_style_combo.currentText(), "-")
-            self.plot_engine.current_ax.grid(
-                visible=self.view.x_major_grid_check.isChecked(), which="major", axis="x",
-                linestyle=style,
-                linewidth=self.view.x_major_grid_linewidth_spin.value(),
-                color=self.x_major_grid_color,
-                alpha=self.view.x_major_grid_alpha_slider.value() / 100.0
-            )
-            
-            # X-Axis Minor
-            if self.view.x_minor_grid_check.isChecked():
-                style = grid_style_map.get(self.view.x_minor_grid_style_combo.currentText(), ":")
-                self.plot_engine.current_ax.grid(
-                    visible=True, which="minor", axis="x",
-                    linestyle=style,
-                    linewidth=self.view.x_minor_grid_linewidth_spin.value(),
-                    color=self.x_minor_grid_color,
-                    alpha=self.view.x_minor_grid_alpha_slider.value() / 100.0
-                )
-            else:
-                self.plot_engine.current_ax.grid(visible=False, which="minor", axis="x")
-
-            # Y-Axis Major
-            style = grid_style_map.get(self.view.y_major_grid_style_combo.currentText(), "-")
-            self.plot_engine.current_ax.grid(
-                visible=self.view.y_major_grid_check.isChecked(), which="major", axis="y",
-                linestyle=style,
-                linewidth=self.view.y_major_grid_linewidth_spin.value(),
-                color=self.y_major_grid_color,
-                alpha=self.view.y_major_grid_alpha_slider.value() / 100.0
-            )
-
-            # Y-Axis Minor
-            if self.view.y_minor_grid_check.isChecked():
-                style = grid_style_map.get(self.view.y_minor_grid_style_combo.currentText(), ":")
-                self.plot_engine.current_ax.grid(
-                    visible=True, which="minor", axis="y",
-                    linestyle=style,
-                    linewidth=self.view.y_minor_grid_linewidth_spin.value(),
-                    color=self.y_minor_grid_color,
-                    alpha=self.view.y_minor_grid_alpha_slider.value() / 100.0
-                )
-            else:
-                self.plot_engine.current_ax.grid(visible=False, which="minor", axis="y")
-        
-        else:
-            #  GLOBAL 
-            which_type = self.view.grid_which_type_combo.currentText()
-            axis = self.view.grid_axis_combo.currentText()
-            
-            # Apply global settings
-            self.plot_engine.current_ax.grid(
-                visible=True,
-                which=which_type,
-                axis=axis,
-                color=self.global_grid_color,
-                alpha=self.view.global_grid_alpha_slider.value() / 100.0
-            )
-
-    
-    def _apply_tick_customization(self):
-        """Apply tick label customization"""
-        #major ticks
-        self.plot_engine.current_ax.tick_params(
-            axis="x",
-            labelsize=self.view.xtick_label_size_spin.value(),
-            direction=self.view.x_major_tick_direction_combo.currentText(),
-            width=self.view.x_major_tick_width_spin.value(),
-            which="major"
-        )
-        self.plot_engine.current_ax.tick_params(
-            axis="y",
-            labelsize=self.view.ytick_label_size_spin.value(),
-            direction=self.view.y_major_tick_direction_combo.currentText(),
-            width=self.view.y_major_tick_width_spin.value(),
-            which="major"
-        )
-        
-        if hasattr(self.plot_engine.current_ax, "zaxis"):
-            self.plot_engine.current_ax.tick_params(
-                axis="z",
-                labelsize=self.view.ztick_label_size_spin.value(),
-                direction=self.view.z_major_tick_direction_combo.currentText(),
-                width=self.view.z_major_tick_width_spin.value(),
-                which="major"
-            )
-
-        #xaxis position
-        if self.view.x_top_axis_check.isChecked():
-            self.plot_engine.current_ax.xaxis.tick_top()
-            self.plot_engine.current_ax.xaxis.set_label_position("top")
-        else:
-            self.plot_engine.current_ax.xaxis.tick_bottom()
-            self.plot_engine.current_ax.xaxis.set_label_position("bottom")
-
-
-        #minor tickmarks
-        needs_x_minor = self.view.x_show_minor_ticks_check.isChecked()
-        needs_y_minor = self.view.y_show_minor_ticks_check.isChecked()
-        needs_z_minor = hasattr(self.view, "z_show_minor_ticks_check") and self.view.z_show_minor_ticks_check.isChecked()
-        
-        if self.view.grid_check.isChecked():
-            if self.view.independent_grid_check.isChecked():
-                if self.view.x_minor_grid_check.isChecked(): 
-                    needs_x_minor = True
-                if self.view.y_minor_grid_check.isChecked(): 
-                    needs_y_minor = True
-            else:
-                which = self.view.grid_which_type_combo.currentText()
-                axis = self.view.grid_axis_combo.currentText()
-                if which in ["minor", "both"]:
-                    if axis in ["x", "both"]: 
-                        needs_x_minor = True
-                    if axis in ["y", "both"]: 
-                        needs_y_minor = True
-                    if hasattr(self.plot_engine.current_ax, "zaxis") and axis == "both":
-                        needs_z_minor = True
-
-        try:
-            if needs_x_minor:
-                if type(self.plot_engine.current_ax.xaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
-                    self.plot_engine.current_ax.xaxis.set_minor_locator(AutoMinorLocator())
-            else:
-                self.plot_engine.current_ax.xaxis.set_minor_locator(NullLocator())
-                
-            if needs_y_minor:
-                if type(self.plot_engine.current_ax.yaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
-                    self.plot_engine.current_ax.yaxis.set_minor_locator(AutoMinorLocator())
-            else:
-                self.plot_engine.current_ax.yaxis.set_minor_locator(NullLocator())
-
-            if hasattr(self.plot_engine.current_ax, "zaxis"):
-                if needs_z_minor:
-                    if type(self.plot_engine.current_ax.zaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
-                        self.plot_engine.current_ax.zaxis.set_minor_locator(AutoMinorLocator())
-                else:
-                    self.plot_engine.current_ax.zaxis.set_minor_locator(NullLocator())
-        except Exception as LocatorErr:
-            self.status_bar.log(f"Warning mapping minor locators: {str(LocatorErr)}", "WARNING")
-        #minor tickmarks styling
-        if self.view.x_show_minor_ticks_check.isChecked():
-            self.plot_engine.current_ax.tick_params(
-                axis="x",
-                which="minor",
-                bottom=True,
-                top=self.view.x_top_axis_check.isChecked(),
-                direction=self.view.x_minor_tick_direction_combo.currentText(),
-                width=self.view.x_minor_tick_width_spin.value()
-            )
-        else:
-            self.plot_engine.current_ax.tick_params(axis="x", which="minor", bottom=False, top=False)
-        
-        if self.view.y_show_minor_ticks_check.isChecked():
-            self.plot_engine.current_ax.tick_params(
-                axis="y",
-                which="minor",
-                left=True,
-                right=False,
-                direction=self.view.y_minor_tick_direction_combo.currentText(),
-                width=self.view.y_minor_tick_width_spin.value()
-            )
-        else:
-            self.plot_engine.current_ax.tick_params(axis="y", which="minor", left=False, right=False)
-        
-        if hasattr(self.plot_engine.current_ax, "zaxis") and hasattr(self.view, "z_show_minor_ticks_check"):
-            if self.view.z_show_minor_ticks_check.isChecked():
-                self.plot_engine.current_ax.tick_params(
-                    axis="z", 
-                    which="minor",
-                    direction=self.view.z_minor_tick_direction_combo.currentText(),
-                    width=self.view.z_minor_tick_width_spin.value()
-                )
-            else:
-                self.plot_engine.current_ax.tick_params(axis="z", which="minor")
-        
-        # add formatts if user specified
-        try:
-            x_unit_str = self.view.x_display_units_combo.currentText()
-            if x_unit_str != "None":
-                x_formatter = self._create_axis_formatter(x_unit_str)
-                if x_formatter:
-                    self.plot_engine.current_ax.xaxis.set_major_formatter(x_formatter)
-            
-            y_unit_str = self.view.y_display_units_combo.currentText()
-            if y_unit_str != "None":
-                y_formatter = self._create_axis_formatter(y_unit_str)
-                if y_formatter:
-                    self.plot_engine.current_ax.yaxis.set_major_formatter(y_formatter)
-                    
-            if hasattr(self.plot_engine.current_ax, "zaxis") and hasattr(self.view, "z_display_units_combo"):
-                z_unit_str = self.view.z_display_units_combo.currentText()
-                if z_unit_str != "None":
-                    z_formatter = self._create_axis_formatter(z_unit_str)
-                    if z_formatter:
-                        self.plot_engine.current_ax.zaxis.set_major_formatter(z_formatter)
-        except Exception as ApplyDisplayUnitsError:
-            self.status_bar.log(f"Failed to apply display units: {str(ApplyDisplayUnitsError)}", "WARNING")
-
-        if self.view.custom_datetime_check.isChecked():
-            format_map = {
-                "YYYY-MM-DD": "%Y-%m-%d",
-                "MM/DD/YYYY": "%m/%d/%Y",
-                "DD/MM/YYYY": "%d/%m/%Y",
-                "YYYY/MM/DD": "%Y/%m/%d",
-                "DD-MM-YYYY": "%d-%m-%Y",
-                "Mon DD, YYYY": "%b %d, %Y",
-                "DD Mon YYYY": "%d %b %Y",
-                "YYYY-MM": "%Y-%m",
-                "MM-YYYY": "%m-%Y",
-                "HH:MM:SS": "%H:%M:%S",
-                "YYYY-MM-DD HH:MM": "%Y-%m-%d %H:%M"
-            }
-            
-            x_fmt_name = self.view.x_datetime_format_combo.currentText()
-            if x_fmt_name and x_fmt_name != "None":
-                fmt_str = self.view.x_custom_datetime_input.text() if x_fmt_name == "Custom" else format_map.get(x_fmt_name)
-                if fmt_str:
-                    try:
-                        self.plot_engine.current_ax.xaxis.set_major_formatter(mdates.DateFormatter(fmt_str))
-                        self.plot_engine.current_ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=15))
-                    except Exception:
-                        pass
-                        
-            y_fmt_name = self.view.y_datetime_format_combo.currentText()
-            if y_fmt_name and y_fmt_name != "None":
-                fmt_str = self.view.y_custom_datetime_format_input.text() if y_fmt_name == "Custom" else format_map.get(y_fmt_name)
-                if fmt_str:
-                    try:
-                        self.plot_engine.current_ax.yaxis.set_major_formatter(mdates.DateFormatter(fmt_str))
-                        self.plot_engine.current_ax.yaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=15))
-                    except Exception:
-                        pass
-        
-        #rotation
-        plt.setp(self.plot_engine.current_ax.get_xticklabels(), rotation=self.view.xtick_rotation_spin.value())
-        plt.setp(self.plot_engine.current_ax.get_yticklabels(), rotation=self.view.ytick_rotation_spin.value())
-
-        if hasattr(self.plot_engine.current_ax, "zaxis"):
-            plt.setp(self.plot_engine.current_ax.get_zticklabels(), rotation=self.view.ztick_rotation_spin.value())
-            
-        #axiss inversion
-        if self.view.x_invert_axis_check.isChecked():
-            if not self.plot_engine.current_ax.xaxis_inverted():
-                self.plot_engine.current_ax.invert_xaxis()
-        else:
-            if self.plot_engine.current_ax.xaxis_inverted():
-                self.plot_engine.current_ax.invert_xaxis()
-        
-        if self.view.y_invert_axis_check.isChecked():
-            if not self.plot_engine.current_ax.yaxis_inverted():
-                self.plot_engine.current_ax.invert_yaxis()
-        else:
-            if self.plot_engine.current_ax.yaxis_inverted():
-                self.plot_engine.current_ax.invert_yaxis()
-        
-        if hasattr(self.plot_engine.current_ax, "zaxis"):
-            if self.view.z_invert_axis_check.isChecked():
-                if not self.plot_engine.current_ax.zaxis_inverted():
-                    self.plot_engine.current_ax.invert_zaxis()
-            else:
-                if self.plot_engine.current_ax.zaxis_inverted():
-                    self.plot_engine.current_ax.invert_zaxis()
-
-    def _apply_textbox(self):
-        """Apply textbox"""
-        if not self.plot_engine.current_ax:
-            return
-        
-        texts_to_remove = []
-        for text_artist in self.plot_engine.current_ax.texts:
-            if text_artist.get_gid() == "custom_textbox":
-                texts_to_remove.append(text_artist)
-        
-        for text_artist in texts_to_remove:
-            try:
-                text_artist.remove()
-            except:
-                pass
-        
-        if self.view.textbox_enable_check.isChecked():
-            textbox_text = self.view.textbox_content.text().strip()
-            if textbox_text:
-                style_map = {
-                    "Rounded": "round",
-                    "Square": "square",
-                    "round,pad=1": "round,pad=1",
-                    "round4,pad=0.5": "round4,pad=0.5"
-                }
-                style = style_map.get(self.view.textbox_style_combo.currentText(), "round")
-
-                position_coords = {
-                    "upper left": (0.05, 0.95),
-                    "upper center": (0.5, 0.95),
-                    "upper right": (0.95, 0.95),
-                    "center left": (0.05, 0.5),
-                    "center": (0.5, 0.5),
-                    "center right": (0.95, 0.5),
-                    "lower left": (0.05, 0.05),
-                    "lower center": (0.5, 0.05),
-                    "lower right": (0.95, 0.05)
-                }
-
-                position_name = self.view.textbox_position_combo.currentText()
-                x, y = position_coords.get(position_name, (0.5, 0.5)) # Default to center
-
-                ha_map = {
-                    "upper left": "left", "center left": "left", "lower left": "left",
-                    "upper center": "center", "center": "center", "lower center": "center",
-                    "upper right": "right", "center right": "right", "lower right": "right"
-                }
-
-                va_map = {
-                    "upper left": "top", "upper center": "top", "upper right": "top",
-                    "center left": "center", "center": "center", "center right": "center",
-                    "lower left": "bottom", "lower center": "bottom", "lower right": "bottom"
-                }
-
-                ha = ha_map.get(position_name, "center")
-                va = va_map.get(position_name, "center")
-
-                self.plot_engine.current_ax.text(
-                    x, y, textbox_text,
-                    transform=self.plot_engine.current_ax.transAxes,
-                    fontsize=11,
-                    verticalalignment=va,
-                    horizontalalignment=ha,
-                    bbox=dict(boxstyle=style, facecolor=self.textbox_bg_color, alpha=0.8, pad=1),
-                    gid="custom_textbox"
-                )
-    
-    def _create_axis_formatter(self, unit_str: str) -> FuncFormatter:
-        """Create a matplitlib Funcfomatter based on the selected unit"""
-
-        def formatter(x, pos):
-            try:
-                if unit_str == "Hundreds (100s)":
-                    val = x / 1e2
-                    return f"{val:.1f}H"
-                elif unit_str == "Thousands":
-                    val = x / 1e3
-                    if abs(val) >= 1000:
-                        return f"{val / 1e3:.1f}M"
-                    return f"{val:.1f}K"
-                elif unit_str == "Millions":
-                    val = x / 1e6
-                    if abs(val) >= 1000:
-                        return f"{val / 1e3:.1f}B"
-                    return f"{val:.1f}M"
-                elif unit_str == "Billions":
-                    val = x / 1e9
-                    return f"{val:.1f}B"
-                else:
-                    return f"{x:g}"
-            except (ValueError, TypeError):
-                return f"{x:g}"
-
-        if unit_str == "None":
-            return None
-        
-        return FuncFormatter(formatter)
-            
-
-    def _apply_spines_customization(self):
-        """Apply spines customization t the current ax"""
-        if not self.plot_engine.current_ax:
-            return
-        
-        try:
-            spines = self.plot_engine.current_ax.spines
-            is_individual = self.view.individual_spines_check.isChecked()
-            
-            # Prepare Global settings
-            global_width = self.view.global_spine_width_spin.value()
-            global_color = self.global_spine_color
-
-            spine_map = [
-                ("top", self.view.top_spine_visible_check, self.view.top_spine_width_spin, "top_spine_color"),
-                ("bottom", self.view.bottom_spine_visible_check, self.view.bottom_spine_width_spin, "bottom_spine_color"),
-                ("left", self.view.left_spine_visible_check, self.view.left_spine_width_spin, "left_spine_color"),
-                ("right", self.view.right_spine_visible_check, self.view.right_spine_width_spin, "right_spine_color")
-            ]
-
-            for key, vis_check, width_spin, color_attr in spine_map:
-                if key not in spines:
-                    continue
-                
-                is_visible = vis_check.isChecked()
-                
-                if is_visible:
-                    spines[key].set_visible(True)
-                    
-                    if is_individual:
-                        width = width_spin.value()
-                        color = getattr(self, color_attr, "black")
-                    else:
-                        width = global_width
-                        color = global_color
-                    
-                    spines[key].set_linewidth(width)
-                    spines[key].set_edgecolor(color)
-                else:
-                    spines[key].set_visible(False)
-        
-        except Exception as ApplySpineCustomizationError:
-            self.status_bar.log(f"Failed to apply spine customization: {str(ApplySpineCustomizationError)}", "ERROR")
-            traceback.print_exc()
-
 
     def clear_plot(self) -> None:
         """Clear the plot"""
