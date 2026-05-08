@@ -49,8 +49,8 @@ class DataOperationsPanel(QWidget):
         self.filtering_tab = FilteringTab(self, self.controller)
         self.columns_tab = ColumnsTab(self, self.controller)
         self.transform_tab = TransformTab(self, self.controller)
-        self.datetime_tab = DatetimeTab(self, self.controller)
         self.subsets_tab = SubsetsTab(self, self.controller)
+        self.datetime_tab = DatetimeTab(self, self.controller)
         self.history_tab = HistoryTab(self, self.controller)
         
         self.ops_tabs.addTab(self.cleaning_tab, IconBuilder.build(IconType.DataCleaning), "Data Cleaning")

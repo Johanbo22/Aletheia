@@ -70,10 +70,10 @@ class SubsetsTab(BaseDataTab):
         view_subset_btn.clicked.connect(self.controller.view_subset_quick)
         subset_list_btns.addWidget(view_subset_btn)
 
-        refresh_subsets_btn = DataPlotStudioButton("Refresh", parent=self)
-        refresh_subsets_btn.setIcon(IconBuilder.build(IconType.RefreshItem))
-        refresh_subsets_btn.clicked.connect(self.controller.refresh_active_subsets)
-        subset_list_btns.addWidget(refresh_subsets_btn)
+        self.refresh_subsets_btn = DataPlotStudioButton("Refresh", parent=self)
+        self.refresh_subsets_btn.setIcon(IconBuilder.build(IconType.RefreshItem))
+        self.refresh_subsets_btn.clicked.connect(self.controller.refresh_active_subsets)
+        subset_list_btns.addWidget(self.refresh_subsets_btn)
         subset_list_layout.addLayout(subset_list_btns)
         subset_list_group.setLayout(subset_list_layout)
         layout.addWidget(subset_list_group)
@@ -141,11 +141,13 @@ class SubsetsTab(BaseDataTab):
             self.injection_status_label.setProperty("statusState", "warning")
             self.restore_original_btn.setEnabled(True)
             self.inject_subset_btn.setEnabled(False)
+            self.refresh_subsets_btn.setEnabled(False)
         else:
             self.injection_status_label.setText("Status: Working with original data")
             self.injection_status_label.setProperty("statusState", "success")
             self.restore_original_btn.setEnabled(False)
             self.inject_subset_btn.setEnabled(True)
+            self.refresh_subsets_btn.setEnabled(True)
         
         self.injection_status_label.style().unpolish(self.injection_status_label)
         self.injection_status_label.style().polish(self.injection_status_label)
