@@ -349,7 +349,7 @@ class PlotConfigManager:
     
     def _get_annotations_config(self) -> Dict[str, Any]:
         return {
-            "text_annotations": self.pt.annotations,
+            "text_annotations": self.pt.annotation_manager.annotations,
             "auto_annotate": {
                 "enabled": self.pt.auto_annotate_check.isChecked(),
                 "column": self.pt.auto_annotate_col_combo.currentText()

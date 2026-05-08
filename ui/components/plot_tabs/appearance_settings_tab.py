@@ -226,7 +226,7 @@ class AppearanceSettingsTab(QWidget):
         self.zlabel_weight.addItems(["normal", "bold", "italic", "heavy", "light"])
         self.zlabel_weight.setCurrentText("normal")
         z_layout.addWidget(self.zlabel_weight)
-        self.z_label_widget.setVisible(False)
+        z_layout.addStretch()
         
         tab_widget.addTab(self.z_label_widget, "Z-Axis")
         

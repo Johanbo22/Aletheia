@@ -110,7 +110,7 @@ class CanvasInteractionManager:
         rely = (cur_ylim[1] - event.ydata) / (cur_ylim[1] - cur_ylim[0])
 
         ax.set_xlim([event.xdata - new_width * (1 - relx), event.xdata + new_width * relx])
-        ax.sey_ylim([event.ydata - new_height * (1 - rely), event.ydata + new_height * rely])
+        ax.set_ylim([event.ydata - new_height * (1 - rely), event.ydata + new_height * rely])
 
         self.plot_tab.canvas.draw_idle()
 
@@ -250,7 +250,7 @@ class CanvasInteractionManager:
         # Check lines
         for line in event.inaxes.get_lines():
             cont, ind = line.contains(event)
-            if cont and ind.get("ind", []):
+            if cont and len(ind.get("ind", [])) > 0:
                 idx = ind["ind"][0]
                 x_val = line.get_xdata()[idx]
                 y_val = line.get_ydata()[idx]
@@ -259,11 +259,11 @@ class CanvasInteractionManager:
                 found_point = True
                 break
 
-        # Chekc collections
+        # Check collections
         if not found_point:
             for collection in event.inaxes.collections:
                 cont, ind = collection.contains(event)
-                if cont and ind.get("ind", []):
+                if cont and len(ind.get("ind", [])) > 0:
                     idx = ind["ind"][0]
                     offsets = collection.get_offsets()[idx]
                     x_val, y_val = offsets[0], offsets[1]

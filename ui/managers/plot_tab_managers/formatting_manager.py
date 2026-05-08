@@ -30,7 +30,7 @@ class PlotFormattingManager:
             z_col_text = self.plot_tab.view.z_column.currentText()
             general_kwargs["z_column"] = z_col_text
             general_kwargs["zlabel"] = self.plot_tab.view.zlabel_input.text() or z_col_text
-            general_kwargs["elevation"] = self.plot_tab.view.camera_elevation_spin.value(),
+            general_kwargs["elevation"] = self.plot_tab.view.camera_elevation_spin.value()
             general_kwargs["azimuth"] = self.plot_tab.view.camera_azimuth_spin.value()
 
         if self.plot_tab.view.secondary_y_check.isChecked() and self.plot_tab.view.secondary_y_check.isEnabled():

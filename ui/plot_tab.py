@@ -2021,7 +2021,7 @@ class PlotTab(PlotTabUI):
             "x_column": x_col,
             "y_column": str(y_cols),
             "data_points": len(self.data_handler.df),
-            "annotations": len(self.annotations)
+            "annotations": len(self.annotation_manager.annotations)
         }
 
         if hue:

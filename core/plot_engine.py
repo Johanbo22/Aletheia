@@ -10,6 +10,8 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
 
 from core.regression_analyser import RegressionMetrics
+from ui.status_bar import LogLevel
+
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
 try:
@@ -1236,7 +1238,7 @@ class PlotEngine:
             elif hasattr(data, "dtype"):
                 return pd.api.types.is_datetime64_any_dtype(data.dtype)
         except Exception as DateTimeColumnError:
-            plot_tab.status_bar.log(f"Datetime detection warning: {str(DateTimeColumnError)}", "WARNING")
+            plot_tab.status_bar.log(f"Datetime detection warning: {str(DateTimeColumnError)}", LogLevel.WARNING)
         return False
 
     def _helper_apply_auto_datetime_format(self, plot_tab: "PlotTab", axis, data):
@@ -1274,7 +1276,7 @@ class PlotEngine:
                 axis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
                 axis.set_major_locator(mdates.YearLocator())
         except Exception as ApplyDateTimeError:
-            plot_tab.status_bar.log(f"Failed to auto-format datetime: {str(ApplyDateTimeError)}", "WARNING")
+            plot_tab.status_bar.log(f"Failed to auto-format datetime: {str(ApplyDateTimeError)}", LogLevel.WARNING)
 
     def _helper_set_intelligent_locator(self, plot_tab: "PlotTab", axis, data):
         """Set tick locators based on tghe datarange"""
@@ -1304,7 +1306,7 @@ class PlotEngine:
             else:
                 axis.set_major_locator(mdates.YearLocator())
         except Exception as DateTimeLocatorError:
-            plot_tab.status_bar.log(f"Failed to set datetime locator: {str(DateTimeLocatorError)}", "WARNING")
+            plot_tab.status_bar.log(f"Failed to set datetime locator: {str(DateTimeLocatorError)}", LogLevel.WARNING)
     
     def _helper_format_datetime_axis(self, plot_tab: "PlotTab", ax, x_data, y_data=None) -> None:
         """Format datetime axes with tick spacing"""
@@ -1324,7 +1326,7 @@ class PlotEngine:
                     elif not hasattr(x_data.dtype, "tz") or x_data.dtype.tz is None:
                         x_data = x_data.dt.tz_localize("UTC", nonexistent="shift_forward", ambiguous="infer")
             except Exception as FormatDateTimeAxisError:
-                plot_tab.status_bar.log(f"X-axis timezone handling: {str(FormatDateTimeAxisError)}", "WARNING")
+                plot_tab.status_bar.log(f"X-axis timezone handling: {str(FormatDateTimeAxisError)}", LogLevel.WARNING)
             
             if use_custom_format:
                 format_text = plot_tab.x_datetime_format_combo.currentText()
@@ -1336,7 +1338,7 @@ class PlotEngine:
                             ax.xaxis.set_major_formatter(mdates.DateFormatter(custom_format))
                             self._helper_set_intelligent_locator(plot_tab, ax.xaxis, x_data)
                         except Exception as FormatDateTimeAxisError:
-                            plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatDateTimeAxisError)}", "WARNING")
+                            plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatDateTimeAxisError)}", LogLevel.WARNING)
                             self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
                     else:
                         self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
@@ -1348,7 +1350,7 @@ class PlotEngine:
                         ax.xaxis.set_major_formatter(mdates.DateFormatter(format_code))
                         self._helper_set_intelligent_locator(plot_tab, ax.xaxis, x_data)
                     except Exception as FormatDateTimeAxisError:
-                        plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatDateTimeAxisError)}", "WARNING")
+                        plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatDateTimeAxisError)}", LogLevel.WARNING)
                         self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
             else:
                 self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
@@ -1362,7 +1364,7 @@ class PlotEngine:
                     elif not hasattr(y_data.dtype, 'tz') or y_data.dtype.tz is None:
                         y_data = y_data.dt.tz_localize('UTC', nonexistent='shift_forward', ambiguous='infer')
             except Exception as FormatYAxisDateTimeError:
-                plot_tab.status_bar.log(f"Y-axis timezone handling: {str(FormatYAxisDateTimeError)}", "WARNING")
+                plot_tab.status_bar.log(f"Y-axis timezone handling: {str(FormatYAxisDateTimeError)}", LogLevel.WARNING)
             
             if use_custom_format:
                 format_text = plot_tab.y_datetime_format_combo.currentText()
@@ -1374,7 +1376,7 @@ class PlotEngine:
                             ax.yaxis.set_major_formatter(mdates.DateFormatter(custom_format))
                             self._helper_set_intelligent_locator(plot_tab, ax.yaxis, y_data)
                         except Exception as FormatYAxisDateTimeError:
-                            plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatYAxisDateTimeError)}", "WARNING")
+                            plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatYAxisDateTimeError)}", LogLevel.WARNING)
                             self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
                     else:
                         self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
