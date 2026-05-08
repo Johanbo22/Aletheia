@@ -68,6 +68,12 @@ class DataTab(QWidget):
         self.current_precision = 2
         self.current_formatting_rules = []
         self.current_render_bools = True
+
+        self.current_nan_display = "NaN"
+        self.current_thousands_sep = False
+        self.current_scientific_notation = False
+        self.current_grid_style = "Solid Line"
+        self.current_grid_color = "#D3D3D3"
         
         self.current_search_matches: list = []
         self.current_search_index: int = -1
@@ -522,6 +528,14 @@ class DataTab(QWidget):
         else:
             self.model = DataTableModel(self.data_handler, editable=self.is_editing, float_precision=self.current_precision, conditional_rules=self.current_formatting_rules)
             self.model.set_bool_render_style(getattr(self, "current_render_bools", True))
+
+            if hasattr(self.model, "set_nan_display"):
+                self.model.set_nan_display(getattr(self, "current_nan_display", "NaN"))
+            if hasattr(self.model, "set_thousands_separator"):
+                self.model.set_thousands_separator(getattr(self, "current_thousands_sep", False))
+            if hasattr(self.model, "set_scientific_notation"):
+                self.model.set_scientific_notation(getattr(self, "current_scientific_notation", False))
+
             self.model.columnsInserted.connect(self._update_column_selectors)
             self.data_table.setSortingEnabled(False)
             self.data_table.setModel(self.model)
@@ -951,6 +965,8 @@ class DataTab(QWidget):
             "alternating_rows": self.data_table.alternatingRowColors(),
             "alt_color": current_alt_color,
             "show_grid": self.data_table.showGrid(),
+            "grid_color": getattr(self, "current_grid_color", "#D3D3D3"),
+            "grid_style": getattr(self, "current_grid_style", "Solid Line"),
             "show_h_headers": self.data_table.horizontalHeader().isVisible(),
             "show_v_headers": self.data_table.verticalHeader().isVisible(),
             "font_family": current_font.family(),
@@ -958,6 +974,9 @@ class DataTab(QWidget):
             "word_wrap": self.data_table.wordWrap(),
             "selection_behavior": self.data_table.selectionBehavior(),
             "float_precision": self.current_precision,
+            "thousands_separator": getattr(self, "current_thousands_sep", False),
+            "scientific_notation": getattr(self, "current_scientific_notation", False),
+            "nan_display": getattr(self, "current_nan_display", "NaN"),
             "conditional_rules": self.current_formatting_rules,
             "text_alignment": getattr(self, "current_text_alignment", "Left"),
             "render_bools_as_checkboxes": getattr(self, "current_render_bools", True)
@@ -980,6 +999,13 @@ class DataTab(QWidget):
         self.current_text_alignment = settings.get("text_alignment", "Left")
         self.current_render_bools = settings.get("render_bools_as_checkboxes", True)
 
+        self.current_nan_display = settings.get("nan_display", "NaN")
+        self.current_thousands_sep = settings.get("thousands_separator", False)
+        self.current_scientific_notation = settings.get("scientific_notation", False)
+
+        self.current_grid_style = settings.get("grid_style", "Solid Line")
+        self.current_grid_color = settings.get("grid_color", "#D3D3D3")
+
         self.data_table.setAlternatingRowColors(settings["alternating_rows"])
         if settings["alternating_rows"]:
             palette = self.data_table.palette()
@@ -988,6 +1014,19 @@ class DataTab(QWidget):
             )
             self.data_table.setPalette(palette)
         self.data_table.setShowGrid(settings["show_grid"])
+        pen_style: Qt.PenStyle = Qt.PenStyle.SolidLine
+        if self.current_grid_style == "Dash Line":
+            pen_style = Qt.PenStyle.DashLine
+        elif self.current_grid_style == "Dot Line":
+            pen_style = Qt.PenStyle.DotLine
+        self.data_table.setGridStyle(pen_style)
+
+        if settings.get("show_grid"):
+            grid_qcolor: QColor = QColor(self.current_grid_color)
+            if grid_qcolor.isValid():
+                palette = self.data_table.palette()
+                palette.setColor(QPalette.ColorRole.Mid, grid_qcolor)
+                self.data_table.setPalette(palette)
 
         self.data_table.horizontalHeader().setVisible(settings["show_h_headers"])
         self.data_table.verticalHeader().setVisible(settings["show_v_headers"])
@@ -1007,6 +1046,15 @@ class DataTab(QWidget):
             self.data_table.model().set_float_precision(self.current_precision)
             self.data_table.model().set_conditional_rules(self.current_formatting_rules)
             self.data_table.model().set_bool_render_style(self.current_render_bools)
+
+            if hasattr(self.data_table.model(), "set_nan_display"):
+                self.data_table.model().set_nan_display(self.current_nan_display)
+            if hasattr(self.data_table.model(), "set_thousands_separator"):
+                self.data_table.model().set_thousands_separator(self.current_thousands_sep)
+            if hasattr(self.data_table.model(), "set_scientific_notation"):
+                self.data_table.model().set_scientific_notation(self.current_scientific_notation)
+
+            self.data_table.model().layoutChanged.emit()
 
         self.status_bar.log("Table settings updated", "SUCCESS")
 

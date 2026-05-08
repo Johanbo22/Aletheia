@@ -21,6 +21,9 @@ class DataTableModel(QAbstractTableModel):
         self.float_precision = float_precision
         self.conditional_rules = conditional_rules if conditional_rules else []
         self.render_bools_as_checkboxes = True
+        self.nan_display = "NaN"
+        self.thousands_separator = False
+        self.scientific_notation = False
         self._compiled_rules: list[tuple] = []
         self._compile_rules(self.conditional_rules)
         
@@ -46,6 +49,21 @@ class DataTableModel(QAbstractTableModel):
     def set_bool_render_style(self, as_checkboxes: bool) -> None:
         """Updates how boolean values are rendered (checkboxes vs text) and refreshes the table"""
         self.render_bools_as_checkboxes = as_checkboxes
+        self.layoutChanged.emit()
+
+    def set_nan_display(self, text: str) -> None:
+        """Updates the display text for missing values"""
+        self.nan_display = text
+        self.layoutChanged.emit()
+
+    def set_thousands_separator(self, use_sep: bool) -> None:
+        """Toggles the thousand separator for numerical formatting"""
+        self.thousands_separator = use_sep
+        self.layoutChanged.emit()
+
+    def set_scientific_notation(self, use_sci: bool) -> None:
+        """Toggles scientific notation for numerical formatting"""
+        self.scientific_notation = use_sci
         self.layoutChanged.emit()
     
     def set_conditional_rules(self, rules: list):
@@ -254,24 +272,37 @@ class DataTableModel(QAbstractTableModel):
     def _get_display_data(self, val: Any, col: int, is_missing: bool = False) -> Any:
         """Formats and returns the data for the DisplayRole"""
         try:
+            if is_missing:
+                return "" if self.nan_display == "<Empty>" else self.nan_display
+
             # Suppress text rendering entirely for inferred Checkbox columns if setting is enabled
-            if self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool) and self._col_is_bool[col]:
+            if self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool) and \
+                    self._col_is_bool[col]:
                 return ""
-                
+
             if isinstance(val, float) or isinstance(val, np.floating):
                 if np.isnan(val):
-                    return "NaN"
-                return f"{val:.{self.float_precision}f}"
-                
-            if is_missing:
-                return "NaN"
-            if not self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool) and self._col_is_bool[col]:
+                    return "" if self.nan_display == "<Empty>" else self.nan_display
+
+                if self.scientific_notation:
+                    return f"{val:.{self.float_precision}e}"
+                elif self.thousands_separator:
+                    return f"{val:,.{self.float_precision}f}"
+                else:
+                    return f"{val:.{self.float_precision}f}"
+
+            if not self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool) and \
+                    self._col_is_bool[col]:
                 return str(self._parse_bool(val))
             if isinstance(val, pd.Timestamp):
                 return val.strftime("%Y-%m-%d %H:%M:%S")
             if isinstance(val, (int, np.integer)):
-                return int(val)
-            
+                if self.scientific_notation:
+                    return f"{val:.{self.float_precision}e}"
+                elif self.thousands_separator:
+                    return f"{val:,}"
+                return str(val)
+
             s_val: str = str(val)
             CHARACTER_LIMIT: int = 64
             if len(s_val) > CHARACTER_LIMIT:
