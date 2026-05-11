@@ -1,0 +1,54 @@
+/*
+Target: RegexReplaceDialog and components
+*/
+#RegexValidationLabel {
+    color: #d32f2f;
+    font-weight: 600;
+    font-size: 11px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+#RegexPresetButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px;
+    color: palette(text);
+}
+
+#RegexPresetButton:hover {
+    background-color: rgba(128, 128, 128, 0.15);
+    border: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+#RegexPresetButton::menu-indicator {
+    image: none;
+}
+
+#RegexPreviewLabel {
+    border-radius: 6px;
+    padding: 10px;
+    font-family: "Consolas", "Courier New", monospace;
+    min-height: 40px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(128, 128, 128, 0.4);
+}
+
+#RegexPreviewLabel[previewState="empty"] {
+    color: #888888;
+    border: 1px dashed rgba(128, 128, 128, 0.4);
+    background-color: transparent;
+}
+
+#RegexPreviewLabel[previewState="success"] {
+    color: #2e7d32;
+    border: 1px solid rgba(46, 125, 50, 0.5);
+    background-color: rgba(46, 125, 50, 0.05);
+}
+
+#RegexPreviewLabel[previewState="error"] {
+    color: #d32f2f;
+    border: 1px solid rgba(211, 47, 47, 0.5);
+    background-color: rgba(211, 47, 47, 0.05);
+}
