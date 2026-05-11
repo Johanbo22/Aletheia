@@ -1,10 +1,8 @@
-from flask.config import T
 import matplotlib
-import matplotlib.pyplot as plt
 from functools import lru_cache
-from PyQt6.QtCore import QSize, Qt, QSettings, QEvent
-from PyQt6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPixmap
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QVBoxLayout, QFrame, QSpinBox
+from PyQt6.QtCore import QSize, Qt, QSettings, QEvent, QObject, QTimer
+from PyQt6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPixmap, QCloseEvent, QResizeEvent, QKeyEvent
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QVBoxLayout, QFrame, QSpinBox, QSizePolicy
 
 from ui.widgets.ControlElements import DataPlotStudioCheckBox
 from ui.widgets.ControlElements import DataPlotStudioLineEdit, DataPlotStudioListWidget
@@ -139,7 +137,8 @@ class ColormapPickerDialog(QDialog):
         
         self.preview_label = QLabel()
         self.preview_label.setObjectName("colormapPreviewLabel")
-        self.preview_label.setMinimumHeight(40)
+        self.preview_label.setMinimumSize(1, 40)
+        self.preview_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.high_label = QLabel("High")
@@ -161,6 +160,13 @@ class ColormapPickerDialog(QDialog):
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         layout.addWidget(self.button_box)
 
+        icon_update_interval_ms = 200
+        self._icon_update_timer = QTimer(self)
+        self._icon_update_timer.setSingleShot(True)
+        self._icon_update_timer.setInterval(icon_update_interval_ms)
+        self._icon_update_timer.timeout.connect(self._apply_list_icon_updates)
+        self._pending_icon_state: tuple[bool, bool, int] = (False, False, 0)
+
         self._populate_colormaps()
 
         if current_colormap:
@@ -174,8 +180,25 @@ class ColormapPickerDialog(QDialog):
         self._filter_items("")
         self.search_input.setFocus()
         self.search_input.installEventFilter(self)
+
+        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        if settings.value("geometry"):
+            self.restoreGeometry(settings.value("geometry"))
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Save geometry when the dialog is closed"""
+        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings.setValue("geometry", self.saveGeometry())
+        super().closeEvent(event)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Ensure the preview gradient stretches when the window is resized"""
+        super().resizeEvent(event)
+        if event.size().width() != event.oldSize().width():
+            if not self.preview_container.isHidden():
+                self._on_item_selection_changed()
     
-    def eventFilter(self, source, event) -> bool:
+    def eventFilter(self, source: QObject, event: QEvent | QKeyEvent) -> bool:
         if source is self.search_input and event.type() == QEvent.Type.KeyPress:
             if event.key() == Qt.Key.Key_Down:
                 self.list_widget.setFocus()
@@ -187,6 +210,10 @@ class ColormapPickerDialog(QDialog):
                             item.setSelected(True)
                             break
                 return True
+            elif event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
+                if self.button_box.button(QDialogButtonBox.StandardButton.Ok).isEnabled():
+                    self.accept()
+                    return True
         return super().eventFilter(source, event)
 
     def keyPressEvent(self, event) -> None:
@@ -200,31 +227,52 @@ class ColormapPickerDialog(QDialog):
         selected_items = self.list_widget.selectedItems()
         has_valid_selection = bool(selected_items and selected_items[0].data(Qt.ItemDataRole.UserRole) != "header")
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(has_valid_selection)
-        
+
+        is_reversed = self.reverse_check.isChecked()
+        is_grayscale = self.grayscale_check.isChecked()
+        discrete_steps = self.discrete_spinbox.value() if self.discrete_check.isChecked() else 0
+
+        sender = self.sender()
+        if sender in (self.reverse_check, self.grayscale_check, self.discrete_check, self.discrete_spinbox):
+            self._update_list_icons(is_reversed, is_grayscale, discrete_steps)
+
         if has_valid_selection:
             colormap_name = selected_items[0].text()
-            is_reversed = self.reverse_check.isChecked()
-            is_grayscale = self.grayscale_check.isChecked()
-            discrete_steps = self.discrete_spinbox.value() if self.discrete_check.isChecked() else 0
-                        
-            
+
             category = self.colormap_to_category.get(colormap_name, "Custom / Other")
             self.category_label.setText(f"Category: {category}")
             self.name_label.setText(colormap_name)
-            
+
             if is_reversed:
                 self.low_label.setText("High")
                 self.high_label.setText("Low")
             else:
                 self.low_label.setText("Low")
                 self.high_label.setText("High")
-            
-            preview_pixmap = self.generate_preview_pixmap(colormap_name, is_reversed, is_grayscale, discrete_steps)
+
+            target_width = max(150, self.preview_container.width())
+            target_height = 40
+
+            preview_pixmap = self.generate_preview_pixmap(colormap_name, target_width, target_height, is_reversed, is_grayscale, discrete_steps)
             self.preview_label.setPixmap(preview_pixmap)
             self.preview_container.setHidden(False)
         else:
             self.preview_container.setHidden(True)
-            
+
+    def _update_list_icons(self, is_reversed: bool, is_grayscale: bool, discrete_steps: int) -> None:
+        """Triggers a debounced update of the list icons to prevent UI stuttering"""
+        self._pending_icon_state = (is_reversed, is_grayscale, discrete_steps)
+        self._icon_update_timer.start()
+
+    def _apply_list_icon_updates(self) -> None:
+        """Updates all list icons to reflect current modifier state"""
+        is_reversed, is_grayscale, discrete_steps = self._pending_icon_state
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.data(Qt.ItemDataRole.UserRole) == "colormap":
+                colormap_name = item.text()
+                icon = self.generate_icon(colormap_name, is_reversed, is_grayscale, discrete_steps)
+                item.setIcon(icon)
     
     def accept(self) -> None:
         """An override to accept() to save a selected colormap to Settings"""
@@ -247,6 +295,9 @@ class ColormapPickerDialog(QDialog):
                 self._final_selected_colormap = base_name
         else:
             self._final_selected_colormap = self.selected_colormap
+
+        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings.setValue("geometry", self.saveGeometry())
         
         super().accept()
     
@@ -318,13 +369,18 @@ class ColormapPickerDialog(QDialog):
         item.setData(Qt.ItemDataRole.UserRole, "colormap")
 
         item.setSizeHint(QSize(0, 24))
-        icon = self.generate_icon(name)
+
+        is_reversed = self.reverse_check.isChecked()
+        is_grayscale = self.grayscale_check.isChecked()
+        discrete_steps = self.discrete_spinbox.value() if self.discrete_check.isChecked() else 0
+
+        icon = self.generate_icon(name, is_reversed, is_grayscale, discrete_steps)
         item.setIcon(icon)
         self.list_widget.addItem(item)
 
     @staticmethod
-    @lru_cache(maxsize=128)
-    def generate_icon(colormap_name) -> QIcon:
+    @lru_cache(maxsize=512)
+    def generate_icon(colormap_name: str, is_reversed: bool = False, is_grayscale: bool = False, discrete_steps: int = 0) -> QIcon:
         """Method to generate an icon that matches the color gradient of the matplotlib colormaps"""
         width = 100
         height = 20
@@ -336,38 +392,61 @@ class ColormapPickerDialog(QDialog):
 
         try:
             colormap = matplotlib.colormaps[colormap_name]
-            
-            gradient = QLinearGradient(0, 0, width, 0)
-            steps = 40
-            for i in range(steps + 1):
-                position = i / steps
-                rgba = colormap(position)
-                color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
-                gradient.setColorAt(position, color)
 
-            painter.setBrush(QBrush(gradient))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRect(0, 0, width, height)
+            if discrete_steps > 0:
+                band_width = width / discrete_steps
+                painter.setPen(Qt.PenStyle.NoPen)
 
+                for i in range(discrete_steps):
+                    position = (i + 0.5) / discrete_steps
+                    color_pos = 1.0 - position if is_reversed else position
+                    rgba = colormap(color_pos)
+
+                    if is_grayscale:
+                        luminance = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
+                        color = QColor.fromRgbF(luminance, luminance, luminance, 1.0)
+                    else:
+                        color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
+
+                    painter.setBrush(QBrush(color))
+                    painter.drawRect(int(i * band_width), 0, int(band_width) + 1, height)
+            else:
+                gradient = QLinearGradient(0, 0, width, 0)
+                steps = 40
+                for i in range(steps + 1):
+                    position = i / steps
+                    color_pos = 1.0 - position if is_reversed else position
+                    rgba = colormap(color_pos)
+
+                    if is_grayscale:
+                        luminance = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
+                        color = QColor.fromRgbF(luminance, luminance, luminance, 1.0)
+                    else:
+                        color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
+
+                    gradient.setColorAt(position, color)
+
+                painter.setBrush(QBrush(gradient))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRect(0, 0, width, height)
         except Exception as error:
             painter.setBrush(QBrush(Qt.GlobalColor.gray))
             painter.drawRect(0, 0, width, height)
-            print(error)
+            print(f"Failed to generate icon for {colormap_name}: {error}")
         finally:
             painter.end()
         return QIcon(pixmap)
 
     @staticmethod
-    @lru_cache(maxsize=128)
     def generate_preview_pixmap(
-        colormap_name: str, 
+        colormap_name: str,
+        width: int,
+        height: int,
         is_reversed: bool = False, 
         is_grayscale: bool = False, 
         discrete_steps: int = 0
         ) -> QPixmap:
-        
-        width = 380
-        height = 40
+
         pixmap = QPixmap(width, height)
         pixmap.fill(Qt.GlobalColor.transparent)
 
@@ -432,6 +511,8 @@ class ColormapPickerDialog(QDialog):
         current_header = None
         header_has_visible_child = False
         visible_colormap_count = 0
+        first_visible_item = None
+        header_is_match = False
 
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
@@ -443,19 +524,28 @@ class ColormapPickerDialog(QDialog):
                 
                 current_header = item
                 header_has_visible_child = False
+                header_is_match = search_text in item.text().lower()
                 item.setHidden(False)
             else:
-                is_match = search_text in item.text().lower()
+                is_match = search_text in item.text().lower() or header_is_match
                 item.setHidden(not is_match)
 
                 if is_match:
                     header_has_visible_child = True
                     visible_colormap_count += 1
+                    if first_visible_item is None:
+                        first_visible_item = item
         
         if current_header:
             current_header.setHidden(not header_has_visible_child)
         
         self.empty_search_label.setHidden(visible_colormap_count > 0)
+
+        if text and first_visible_item:
+            self.list_widget.setCurrentItem(first_visible_item)
+            first_visible_item.setSelected(True)
+        elif not text and self.list_widget.selectedItems():
+            self.list_widget.scrollToItem(self.list_widget.selectedItems()[0])
 
     def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
         """Handles double click"""

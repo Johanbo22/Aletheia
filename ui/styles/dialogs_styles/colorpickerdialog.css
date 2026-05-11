@@ -1,23 +1,64 @@
 #colormapPreviewContainer {
-    background-color: #f9f9f9;
-    border: 1px solid #dcdcdc;
-    border-radius: 6px;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-top: 4px;
 }
 
 #colormapDiscreteSpinBox {
     background-color: #ffffff;
-    border: 1px solid #cccccc;
+    border: 1px solid #cbd5e1;
     border-radius: 4px;
-    padding: 2px;
-    color: #333333;
+    padding: 2px 4px;
+    color: #334155;
+    min-height: 24px;
 }
 
 #colormapDiscreteSpinBox:disabled {
-    background-color: #f5f5f5;
-    color: #aaaaaa;
-    border: 1px solid #e0e0e0;
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    border: 1px solid #e2e8f0;
 }
 
 #colormapDiscreteSpinBox:focus {
-    border: 1px solid #0078d7;
+    border: 1px solid #3b82f6;
+    background-color: #ffffff;
+}
+
+#colormapSearchInput {
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    min-height: 24px;
+}
+
+#colormapSearchInput:focus {
+    border: 1px solid #3b82f6;
+}
+
+#colormapListWidget {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background-color: #ffffff;
+    outline: none;
+}
+
+#colormapListWidget::item {
+    border-radius: 4px;
+    margin: 1px 4px;
+    padding: 2px;
+}
+
+#colormapListWidget::item:hover {
+    background-color: #f1f5f9;
+}
+
+#colormapListWidget::item:selected {
+    background-color: #e0f2fe;
+    color: #0369a1;
+}
+
+#colormapPreviewLabel {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
 }
