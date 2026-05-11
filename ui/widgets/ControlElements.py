@@ -32,6 +32,9 @@ class DataPlotStudioSlider(QSlider):
         self.setProperty("styleClass", "dpsSlider")
 
         if orientation == Qt.Orientation.Horizontal:
+            pass
+
+        if orientation == Qt.Orientation.Horizontal:
             self.setMinimumHeight(40)
         else:
             self.setMinimumWidth(40)
@@ -40,28 +43,32 @@ class DataPlotStudioSlider(QSlider):
             self.setTickPosition(QSlider.TickPosition.TicksBelow)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        """Enables click to jump behaviour
-        Clicking on groove moves the value to that point"""
+        """
+        Handles mouse press events to jump the slider's value
+        to the absolute position of the users click
+        """
         if event.button() == Qt.MouseButton.LeftButton:
-            opt = QStyleOptionSlider()
-            self.initStyleOption(opt)
-            style = self.style()
+            style_option = QStyleOptionSlider()
+            self.initStyleOption(style_option)
 
-            handle_rect = style.subControlRect(
-                QStyle.ComplexControl.CC_Slider, opt, QStyle.SubControl.SC_SliderHandle, self
+            # Get coordinates and span based on orientation
+            if self.orientation() == Qt.Orientation.Horizontal:
+                click_position: int = event.pos().x()
+                slider_span: int = self.width()
+            else:
+                click_position: int = event.pos().y()
+                slider_span: int = self.height()
+
+            new_value: int = self.style().sliderValueFromPosition(
+                self.minimum(),
+                self.maximum(),
+                click_position,
+                slider_span,
+                style_option.upsideDown
             )
+            self.setValue(new_value)
+            event.accept()
 
-            # If clicked outside the handle
-            # jumpt to the clicked position
-            if not handle_rect.contains(event.pos()):
-                new_val = style.sliderValueFromPosition(
-                    self.minimum(),
-                    self.maximum(),
-                    event.pos() if self.orientation() == Qt.Orientation.Horizontal else event.pos().y(),
-                    self.width() if self.orientation() == Qt.Orientation.Horizontal else self.height(),
-                    self.invertedAppearance()
-                )
-                self.setValue(new_val)
         super().mousePressEvent(event)
 
         # also show the tooltip for the value
