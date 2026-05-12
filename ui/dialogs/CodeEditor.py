@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from ui.LineNumberArea import LineNumberArea
 
 from PyQt6.QtCore import QRect, Qt, QStringListModel, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QTextCursor, QTextFormat, QAction, QKeySequence, QKeyEvent, QWheelEvent, QTextCharFormat, QTextBlock, QPaintEvent, QMouseEvent
+from PyQt6.QtGui import QColor, QFont, QPainter, QTextCursor, QTextFormat, QAction, QKeySequence, QKeyEvent, QWheelEvent, QTextCharFormat, QTextBlock, QPaintEvent, QMouseEvent, QTextOption
 from PyQt6.QtWidgets import QPlainTextEdit, QTextEdit, QCompleter, QMessageBox, QInputDialog, QToolTip
 import traceback
 
@@ -72,6 +72,24 @@ class CodeEditor(QPlainTextEdit):
         duplicate_lines_action.setShortcut(QKeySequence("Ctrl+D"))
         duplicate_lines_action.triggered.connect(self.duplicateLine)
         self.addAction(duplicate_lines_action)
+
+        # Delete line
+        delete_line_action = QAction("Delete Line", self)
+        delete_line_action.setShortcut(QKeySequence("Ctrl+Shift+K"))
+        delete_line_action.triggered.connect(self.deleteLine)
+        self.addAction(delete_line_action)
+
+        # Move lin up
+        move_up_action = QAction("Move Line Up", self)
+        move_up_action.setShortcut(QKeySequence("Alt+Up"))
+        move_up_action.triggered.connect(self.moveLinesUp)
+        self.addAction(move_up_action)
+
+        # Move line down
+        move_down_action = QAction("Move Line Down", self)
+        move_down_action.setShortcut(QKeySequence("Alt+Down"))
+        move_down_action.triggered.connect(self.moveLinesDown)
+        self.addAction(move_down_action)
         
         # Go to line
         goto_action = QAction("Go To Line", self)
@@ -84,6 +102,12 @@ class CodeEditor(QPlainTextEdit):
         wrap_action.setShortcut(QKeySequence("Alt+Z"))
         wrap_action.triggered.connect(self.toggleWordWrap)
         self.addAction(wrap_action)
+
+        # Whitespace toggle
+        whitespace_action = QAction("Toggle Whitespace", self)
+        whitespace_action.setShortcut(QKeySequence("Alt+W"))
+        whitespace_action.triggered.connect(self.toggleWhitespaceVisibility)
+        self.addAction(whitespace_action)
         
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._folded_cursors: list[QTextCursor] = []
@@ -549,6 +573,17 @@ class CodeEditor(QPlainTextEdit):
             self.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         else:
             self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+
+    def toggleWhitespaceVisibility(self) -> None:
+        """Toggles the visual rendering of spaces as dots and tabs as arrows"""
+        option = self.document().defaultTextOption()
+
+        if option.flags() & QTextOption.Flag.ShowTabsAndSpaces:
+            option.setFlags(option.flags() & ~QTextOption.Flag.ShowTabsAndSpaces)
+        else:
+            option.setFlags(option.flags() | QTextOption.Flag.ShowTabsAndSpaces)
+
+        self.document().setDefaultTextOption(option)
             
     def getBracketSelections(self) -> list[QTextEdit.ExtraSelection]:
         """Finds and highlights matching bracket pairs if the cursor is adjacent to one"""
@@ -624,17 +659,138 @@ class CodeEditor(QPlainTextEdit):
         return selections
     
     def duplicateLine(self) -> None:
-        """Duplicates the current line below itself"""
+        """Duplicates the current line or selected block of lines below"""
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
-        if not cursor.hasSelection():
-            cursor.select(QTextCursor.SelectionType.LineUnderCursor)
-            line_text: str = cursor.selectedText()
-            cursor.clearSelection()
-            cursor.movePosition(QTextCursor.MoveOperation.EndOfLine)
-            cursor.insertText("\n" + line_text)
+
+        start_pos: int = cursor.selectionStart()
+        end_pos: int = cursor.selectionEnd()
+
+        # Create the block bouindaries
+        cursor.setPosition(start_pos)
+        start_block: int = cursor.blockNumber()
+        cursor.setPosition(end_pos)
+        end_block: int = cursor.blockNumber()
+
+        if cursor.hasSelection() and cursor.positionInBlock() == 0 and end_block > start_block:
+            end_block -= 1
+
+        cursor.setPosition(self.document().findBlockByNumber(start_block).position())
+        cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+
+        fragment: str = cursor.selection().toPlainText()
+
+        cursor.setPosition(self.document().findBlockByNumber(end_block).position())
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
+        cursor.insertText("\n" + fragment)
+
         cursor.endEditBlock()
-        
+
+    def deleteLine(self) -> None:
+        """Deletes the current line or selected block of lines"""
+        cursor: QTextCursor = self.textCursor()
+        cursor.beginEditBlock()
+
+        start_pos: int = cursor.selectionStart()
+        end_pos: int = cursor.selectionEnd()
+
+        cursor.setPosition(start_pos)
+        start_block: int = cursor.blockNumber()
+        cursor.setPosition(end_pos)
+        end_block: int = cursor.blockNumber()
+
+        if cursor.hasSelection() and cursor.positionInBlock() == 0 and end_block > start_block:
+            end_block -= 1
+
+        cursor.setPosition(self.document().findBlockByNumber(start_block).position())
+        cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+
+        if start_block == 0 and end_block == self.document().blockCount() -1 :
+            cursor.removeSelectedText()
+        elif end_block < self.document().blockCount() - 1:
+            cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+        else:
+            cursor.removeSelectedText()
+            cursor.deletePreviousChar()
+
+        cursor.endEditBlock()
+
+    def moveLinesUp(self) -> None:
+        """Moves the current line or selected block of lines up by one"""
+        cursor: QTextCursor = self.textCursor()
+        cursor.beginEditBlock()
+
+        start_pos: int = cursor.selectionStart()
+        end_pos: int = cursor.selectionEnd()
+
+        cursor.setPosition(start_pos)
+        start_block: int = cursor.blockNumber()
+        cursor.setPosition(end_pos)
+        end_block: int = cursor.blockNumber()
+
+        if cursor.hasSelection() and cursor.positionInBlock() == 0 and end_block > start_block:
+            end_block -= 1
+
+        if end_block > 0:
+            cursor.setPosition(self.document().findBlockByNumber(start_block).position())
+            cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+
+            fragment: str = cursor.selection().toPlainText()
+            cursor.removeSelectedText()
+            cursor.deletePreviousChar()
+
+            cursor.setPosition(self.document().findBlockByNumber(start_block - 1).position())
+            cursor.insertText(fragment + "\n")
+
+            cursor.setPosition(self.document().findBlockByNumber(start_block - 1).position())
+            cursor.setPosition(self.document().findBlockByNumber(end_block - 1).position(), QTextCursor.MoveMode.KeepAnchor)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(cursor)
+
+        cursor.endEditBlock()
+
+    def moveLinesDown(self) -> None:
+        """Moves the current line or selected block of lines down by one line."""
+        cursor: QTextCursor = self.textCursor()
+        cursor.beginEditBlock()
+
+        start_pos: int = cursor.selectionStart()
+        end_pos: int = cursor.selectionEnd()
+
+        cursor.setPosition(start_pos)
+        start_block: int = cursor.blockNumber()
+        cursor.setPosition(end_pos)
+        end_block: int = cursor.blockNumber()
+
+        if cursor.hasSelection() and cursor.positionInBlock() == 0 and end_block > start_block:
+            end_block -= 1
+
+        if end_block < self.document().blockCount() - 1:
+            cursor.setPosition(self.document().findBlockByNumber(start_block).position())
+            cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+
+            fragment: str = cursor.selection().toPlainText()
+
+            cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
+            cursor.removeSelectedText()
+
+            cursor.setPosition(self.document().findBlockByNumber(start_block).position())
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
+            cursor.insertText("\n" + fragment)
+
+            cursor.setPosition(self.document().findBlockByNumber(start_block + 1).position())
+            cursor.setPosition(self.document().findBlockByNumber(end_block + 1).position(),
+                               QTextCursor.MoveMode.KeepAnchor)
+            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(cursor)
+
+        cursor.endEditBlock()
+
     def _startLinting(self) -> None:
         """Creates the thread background to lint the text state"""
         text: str = self.toPlainText()
