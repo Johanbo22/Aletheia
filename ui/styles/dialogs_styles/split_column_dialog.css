@@ -1,0 +1,40 @@
+/* Target SplitColumnDialog */
+#SplitColumnDialog {
+    min-width: 450px;
+}
+
+QLabel[subtleText="true"] {
+    color: #8a9199;
+    font-size: 12px;
+    font-style: italic;
+    padding-top: 2px;
+    padding-bottom: 5px;
+}
+
+QLabel[errorText="true"] {
+    color: #e06c75;
+    font-weight: bold;
+    font-size: 12px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+#SplitPresetCombo {
+    min-width: 120px;
+    margin-right: 8px;
+}
+
+#SplitDelimiterInput {
+    min-width: 80px;
+}
+
+#SplitAutoGenSpinBox {
+    max-width: 100px;
+}
+
+#SplitDelimiterInput:focus,
+#SplitColumnCombo:focus,
+#SplitNewColumnsInput:focus {
+    border: 1px solid #528bff;
+    background-color: rgba(82, 139, 255, 0.05);
+}

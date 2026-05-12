@@ -400,12 +400,13 @@ QLineEdit[styleClass="dpsLineEdit"]:hover {
 
 QLineEdit[styleClass="dpsLineEdit"]:focus {
     border-color: #2563eb;
+    background-color: rgba(82, 139, 255, 0.05);
     outline: none;
 }
 
 QComboBox[styleClass="dpsComboBox"] {
     border: 1.5px solid #bdc3c7;
-    border-radius: 3cqh;
+    border-radius: 3px;
     padding: 1px 35px 1px 3px;
     min-width: 6em;
     background-color: #ffffff;
@@ -418,7 +419,8 @@ QComboBox[styleClass="dpsComboBox"]:hover {
 
 QComboBox[styleClass="dpsComboBox"]:focus,
 QComboBox[styleClass="dpsComboBox"]:on {
-    border-color: #2563eb;
+    border: 1px solid #2563eb;
+    background-color: rgba(82, 139, 255, 0.05);
 }
 
 QComboBox[styleClass="dpsComboBox"] QLineEdit {
@@ -515,7 +517,8 @@ QDoubleSpinBox[styleClass="dpsSpinBox"]:hover {
 
 QSpinBox[styleClass="dpsSpinBox"]:focus,
 QDoubleSpinBox[styleClass="dpsSpinBox"]:focus {
-    border-color: #2563eb;
+    border: 1px solid #2563eb;
+    background-color: rgba(82, 139, 255, 0.05);
     outline: none;
 }
 
