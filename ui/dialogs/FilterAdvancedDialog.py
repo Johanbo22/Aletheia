@@ -1,6 +1,6 @@
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QStackedWidget, QDateEdit, QSizePolicy, QWidget, QCompleter, QScrollArea, QPushButton
-from PyQt6.QtCore import QDate, QThreadPool, Qt, QTimer
+from PyQt6.QtGui import QFont, QShortcut, QKeySequence
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QStackedWidget, QDateEdit, QSizePolicy, QWidget, QCompleter, QScrollArea, QPushButton, QGraphicsOpacityEffect, QApplication
+from PyQt6.QtCore import QDate, QThreadPool, Qt, QTimer, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QPoint
 import pandas as pd
 from typing import List, Dict, Any, Optional
 
@@ -46,6 +46,7 @@ class FilterAdvancedDialog(QDialog):
         self.filters = []
         self.thread_pool = QThreadPool.globalInstance()
         self._column_stats_cache: Dict[str, Dict[str, Any]] = {}
+        self._active_animations: List[QPropertyAnimation] = []
         
         # Timer for the preview_label to not lag
         PREVIEW_TIMER_MS = 250
@@ -53,8 +54,26 @@ class FilterAdvancedDialog(QDialog):
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(PREVIEW_TIMER_MS)
         self._preview_timer.timeout.connect(self._render_preview)
+
+        loading_timer_ms = 400
+        self._loading_timer = QTimer(self)
+        self._loading_timer.setInterval(loading_timer_ms)
+        self._loading_timer.timeout.connect(self._update_loading_text)
+        self._loading_dots = 0
+
+        self._setup_shortcuts()
         
         self.init_ui()
+
+    def _setup_shortcuts(self) -> None:
+        """Setup keyboard shortcuts"""
+        add_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        add_shortcut.activated.connect(self.add_filter_row)
+        add_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+
+        clear_shortcut = QShortcut(QKeySequence("Ctrl+Del"), self)
+        clear_shortcut.activated.connect(self.clear_fields)
+        clear_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
     
     @property
     def _has_active_filters(self) -> bool:
@@ -80,7 +99,26 @@ class FilterAdvancedDialog(QDialog):
             )
             if reply == QMessageBox.StandardButton.No:
                 return
+
+        if hasattr(self, "_preview_timer"):
+            self._preview_timer.stop()
+        if hasattr(self, "_loading_timer"):
+            self._loading_timer.stop()
         super().reject()
+
+    def accept(self) -> None:
+        if hasattr(self, '_preview_timer'):
+            self._preview_timer.stop()
+        if hasattr(self, '_loading_timer'):
+            self._loading_timer.stop()
+        super().accept()
+
+    def closeEvent(self, event) -> None:
+        if hasattr(self, '_preview_timer'):
+            self._preview_timer.stop()
+        if hasattr(self, '_loading_timer'):
+            self._loading_timer.stop()
+        super().closeEvent(event)
 
     def init_ui(self):
         """Initialize dialog UI"""
@@ -123,9 +161,27 @@ class FilterAdvancedDialog(QDialog):
         add_btn_layout.addWidget(self.add_filter_btn)
         add_btn_layout.addStretch()
         layout.addLayout(add_btn_layout)
-        
         layout.addSpacing(15)
-        layout.addWidget(self.preview_label)
+
+        # Preview Container
+        preview_container = QWidget()
+        preview_layout = QHBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        preview_layout.addWidget(self.preview_label)
+
+        self.copy_btn = DataPlotStudioButton("Copy Query", parent=self)
+        self.copy_btn.setToolTip("Copy the raw filter query to the system clipboard")
+        self.copy_btn.clicked.connect(self._copy_query_to_clipboard)
+        self.copy_btn.setVisible(False)
+
+        btn_layout = QVBoxLayout()
+        btn_layout.addWidget(self.copy_btn)
+        btn_layout.addStretch()
+        preview_layout.addLayout(btn_layout)
+
+        layout.addWidget(preview_container)
         layout.addSpacing(10)
 
         # Button layout
@@ -151,11 +207,42 @@ class FilterAdvancedDialog(QDialog):
 
         layout.addLayout(button_layout)
         self.update_preview()
+
+    def _update_logic_styling(self, row: dict, logic: str) -> None:
+        """Update the visual border styling of the group box based on the logic operator"""
+        group = row["group"]
+        if logic == "ROOT":
+            group.setTitle("Where...")
+            group.setProperty("logicStyle", "root")
+        elif logic == "AND":
+            group.setTitle("And...")
+            group.setProperty("logicStyle", "and")
+        else:
+            group.setTitle("Or...")
+            group.setProperty("logicStyle", "or")
+
+        group.style().unpolish(group)
+        group.style().polish(group)
+
+    def _copy_query_to_clipboard(self) -> None:
+        """Extracts the raw query text to system clipboard with a visual confrmation"""
+        if hasattr(self, "_current_raw_query") and self._current_raw_query:
+            QApplication.clipboard().setText(self._current_raw_query)
+            self.copy_btn.setText("Copied!")
+            QTimer.singleShot(2000, lambda: self.copy_btn.setText("Copy Query") if hasattr(self, "copy_btn") else None)
+
+    def _cleanup_effect_animation(self, anim: QPropertyAnimation, widget: QWidget) -> None:
+        """Restores native rendering after a fade animation completes"""
+        if anim in self._active_animations:
+            self._active_animations.remove(anim)
+        if widget:
+            widget.setGraphicsEffect(None)
     
     def add_filter_row(self) -> None:
         """ adds a new filter configuration row to the dialog."""
         row_index = len(self.filter_rows)
         filter_group = DataPlotStudioGroupBox(f"Filter {row_index +1}", parent=self)
+        filter_group.setObjectName("FilterGroupBox")
         filter_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         filter_layout = QHBoxLayout()
         
@@ -243,6 +330,12 @@ class FilterAdvancedDialog(QDialog):
         filter_layout.addWidget(remove_btn)
 
         filter_group.setLayout(filter_layout)
+
+        # Animation states
+        effect = QGraphicsOpacityEffect(filter_group)
+        filter_group.setGraphicsEffect(effect)
+        effect.setOpacity(0.0)
+        filter_group.setMaximumHeight(0)
         
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, filter_group)
 
@@ -261,10 +354,35 @@ class FilterAdvancedDialog(QDialog):
             'group': filter_group
         }
         self.filter_rows.append(row_data)
+
+        # Execute animation sequence
+        anim_group = QParallelAnimationGroup(self)
+
+        height_anim = QPropertyAnimation(filter_group, b"maximumHeight")
+        height_anim.setDuration(250)
+        height_anim.setStartValue(0)
+        height_anim.setEndValue(120)
+        height_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        opacity_anim = QPropertyAnimation(effect, b"opacity")
+        opacity_anim.setDuration(250)
+        opacity_anim.setStartValue(0.0)
+        opacity_anim.setEndValue(1.0)
+        opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        anim_group.addAnimation(height_anim)
+        anim_group.addAnimation(opacity_anim)
+
+        self._active_animations.append(anim_group)
+        anim_group.finished.connect(lambda: self._active_animations.remove(anim_group) if anim_group in self._active_animations else None)
+        anim_group.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
         
         column_combo.currentTextChanged.connect(lambda _, r=row_data: self.update_row_ui(r))
         condition_combo.currentTextChanged.connect(lambda _, r=row_data: self.update_row_ui(r))
         logic_combo.currentTextChanged.connect(self.update_preview)
+
+        logic_combo.currentTextChanged.connect(lambda text, r=row_data: self._update_logic_styling(r, text))
+
         text_input.textChanged.connect(self.update_preview)
         number_input.valueChanged.connect(self.update_preview)
         category_input.currentTextChanged.connect(self.update_preview)
@@ -272,12 +390,13 @@ class FilterAdvancedDialog(QDialog):
         remove_btn.clicked.connect(lambda _, r=row_data: self.remove_filter_row(r))
         
         self.update_row_ui(row_data)
+        self._update_logic_styling(row_data, "ROOT" if row_index == 0 else logic_combo.currentText())
         
         if row_index > 0:
             column_combo.setFocus()
             
         self.update_preview()
-        QTimer.singleShot(10, self._scroll_to_bottom)
+        QTimer.singleShot(60, self._scroll_to_bottom)
     
     def _scroll_to_bottom(self) -> None:
         """Scrolls to the bottom of the filter list"""
@@ -296,15 +415,48 @@ class FilterAdvancedDialog(QDialog):
             return
         
         self.filter_rows.remove(row_data)
-        row_data["group"].deleteLater()
-        
+        group = row_data["group"]
+
+        effect = group.graphicsEffect()
+        if not effect:
+            effect = QGraphicsOpacityEffect(group)
+            group.setGraphicsEffect(group)
+
+        anim_group = QParallelAnimationGroup(self)
+
+        height_anim = QPropertyAnimation(group, b"maximumHeight")
+        height_anim.setDuration(200)
+        height_anim.setStartValue(group.height())
+        height_anim.setEndValue(0)
+        height_anim.setEasingCurve(QEasingCurve.Type.InCubic)
+
+        opacity_anim = QPropertyAnimation(effect, b"opacity")
+        opacity_anim.setDuration(200)
+        opacity_anim.setStartValue(1.0)
+        opacity_anim.setEndValue(0.0)
+        opacity_anim.setEasingCurve(QEasingCurve.Type.InCubic)
+
+        anim_group.addAnimation(height_anim)
+        anim_group.addAnimation(opacity_anim)
+
+        self._active_animations.append(anim_group)
+
+        def _on_remove_finished():
+            group.deleteLater()
+            if anim_group in self._active_animations:
+                self._active_animations.remove(anim_group)
+            self.update_preview()
+
+        anim_group.finished.connect(_on_remove_finished)
+        anim_group.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+
         for i, row in enumerate(self.filter_rows):
-            row["group"].setTitle(f"Filter {i+1}")
             if i == 0:
                 row["logic"].setVisible(False)
+                self._update_logic_styling(row, "ROOT")
             else:
                 row["logic"].setVisible(True)
-        self.update_preview()
+                self._update_logic_styling(row, row["logic"].currentText())
     
     def update_row_ui(self, row: dict):
         """Update the input widget based on the datatype of selected column and the selected condition"""
@@ -363,7 +515,8 @@ class FilterAdvancedDialog(QDialog):
                         if not col_data.empty:
                             stats["max_date"] = col_data.max()
                     elif pd.api.types.is_object_dtype(col_dtype) or pd.api.types.is_categorical_dtype(col_dtype) or pd.api.types.is_string_dtype(col_dtype):
-                        unique_vals = col_data.unique()
+                        sample_data = col_data if len(col_data) <= 500000 else col_data.head(500000)
+                        unique_vals = sample_data.unique()
                         if len(unique_vals) < 1000:
                             stats["unique"] = sorted([str(v) for v in unique_vals])
                 
@@ -442,6 +595,18 @@ class FilterAdvancedDialog(QDialog):
         active_widget = stack.currentWidget()
         if active_widget.isVisible() and active_widget.isEnabled():
             active_widget.setFocus()
+
+            effect = QGraphicsOpacityEffect(active_widget)
+            active_widget.setGraphicsEffect(effect)
+            morph_anim = QPropertyAnimation(effect, b"opacity")
+            morph_anim.setDuration(250)
+            morph_anim.setStartValue(0.0)
+            morph_anim.setEndValue(1.0)
+            morph_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+            self._active_animations.append(morph_anim)
+            morph_anim.finished.connect(lambda: self._cleanup_effect_animation(morph_anim, active_widget))
+            morph_anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
         
         self.update_preview()
     
@@ -497,9 +662,14 @@ class FilterAdvancedDialog(QDialog):
     def get_current_value(self, row):
         """Retrieve the value from the current active widget"""
         stack_index = row["stack"].currentIndex()
-        
+        cond_display = row["condition"].currentText()
+        condition = self.ConditionMap.get(cond_display, cond_display)
+
         if stack_index == 0:
-            return row["inputs"]["text"].text().strip()
+            val = row["inputs"]["text"].text().strip()
+            if condition == "in" and val:
+                cleaned_items = [item.strip() for item in val.split(",")]
+                return ", ".join(filter(None, cleaned_items))
         elif stack_index == 1:
             return row["inputs"]["number"].value()
         elif stack_index == 2:
@@ -522,18 +692,24 @@ class FilterAdvancedDialog(QDialog):
             if reply == QMessageBox.StandardButton.No:
                 return
 
-        while len(self.filter_rows) > 1:
-            self.remove_filter_row(self.filter_rows[-1])
+        rows_to_remove = self.filter_rows[1:]
 
-        row = self.filter_rows[0]
-        if row["column"].count() > 0:
-            row["column"].setCurrentIndex(0)
-        row["condition"].setCurrentIndex(0)
-        row['inputs']['text'].clear()
-        row['inputs']['number'].setValue(0)
-        row['inputs']['date'].setDate(QDate.currentDate())
-
-        self.update_preview()
+        def _cascade_remove() -> None:
+            """Recursively pops and removes rows with a slight delay"""
+            if rows_to_remove:
+                row = rows_to_remove.pop()
+                self.remove_filter_row(row)
+                QTimer.singleShot(75, _cascade_remove)
+            else:
+                row = self.filter_rows[0]
+                if row["column"].count() > 0:
+                    row["column"].setCurrentIndex(0)
+                row["condition"].setCurrentIndex(0)
+                row['inputs']['text'].clear()
+                row['inputs']['number'].setValue(0)
+                row['inputs']['date'].setDate(QDate.currentDate())
+                self.update_preview()
+        _cascade_remove()
 
     def update_preview(self) -> None:
         """Debounce the preview rendering from self.preview_timer"""
@@ -544,32 +720,52 @@ class FilterAdvancedDialog(QDialog):
     
     def _render_preview(self):
         """update the filter preview"""
+        try:
+            if not hasattr(self, "preview_label") or self.preview_label is None:
+                return
+            _ = self.preview_label.objectName()
+        except RuntimeError:
+            return
         preview_parts = []
+        raw_preview_parts = []
         
         for i, row in enumerate(self.filter_rows):
             col = row["column"].currentText()
             cond_display = row["condition"].currentText()
             cond = self.ConditionMap.get(cond_display, cond_display)
             val = self.get_current_value(row)
-            
+
+            col_styled = f"<span style='color: #d73a49; font-weight: bold;'>{col}</span>"
+            cond_styled = f"<span style='color: #005cc5;'>{cond}</span>"
+
             part = ""
+            raw_part = ""
             if cond in ["Is Null", "Is Not Null"]:
-                part = f"<b>{col}</b> {cond}"
+                part = f"{col_styled} {cond_styled}"
+                raw_part = f"[{col}] {cond}"
             else:
-                part = f"<b>{col}</b> {cond} '<i>{val}</i>'"
-            
+                val_styled = f"<span style='color: #22863a;'>'{val}'</span>"
+                part = f"{col_styled} {cond_styled} {val_styled}"
+                raw_part = f"[{col}] {cond} '{val}'"
+
             if i > 0 and preview_parts:
                 logic = row["logic"].currentText()
-                part = f" <span style='color: #0055A4; font-weight: bold;'>{logic}</span> {part}"
-            
+                logic_styled = f"<span style='color: #6f42c1; font-weight: bold;'>{logic}</span>"
+                part = f" {logic_styled} {part}"
+                raw_part = f" {logic} {raw_part}"
+
             preview_parts.append(part)
-        
+            raw_preview_parts.append(raw_part)
+
         text = "".join(preview_parts)
+        self._current_raw_query = "".join(raw_preview_parts)
         if text:
-            self.preview_label.setText(f"Preview: {text}")
+            self.preview_label.setText(f"<div style='line-height: 1.4; font-size: 13px;'>{text}</div>")
+            self.copy_btn.setVisible(True)
         else:
-            self.preview_label.setText("Preview: No filters active")
-            
+            self.preview_label.setText("<i>No filters configured</i>")
+            self.copy_btn.setVisible(False)
+
         is_fully_valid = False
         if text:
             is_fully_valid = True
@@ -601,17 +797,24 @@ class FilterAdvancedDialog(QDialog):
         if not self.filter_rows:
             return
 
+        has_validation_error = False
         for row in self.filter_rows:
             cond_display = row["condition"].currentText()
             cond = self.ConditionMap.get(cond_display, cond_display)
             val = self.get_current_value(row)
             if cond not in ["Is Null", "Is Not Null"]:
                 if isinstance(val, str) and not val.strip():
-                    return
-        
-        self.apply_button.setText("Applying...")
+                    self._shake_widget(row["inputs"]["text"])
+                    has_validation_error = True
+
+        if has_validation_error:
+            return
+
+        self._loading_dots = 0
+        self.apply_button.setText("Applying")
         self.apply_button.setEnabled(False)
-        self.setEnabled(False)
+        self.scroll_area.setEnabled(False)
+        self._loading_timer.start()
         
         filter_config = self.get_filters()
         
@@ -619,16 +822,48 @@ class FilterAdvancedDialog(QDialog):
         worker.signals.finished.connect(self.on_filter_finished)
         worker.signals.error.connect(self.on_filter_error)
         self.thread_pool.start(worker)
+
+    def _update_loading_text(self) -> None:
+        """Animates an ellipsis on the Apply button to indicate when background worker is active"""
+        try:
+            self._loading_dots = (self._loading_dots + 1) % 4
+            dots = "." * self._loading_dots
+            self.apply_button.setText(f"Applying{dots}")
+        except RuntimeError:
+            self._loading_timer.stop()
+
+    def _shake_widget(self, widget: QWidget) -> None:
+        """
+        Triggers a horizontal shake to indicate an input error
+        """
+        anim = QPropertyAnimation(widget, b"pos")
+        anim.setDuration(350)
+        anim.setEasingCurve(QEasingCurve.Type.OutBounce)
+
+        original_pos = widget.pos()
+        anim.setKeyValueAt(0, original_pos)
+        anim.setKeyValueAt(0.25, original_pos + QPoint(-5, 0))
+        anim.setKeyValueAt(0.5, original_pos + QPoint(5, 0))
+        anim.setKeyValueAt(0.75, original_pos + QPoint(-5, 0))
+        anim.setKeyValueAt(1.0, original_pos)
+
+        self._active_animations.append(anim)
+        anim.finished.connect(lambda: self._active_animations.remove(anim) if anim in self._active_animations else None)
+        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
     
     def on_filter_finished(self, result_df):
+        self._loading_timer.stop()
         self.apply_button.setText("Apply Filters")
+        self.scroll_area.setEnabled(True)
+        self.apply_button.setEnabled(True)
         self.data_handler.df = result_df
-        self.setEnabled(True)
         self.accept()
     
     def on_filter_error(self, error):
+        self._loading_timer.stop()
         self.apply_button.setText("Apply Filters")
-        self.setEnabled(True)
+        self.scroll_area.setEnabled(True)
+        self.apply_button.setEnabled(True)
         QMessageBox.critical(self, "Filter error", f"An error occurred during filtering:\n{str(error)}")
 
     def get_filters(self):

@@ -1,23 +1,85 @@
 QLabel#filter_preview_label {
-    background-color: #f0f0f0;
-    color: #333333;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    background-color: #f6f8fa;
+    color: #24292e;
+    padding: 14px 16px;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
+    min-height: 45px;
 }
 
 QPushButton[styleClass="remove_filter_btn"] {
-    color: #d9534f;
+    color: #d73a49;
     font-weight: bold;
-    border: none;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 4px 6px;
+    background-color: transparent;
 }
 
 QPushButton[styleClass="remove_filter_btn"]:hover {
-    background-color: #fdf0f0;
-    border-radius: 4px;
+    background-color: #ffeef0;
+    border: 1px solid #f9cacc;
+}
+
+QPushButton[styleClass="remove_filter_btn"]:pressed {
+    background-color: #fcd4d7;
 }
 
 DataPlotStudioLineEdit[validationState="error"] {
-    border: 1px solid #d9534f;
-    background-color: #fdf0f0;
+    border: 1px solid #d73a49;
+    background-color: #fff5f5;
+    color: #cb2431;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox {
+    border: 1px solid #e1e4d8;
+    border-radius: 6px;
+    margin-top: 10px;
+    background-color: #ffffff;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 5px;
+    color: #586069;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox[logicStyle="root"] {
+    border: 1px solid #e1e4e8;
+    border-left: 3px solid #28a745;
+    background-color: #ffffff;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox[logicStyle="root"]:hover {
+    border: 1px solid #b3d4fc;
+    border-left: 3px solid #28a745;
+    background-color: #fafdff;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox[logicStyle="and"] {
+    border: 1px solid #e1e4e8;
+    border-left: 3px solid #005cc5;
+    background-color: #ffffff;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox[logicStyle="and"]:hover {
+    border: 1px solid #b3d4fc;
+    border-left: 3px solid #005cc5;
+    background-color: #fafdff;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox[logicStyle="or"] {
+    border: 1px solid #e1e4e8;
+    border-left: 3px solid #6f42c1;
+    background-color: #ffffff;
+}
+
+DataPlotStudioGroupBox#FilterGroupBox[logicStyle="or"]:hover {
+    border: 1px solid #b3d4fc;
+    border-left: 3px solid #6f42c1;
+    background-color: #fafdff;
 }
