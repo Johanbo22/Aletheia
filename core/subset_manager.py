@@ -7,6 +7,24 @@ import shutil
 import tempfile
 import atexit
 from pathlib import Path
+from enum import Enum
+
+class FilterLogic(str, Enum):
+    AND = "AND"
+    OR = "OR"
+    COMPLEX = "COMPLEX"
+
+class FilterCondition(str, Enum):
+    EQUALS = "=="
+    NOT_EQUALS = "!="
+    GREATER_THAN = ">"
+    LESS_THAN = "<"
+    GREATER_EQUAL = ">="
+    LESS_EQUAL = "<="
+    IS_NULL = "Is Null"
+    IS_NOT_NULL = "Is Not Null"
+    CONTAINS = "contains"
+    IN = "in"
 
 @dataclass
 class Subset:
@@ -37,7 +55,7 @@ class Subset:
             name=data["name"],
             description=data["description"],
             filters=data["filters"],
-            logic=data.get("logic", "AND"),
+            logic=data.get("logic", FilterLogic.AND.value),
             created_at=created_at,
             row_count=data.get("row_count", 0)
         )
@@ -55,15 +73,15 @@ class SubsetManager:
         if self.cached_directory.exists():
             try:
                 shutil.rmtree(self.cached_directory)
-            except Exception as CacheRemovalError:
-                print(f"Error deleting cache: {CacheRemovalError}")
+            except Exception as error:
+                print(f"Error deleting cache: {error}")
     
     def _get_cache_path(self, name: str) -> Path:
         """Retrieve the path for the cache file"""
         safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
         return self.cached_directory / f"{safe_name}.parquet"
     
-    def create_subset(self, name: str, description: str, filters: List[Dict[str, Any]], logic: str = "AND") -> Subset:
+    def create_subset(self, name: str, description: str, filters: List[Dict[str, Any]], logic: str = FilterLogic.AND.value) -> Subset:
         """Create a new subset definition"""
         if name in self.subsets:
             raise ValueError(f"Subset '{name}' already exists")
@@ -124,8 +142,8 @@ class SubsetManager:
         if use_cache and cache_path.exists():
             try:
                 return pd.read_parquet(cache_path)
-            except Exception as CacheReadError:
-                print(f"WARNING: Failed to read cached data for {name}: {CacheReadError}")
+            except Exception as error:
+                print(f"WARNING: Failed to read cached data for {name}: {error}")
         
         subset = self.subsets[name]
         filtered_df = self._apply_filters(df, subset.filters, subset.logic)
@@ -136,8 +154,8 @@ class SubsetManager:
             try:
                 self.cached_directory.mkdir(parents=True, exist_ok=True)
                 filtered_df.to_parquet(cache_path, index=False)
-            except Exception as ParquetWriteError:
-                print(f"WARNING: Failed to write cache file for subset {name} to disk: {ParquetWriteError}")
+            except Exception as error:
+                print(f"WARNING: Failed to write cache file for subset {name} to disk: {error}")
             
         return filtered_df
     
@@ -146,29 +164,29 @@ class SubsetManager:
         if not filters:
             return df.copy()
         
-        if logic == "COMPLEX":
+        if logic == FilterLogic.COMPLEX.value:
             current_mask = self._get_filter_mask(df, filters[0])
             for i in range(1, len(filters)):
                 current_filter = filters[i]
                 next_mask = self._get_filter_mask(df, current_filter)
-                operator = current_filter.get("operator", "AND")
+                operator = current_filter.get("operator", FilterLogic.AND.value)
                 
-                if operator == "AND":
+                if operator == FilterLogic.AND.value:
                     current_mask = current_mask & next_mask
-                elif operator == "OR":
+                elif operator == FilterLogic.OR.value:
                     current_mask = current_mask | next_mask
             return df[current_mask]
         
-        if logic == "AND":
+        if logic == FilterLogic.AND.value:
             # apply filters in sequence
             result = df.copy()
-            for filter in filters:
-                result = self._apply_single_filter(result, filter)
+            for filter_def in filters:
+                result = self._apply_single_filter(result, filter_def)
             return result
         else:
             mask = pd.Series(False, index=df.index, dtype=bool)
-            for filter in filters:
-                filtered = self._apply_single_filter(df, filter)
+            for filter_def in filters:
+                filtered = self._apply_single_filter(df, filter_def)
                 mask = mask | df.index.isin(filtered.index)
             return df[mask]
     
@@ -195,39 +213,52 @@ class SubsetManager:
                     value = float(value)
             except (TypeError, ValueError):
                 pass
-        
-        if condition == ">": return df[column] > value
-        elif condition == "<": return df[column] < value
-        elif condition == "==": return df[column] == value
-        elif condition == "!=": return df[column] != value
-        elif condition == ">=": return df[column] >= value
-        elif condition == "<=": return df[column] <= value
-        elif condition == "contains": return df[column].astype(str).str.contains(str(value), na=False)
-        elif condition == "in": return df[column].isin(value if isinstance(value, list) else [value])
+
+        if condition == FilterCondition.GREATER_THAN.value:
+            return df[column] > value
+        elif condition == FilterCondition.LESS_THAN.value:
+            return df[column] < value
+        elif condition == FilterCondition.EQUALS.value:
+            return df[column] == value
+        elif condition == FilterCondition.NOT_EQUALS.value:
+            return df[column] != value
+        elif condition == FilterCondition.GREATER_EQUAL.value:
+            return df[column] >= value
+        elif condition == FilterCondition.LESS_EQUAL.value:
+            return df[column] <= value
+        elif condition == FilterCondition.CONTAINS.value:
+            return df[column].astype(str).str.contains(str(value), na=False)
+        elif condition == FilterCondition.IN.value:
+            return df[column].isin(value if isinstance(value, list) else [value])
         
         return pd.Series([False] * len(df), index=df.index)
     
     def _apply_single_filter(self, df: pd.DataFrame, filter_def: Dict[str, Any]) -> pd.DataFrame:
-        """Apply a singulear filter to df"""
+        """Apply a singular filter to the DataFrame"""
         mask = self._get_filter_mask(df, filter_def)
         return df[mask]
     
     def clear_cache(self, name: Optional[str] = None) -> None:
-        """Clear cached subset data"""
+        """
+        Clear cached subset data
+        If name is provided, clears all caches mapped to that specific subset
+        """
+        if not self.cached_directory.exists():
+            return
+
         if name:
-            cache_path = self._get_cache_path(name)
-            if cache_path.exists():
+            safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
+            for file_path in self.cached_directory.glob(f"{safe_name}_*.parquet"):
                 try:
-                    cache_path.unlink()
-                except OSError as delete_cached_error:
-                    print(f"WARNING: Failed to deleted cached directory at {cache_path}: {delete_cached_error}")
+                    file_path.unlink()
+                except OSError as e:
+                    print(f"WARNING: Failed to delete cache file {file_path}: {e}")
         else:
-            if self.cached_directory.exists():
-                for file_path in self.cached_directory.glob("*.parquet"):
-                    try:
-                        file_path.unlink()
-                    except OSError as delete_cached_directory_error:
-                        print(f"WARNING: Failed to delete {file_path}: {delete_cached_directory_error}")
+            for file_path in self.cached_directory.glob("*.parquet"):
+                try:
+                    file_path.unlink()
+                except OSError as e:
+                    print(f"WARNING: Failed to delete cache file {file_path}: {e}")
     
     def get_subset_info(self, name: str) -> Dict[str, Any]:
         """Get info about a subset"""
@@ -266,10 +297,13 @@ class SubsetManager:
 
     def create_subset_from_unique_values(self, df: pd.DataFrame, column: str, prefix: str = "") -> List[str]:
         """
-        Create multiple subsets based on unique values in a column.
-        useful for splitting data by more columns such as location, category etc.
+        Create multiple subsets based on unique values in a column
+        Useful for splitting data by more columns such as location, category etc.
 
-        Returns a list of created subset names
+        :param df: The DataFrame to evaluate
+        :param column: The column to find unique values in
+        :param prefix: Optional prefix for the subset names
+        :return: A list of created subset names
         """
         if column not in df.columns:
             raise ValueError(f"Column: {column} not found in DataFrame")
@@ -278,6 +312,9 @@ class SubsetManager:
         created_subsets = []
 
         for value in unique_values:
+            is_null_val = pd.isna(value)
+            val_str = "NaN" if is_null_val else str(value)
+
             #create a safe name fot the subset
             subset_name = f"{prefix}{column}_{value}".replace(" ", "_")
 
@@ -288,7 +325,7 @@ class SubsetManager:
             #create filter
             filters = [{
                 "column": column,
-                "condition": "==",
+                "condition": FilterCondition.IS_NULL.value if is_null_val else FilterCondition.EQUALS.value,
                 "value": value
             }]
 
@@ -296,9 +333,9 @@ class SubsetManager:
             try:
                 self.create_subset(
                     name=subset_name,
-                    description=f"Auto Created subset: {column} = {value}",
+                    description=f"Auto Created subset: {column} = {val_str}",
                     filters=filters,
-                    logic="AND"
+                    logic=FilterLogic.AND.value
                 )
                 created_subsets.append(subset_name)
             except ValueError:

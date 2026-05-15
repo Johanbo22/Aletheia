@@ -1,8 +1,9 @@
 import keyword
 import pandas as pd
 import numpy as np
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 from enum import Enum
+from functools import wraps
 
 try:
     from scipy import stats
@@ -10,7 +11,16 @@ try:
 except ImportError:
     stats = None
     IsolationForest = None
-    
+
+def require_dataframe(func: Callable) -> Callable:
+    """Ensures the provided dataframe is not None"""
+    @wraps(func)
+    def wrapper(self, df: pd.DataFrame, *args, **kwargs) -> Any:
+        if df is None:
+            raise ValueError("No data is loaded")
+        return func(self, df, *args, **kwargs)
+    return wrapper
+
 class StatisticalTest(str, Enum):
     T_TEST = "t-test"
     ANOVA = "anova"
@@ -88,7 +98,8 @@ class DataMutator:
             DataOperation.SHIFT_DATA: self._apply_shift,
             DataOperation.PERCENTAGE_CHANGE: self._apply_pct_change
         }
-    
+
+    @require_dataframe
     def clean_data(self, df: pd.DataFrame, action: "DataOperation | str", sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
         """
         Caller for the cleaning/transformation action via operaton registry\n
@@ -98,68 +109,80 @@ class DataMutator:
         :param **kwargs: Arguments forwarded to each action 
         :return (changed_df, updated_sort_state):
         """
-        if df is None:
-            raise ValueError("No data loaded")
-        
         if isinstance(action, str):
             try:
                 action = DataOperation(action)
             except ValueError:
                 raise ValueError(f"Unsupported operation: {action}")
-        
+
         if action not in self._operation_registry:
             raise ValueError(f"Unknown operation; not in registry: {action}")
-        
+
         try:
             handler_method = self._operation_registry[action]
             df, sort_state = handler_method(df=df, sort_state=sort_state, **kwargs)
             return df, sort_state
         except Exception as CleanDataError:
             raise Exception(f"Error cleaning data: {str(CleanDataError)}")
-    
+
+    def _cast_cell_value(self, value: Any, column_name: str, column_datatype: Any) -> Any:
+        """
+        Casts a value to the target column's datatype
+
+        :param value: The raw value to cast
+        :param column_name: The name of the column
+        :param column_datatype: The pandas datatype of the target column
+        :return: The casted value
+        """
+        if value is None:
+            return None
+
+        if pd.api.types.is_integer_dtype(column_datatype):
+            try:
+                return int(value)
+            except ValueError:
+                pass
+
+            try:
+                return int(float(value))
+            except ValueError:
+                raise ValueError(f"Value '{value}' is not a valid integer for column '{column_name}'")
+
+        elif pd.api.types.is_float_dtype(column_datatype):
+            try:
+                return float(value)
+            except ValueError:
+                raise ValueError(f"Value '{value}' is not a valid float for column '{column_name}'")
+
+        elif pd.api.types.is_bool_dtype(column_datatype):
+            if isinstance(value, str):
+                return value.lower() in ("true", "1", "t", "yes", "y")
+            return bool(value)
+
+        return value
+
+    @require_dataframe
     def update_cell(self, df: pd.DataFrame, row_index: int, column_index: int, value: Any) -> pd.DataFrame:
         """
-        Update a single cell in the DataTableModel and forcing value to match column datatype\n
-        :param df (pd.DataFrame): The DataFrame to change
-        :param row_index (int): Row position
-        :param column_index (int): Column position
+        Update a single cell in the DataTableModel and forcing value to match column datatype
+
+        :param df (pd.DataFrame): the DataFrame to change
+        :param row_index (int): Row positon
+        :param column_index (int): Column Position
         :param value (Any): The new cell value
         :return (pd.DataFrame): The changed DataFrame
         """
-        if df is None:
-            return df
-
         try:
             column_name = df.columns[column_index]
             column_datatype = df[column_name].dtype
 
-            if value is not None:
-                if pd.api.types.is_integer_dtype(column_datatype):
-                    try:
-                        value = int(value)
-                    except ValueError:
-                        try:
-                            value = int(float(value))
-                        except ValueError:
-                            raise ValueError(
-                                f"Value: '{value}' is not a valid integer for column '{column_name}'"
-                            )
-                elif pd.api.types.is_float_dtype(column_datatype):
-                    try:
-                        value = float(value)
-                    except ValueError:
-                        raise ValueError(
-                            f"Value '{value}' is not a valid float for column '{column_name}'"
-                        )
-                elif pd.api.types.is_bool_dtype(column_datatype):
-                    if isinstance(value, str):
-                        value = value.lower() in ("true", "1", "t", "yes", "y")
-
-            df.iat[row_index, column_index] = value
+            casted_value = self._cast_cell_value(value, column_name, column_datatype)
+            df.iat[row_index, column_index] = casted_value
             return df
         except Exception as UpdateCellError:
             raise Exception(f"Error updating cell: {str(UpdateCellError)}")
-    
+
+    @require_dataframe
     def filter_data(self, df: pd.DataFrame, column: str = None, condition: str = None, value: Any = None, advanced_filters: List[Dict] = None) -> pd.DataFrame:
         """
         Filter data based on a single condition or multiple filters\n
@@ -170,8 +193,6 @@ class DataMutator:
         :param advanced_filters (List[Dict]): List of filter dicts for multi-conditional queries
         :return (pd.DataFrame): The filtered DataFrame
         """
-        if df is None:
-            raise ValueError("No data loaded")
         if not isinstance(df, pd.DataFrame):
             raise TypeError(f"df is {type(df)}, expected pandas DataFrame")
 
@@ -254,7 +275,8 @@ class DataMutator:
 
         except Exception as FilterDataError:
             raise Exception(f"Error filtering data: {str(FilterDataError)}")
-    
+
+    @require_dataframe
     def sort_data(self, df: pd.DataFrame, column: str, ascending: bool = True, current_sort_state: Optional[tuple] = None) -> tuple[pd.DataFrame, tuple]:
         """
         Sort df by column\n
@@ -264,9 +286,6 @@ class DataMutator:
         :param current_sort_state (Optional[tuple]): The current sort of the df
         :return (tuple[pd.DataFrame, tuple]): sorted_df, new_sort_state
         """
-        if df is None:
-            raise ValueError("No data loaded")
-
         if current_sort_state == (column, ascending):
             return df, current_sort_state
 
@@ -279,14 +298,12 @@ class DataMutator:
             return df, new_sort_state
         except Exception as SortDataError:
             raise Exception(f"Error sorting data: {str(SortDataError)}")
-    
+
+    @require_dataframe
     def aggregate_data(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, str], date_grouping: Dict[str, str]) -> pd.DataFrame:
         """
         Aggregate df with per column aggregation functions and optional datetime grouping
         """
-        if df is None:
-            raise ValueError("No data loaded")
-
         try:
             groupers = []
             for col in group_by:
@@ -307,7 +324,7 @@ class DataMutator:
             return df
         except Exception as AggregateDataError:
             raise Exception(f"Error aggregating data: {str(AggregateDataError)}")
-    
+
     def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, str], date_grouping: Dict[str, str] = None, limit: int = 5) -> pd.DataFrame:
         """
         Previews an aggregation without modifying the source DataFrame
@@ -334,25 +351,21 @@ class DataMutator:
             return preview_df.head(limit)
         except Exception as PreviewAggregationError:
             raise Exception(f"Preview Calculation failed: {str(PreviewAggregationError)}")
-    
+
     # DATA TRANSFORMATIONS
+    @require_dataframe
     def melt_data(self, df: pd.DataFrame, id_vars: List[str], value_vars: List[str], var_name: str, value_name: str) -> pd.DataFrame:
         """Unpivoting a df from a wide to a long format"""
-        if df is None:
-            raise ValueError("No data is loaded")
-        
         try:
             v_vars = value_vars if value_vars else None
             df = pd.melt(df, id_vars=id_vars, value_vars=v_vars, var_name=var_name, value_name=value_name)
             return df
         except Exception as MeltDataError:
             raise Exception(f"Error melting data: {str(MeltDataError)}")
-    
+
+    @require_dataframe
     def pivot_data(self, df: pd.DataFrame, index: List[str], columns: str, values: List[str], aggfunc: str) -> pd.DataFrame:
         """Creates a pivot table from a DataFrame"""
-        if df is None:
-            raise ValueError("No data loaded")
-        
         try:
             df = pd.pivot_table(df, index=index, columns=columns, values=values, aggfunc=aggfunc).reset_index()
             if isinstance(df.columns, pd.MultiIndex):
@@ -361,33 +374,28 @@ class DataMutator:
             return df
         except Exception as PivotError:
             raise Exception(f"Error pivoting data: {str(PivotError)}")
-    
+
+    @require_dataframe
     def merge_data(self, df: pd.DataFrame, right_df: pd.DataFrame, how: str, left_on: List[str], right_on: List[str], suffixes: tuple = ("_left", "_right")) -> pd.DataFrame:
         """Merge the df with another df"""
-        if df is None:
-            raise ValueError("No active data to merge with.")
-        
         try:
             df = pd.merge(df, right_df, how=how, left_on=left_on, right_on=right_on, suffixes=suffixes)
             return df
         except Exception as MergeDataError:
             raise Exception(f"Merge operation failed: {str(MergeDataError)}")
-    
-    def concatenate_data(self, df: pd.DataFrame, other_df: pd.DataFrame, ignore_index: bool = True) -> pd.DataFrame:
-        """Append rowss from *other_df* to *df*"""
-        if df is None:
-            raise ValueError("No active data to append to")
 
+    @require_dataframe
+    def concatenate_data(self, df: pd.DataFrame, other_df: pd.DataFrame, ignore_index: bool = True) -> pd.DataFrame:
+        """Append rows from other_d* to df"""
         try:
             df = pd.concat([df, other_df], ignore_index=ignore_index)
             return df
         except Exception as ConcatenateDataError:
             raise Exception(f"Concatenate operation failed: {str(ConcatenateDataError)}")
-    
+
+    @require_dataframe
     def create_computed_column(self, df: pd.DataFrame, new_column_name: str, expression: str) -> pd.DataFrame:
         """Add a column whose values are derived from a pandas eval expression"""
-        if df is None:
-            raise ValueError("No data loaded")
         try:
             if not new_column_name or not str(new_column_name).strip():
                 raise ValueError("New column name cannot be empty")
@@ -408,7 +416,8 @@ class DataMutator:
             raise Exception(
                 f"Error computing and creating new column: {str(ComputedColumnError)}"
             )
-    
+
+    @require_dataframe
     def bin_column(self, df: pd.DataFrame, column: str, new_column_name: str, method: str, bins: Any, labels: List[str] = None, right_inclusive: bool = True, drop_original: bool = False) -> pd.DataFrame:
         """
         Bin a continuous variable into categorical buckets\n
@@ -421,29 +430,28 @@ class DataMutator:
         :param drop_original (bool): Whether to drop the tartget column after binning
         :return (pd.DataFrame):
         """
-        if df is None:
-            raise ValueError("No data loaded")
         if column not in df.columns:
             raise ValueError(f"Column '{column}' not found")
         if not pd.api.types.is_numeric_dtype(df[column]):
             raise TypeError(f"Column '{column}' must be numeric for binning")
-        
+
         try:
             if method == "qcut":
                 df[new_column_name] = pd.qcut(df[column], q=bins, labels=labels, duplicates="drop")
             else:
                 df[new_column_name] = pd.cut(df[column], bins=bins, labels=labels, include_lowest=True, right=right_inclusive)
-            
+
             if not isinstance(df[new_column_name].dtype, pd.CategoricalDtype):
                 df[new_column_name] = df[new_column_name].astype("category")
-            
+
             if drop_original and column != new_column_name:
                 df = df.drop(columns=[column])
-            
+
             return df
         except Exception as BinningError:
             raise Exception(f"Error binning column: {str(BinningError)}")
-    
+
+    @require_dataframe
     def run_statistical_test(self, df: pd.DataFrame, test_type: "Union[StatisticalTest, str]", col1: str, col2: str) -> Dict[str, Any]:
         """
         Run a statistical test on two numerical columns
@@ -454,8 +462,6 @@ class DataMutator:
         :param col2 (str): Name of the second column
         :return dict with keys (Dict[str, Any]): test, statistics, p_value, interpretation 
         """
-        if df is None:
-            raise ValueError("No data loaded to perform any statistical tests")
         if not stats:
             raise ImportError(
                 "The 'scipy' library is not installed. "
@@ -525,7 +531,7 @@ class DataMutator:
             "p_value": float(p_val),
             "interpretation": interpretation,
         }
-    
+
     def detect_outliers(self, df: pd.DataFrame, method: str, columns: List[str], **kwargs) -> List[int]:
         """
         Detect outlier row indices in the *df*\n
@@ -607,25 +613,25 @@ class DataMutator:
             method = FillMethod(raw_method) if isinstance(raw_method, str) else raw_method
         except ValueError:
             method = raw_method
-        
+
         column = kwargs.get("column", "All Columns")
         val = kwargs.get("value", None)
         group_by = kwargs.get("group_by", None)
-        
+
         target_cols = [c for c in (df.columns if column in ("All Columns", None) else [column]) if c != group_by]
-        
+
         if method == FillMethod.TIME and not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError("Time interpolation requires the dataframe to be a DatetimeIndex")
-        
+
         is_grouped = bool(group_by and group_by in df.columns)
-        
+
         for col in target_cols:
             is_num = pd.api.types.is_numeric_dtype(df[col])
             if method in (FillMethod.MEAN, FillMethod.MEDIAN, FillMethod.LINEAR, FillMethod.TIME) and not is_num:
                 continue
-        
+
             obj = df.groupby(group_by)[col] if is_grouped else df[col]
-            
+
             if method == FillMethod.STATIC_VALUE:
                 fill_val = val
                 if is_num and isinstance(val, str):
@@ -964,22 +970,22 @@ class DataMutator:
         Validates that no columns are dropped during the reordreing
         """
         new_order: list[str] = kwargs.get("new_order", [])
-        
+
         if not new_order:
             raise ValueError("A new column order must be provided")
-        
+
         # Verify that the new col order has the same cols as before
         missing_cols = set(df.columns) - set(new_order)
         extra_cols = set(new_order) - set(df.columns)
-        
+
         if missing_cols or extra_cols:
             raise ValueError(f"Column mismatch. Missing: {missing_cols}, Extra: {extra_cols}")
-        
+
         # Reindex the df with the new ordered list
         df = df[new_order]
-        
+
         return df, sort_state
-    
+
     def _drop_empty_columns(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
         """Removes columns where all values are missing"""
         cols_to_drop: list[str] = df.columns[df.isna().all()].tolist()
@@ -988,7 +994,7 @@ class DataMutator:
             if sort_state and sort_state[0] in cols_to_drop:
                 sort_state = None
         return df, sort_state
-    
+
     def _apply_rolling_window(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
         """Applies a rolling window operations to a numeric column
 
@@ -1005,20 +1011,20 @@ class DataMutator:
         new_column: str = kwargs.get("new_column")
         center: bool = kwargs.get("center", False)
         min_periods: Optional[int] = kwargs.get("min_periods", None)
-        
+
         if not column or column not in df.columns:
             raise ValueError(f"Column '{column}' not found")
         if not pd.api.types.is_numeric_dtype(df[column]):
             raise TypeError(f"Column '{column}' must be a numeric column to perform rolling window operation")
-        
+
         if not new_column:
             new_column = f"{column}_rolling_{window}_{operation}"
-        
+
         if new_column in df.columns and new_column != column:
             raise ValueError(f"Column '{column}' already exists")
-        
+
         rolling_obj = df[column].rolling(window=window, center=center, min_periods=min_periods)
-        
+
         if operation == "mean":
             df[new_column] = rolling_obj.mean()
         elif operation == "sum":
@@ -1033,7 +1039,7 @@ class DataMutator:
             df[new_column] = rolling_obj.median()
         else:
             raise ValueError(f"Unsupported rolling operation: {operation}")
-        
+
         return df, sort_state
 
     def _apply_shift(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
@@ -1050,20 +1056,20 @@ class DataMutator:
         periods: int = kwargs.get("periods", 1)
         fill_value: Any = kwargs.get("fill_value", None)
         new_column: Optional[str] = kwargs.get("new_column")
-        
+
         if not column or column not in df.columns:
             raise ValueError(f"Column '{column}' not found")
-        
+
         if not new_column:
             new_column = f"{column}_shifted_{periods}"
-            
+
         if new_column in df.columns and new_column != column:
             raise ValueError(f"Column '{new_column}' already exists")
 
         df[new_column] = df[column].shift(periods=periods, fill_value=fill_value)
 
         return df, sort_state
-    
+
     def _apply_pct_change(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
         """Calculates the percentage change between the current and a prior element.
 
@@ -1083,10 +1089,10 @@ class DataMutator:
             raise ValueError(f"Column '{column}' not found")
         if not pd.api.types.is_numeric_dtype(df[column]):
             raise TypeError(f"Column '{column}' must be a numeric column to calculate percentage change")
-            
+
         if not new_column:
             new_column = f"{column}_pct_change_{periods}"
-            
+
         if new_column in df.columns and new_column != column:
             raise ValueError(f"Column '{new_column}' already exists")
 

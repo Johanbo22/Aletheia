@@ -54,7 +54,10 @@ class ProjectManager:
     
     def _create_dps_package(self, project_data: Dict[str, Any], filepath_obj: Path) -> None:
         """
-        Serializing and zipping project data into the .dps package format
+        Serializes and archives project data, configurations and metadata into a .dps zip package
+
+        :param project_data: The active dict of the project to be serialized
+        :param filepath_obj: Destination file path for the package
         """
         save_data: Dict[str, Any] = project_data.copy()
         dataframe: Optional[pd.DataFrame] = save_data.pop("data", None) if isinstance(save_data.get("data"), pd.DataFrame) else None
@@ -138,8 +141,34 @@ class ProjectManager:
         except OSError:
             pass
         
-    
+    def _load_dataframe(self, parquet_buffer: io.BytesIO) -> pd.DataFrame:
+        """
+        Attempts to load a parquet buffer into a GeoDataFrame,
+        falling back to standard Pandas DataFrame
+
+        :param parquet_buffer: The in-memory byte buffer of the parquet file
+        :return: The parsed DataFrame
+        """
+        try:
+            import geopandas as gpd
+            try:
+                return gpd.read_parquet(parquet_buffer)
+            except ValueError:
+                parquet_buffer.seek(0)
+        except ImportError:
+            pass
+
+        return pd.read_parquet(parquet_buffer, engine="pyarrow")
+
     def load_project(self, filepath: str) -> Dict[str, Any]:
+        """
+        Extracts and loads a DataPlotStudio project package into memory
+
+        :param filepath (str): The path to the saved project package
+        :raises FleNotFoundError: If the target .dps file does not exist
+        :raises RuntimeError: If extraction or internal procedures fail
+        :return: The restored project state dictionary
+        """
         filepath_obj = Path(filepath)
         
         if not filepath_obj.exists():
@@ -158,19 +187,7 @@ class ProjectManager:
                 if "data.parquet" in file_list:
                     with zip_package.open("data.parquet") as data_file:
                         parquet_buffer = io.BytesIO(data_file.read())
-                        loaded_dataframe: Optional[pd.DataFrame] = None
-                        
-                        try:
-                            import geopandas as gpd
-                            try:
-                                loaded_dataframe = gpd.read_parquet(parquet_buffer)
-                            except Exception:
-                                parquet_buffer.seek(0)
-                        except ImportError:
-                            pass
-                        if loaded_dataframe is None:
-                            loaded_dataframe = pd.read_parquet(parquet_buffer, engine="pyarrow")
-                        project_data["data"] = loaded_dataframe
+                        project_data["data"] = self._load_dataframe(parquet_buffer)
                 
                 if "plot_config.json" in file_list:
                     with zip_package.open("plot_config.json") as config_file:
