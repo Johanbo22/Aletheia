@@ -1,29 +1,42 @@
 # main.py
+import os
 import sys
-import threading
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTranslator, QLocale, Qt
-from PyQt6.QtGui import QGuiApplication
+import traceback
 
+from PyQt6.QtCore import QSharedMemory
+from PyQt6.QtWidgets import QApplication, QSplashScreen
+
+import appInit
 from ui.DataPlotStudioApp import DataPlotStudio
-from core.tempfilehandling.cleanup_temp_files import cleanup_forgotten_temp_files
 
+
+def global_exception_handler(exc_type, exc_value, exc_traceback) -> None:
+    print("UNHANDLED EXCEPTION", file=sys.stderr)
+    traceback.print_exception(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = global_exception_handler
 
 def main():
-    cleanup_thread = threading.Thread(target=cleanup_forgotten_temp_files, daemon=True)
-    cleanup_thread.start()
-    
-    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
-    app = QApplication(sys.argv)
-    translator = QTranslator()
+    appInit.configure_runtime_environment()
 
-    if translator.load(QLocale.system(), "dataplotstudio", "_", "translations"):
-        app.installTranslator(translator)
+    app = QApplication(sys.argv)
+    instance_lock: QSharedMemory = appInit.enforce_single_instance()
+    splash_screen: QSplashScreen = appInit.display_splash_screen(app)
+
+    appInit.initialize_background_services(app)
+    appInit.setup_translations(app)
+    appInit.register_application_metadata()
 
     window = DataPlotStudio()
-    window.showMaximized()
-    sys.exit(app.exec())
 
+    if os.environ.get("ENV") == "development":
+        window.enable_live_reloader()
+        print("Launching in development mode", file=sys.stdout)
+
+    window.showMaximized()
+    splash_screen.finish(window)
+
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
