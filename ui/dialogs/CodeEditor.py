@@ -845,7 +845,7 @@ class CodeEditor(QPlainTextEdit):
         super().mouseMoveEvent(event)
     
     def wheelEvent(self, event: QWheelEvent) -> None:
-        """Handles zooming with ctrl + wheel"""
+        """Handles zooming with ctrl + wheel and horizontal scrolling with shift"""
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.angleDelta().y() > 0:
                 self.zoomIn(1)
@@ -853,6 +853,12 @@ class CodeEditor(QPlainTextEdit):
                 self.zoomOut(1)
             event.accept()
             return
+        elif event.modifiers() == Qt.KeyboardModifier.ShiftModifier:
+            scroll_bar = self.horizontalScrollBar()
+            scroll_bar.setValue(scroll_bar.value() - event.angleDelta().y())
+            event.accept()
+            return
+
         super().wheelEvent(event)
     
     def keyPressEvent(self, event: QKeyEvent):
@@ -860,6 +866,21 @@ class CodeEditor(QPlainTextEdit):
             if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
                 event.ignore()
                 return
+
+        if event.key() == Qt.Key.Key_Home:
+            cursor: QTextCursor = self.textCursor()
+            block_text: str = cursor.block().text()
+            indent_pos: int = len(block_text) - len(block_text.lstrip())
+            mode = QTextCursor.MoveMode.KeepAnchor if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else QTextCursor.MoveMode.MoveAnchor
+
+            if cursor.positionInBlock() == indent_pos:
+                cursor.setPosition(cursor.block().position(), mode)
+            else:
+                cursor.setPosition(cursor.block().position() + indent_pos, mode)
+
+            self.setTextCursor(cursor)
+            event.accept()
+            return
         
         is_shortcut = (event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
         if is_shortcut:

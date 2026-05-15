@@ -1,7 +1,7 @@
 from enum import Enum
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, QHeaderView, QAbstractItemView, QTableWidgetItem, QMenu, QSplitter, QWidget, QListWidgetItem
-from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint
+from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, QRunnable
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
 import pandas as pd
@@ -13,6 +13,34 @@ DIALOG_HEIGHT: int = 700
 PREVIEW_TABLE_MAX_HEIGHT: int = 200
 DEFAULT_PREVIEW_LIMIT: int = 5
 DEBOUNCE_DELAY_MS: int = 300
+
+class PreviewSignals(QObject):
+    finished = pyqtSignal(int, object)
+    error = pyqtSignal(int, str)
+
+class PreviewWorker(QRunnable):
+    """Worker to calculate the aggregation preview asynchronously"""
+    def __init__(self, data_handler, group_cols: list[str], agg_config: dict[str, str], date_grouping: dict[str, str], limit: int, req_id: int) -> None:
+        super().__init__()
+        self.data_handler = data_handler
+        self.group_cols = group_cols
+        self.agg_config = agg_config
+        self.date_grouping = date_grouping
+        self.limit = limit
+        self.req_id = req_id
+        self.signals = PreviewSignals()
+
+    def run(self) -> None:
+        try:
+            preview_df = self.data_handler.preview_aggregation(
+                group_by=self.group_cols,
+                agg_config=self.agg_config,
+                date_grouping=self.date_grouping,
+                limit=self.limit
+            )
+            self.signals.finished.emit(self.req_id, preview_df)
+        except Exception as error:
+            self.signals.error.emit(self.req_id, str(error))
 
 class AggregationFunctions(str, Enum):
     """Enumeration of supported pandas aggregation functions."""
@@ -56,6 +84,8 @@ class AggregationDialog(QDialog):
         self.columns = list(data_handler.df.columns)
 
         self.date_grouping_options = ["None", "Year", "Quarter", "Month", "Week", "Day"]
+        self._agg_column_set: set[str] = set()
+        self._preview_request_id: int = 0
         
         self.preview_timer = QTimer(self)
         self.preview_timer.setSingleShot(True)
@@ -102,6 +132,15 @@ class AggregationDialog(QDialog):
         self._populate_list_with_icons(self.group_by_list, self.columns)
         self.group_by_list.itemSelectionChanged.connect(self.on_group_selection_change)
         group_layout.addWidget(self.group_by_list)
+
+        self.date_hint_label = QLabel("Select a datetime column to enable date grouping")
+        self.date_hint_label.setObjectName("DateGroupingHintLabel")
+        hint_font = self.date_hint_label.font()
+        hint_font.setPointSize(8)
+        hint_font.setItalic(True)
+        self.date_hint_label.setFont(hint_font)
+        self.date_hint_label.setWordWrap(True)
+        group_layout.addWidget(self.date_hint_label)
 
         # Date grouping for datetime cols
         self.date_group_frame = DataPlotStudioGroupBox("Date Grouping")
@@ -200,9 +239,14 @@ class AggregationDialog(QDialog):
         
         # Keyboard shortcuts for row deletion
         self.delete_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self.agg_table)
-        self.delete_shortcut.activated.connect(self.remove_single_column_from_agg)
+        self.delete_shortcut.activated.connect(self.remove_column_from_agg)
         self.backspace_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Backspace), self.agg_table)
         self.backspace_shortcut.activated.connect(self.remove_column_from_agg)
+
+        self.move_up_shortcut = QShortcut(QKeySequence("Alt+Up"), self.agg_table)
+        self.move_up_shortcut.activated.connect(self.move_agg_row_up)
+        self.move_down_shortcut = QShortcut(QKeySequence("Alt+Down"), self.agg_table)
+        self.move_down_shortcut.activated.connect(self.move_agg_row_down)
         
         table_and_controls_layout.addWidget(self.agg_table)
         
@@ -267,10 +311,12 @@ class AggregationDialog(QDialog):
         )
         self.save_agg_group.setCheckable(True)
         self.save_agg_group.setChecked(False)
+        self.save_agg_group.toggled.connect(self._on_save_group_toggled)
 
         save_layout = QFormLayout()
         self.save_name_input = DataPlotStudioLineEdit()
         self.save_name_input.setPlaceholderText("e.g., 'Sales by Region'")
+        self.save_name_input.textChanged.connect(self._re_evaluate_apply_button)
         save_layout.addRow(QLabel("Save as:"), self.save_name_input)
 
         self.save_agg_group.setLayout(save_layout)
@@ -278,7 +324,7 @@ class AggregationDialog(QDialog):
 
         # buttons for accept and reject
         btn_layout = QHBoxLayout()
-        self.apply_button = DataPlotStudioButton("Apply Aggregation", parent=self, base_color_hex=ThemeColors.MainColor)
+        self.apply_button = DataPlotStudioButton("Apply Aggregation", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
         self.apply_button.clicked.connect(self.validate_and_accept)
         self.apply_button.setEnabled(False)
         self.apply_button.setDefault(True)
@@ -294,6 +340,12 @@ class AggregationDialog(QDialog):
         self.column_search_input.setFocus()
         self.update_preview()
 
+    def _on_save_group_toggled(self, checked: bool) -> None:
+        """Handle toggling of the save aggregation group"""
+        if checked:
+            self.save_name_input.setFocus()
+        self._re_evaluate_apply_button()
+
     def on_group_selection_change(self):
         """Changes in group by selection t show date options"""
         selected_items = self.group_by_list.selectedItems()
@@ -307,20 +359,26 @@ class AggregationDialog(QDialog):
                 break
 
         self.date_group_frame.setVisible(show_date_options)
+        self.date_hint_label.setVisible(not show_date_options)
         self.update_preview()
     
     def filter_available_columns(self, search_text: str) -> None:
         """Filter the available columns list based on the user's search query."""
+        search_lower = search_text.lower()
+        self.available_list.setUpdatesEnabled(False)
         for i in range(self.available_list.count()):
             item = self.available_list.item(i)
-            #Hide all other items
-            item.setHidden(search_text.lower() not in item.text().lower())
+            item.setHidden(search_lower not in item.text().lower())
+        self.available_list.setUpdatesEnabled(True)
     
     def filter_group_by_columns(self, search_text: str) -> None:
         """Filter the group by column list based on user's search query"""
+        search_lower = search_text.lower()
+        self.group_by_list.setUpdatesEnabled(False)
         for i in range(self.group_by_list.count()):
             item = self.group_by_list.item(i)
-            item.setHidden(search_text.lower() not in item.text().lower())
+            item.setHidden(search_lower not in item.text().lower())
+        self.group_by_list.setUpdatesEnabled(True)
     
     def add_single_column_to_agg(self, item: QTableWidgetItem) -> None:
         """Handle double-click event to add a single column directly to the aggregation config."""
@@ -340,6 +398,7 @@ class AggregationDialog(QDialog):
     def clear_all_aggregations(self) -> None:
         """Remove all currently selected columns from the aggregation table."""
         self.agg_table.setRowCount(0)
+        self._agg_column_set.clear()
         self.update_preview()
     
     def _show_available_list_context_menu(self, position: QPoint) -> None:
@@ -407,33 +466,33 @@ class AggregationDialog(QDialog):
     
     def _add_specific_column_to_agg(self, col_name: str) -> None:
         """Internal helper to add a specific column by name"""
-        exists: bool = False
-        for row in range(self.agg_table.rowCount()):
-            if self.agg_table.item(row, 0).text() == col_name:
-                exists = True
-                break
-        
-        if not exists:
-            row: int = self.agg_table.rowCount()
-            self.agg_table.insertRow(row)
-            
-            name_item = QTableWidgetItem(col_name)
-            name_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            self.agg_table.setItem(row, 0, name_item)
-            
-            combo = DataPlotStudioComboBox()
-            for index, func in enumerate(AggregationFunctions):
-                combo.addItem(func.value)
-                combo.setItemData(index, AGGREGATION_TOOLTIPS[func], Qt.ItemDataRole.ToolTipRole)
-            
-            # Default based on type
-            if pd.api.types.is_numeric_dtype(self.data_handler.df[col_name]):
-                combo.setCurrentText("sum")
-            else:
-                combo.setCurrentText("count")
+        if col_name in self._agg_column_set:
+            return
 
-            combo.currentTextChanged.connect(self.update_preview)
-            self.agg_table.setCellWidget(row, 1, combo)
+        self._agg_column_set.add(col_name)
+        row: int = self.agg_table.rowCount()
+        self.agg_table.insertRow(row)
+
+        name_item = QTableWidgetItem(col_name)
+        name_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+        self.agg_table.setItem(row, 0, name_item)
+
+        combo = DataPlotStudioComboBox()
+        for index, func in enumerate(AggregationFunctions):
+            combo.addItem(func.value)
+            combo.setItemData(index, AGGREGATION_TOOLTIPS[func], Qt.ItemDataRole.ToolTipRole)
+
+        # Default based on type
+        if pd.api.types.is_numeric_dtype(self.data_handler.df[col_name]):
+            combo.setCurrentText(AggregationFunctions.SUM.value)
+        else:
+            combo.setCurrentText(AggregationFunctions.COUNT.value)
+
+        combo.currentTextChanged.connect(self.update_preview)
+        self.agg_table.setCellWidget(row, 1, combo)
+
+        self.agg_table.selectRow(row)
+        self.agg_table.scrollToItem(name_item)
 
     def add_column_to_agg(self):
         """Add selected columns from the list to the aggregation table"""
@@ -447,11 +506,15 @@ class AggregationDialog(QDialog):
             set(index.row() for index in self.agg_table.selectedIndexes()), reverse=True
         )
         for row in rows:
+            col_name = self.agg_table.item(row, o).text()
+            self._agg_column_set.discard(col_name)
             self.agg_table.removeRow(row)
         self.update_preview()
     
     def remove_single_column_from_agg(self, row: int) -> None:
         """Handle double-click event to remove a specific row from the aggregation table."""
+        col_name = self.agg_table.item(row, 0).text()
+        self._agg_column_set.discard(col_name)
         self.agg_table.removeRow(row)
         self.update_preview()
     
@@ -460,15 +523,24 @@ class AggregationDialog(QDialog):
         has_groups: bool = len(group_cols) > 0
         has_aggs: bool = len(agg_config) > 0
         overlap: set[str] = set(group_cols) & set(agg_config.keys())
-        
-        # Valid if we have both groups and aggregations, and no overlapping columns
+
+        requires_name: bool = self.save_agg_group.isChecked()
+        has_name: bool = bool(self.save_name_input.text().strip())
+
         is_valid: bool = has_groups and has_aggs and not bool(overlap)
-        
+        if requires_name and not has_name:
+            is_valid = False
+
         self.apply_button.setEnabled(is_valid)
-        if not is_valid:
+
+        if overlap:
+            self.apply_button.setToolTip(f"Overlapping columns: {', '.join(overlap)}")
+        elif not has_groups or not has_aggs:
             self.apply_button.setToolTip("Select at least one group-by and one aggregation column")
+        elif requires_name and not has_name:
+            self.apply_button.setToolTip("Please enter a name for the saved aggregation")
         else:
-            self.apply_button.setToolTip("")
+            self.apply_button.setToolTip("Apply configuration")
 
     def get_current_config(self):
         """Construct the config"""
@@ -508,6 +580,10 @@ class AggregationDialog(QDialog):
             item.setIcon(QIcon(icon_path))
             list_widget.addItem(item)
 
+    def _re_evaluate_apply_button(self) -> None:
+        group_cols, agg_config, _ = self.get_current_config()
+        self._evaluate_apply_button_state(group_cols, agg_config)
+
     def update_preview(self) -> None:
         """Restarts the debounce timer. The actual preview is generated on timeout."""
         group_cols, agg_config, _ = self.get_current_config()
@@ -536,44 +612,57 @@ class AggregationDialog(QDialog):
             self.preview_table.horizontalHeader().setSectionResizeMode(
                 0, QHeaderView.ResizeMode.Stretch
             )
+
+        self._preview_request_id += 1
+        worker = PreviewWorker(
+            self.data_handler,
+            group_cols,
+            agg_config,
+            date_grouping,
+            DEFAULT_PREVIEW_LIMIT,
+            self._preview_request_id
+        )
+        worker.signals.finished.connect(self._on_preview_finished)
+        worker.signals.error.connect(self._on_preview_error)
+        self.thread_pool.start(worker)
+
+    def _on_preview_finished(self, req_id: int, preview_df: pd.DataFrame) -> None:
+        """Handle successful async preview generation."""
+        if req_id != self._preview_request_id:
             return
 
-        try:
-            preview_df = self.data_handler.preview_aggregation(
-                group_by=group_cols,
-                agg_config=agg_config,
-                date_grouping=date_grouping,
-                limit=DEFAULT_PREVIEW_LIMIT,
-            )
+        self.preview_table.clear()
+        self.preview_table.setRowCount(len(preview_df))
+        self.preview_table.setColumnCount(len(preview_df.columns))
+        self.preview_table.setHorizontalHeaderLabels(
+            [str(column) for column in preview_df.columns]
+        )
 
-            self.preview_table.clear()
-            self.preview_table.setRowCount(len(preview_df))
-            self.preview_table.setColumnCount(len(preview_df.columns))
-            self.preview_table.setHorizontalHeaderLabels(
-                [str(column) for column in preview_df.columns]
-            )
+        for row in range(len(preview_df)):
+            for col in range(len(preview_df.columns)):
+                val = preview_df.iloc[row, col]
+                item = QTableWidgetItem(str(val))
+                self.preview_table.setItem(row, col, item)
 
-            for row in range(len(preview_df)):
-                for col in range(len(preview_df.columns)):
-                    val = preview_df.iloc[row, col]
-                    item = QTableWidgetItem(str(val))
-                    self.preview_table.setItem(row, col, item)
+        self.preview_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Interactive
+        )
 
-            self.preview_table.horizontalHeader().setSectionResizeMode(
-                QHeaderView.ResizeMode.Interactive
-            )
+    def _on_preview_error(self, req_id: int, error_msg: str) -> None:
+        """Handle errors during async preview generation."""
+        if req_id != self._preview_request_id:
+            return
 
-        except Exception as PreviewTableError:
-            self.preview_table.clear()
-            self.preview_table.setRowCount(1)
-            self.preview_table.setColumnCount(1)
-            self.preview_table.setHorizontalHeaderLabels(["Error"])
-            self.preview_table.setItem(
-                0, 0, QTableWidgetItem(f"Cannot preview: {str(PreviewTableError)}")
-            )
-            self.preview_table.horizontalHeader().setSectionResizeMode(
-                0, QHeaderView.ResizeMode.Stretch
-            )
+        self.preview_table.clear()
+        self.preview_table.setRowCount(1)
+        self.preview_table.setColumnCount(1)
+        self.preview_table.setHorizontalHeaderLabels(["Error"])
+        self.preview_table.setItem(
+            0, 0, QTableWidgetItem(f"Cannot preview: {error_msg}")
+        )
+        self.preview_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
 
     def validate_and_accept(self):
         """Validate selections before accepting"""
@@ -585,6 +674,7 @@ class AggregationDialog(QDialog):
                 "Validation Error",
                 "Please select at least one column to group by",
             )
+            self.group_by_search_input.setFocus()
             return
 
         if not agg_config:
@@ -593,6 +683,7 @@ class AggregationDialog(QDialog):
                 "Validation Error",
                 "Please select at least one column to aggregate",
             )
+            self.column_search_input.setFocus()
             return
 
         # check for overlap
@@ -612,13 +703,14 @@ class AggregationDialog(QDialog):
                 "Validation Error",
                 "Please enter a name for the aggregation you want to save.",
             )
+            self.save_name_input.setFocus()
             return
-        
+
         self.setEnabled(False)
         self.button_add.setEnabled(False)
         self.button_remove.setEnabled(False)
-        
-        worker = AggregationWorker(self.data_handler, group_cols,agg_config, date_grouping)
+
+        worker = AggregationWorker(self.data_handler, group_cols, agg_config, date_grouping)
         worker.signals.finished.connect(self.on_aggregation_finished)
         worker.signals.error.connect(self.on_aggregation_error)
         self.thread_pool.start(worker)
