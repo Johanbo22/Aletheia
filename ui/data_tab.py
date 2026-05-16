@@ -20,6 +20,8 @@ from ui.icons import IconBuilder, IconType
 from ui.components.data_operations_panel import DataOperationsPanel
 from ui.components.statistics_generator import StatisticsGenerator
 from ui.components.data_table_delegate import DataTableDelegate
+from ui.components.data_search_bar import DataSearchBar
+from ui.components.data_view_toolbar import DataViewToolbar
 from ui.LandingPage import LandingPage
 from ui.icons import IconBuilder, IconType
 
@@ -74,17 +76,6 @@ class DataTab(QWidget):
         self.current_scientific_notation = False
         self.current_grid_style = "Solid Line"
         self.current_grid_color = "#D3D3D3"
-        
-        self.current_search_matches: list = []
-        self.current_search_index: int = -1
-        self.search_worker = None
-        self.pending_search_text = ""
-        self.search_token = 0
-        
-        self.search_timer = QTimer(self)
-        self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(300)
-        self.search_timer.timeout.connect(self._execute_search_worker)
 
         self.init_ui()
 
@@ -123,116 +114,26 @@ class DataTab(QWidget):
         data_view_layout.setSpacing(6)
         self.left_stack.addWidget(self.data_view_widget)
 
-        # data toolbar
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        # Data toolbar
+        self.toolbar = DataViewToolbar(parent=self)
+        self.toolbar.create_dataset_requested.connect(self.controller.create_new_dataset)
+        self.toolbar.refresh_data_requested.connect(self.controller.refresh_google_sheets)
+        self.toolbar.python_console_requested.connect(self.request_python_console.emit)
+        self.toolbar.edit_mode_toggled.connect(self.toggle_edit_mode)
+        data_view_layout.addWidget(self.toolbar)
 
-        # create dataset
-        self.create_new_dataset_button = DataPlotStudioButton(
-            "Create a New Dataset",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white",
-        )
-        self.create_new_dataset_button.setIcon(IconBuilder.build(IconType.NewProject)
-        )
-        self.create_new_dataset_button.setToolTip("Create a new empty DataFrame")
-        self.create_new_dataset_button.clicked.connect(self.controller.create_new_dataset)
-        toolbar_layout.addWidget(self.create_new_dataset_button)
+        # Search bar
+        self.search_bar = DataSearchBar(data_handler=self.data_handler, parent=self)
+        self.search_bar.match_found.connect(self.highlight_cell)
+        self.search_bar.clear_selection_requested.connect(lambda: self.data_table.clearSelection() if self.data_handler else None)
+        
+        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.search_shortcut.activated.connect(self.open_search_bar)
 
-        self.data_source_refresh_button = DataPlotStudioButton(
-            "Refresh Data",
-            parent=self,
-            base_color_hex="#27ae60",
-            hover_color_hex="#229954",
-            text_color_hex="white",
-            font_weight="bold",
-        )
-        self.data_source_refresh_button.setIcon(
-            QIcon(get_resource_path("icons/menu_bar/google_sheet.png"))
-        )
-        self.data_source_refresh_button.setToolTip(
-            "Re-import data from your Google Sheets document"
-        )
-        self.data_source_refresh_button.clicked.connect(self.controller.refresh_google_sheets)
-        self.data_source_refresh_button.setVisible(False)
-        toolbar_layout.addWidget(self.data_source_refresh_button)
-
-        toolbar_layout.addStretch()
-        
-        self.python_console_button = DataPlotStudioButton(
-            "",
-            parent=self,
-        )
-        self.python_console_button.setIcon(QIcon(get_resource_path("icons/menu_bar/python-5.svg")))
-        self.python_console_button.setToolTip("Open the Python Console to use commands to directly work with the DataFrame")
-        self.python_console_button.clicked.connect(self.request_python_console.emit)
-        toolbar_layout.addWidget(self.python_console_button)
-
-        # edit current dataset toggle
-        self.edit_dataset_toggle_button = DataPlotStudioButton(
-            "Edit Mode: OFF",
-            parent=self,
-            base_color_hex="#95a5a6",
-            text_color_hex="white",
-        )
-        self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOff))
-        self.edit_dataset_toggle_button.setCheckable(True)
-        self.edit_dataset_toggle_button.setToolTip(
-            "Toggle to edit data directly in the table"
-        )
-        self.edit_dataset_toggle_button.clicked.connect(self.toggle_edit_mode)
-        toolbar_layout.addWidget(self.edit_dataset_toggle_button)
-
-        data_view_layout.addLayout(toolbar_layout)
-        
-        self.search_widget = QWidget()
-        self.search_widget.setObjectName("InlineSearchBar")
-        search_layout = QHBoxLayout(self.search_widget)
-        search_layout.setContentsMargins(5, 5, 5, 5)
-        
-        search_icon = QLabel()
-        search_icon.setPixmap(IconBuilder.build(IconType.Search).pixmap(16, 16))
-        search_layout.addWidget(search_icon)
-        
-        self.search_input = DataPlotStudioLineEdit(parent=self.search_widget)
-        self.search_input.setPlaceholderText("Find in table (Enter for next)...")
-        self.search_input.textChanged.connect(self._on_search_text_changed)
-        self.search_input.returnPressed.connect(self._search_next)
-        search_layout.addWidget(self.search_input)
-        
-        self.search_count_label = QLabel("0/0 matches")
-        self.search_count_label.setFixedWidth(100)
-        self.search_count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.search_count_label.setProperty("styleClass", "muted_text")
-        search_layout.addWidget(self.search_count_label)
-        
-        self.search_prev_btn = DataPlotStudioButton("", parent=self.search_widget, padding="4px")
-        self.search_prev_btn.setIcon(IconBuilder.build(IconType.UpArrow))
-        self.search_prev_btn.setToolTip("Previous Match")
-        self.search_prev_btn.clicked.connect(self._search_prev)
-        search_layout.addWidget(self.search_prev_btn)
-        
-        self.search_next_btn = DataPlotStudioButton("", parent=self.search_widget, padding="4px")
-        self.search_next_btn.setIcon(IconBuilder.build(IconType.DownArrow))
-        self.search_next_btn.setToolTip("Next Match (Enter)")
-        self.search_next_btn.clicked.connect(self._search_next)
-        search_layout.addWidget(self.search_next_btn)
-        
-        self.search_close_btn = DataPlotStudioButton("", parent=self.search_widget, padding="4px")
-        self.search_close_btn.setIcon(IconBuilder.build(IconType.Close))
-        self.search_close_btn.setToolTip("Close Search (Esc)")
-        self.search_close_btn.clicked.connect(self.hide_search_bar)
-        search_layout.addWidget(self.search_close_btn)
-        
-        search_layout.addStretch()
-        self.search_widget.setVisible(False)
-        
-        self.esc_shortcut = QShortcut(QKeySequence("Esc"), self.search_widget)
+        self.esc_shortcut = QShortcut(QKeySequence("Esc"), self.search_bar)
         self.esc_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        self.esc_shortcut.activated.connect(self.hide_search_bar)
-        
-        data_view_layout.addWidget(self.search_widget)
+        self.esc_shortcut.activated.connect(self.search_bar.close_search)
+        data_view_layout.addWidget(self.search_bar)
 
         # Create tabs for data and statistics
         self.data_tabs = QTabWidget()
@@ -244,11 +145,11 @@ class DataTab(QWidget):
         self.data_table.verticalHeader().setObjectName("MainDataHeader")
         self.data_table.setAlternatingRowColors(True)
         self.data_table.setSortingEnabled(True)
-        
+
         self.table_delegate = DataTableDelegate(self.data_table)
         self.data_table.setItemDelegate(self.table_delegate)
         self.data_table.verticalHeader().setDefaultSectionSize(32)
-        
+
         self.data_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Interactive
         )
@@ -270,10 +171,6 @@ class DataTab(QWidget):
         
         self.data_table.horizontalHeader().sectionClicked.connect(self._on_horizontal_header_clicked)
         self.data_table.verticalHeader().sectionClicked.connect(self._on_vertical_header_clicked)
-
-        # Search functionality to data table
-        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
-        self.search_shortcut.activated.connect(self.open_search_bar)
         
         self.copy_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self.data_table)
         self.copy_shortcut.activated.connect(self.copy_selection)
@@ -323,48 +220,24 @@ class DataTab(QWidget):
 
         self.refresh_data_view()
 
-
-    def toggle_edit_mode(self):
-        """Toggles the edit mode in the datble"""
-        self.is_editing = self.edit_dataset_toggle_button.isChecked()
+    def toggle_edit_mode(self, is_editing: bool) -> None:
+        """
+        Toggles the edit mode in the data table based on toolbar state
+        """
+        self.is_editing = is_editing
 
         if self.is_editing:
-            self.edit_dataset_toggle_button.setText("Edit Mode: ON")
-            self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOn))
-            self.edit_dataset_toggle_button.updateColors(
-                base_color_hex="#E74C3C", hover_color_hex="#C0392B"
-            )
-            self.data_table.setEditTriggers(
-                QTableView.EditTrigger.DoubleClicked
-                | QTableView.EditTrigger.AnyKeyPressed
-            )
-            self.status_bar.log(
-                "Edit Mode Enabled. You are now able to edit cells in the data table",
-                "INFO",
-            )
+            self.data_table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.AnyKeyPressed)
+            self.status_bar.log("Edit Mode Enabled. You are now able to edit cells in the data table", "INFO")
 
-            self.edit_toggle_on_animation = EditModeToggleAnimation(
-                parent=self, is_on=True
-            )
-            self.edit_toggle_on_animation.start(target_widget=self)
+            EditModeToggleAnimation(parent=self, is_on=True).start(target_widget=self)
         else:
-            self.edit_dataset_toggle_button.setText("Edit Mode: OFF")
-            self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOff))
-            self.edit_dataset_toggle_button.updateColors(
-                base_color_hex="#95A5A6", hover_color_hex="#7F8C8D"
-            )
             self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
             self.status_bar.log("Edit Mode Disabled", "INFO")
+            EditModeToggleAnimation(parent=self, is_on=False).start(target_widget=self)
 
-            self.edit_toggle_off_animation = EditModeToggleAnimation(
-                parent=self, is_on=False
-            )
-            self.edit_toggle_off_animation.start(target_widget=self)
-
-        # update the flags
-        if self.data_table.model() is not None and isinstance(
-            self.data_table.model(), DataTableModel
-        ):
+        # Update the flags
+        if self.data_table.model() is not None and isinstance(self.data_table.model(), DataTableModel):
             self.data_table.model().set_editable(self.is_editing)
         else:
             self.refresh_data_view()
@@ -373,75 +246,7 @@ class DataTab(QWidget):
         """Show the inline search bar and focus input"""
         if self.data_handler.df is None:
             return
-        self.search_widget.setVisible(True)
-        self.search_input.setFocus()
-        self.search_input.selectAll()
-    
-    def hide_search_bar(self) -> None:
-        """Hides the serach bar and clears current query"""
-        self.search_widget.setVisible(False)
-        self.search_input.clear()
-        if self.data_table:
-            self.data_table.clearSelection()
-    
-    def _on_search_text_changed(self, text: str) -> None:
-        self.pending_search_text = text
-        self.search_count_label.setText("...")
-        self.search_timer.start()
-        
-    def _execute_search_worker(self) -> None:
-        text = self.pending_search_text
-        
-        if hasattr(self, 'last_searched_text') and self.last_searched_text == text:
-            if self.search_worker is not None and self.search_worker.isRunning():
-                return
-        self.last_searched_text = text
-        
-        self.search_token += 1
-        current_token = self.search_token
-        
-        if not text or self.data_handler.df is None or self.data_handler.df.empty:
-            self._handle_search_results([], current_token)
-            return
-        
-        self.search_worker = SearchWorker(self.data_handler.df, text, current_token, parent=self)
-        self.search_worker.finished_search.connect(self._handle_search_results)
-        self.search_worker.start()
-    
-    def _handle_search_results(self, matches: list, token: int) -> None:
-        if token != self.search_token:
-            return
-        
-        self.current_search_matches = matches
-        self.current_search_index = -1
-        
-        if self.current_search_matches:
-            self.current_search_index = 0
-            self._highlight_current_match()
-        else:
-            self.search_count_label.setText("0/0 matches")
-            if self.data_table:
-                self.data_table.clearSelection()
-    
-    def _search_next(self) -> None:
-        if not self.current_search_matches:
-            return
-        self.current_search_index = (self.current_search_index + 1) % len(self.current_search_matches)
-        self._highlight_current_match()
-    
-    def _search_prev(self) -> None:
-        if not self.current_search_matches:
-            return
-        self.current_search_index = (self.current_search_index - 1) % len(self.current_search_matches)
-        self._highlight_current_match()
-    
-    def _highlight_current_match(self) -> None:
-        if 0 <= self.current_search_index < len(self.current_search_matches):
-            row, col = self.current_search_matches[self.current_search_index]
-            self.highlight_cell(row, col)
-            self.search_count_label.setText(f"{self.current_search_index + 1}/{len(self.current_search_matches)} matches")
-            
-            self.search_input.setFocus()
+        self.search_bar.open_search()
 
     def highlight_cell(self, row_index: int, column_index: int):
         """Scrolls to and highlights the specified index cell in the data table"""
@@ -500,19 +305,19 @@ class DataTab(QWidget):
         """Clears the UI when no data is loaded"""
         if hasattr(self, "left_stack"):
             self.left_stack.setCurrentIndex(0)
-        
+
         if hasattr(self, "right_widget"):
             self.right_widget.setVisible(False)
-        
+
         if hasattr(self, "data_table") and self.data_table is not None:
             self.data_table.setModel(None)
-        
+
         if hasattr(self, "stats_text") and self.stats_text is not None:
             self.stats_text.setHtml("")
-            
-        if hasattr(self, "data_source_refresh_button"):
-            self.data_source_refresh_button.setVisible(False)
-        
+
+        if hasattr(self, "toolbar"):
+            self.toolbar.set_refresh_visible(False)
+
         self.status_bar.set_data_source("")
         self.status_bar.set_view_context("", "normal")
     
@@ -603,7 +408,7 @@ class DataTab(QWidget):
     def _update_data_source_status(self) -> None:
         """Updates the status bar and refreshes butotns based on datat source"""
         if self.data_handler.has_google_sheets_import():
-            self.data_source_refresh_button.setVisible(True)
+            self.toolbar.set_refresh_visible(True)
             display_name = self.data_handler.last_gsheet_name
             if not display_name:
                 display_name = f"GID: {self.data_handler.last_gsheet_gid}"
@@ -613,12 +418,12 @@ class DataTab(QWidget):
                 file_name = Path(self.data_handler.file_path).name
             except Exception:
                 file_name = str(self.data_handler.file_path)
-            
+
             self.status_bar.set_data_source(f"Local File: {file_name}")
-            self.data_source_refresh_button.setVisible(False)
+            self.toolbar.set_refresh_visible(False)
         else:
             self.status_bar.set_data_source("New")
-            self.data_source_refresh_button.setVisible(False)
+            self.toolbar.set_refresh_visible(False)
     
     def _update_subsets_status(self) -> None:
         """Refreshes subset info and updates status bar"""
@@ -791,7 +596,8 @@ class DataTab(QWidget):
         if hasattr(self, "test_results_text"):
             self.set_test_results_greeting()
 
-        self.data_source_refresh_button.setVisible(False)
+        if hasattr(self, "toolbar"):
+            self.toolbar.set_refresh_visible(False)
         self.status_bar.set_data_source("")
         self.status_bar.set_view_context("", "normal")
 
