@@ -50,7 +50,7 @@ class StrategyRegistry:
         "Image Show (imshow)": ImshowPlotStrategy,
         "PColormesh": PColormeshPlotStrategy,
         "Contour": ContourPlotStrategy,
-        "ContourF": ContourFPlotStrategy,
+        "Contourf": ContourFPlotStrategy,
         "Barbs": BarbsPlotStrategy,
         "Quiver": QuiverPlotStrategy,
         "Streamplot": StreamplotPlotStrategy,
