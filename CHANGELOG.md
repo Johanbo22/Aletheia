@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v 0.2.1 [Patch]
+### Changed
+- Updated PlotTab._update_customization_visibility to automatically disable and uncheck tight_layout_check when a 3D plot type is selected, preventing the UserWarning associated with margin calculation limits in matplotlib's 3D axes.
+
+### Fixed
+- AttributeError during regression plotting when using DataFrames backed by PyArrow or nullable extension types. RegressionAnalyser.clean_data now explicitly forces data to standard float np.ndarray using .to_numpy(dtype=float, na_value=np.nan), preventing missing attribute errors when calculating bounds.
+- Fixed a TypeError in pie_strategy.py where PlotEngine._set_labels() received multiple values for xlabel and ylabel by popping them from general_kwargs prior to method execution.
+- Fixed a TypeError (ufunc 'isfinite' not supported) in gridded plots (e.g., Contour, Pcolormesh) by coercing the Z column to numeric and casting the final pivot matrix to float dtype in _prepare_gridded_data().
+- Resolved TypeError: got multiple values for keyword argument in GeoSpatialPlotStrategy by safely removing explicitly passed parameters from kwargs before unpacking them into gdf.plot().
+- Fixed a styling error on missing percentages in the Statistics Panel
+
 ## v 0.2.0 [Prerelease]
 ### Added
 - Initial 3D plotting support: Supports Scatter, Line and Surface

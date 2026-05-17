@@ -1527,6 +1527,15 @@ class PlotTab(PlotTabUI):
         self.view.z_column_widget.setVisible(is_3d)
         self.view.camera_3d_group.setVisible(is_3d)
         self.view.zlabel_widget.setVisible(is_3d)
+
+        # Disable tight layout for 3D plots
+        if is_3d:
+            self.view.tight_layout_check.setChecked(False)
+            self.view.tight_layout_check.setEnabled(False)
+            self.view.tight_layout_check.setToolTip("Tight layout is not supported for 3D plots")
+        else:
+            self.view.tight_layout_check.setEnabled(True)
+            self.view.tight_layout_check.setToolTip("")
         
         z_tab_idx = self.view.axis_tab_widget.indexOf(self.view.z_tab)
         if is_3d and z_tab_idx == -1:

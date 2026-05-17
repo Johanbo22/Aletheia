@@ -33,19 +33,22 @@ class RegressionResult:
     residuals: np.ndarray
 
 class RegressionAnalyser:
-    """Handles mathematcal modeling and statistics for dataset regression"""
+    """Handles mathematical modeling and statistics for dataset regression"""
     
     @staticmethod
     def clean_data(df: pd.DataFrame, x_col: str, y_col: str, reg_type: RegressionType) -> Tuple[np.ndarray, np.ndarray]:
         """Validates and extracts numeric vectors used for analysis"""
         if not pd.api.types.is_numeric_dtype(df[x_col]) or not pd.api.types.is_numeric_dtype(df[y_col]):
             raise TypeError(f"Columns {x_col} and {y_col} must be numeric")
-        
-        mask = np.isfinite(df[x_col]) & np.isfinite(df[y_col])
+
+        x_data = df[x_col].to_numpy(dtype=float, na_value=np.nan)
+        y_data = df[y_col].to_numpy(dtype=float, na_value=np.nan)
+
+        mask = np.isfinite(x_data) & np.isfinite(y_data)
         if reg_type == RegressionType.LOGARITHMIC:
-            mask &= (df[x_col] > 0)
-        
-        return df.loc[mask, x_col].values, df.loc[mask, y_col].values
+            mask &= (x_data > 0)
+
+        return x_data[mask], y_data[mask]
     
     @staticmethod
     def compute_fit(x_data: np.ndarray, y_data: np.ndarray, reg_type: RegressionType, degree: int = 2) -> RegressionResult:

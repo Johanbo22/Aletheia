@@ -15,6 +15,9 @@
     --warning-bg: #fef9c3;
     --warning-text: #854d0e;
     --warning-border: #fef08a;
+    --info-bg: #eff6ff;
+    --info-text: #1e40af;
+    --info-border: #bfdbfe
 }
 
 body {
@@ -189,6 +192,12 @@ tr:hover td {
     background-color: var(--warning-bg);
     color: var(--warning-text);
     border-color: var(--warning-border);
+}
+
+.badge-info {
+    background-color: var(--info-bg);
+    color: var(--info-text);
+    border-color: var(--info-border);
 }
 
 .badge-success {

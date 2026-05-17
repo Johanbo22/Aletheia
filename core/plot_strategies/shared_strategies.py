@@ -19,23 +19,24 @@ class GriddedPlotStrategy(BasePlotStrategy):
     def _prepare_gridded_data(self, df: pd.DataFrame, x: str, y: str, z: str):
         """Helper func to pivot data for gridded plots"""
         try:
-            if df[[x, y]].duplicated().any():
-                # agg by mean
-                df_agg = df.groupby([x, y])[z].mean().reset_index()
+            df_grid = df[[x, y, z]].copy()
+            df_grid[z] = pd.to_numeric(df_grid[z], errors="coerce")
+
+            if df_grid[[x, y]].duplicated().any():
+                df_agg = df_grid.groupby([x, y])[z].mean().reset_index()
             else:
-                df_agg = df
+                df_agg = df_grid
 
             pivot_df = df_agg.pivot(index=y, columns=x, values=z)
             pivot_df = pivot_df.sort_index(axis=0).sort_index(axis=1)
 
             X = pivot_df.columns.values
             Y = pivot_df.index.values
-            Z = pivot_df.values
+            Z = pivot_df.astype(float).values
 
             return X, Y, Z
         except Exception as GridDataError:
-            raise ValueError(
-                f"Data could not be pivoted into a 2D grid. Is the data gridded?: Error: {str(GridDataError)}")
+            raise ValueError(f"Could not grid data: {str(GridDataError)}")
 
     @abstractmethod
     def _render_plot(self, engine: 'PlotEngine', X, Y, Z, axes_flipped: bool, z_col: str, **kwargs):

@@ -60,7 +60,10 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
                 is_categorical = True
             if kwargs.get("categorical", False):
                 is_categorical = True
-            if kwargs.get("scheme", "None") != "None":
+            if is_categorical:
+                kwargs.pop("scheme", None)
+                kwargs.pop("k", None)
+            elif kwargs.get("scheme", "None") != "None":
                 is_categorical = False
 
         if not is_categorical:
@@ -196,6 +199,20 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
             kwargs["cmap"] = cmap_name
         elif "cmap" not in kwargs and not is_categorical:
             kwargs["cmap"] = "viridis"
+
+        kwargs.pop("basemap_zoom", "auto")
+        kwargs.pop("basemap_source", "OpenStreetMap")
+        kwargs.pop("use_divider", None)
+        kwargs.pop("axis_off", None)
+        kwargs.pop("categorical", None)
+        kwargs.pop("cax_enabled", None)
+        kwargs.pop("column", None)
+        kwargs.pop("ax", None)
+        kwargs.pop("cax", None)
+        kwargs.pop("legend", None)
+        kwargs.pop("legend_kwds", None)
+        kwargs.pop("target_crs", None)
+        kwargs.pop("add_basemap", False)
 
         if plot_col and plot_col in gdf:
             gdf.plot(column=plot_col, ax=engine.current_ax, cax=cax, legend=legend, legend_kwds=legend_kwds, **kwargs)

@@ -134,7 +134,7 @@ class StatisticsGenerator:
                 elif missing_pct > 20:
                     badge_html = f"<span class='badge badge-warning'>{missing_pct:.1f}%</span>"
                 elif missing_pct > 0:
-                    badge_html = f"<span style='color: #854d0e;'>{missing_pct:.1f}%</span>"
+                    badge_html = f"<span class='badge badge-info'>{missing_pct:.1f}%</span>"
                 else:
                     badge_html = f"<span class='badge badge-success'>0.0%</span>"
                 

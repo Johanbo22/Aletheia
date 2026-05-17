@@ -15,6 +15,8 @@ class PiePlotStrategy(BasePlotStrategy):
         y_col = y_cols[0] if y_cols else x_col
 
         title = general_kwargs.pop('title', None)
+        general_kwargs.pop('xlabel', None)
+        general_kwargs.pop('ylabel', None)
         legend = general_kwargs.pop('legend', True)
         cmap_name = general_kwargs.pop('cmap', general_kwargs.pop('palette', None))
 

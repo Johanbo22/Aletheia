@@ -7,7 +7,7 @@ APPLICATION_NAME: Final[str] = "Aletheia"
 ORGANIZATION_NAME: Final[str] = f"{APPLICATION_NAME}Studio"
 
 # Application version
-APPLICATION_VERSION = "0.2.0"
+APPLICATION_VERSION = "0.2.1"
 
 # File extension name
 PROJECT_EXTENSION = ".dps"
