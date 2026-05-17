@@ -5,6 +5,7 @@ from PyQt6.QtCore import QSettings, Qt, QTimer
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QTabWidget, QFrame
 
+from resources.version import APPLICATION_NAME
 from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
 from ui.icons import IconBuilder, IconType
@@ -444,7 +445,7 @@ class GoogleSheetsDialog(QDialog):
 
     def load_history(self) -> None:
         """Load sheet ID history from settings"""
-        settings = QSettings("DataPlotStudio", "GoogleSheetsImport")
+        settings = QSettings(f"{APPLICATION_NAME}", "GoogleSheetsImport")
         history = settings.value("history", [], type=list)
         raw_history_names = settings.value("history_names", {}, type=dict)
 
@@ -473,7 +474,7 @@ class GoogleSheetsDialog(QDialog):
         if not current_id:
             return
         
-        settings = QSettings("DataPlotStudio", "GoogleSheetsImport")
+        settings = QSettings(f"{APPLICATION_NAME}", "GoogleSheetsImport")
         history = settings.value("history", [], type=list)
         history_names = settings.value("history_names", {}, type=dict)
 

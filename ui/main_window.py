@@ -6,7 +6,7 @@ from pathlib import Path
 import traceback
 
 
-from resources.version import APPLICATION_VERSION, SCRIPT_FILE_NAME, LOG_FILE_NAME
+from resources.version import APPLICATION_NAME, APPLICATION_VERSION, SCRIPT_FILE_NAME, LOG_FILE_NAME
 from core.subset_manager import SubsetManager
 from ui.workers import FileImportWorker, GoogleSheetsImportWorker
 from ui.data_tab import DataTab
@@ -174,14 +174,14 @@ class MainWindow(QWidget):
     
     def _update_window_title(self) -> None:
         if self.data_handler.df is None:
-            title = f"DataPlotStudio - v{APPLICATION_VERSION}"
+            title = f"{APPLICATION_NAME} - v{APPLICATION_VERSION}"
         else:
             project_path = self.project_manager.get_current_project_path()
             if project_path:
                 project_name = Path(project_path).name
-                base_title = f"DataPlotStudio - {project_name}"
+                base_title = f"{APPLICATION_NAME} - {project_name}"
             else:
-                base_title = f"DataPlotStudio - Untitled Project"
+                base_title = f"{APPLICATION_NAME} - Untitled Project"
             
             indicator = " *" if self._unsaved_changes else ""
             title = f"{base_title}{indicator}"
@@ -196,7 +196,7 @@ class MainWindow(QWidget):
         if not filepath:
             return
         
-        settings = QSettings("DataPlotStudio", "RecentProjects")
+        settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
         recent_files = settings.value("recent_files", [])
         
         if isinstance(recent_files, str):
@@ -233,7 +233,7 @@ class MainWindow(QWidget):
                 self,
                 "Open Project",
                 "",
-                f"DataPlotStudio Portable Files (*{self.project_manager.PROJECT_EXTENSION})"
+                f"{APPLICATION_NAME} Portable Files (*{self.project_manager.PROJECT_EXTENSION})"
             )
             if filepath:
                 self._load_project_from_path(filepath)
@@ -300,7 +300,7 @@ class MainWindow(QWidget):
                     self,
                     "Save Project Package",
                     "",
-                    f"DataPlotStudio Portable Files (*{self.project_manager.PROJECT_EXTENSION});;All Files (*)"
+                    f"{APPLICATION_NAME} Portable Files (*{self.project_manager.PROJECT_EXTENSION});;All Files (*)"
                 )
                 if not filepath:
                     return False
@@ -335,7 +335,7 @@ class MainWindow(QWidget):
             "data": self.data_handler.df,
             "plot_config": self.plot_tab.get_config(),
             "subsets": self.subset_manager.export_subsets(),
-            "metadata": {"version": APPLICATION_VERSION, "name": "DataPlotStudio Project"}
+            "metadata": {"version": APPLICATION_VERSION, "name": f"{APPLICATION_NAME} Project"}
         }
         
     def open_python_console(self) -> None:

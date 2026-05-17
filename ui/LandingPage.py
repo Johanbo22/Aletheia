@@ -8,7 +8,7 @@ from ui.icons import IconBuilder, IconType
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors
 from ui.widgets.AnimatedButton import DataPlotStudioButton
-from resources.version import APPLICATION_VERSION
+from resources.version import APPLICATION_VERSION, APPLICATION_NAME
 from core.markdown_parser import parse_changelog, ChangelogSection, ParseMode
 
 class ChangelogViewer(QDialog):
@@ -73,7 +73,7 @@ class LandingPage(QWidget):
             logo_label.setPixmap(logo_pixmap.scaled(72, 72, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        title_label = QLabel("DataPlotStudio")
+        title_label = QLabel(f"{APPLICATION_NAME}")
         title_label.setObjectName("landing_title")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -289,7 +289,7 @@ class LandingPage(QWidget):
         dialog.exec()
         
     def _populate_recent_projects(self, button_width: int) -> None:
-        settings = QSettings("DataPlotStudio", "RecentProjects")
+        settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
         recent_files = settings.value("recent_files", [])
         
         if isinstance(recent_files, str):

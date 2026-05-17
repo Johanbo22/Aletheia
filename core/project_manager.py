@@ -20,9 +20,9 @@ class ProjectManager:
         self.project_data: Dict[str, Any] = {}
         
         # Workspace and autosave configurations
-        self.autosave_dir: Path = Path.home() / ".dataplotstudio"
+        self.autosave_dir: Path = Path.home() / ".aletheia"
         self.autosave_dir.mkdir(parents=True, exist_ok=True)
-        self.autosave_path: Path = self.autosave_dir / "DataPlotStudioAutosave.dps"
+        self.autosave_path: Path = self.autosave_dir / "AletheiaAutosave.dps"
     
     def new_project(self) -> None:
         
@@ -162,7 +162,7 @@ class ProjectManager:
 
     def load_project(self, filepath: str) -> Dict[str, Any]:
         """
-        Extracts and loads a DataPlotStudio project package into memory
+        Extracts and loads an Aletheia project package into memory
 
         :param filepath (str): The path to the saved project package
         :raises FleNotFoundError: If the target .dps file does not exist

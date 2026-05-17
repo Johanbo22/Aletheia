@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 
+from resources.version import APPLICATION_NAME
+
 class CodeExporter:
     """
     Generates a complete, runnable Python script by inspecting
@@ -76,11 +78,11 @@ class CodeExporter:
         """Generates the script header and imports."""
         header = [
             "\"\"\"",
-            "DataPlot Studio - Generated Analysis Script",
+            f"{APPLICATION_NAME} - Generated Analysis Script",
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             "",
             "This script replicates the data loading, processing, and",
-            "visualization steps performed in DataPlot Studio.",
+            f"visualization steps performed in {APPLICATION_NAME}.",
             "\"\"\"",
             "",
         ]
@@ -1134,7 +1136,7 @@ class CodeExporter:
         lines = [
             "\n",
             "if __name__ == '__main__':",
-            "    print('--- DataPlot Studio Export Script ---')",
+            f"    print('--- {APPLICATION_NAME} Export Script ---')",
             "    # 1. Load Data",
             "    df_raw = load_data()",
             "",

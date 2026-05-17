@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QDialogBu
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from resources.version import APPLICATION_NAME
 from ui.widgets import DataPlotStudioButton, DataPlotStudioToggleSwitch
 from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioListWidget, DataPlotStudioSpinBox
 
@@ -173,7 +174,7 @@ class TableCustomizationDialog(QDialog):
         vbox.addLayout(hbox_size)
 
         # Font preview
-        self.font_preview_label = QLabel("DataPlotStudio 123.45")
+        self.font_preview_label = QLabel(f"{APPLICATION_NAME} 123.45")
         self.font_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.font_preview_label.setFrameShape(QLabel.Shape.StyledPanel)
         self.font_preview_label.setMinimumHeight(45)

@@ -5,10 +5,10 @@ import shutil
 
 def cleanup_forgotten_temp_files() -> None:
     """
-    Purges the DataPlotStudio temporary directory on application startup.
+    Purges the Aletheia temporary directory on application startup.
     This guarantees that any files left over from a previous hard crash are reclaimed from disk.
     """
-    temp_dir: Path = Path(tempfile.gettempdir()) / "DataPlotStudio"
+    temp_dir: Path = Path(tempfile.gettempdir()) / "Aletheia"
     
     if temp_dir.exists() and temp_dir.is_dir():
         try:

@@ -7,7 +7,7 @@ from PyQt6.QtGui import QGuiApplication, QPixmap
 
 from core.resource_loader import get_resource_path
 from core.tempfilehandling.cleanup_temp_files import cleanup_forgotten_temp_files
-from resources.version import APPLICATION_VERSION
+from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 
 # This file handles initialization of application properties
 # The file is imported and used in main.py at init.
@@ -23,9 +23,9 @@ def enforce_single_instance() -> QSharedMemory:
     Ensures only one instance of the application is running using shared memory
     Returns the QSharedMemory instance to prevent it from being garbage collected
     """
-    shared_memory_lock = QSharedMemory("DataPlotStudio_Instance_Lock")
+    shared_memory_lock = QSharedMemory(f"{APPLICATION_NAME}_Instance_Lock")
     if shared_memory_lock.attach():
-        print("Another instance of DataPlotStudio is already running. Exiting...")
+        print(f"Another instance of {APPLICATION_NAME} is already running. Exiting...")
         sys.exit(1)
 
     shared_memory_lock.create(1)
@@ -57,5 +57,5 @@ def setup_translations(app: QApplication) -> None:
 
 def register_application_metadata() -> None:
     """Registers the metadata used by OS and QSettings"""
-    QCoreApplication.setApplicationName("DataPlotStudio")
+    QCoreApplication.setApplicationName(APPLICATION_NAME)
     QCoreApplication.setApplicationVersion(APPLICATION_VERSION)

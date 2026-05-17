@@ -1,5 +1,6 @@
 from typing import Any
 
+from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
 from ui.widgets.ControlElements import DataPlotStudioCheckBox
 from ui.dialogs import CodeEditor
@@ -103,7 +104,7 @@ class ScriptEditorDialog(QDialog):
     
     def read_settings(self) -> None:
         """Restores the window size, position, and splitter layout from previous sessions."""
-        settings = QSettings("DataPlotStudio", "ScriptEditor")
+        settings = QSettings(f"{APPLICATION_NAME}", "ScriptEditor")
         saved_geometry = settings.value("geometry")
         if saved_geometry:
             self.restoreGeometry(saved_geometry)
@@ -118,7 +119,7 @@ class ScriptEditorDialog(QDialog):
     
     def write_settings(self) -> None:
         """Saves the current window layout preferences to the system registry/config."""
-        settings = QSettings("DataPlotStudio", "ScriptEditor")
+        settings = QSettings(f"{APPLICATION_NAME}", "ScriptEditor")
         settings.setValue("geometry", self.saveGeometry())
         if hasattr(self, "horizontal_splitter"):
             settings.setValue("horizontal_splitter_state", self.horizontal_splitter.saveState())
@@ -459,7 +460,7 @@ class ScriptEditorDialog(QDialog):
     def _load_syntax_theme(self) -> None:
         """Loads the custom syntax highlighting theme from QSettings"""
         from ui.PythonHighlighter import SyntaxCategory, DefaultColorScheme
-        settings = QSettings("DataPlotStudio", "SyntaxHighlighting")
+        settings = QSettings(f"{APPLICATION_NAME}", "SyntaxHighlighting")
         
         saved_scheme: dict[SyntaxCategory, str] = {}
         for category in SyntaxCategory:
@@ -475,7 +476,7 @@ class ScriptEditorDialog(QDialog):
             new_scheme = dialog.get_color_scheme()
             self.highlighter.set_color_scheme(new_scheme)
             
-            settings = QSettings("DataPlotStudio", "SyntaxHighlighting")
+            settings = QSettings(f"{APPLICATION_NAME}", "SyntaxHighlighting")
             for category, color in new_scheme.items():
                 settings.setValue(category.value, color)
         

@@ -8,6 +8,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from core.resource_loader import get_resource_path
+from resources.version import APPLICATION_NAME
 from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
 from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioRadioButton
@@ -51,7 +52,7 @@ class DatabaseConnectionDialog(QDialog):
 
         self.details = {}
 
-        self.settings = QSettings("DataPlotStudio", "DatabaseProfiles")
+        self.settings = QSettings(f"{APPLICATION_NAME}", "DatabaseProfiles")
         self.threadpool = QThreadPool.globalInstance()
 
         main_layout = QVBoxLayout(self)

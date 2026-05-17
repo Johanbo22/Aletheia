@@ -2,7 +2,7 @@ from PyQt6.QtGui import QColor
 
 class ThemeColors:
     """
-    Central config for DataPlotStudio theme colors
+    Central config for Aletheia theme colors
     """
     
     # Border colors

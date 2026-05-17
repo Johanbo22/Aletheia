@@ -7,6 +7,7 @@ import platform
 from pathlib import Path
 
 from core.resource_loader import get_resource_path
+from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
@@ -19,7 +20,7 @@ class AboutDialog(QDialog):
         
     def _init_ui(self) -> None:
         self.setObjectName("aboutDialog")
-        self.setWindowTitle("About DataPlotStudio")
+        self.setWindowTitle(f"About {APPLICATION_NAME}")
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
         
         main_layout = QVBoxLayout(self)
@@ -39,7 +40,7 @@ class AboutDialog(QDialog):
         app_info_layout = QVBoxLayout()
         app_info_layout.setSpacing(2)
         
-        header_title = QLabel(f"DataPlotStudio")
+        header_title = QLabel(f"{APPLICATION_NAME}")
         header_title.setObjectName("aboutHeaderLabel")
         
         version_label = QLabel(f"App. Ver. {self.application_version}")
@@ -111,11 +112,11 @@ class AboutDialog(QDialog):
             credits_layout.addWidget(library_label)
         
         links_layout = QHBoxLayout()
-        github_link = QLabel('<a href="https://github.com/Johanbo22/DataPlotStudio">Github Repository</a>')
+        github_link = QLabel('<a href="https://github.com/Johanbo22/Aletheia">Github Repository</a>')
         github_link.setObjectName("aboutGithubLink")
         github_link.setOpenExternalLinks(True)
         
-        bug_report_link = QLabel('<a href="https://github.com/Johanbo22/DataPlotStudio/issues">Report a Bug</a>')
+        bug_report_link = QLabel('<a href="https://github.com/Johanbo22/Aletheia/issues">Report a Bug</a>')
         bug_report_link.setObjectName("aboutBugReportLink")
         bug_report_link.setOpenExternalLinks(True)
         bug_report_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -130,7 +131,7 @@ class AboutDialog(QDialog):
         links_layout.addStretch()
         links_layout.addWidget(website_link, alignment=Qt.AlignmentFlag.AlignRight)
         
-        copyright_label = QLabel("Released under the GNU GPL-3 open source license.\n© DataPlotStudio")
+        copyright_label = QLabel("Released under the GNU GPL-3 open source license.\n© Aletheia")
         copyright_label.setObjectName("aboutCopyrightLabel")
         copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         

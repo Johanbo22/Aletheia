@@ -7,7 +7,7 @@ from ui.theme import ThemeColors
 
 class DataPlotStudioButton(QPushButton):
     """
-    Custom QPushButton, default button for DataPlotStudio\n
+    Custom QPushButton, default button for Aletheia\n
     If unique buttons with unique styling is required, use regular QPushButton.setObjectName() and style it in css file\n
     Regular main action buttons use the theme.ThemeColors.MainColor property
     """

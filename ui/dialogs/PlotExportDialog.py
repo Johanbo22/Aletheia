@@ -4,6 +4,7 @@ from PyQt6.QtGui import QPixmap
 
 from pathlib import Path
 
+from resources.version import APPLICATION_NAME
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
@@ -18,7 +19,7 @@ class PlotExportDialog(QDialog):
         self.setModal(True)
         self.resize(720, 420)
         
-        self.settings = QSettings("DataPlotStudio", "PlotExportPreferences")
+        self.settings = QSettings(f"{APPLICATION_NAME}", "PlotExportPreferences")
         
         self.fallback_dpi: int = current_dpi
         self.preview_pixmap: QPixmap | None = preview_pixmap

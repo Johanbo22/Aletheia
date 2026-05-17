@@ -5,6 +5,8 @@ from typing import List, Optional, Dict, Any, Deque
 from collections import deque, Counter
 import textwrap
 
+from resources.version import APPLICATION_NAME
+
 
 class LogEntry:
     """Represents a single log entry"""
@@ -23,7 +25,7 @@ class LogEntry:
 
 
 class Logger:
-    """Handles all logging for DataPlotStudio"""
+    """Handles all logging for Aletheia"""
     
     def __init__(self, max_entries: int = 1000) -> None:
         self.max_entries = max_entries
@@ -205,7 +207,7 @@ class Logger:
         """Generate formatted log report"""
         header = textwrap.dedent(f"""
             {'='*120}
-            DataPlot Studio - Session Log Report
+            {APPLICATION_NAME} - Session Log Report
             Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             This log is automatically generated
             {'='*120}

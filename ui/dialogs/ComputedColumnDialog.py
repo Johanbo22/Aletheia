@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageB
 from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
+from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
 from ui.dialogs.CodeEditor import CodeEditor
@@ -271,7 +272,7 @@ class ComputedColumnDialog(QDialog):
     
     def read_settings(self) -> None:
         """Load the saved window geometry and splitter states"""
-        settings = QSettings("DataPlotStudio", "ComputedColumnDialog")
+        settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
         
         geometry = settings.value("geometry")
         if geometry:
@@ -287,7 +288,7 @@ class ComputedColumnDialog(QDialog):
     
     def write_settings(self) -> None:
         """Save the current window geometry and splitter states."""
-        settings = QSettings("DataPlotStudio", "ComputedColumnDialog")
+        settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("main_splitter", self.main_splitter.saveState())
         settings.setValue("helpers_splitter", self.helpers_splitter.saveState())

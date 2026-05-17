@@ -4,6 +4,7 @@ from PyQt6.QtCore import QSize, Qt, QSettings, QEvent, QObject, QTimer
 from PyQt6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPixmap, QCloseEvent, QResizeEvent, QKeyEvent
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QVBoxLayout, QFrame, QSpinBox, QSizePolicy
 
+from resources.version import APPLICATION_NAME
 from ui.widgets.ControlElements import DataPlotStudioCheckBox
 from ui.widgets.ControlElements import DataPlotStudioLineEdit, DataPlotStudioListWidget
 
@@ -181,13 +182,13 @@ class ColormapPickerDialog(QDialog):
         self.search_input.setFocus()
         self.search_input.installEventFilter(self)
 
-        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         if settings.value("geometry"):
             self.restoreGeometry(settings.value("geometry"))
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Save geometry when the dialog is closed"""
-        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
 
@@ -296,14 +297,14 @@ class ColormapPickerDialog(QDialog):
         else:
             self._final_selected_colormap = self.selected_colormap
 
-        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         settings.setValue("geometry", self.saveGeometry())
         
         super().accept()
     
     def _save_recent_colormap(self, name: str) -> None:
         """Saves the colormap to the QSettings history"""
-        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         recents = settings.value("recent_colormaps", [], type=list)
         
         if name in recents:
@@ -340,7 +341,7 @@ class ColormapPickerDialog(QDialog):
             item.setSizeHint(QSize(0, 25))
             self.list_widget.addItem(item)
         
-        settings = QSettings("DataPlotStudio", "ColormapPicker")
+        settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         recents = settings.value("recent_colormaps", [], type=list)
         valid_recents = [r for r in recents if r in all_maps]
         

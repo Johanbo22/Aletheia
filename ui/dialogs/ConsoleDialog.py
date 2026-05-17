@@ -14,6 +14,7 @@ from PyQt6.QtGui import QTextCursor, QColor, QFontDatabase, QFont, QKeyEvent
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPlainTextEdit, QCompleter
 
 from core.data_handler import DataHandler
+from resources.version import APPLICATION_NAME
 from ui.dialogs.ScriptEditorDialog import StreamRedirector
 from ui.PythonHighlighter import PythonHighlighter
 
@@ -82,7 +83,7 @@ class ConsoleDialog(QDialog):
     
     def _print_welcome_message(self) -> None:
         self.console_output.blockSignals(True)
-        print("DataPlotStudio Python Console")
+        print(f"{APPLICATION_NAME} Python Console")
         print("----------------------------------")
         print("Available variables:")
         print("  df   : Current pandas DataFrame")
@@ -97,14 +98,14 @@ class ConsoleDialog(QDialog):
     
     def _read_settings(self) -> None:
         """Restore window geometry from settings."""
-        settings: QSettings = QSettings("DataPlotStudio", "InteractiveConsole")
+        settings: QSettings = QSettings(f"{APPLICATION_NAME}", "InteractiveConsole")
         saved_geometry = settings.value("geometry")
         if saved_geometry:
             self.restoreGeometry(saved_geometry)
 
     def _write_settings(self) -> None:
         """Save current window geometry."""
-        settings: QSettings = QSettings("DataPlotStudio", "InteractiveConsole")
+        settings: QSettings = QSettings(f"{APPLICATION_NAME}", "InteractiveConsole")
         settings.setValue("geometry", self.saveGeometry())
     
     def closeEvent(self, event: QEvent) -> None:
@@ -457,7 +458,7 @@ class ConsoleDialog(QDialog):
     
     def _custom_help(self, request: Any = None) -> None:
         if request is None:
-            print("Welcome to DataPlotStudio Console Help!\nType help(object) to get help about a specific object or method.")
+            print(f"Welcome to {APPLICATION_NAME} Console Help!\nType help(object) to get help about a specific object or method.")
             return
         
         try:

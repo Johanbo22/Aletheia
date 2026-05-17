@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QLineE
 
 from core.help_manager import HelpManager, HelpTopicDetail
 from core.resource_loader import get_resource_path
+from resources.version import APPLICATION_NAME
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.widgets import DataPlotStudioButton
 
@@ -29,7 +30,7 @@ class HelpExplorerDialog(QDialog):
         if parent is None:
             self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
         
-        self.setWindowTitle("DataPlotStudio Help Explorer")
+        self.setWindowTitle(f"{APPLICATION_NAME} Help Explorer")
         self.setMinimumSize(1450, 850)
         self.setObjectName("helpExplorerDialog")
         

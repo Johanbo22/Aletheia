@@ -5,10 +5,10 @@ import tempfile
 def create_temp_csv_file(df: pd.DataFrame, source_name: str = "google_sheets") -> Path:
     """
     Creates a temporary CSV file from the dataframe when importing from Google Sheets.
-    All temporary files are nested within 'DataPlotStudio' base directory
+    All temporary files are nested within 'Aletheia' base directory
     """
     try:
-        base_temp_dir: Path = Path(tempfile.gettempdir()) / "DataPlotStudio"
+        base_temp_dir: Path = Path(tempfile.gettempdir()) / "Aletheia"
         base_temp_dir.mkdir(parents=True, exist_ok=True)
 
         temp_dir_path: str = tempfile.mkdtemp(dir=str(base_temp_dir), prefix="session_")

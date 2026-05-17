@@ -12,7 +12,7 @@ from core.logger import Logger
 from core.project_manager import ProjectManager
 from core.resource_loader import get_resource_path
 from core.style_reloader import StyleReloader
-from resources.version import APPLICATION_VERSION
+from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 from ui.dialogs import SettingsDialog, AboutDialog, HelpExplorerDialog
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.main_window import MainWindow
@@ -33,7 +33,7 @@ class DataPlotStudio(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle(f"DataPlotStudio - v{APPLICATION_VERSION}")
+        self.setWindowTitle(f"{APPLICATION_NAME} - v{APPLICATION_VERSION}")
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
         self.resize(1280, 720)
@@ -55,10 +55,10 @@ class DataPlotStudio(QMainWindow):
         self.setStatusBar(self.status_bar_widget)
         self.status_bar_widget.set_logger(self.logger)
 
-        self.status_bar_widget.log("DataPlotStudio started", "INFO")
+        self.status_bar_widget.log(f"{APPLICATION_NAME} started", "INFO")
 
         # Load settings
-        app_settings = QSettings("DataPlotStudio", "UserSettings")
+        app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
         self.settings = {
             "dark_mode": app_settings.value("dark_mode", False, type=bool),
             "font_family": app_settings.value("font_family", "Consolas", type=str),
@@ -104,7 +104,7 @@ class DataPlotStudio(QMainWindow):
         Recovers the user's previous window size, monitor placement, and dock layout.
         Synchronizes the Tab UI if the Plot Studio was left undocked in the previous session.
         """
-        settings = QSettings("DataPlotStudio", "AppLayout")
+        settings = QSettings(f"{APPLICATION_NAME}", "AppLayout")
         if settings.contains("geometry") and settings.contains("windowState"):
             self.restoreGeometry(settings.value("geometry"))
             self.restoreState(settings.value("windowState"))
@@ -232,7 +232,7 @@ class DataPlotStudio(QMainWindow):
         
         def save_layout():
             """Helper to save UI state before the application teardown."""
-            settings = QSettings("DataPlotStudio", "AppLayout")
+            settings = QSettings(f"{APPLICATION_NAME}", "AppLayout")
             settings.setValue("geometry", self.saveGeometry())
             settings.setValue("windowState", self.saveState())
         
@@ -266,7 +266,7 @@ class DataPlotStudio(QMainWindow):
             new_settings = dialog.get_settings()
             self.settings.update(new_settings)
             
-            app_settings = QSettings("DataPlotStudio", "UserSettings")
+            app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
             for key, value in self.settings.items():
                 app_settings.setValue(key, value)
             self.apply_settings(self.settings)

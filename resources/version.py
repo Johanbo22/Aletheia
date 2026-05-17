@@ -10,12 +10,12 @@ ORGANIZATION_NAME: Final[str] = f"{APPLICATION_NAME}Studio"
 APPLICATION_VERSION = "0.2.1"
 
 # File extension name
-PROJECT_EXTENSION = ".dps"
+PROJECT_EXTENSION = ".ath"
 
 # Data file extension
-DATA_EXTENSION = ".dps.data"
+DATA_EXTENSION = ".ath.data"
 
 # Filenames for the placeholder name for both .log file
 # and exported python script
-LOG_FILE_NAME = "DataPlotStudioSessionLog"
-SCRIPT_FILE_NAME = "DataPlotStudioPythonScript"
+LOG_FILE_NAME = f"{APPLICATION_NAME}SessionLog"
+SCRIPT_FILE_NAME = f"{APPLICATION_NAME}PythonScript"
