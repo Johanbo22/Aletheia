@@ -2,9 +2,9 @@
     <img src="resources/images/logo.png" alt="DataPlotStudio Logo" width="200" height="200">
 </div>
 
-# DataPlotStudio
+# Aletheia
 
-DataPlotStudio is a GUI implementation of the Matplotlib plotting and pandas data analytics capabilities. 
+Aletheia is a GUI implementation of the Matplotlib plotting and pandas data analytics capabilities. 
 The program is built up of two primary interfaces:
 * A data driven tab where you can view, edit, manipulate and alter data based primarily on the pandas library and embedded tools.
 * A plotting interface where you can plot your data, as well as tweaking the plot in a graphical environment based on the Matplotlib's `pyplot` functionality.
@@ -47,7 +47,7 @@ To build the project from source:
 
 1. Clone the repository:
 ```
-git clone https://github.com/Johanbo22/DataPlotStudio.git
+git clone https://github.com/Johanbo22/Aletheia.git
 ```
 
 2. Synchronize the virtual environment and install dependencies
@@ -56,8 +56,8 @@ git clone https://github.com/Johanbo22/DataPlotStudio.git
 uv sync
 ```
 
-3. Navigate into the DataPlotStudio root directory and run main
+3. Navigate into the Aletheia root directory and run main
 ```
-cd DataPlotStudio
+cd Aletheia
 python ./main.py
 ```
