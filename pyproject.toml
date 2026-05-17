@@ -1,6 +1,6 @@
 [project]
 name = "dataplotstudio"
-version = "0.1.0"
+version = "0.2.0"
 description = "DataPlotStudio is a GUI implementation of the Matplotlib and pandas data analytics and plotting capabilities written using the PyQt6 GUI framework"
 readme = "README.md"
 requires-python = ">=3.12"

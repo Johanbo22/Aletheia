@@ -4,6 +4,94 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v 0.2.0 [Prerelease]
+### Added
+- Initial 3D plotting support: Supports Scatter, Line and Surface
+- Z-Axis selection, axis label, axis parameters support
+- Camera settings for 3D plots 
+- Code Export of 3D plots
+- PlotConfigManager updated to recognize is_3d_axes flag, z-axis, and camera settings
+- SyntaxHighlightSettingsDialog to permit modification of Python keyword and tokens highlighting
+- Color theme presets (Light Theme, Solarized Dark, and Dracula) to SyntaxHighlightSettingsDialog.
+- Added a `Settings` button to the `LandingPage` sidebar for direct access to application settings.
+- Implemented `Recent Projects` section on the `LandingPage` to display up to 4 most recently accessed projects.
+- Added automatic file path validation to remove deleted/moved projects from QSettings history.
+- Project saving and opening actions automatically updates the global recent files registry used by the Landing Page.
+- Bracket pair highlighting in `CodeEditor`.
+- `Ctrl+G` shortcut in `CodeEditor` to jump directly to a specified line number.
+- `Alt+Z` shortcut in `CodeEditor` to toggle word wrapping on and off.
+- `Alt+W` shortcut in `CodeEditor` to toggle whitespace rendering
+- Deleting a line using keyboard shortcut `Ctrl+Shift+K`
+- Move lines or blocks of lines up or down using `Alt+Down/up` arrow keys
+- Native Live Linting in the `CodeEditor`. Syntax errors are now parsed continuously in a background thread, highlighting broken lines with a red underline.
+- Syntax Error tooltips. Hovering the mouse over a squiggly red line will now display a popup explaining the Python `SyntaxError`.
+- Native code folding in `CodeEditor`. Blocks of code can now be collapsed or expanded by clicking the `[-]` / `[+]` indicators in the line number margin.
+- Interactive `+` cells at the trailing row and column of the Data Table when `editable` is toggled on.
+- `DataTableModel.insert_empty_row()` and `DataTableModel.insert_empty_column()` methods to dynamically expand the dataset.
+- A distribution bar chart widget for the BinningDialog to visualize binnings result on the dataset before validation.
+- Improvements to caching and rendering of the PipelineGraphViewer widget. 
+- Zooming bounds for the PipelineGraphViewer and keyboard shortcuts for faster navigation
+- A thread to fetch schema information on a database.
+- Bold and italic font styles for annotations using Toolbar
+- Annotations toolbar color choice now has Alpha channel.
+- CanvasInteractionManager to encapsulate all mouse events for canvas interactions
+- PlotFormattingManager to handle all Plot formatting sequences
+- Scientitic notation, thousands seperator and gridline style toggles for Table customization.
+- UI updates and styling for SplitColumnDialog
+- More Help animations
+- Splash_Screen at startup
+- appInit to handle startup functions
+
+### Changed
+- Modifed PythonHighlighter to dynamically rebuild regex rules natively when its theme is altered.
+- `CodeEditor` now defaults to horizontal scrolling (no word wrap) to preserve code formatting visually.
+- `DataTableModel.rowCount()` and `columnCount()` dynamically append 1 extra index when the table is editable.
+- `DataTableModel.data()`, `flags()`, and `headerData()` augmented to safely intercept requests targeting the artificial insertion cells to prevent `IndexError` on the underlying DataFrame.
+- `set_editable()` now properly broadcasts `layoutAboutToBeChanged` to safely expand/collapse the insertion UI.
+- Validation of renaming columns. UI reflecting name before submitting.
+- Centralised styling into component styling files
+- CreateDatasetDialog has received numerous updates to UX
+- Refactored rendering of the GridSpecDesigner widget
+- Optimized rendering and animation flow of PipelineGraphViewer
+- Optimized performance of loading data from Google Sheets
+- Improved stability of Database Connections and loading data from large databases.
+- Overhauled styling and animations for control-elements
+- General UX updates for FilterAdvancedDialog
+- Layout for Filter-tab in the Data-operations panel.
+- Moved Theme handling from PlotTab into ThemeManager
+- Moved script editor handling from PlotTab into ScriptManager
+- Moved Subplot handling from PlotTab to SubplotManager
+- Moved Annotation handling and annotation+mouse interactions form PlotTab to AnnotationManager
+- Refactored PlotTab to delegate canvas interaction handling to CanvasInteractionManager.
+- Upgraded CodeEditor.duplicateLine (Ctrl+D) to natively handle copying multi-line user selections without explicit bounding box edge conflicts.
+- Refactored DataTab with DataViewToolbar and DataSearchBar objects to lessen class size.
+- Major refactor of PlotEngine and the plot strategies. All plot definitions are moved from engine and gathered using PlotEngine._execute_strategy.
+- Elevated HelpExplorerDialog to a ApplicationWindow when requested. 
+
+### Fixed
+- Fixed bug where unchecking "Show Data Table" would not remove the table without a manual redraw of canvas.
+- Fixed a bug in AdvancedFilterDialog where removing an active filter condition failed to refresh the query preview at the bottom of the dialog.
+- Fixed bug in CreateDatasetDialog._apply_prefix_to_table where _validate_schema was missing execution parentheses, preventing duplicate validation upon bulk rename.
+- Fixed scroll stuttering issue on the PipelineGraphViewer
+- Function insertion bug in ComputedColumnDialog
+- Fixed a styling bug with the Window Menu not applying the same style as the other menus
+- Fixed a stretching issue causing a large gap in the subset tab.
+- Fixed an issue where unchecking "Add subplots" did not automatically clear the canvas
+- Resolved a bug where subset_column_combo and sort_column_combo failed to populate with DataFrame columns upon data load
+- Fixed a bug where clicking the Refresh Button while a subset was active would cause the other subsets to loose data.
+- Fixed an issue where hovering over a point in the canvas caused an wrong index and wrong value to be returned
+- Fixed an alignment bug with the buttons in the cleaning tab.
+- Resolved visual bug in the Axis Label Options where Z-axis controls were visible on top of other tabs.
+- Resolved a TypeError in DataPlotStudioSlider.mousePressEvent by correctly unpacking the x or y integer coordinate from the QMouseEvent's QPoint prior to calculating the click-to-jump value.
+- Resolved a critical race condition where opening a second application instance would erroneously purge the primary instance's temporary data before the singleton lock forced a shutdown.
+- Fixed bug with Combobox corners not matching other control widgets.
+- An unparented QMessageBox in ui/main_window.py
+
+### Removed
+- _on_draw_event, _setup_brush_and_link, _handle_brush_selection, on_pick, on_scroll, on_mouse_press, on_mouse_move, and on_mouse_release from PlotTab.
+- Canvas mpl_connect hooks from PlotTab._connect_main_controls
+- Deleted 17 styling and attribute configuration methods from PlotTab. They now reside in PlotFormattingManager
+
 ## v0.1.4 [Prerelease]
 ### Changed
 - Restructured `SubsetManager` cache keys to include underlying dataframe layout state, preventing incorrect cache returns when source data mutates.
