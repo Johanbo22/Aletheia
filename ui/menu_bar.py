@@ -1,6 +1,7 @@
 # ui/menu_bar.py
 from PyQt6.QtWidgets import QMenuBar, QWidget
 from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import Qt
 from core.resource_loader import get_resource_path
 from ui.widgets.ControlElements import DataPlotStudioMenu
 from ui.icons import IconBuilder, IconType
@@ -131,5 +132,6 @@ class MenuBar(QMenuBar):
         
         self.explore_help_action = QAction(IconBuilder.build(IconType.Help), self.tr("Help Explorer"), parent)
         self.explore_help_action.setShortcut("F1")
+        self.explore_help_action.setShortcutContext(Qt.ShortcutContext.ApplicationShortcut)
         self.explore_help_action.setStatusTip("Open the Help Explorer menu")
         help_menu.addAction(self.explore_help_action)

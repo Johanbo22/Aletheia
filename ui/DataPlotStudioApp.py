@@ -1,23 +1,32 @@
 # ui/DataPlotStudioApp.py
+from pathlib import Path
+from typing import Optional
+
+from PyQt6.QtCore import Qt, QSettings, QEvent, QObject
+from PyQt6.QtGui import QCloseEvent, QFont, QIcon, QShortcut, QKeySequence, QAction, QKeyEvent
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QDockWidget, QPushButton, QTabBar, QDialog
+
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
 from core.logger import Logger
 from core.project_manager import ProjectManager
-from ui.dialogs import SettingsDialog, AboutDialog
+from core.resource_loader import get_resource_path
+from core.style_reloader import StyleReloader
+from resources.version import APPLICATION_VERSION
+from ui.dialogs import SettingsDialog, AboutDialog, HelpExplorerDialog
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.main_window import MainWindow
 from ui.menu_bar import MenuBar
 from ui.status_bar import StatusBar
-from core.resource_loader import get_resource_path
 
-from PyQt6.QtGui import QCloseEvent, QFont, QIcon, QShortcut, QKeySequence, QAction
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QDockWidget, QPushButton, QTabBar
-from PyQt6.QtCore import Qt, QSettings
-from pathlib import Path
-from typing import Optional
-
-from resources.version import APPLICATION_VERSION
-from core.style_reloader import StyleReloader
+# Simple Monkeypatch for now. Needs fixing.
+# TODO fix this. Must be removed at some point.
+_original_qdialog_exec = QDialog.exec
+def _non_blocking_exec(self, *args, **kwargs) -> int:
+    if self.parent() is not None:
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+    return _original_qdialog_exec(self, *args, **kwargs)
+QDialog.exec = _non_blocking_exec
 
 class DataPlotStudio(QMainWindow):
     """Main Application shell"""
@@ -38,6 +47,8 @@ class DataPlotStudio(QMainWindow):
         self.data_handler = DataHandler()
         self.code_exporter = CodeExporter()
         self.logger = Logger()
+
+        self._help_explorer: Optional[HelpExplorerDialog] = None
 
         # Create the status bar
         self.status_bar_widget = StatusBar()
@@ -74,6 +85,19 @@ class DataPlotStudio(QMainWindow):
         self._restore_window_state()
         
         self.main_widget._update_window_title()
+
+        if QApplication.instance() is not None:
+            QApplication.instance().installEventFilter(self)
+
+    def eventFilter(self, obj: QObject, event: QEvent | QKeyEvent) -> bool:
+        """
+        Global event filter
+        """
+        if event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_F1 and not event.isAutoRepeat():
+                self.show_help_explorer()
+                return True
+        return super().eventFilter(obj, event)
     
     def _restore_window_state(self) -> None:
         """
@@ -194,7 +218,7 @@ class DataPlotStudio(QMainWindow):
         # App level
         self.menu_bar.settings_action.triggered.connect(self.open_settings)
         self.menu_bar.about_action.triggered.connect(self.show_about)
-        self.menu_bar.explore_help_action.triggered.connect(self.main_widget._show_help_explorer)
+        self.menu_bar.explore_help_action.triggered.connect(self.show_help_explorer)
     
     def _reset_window_layout(self) -> None:
         """Panic button for lost docks: returns the UI to a tabbed starting state."""
@@ -249,11 +273,23 @@ class DataPlotStudio(QMainWindow):
             self.status_bar_widget.log("Settings updated", "INFO")
     
     def show_about(self) -> None:
-        """Shows the about dialog box"""
+        """Shows the About dialog box"""
         AboutDialog.show_about_dialog(
             parent=self,
             application_version=self.project_manager.APPLICATION_VERSION
         )
+
+    def show_help_explorer(self) -> None:
+        """
+        Shows the Help Explorer dialog
+        Can be viewed from anywhere and acts like an independent window
+        """
+        if self._help_explorer is None:
+            self._help_explorer = HelpExplorerDialog(None)
+            self._help_explorer.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        self._help_explorer.show()
+        self._help_explorer.raise_()
+        self._help_explorer.activateWindow()
     
     def apply_settings(self, settings: dict) -> None:
         """Apply the settings to main app loop"""

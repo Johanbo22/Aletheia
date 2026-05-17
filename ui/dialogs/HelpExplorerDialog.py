@@ -1,16 +1,17 @@
+import importlib.util
 import logging
 import sys
-import importlib.util
 from pathlib import Path
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QLineEdit, QListView, QTextBrowser, QLabel, QPushButton, QWidget, QFrame, QSizePolicy, QTreeView
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, QItemSelection, QUrl, QModelIndex
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, QUrl, QModelIndex
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QDesktopServices
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QLineEdit, QTextBrowser, QLabel, QWidget, \
+    QFrame, QSizePolicy, QTreeView
 
 from core.help_manager import HelpManager, HelpTopicDetail
+from core.resource_loader import get_resource_path
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.widgets import DataPlotStudioButton
-from core.resource_loader import get_resource_path
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,9 @@ class HelpExplorerDialog(QDialog):
         super().__init__(parent)
         self.help_manager = HelpManager()
         self.current_link: str | None = None
+
+        if parent is None:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
         
         self.setWindowTitle("DataPlotStudio Help Explorer")
         self.setMinimumSize(1450, 850)
