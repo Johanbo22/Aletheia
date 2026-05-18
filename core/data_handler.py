@@ -297,6 +297,7 @@ class DataHandler:
                         group_by=kwargs.get("group_by", []),
                         agg_config=kwargs.get("agg_config", {}),
                         date_grouping=kwargs.get("date_grouping", {}),
+                        rename_mapping=kwargs.get("rename_mapping", None)
                     )
                 elif current_op_type == "melt":
                     self.melt_data(
@@ -402,11 +403,11 @@ class DataHandler:
         except Exception as SortDataError:
             raise Exception(f"Error sorting data: {str(SortDataError)}")
     
-    def aggregate_data(self, group_by: List[str], agg_config: Dict[str, str], date_grouping: Dict[str, str]) -> pd.DataFrame:
+    def aggregate_data(self, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str], rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         if self.df is None:
             raise ValueError("No data loaded")
         self._save_state()
-        changed_df = self._mutator.aggregate_data(self.df, group_by, agg_config, date_grouping)
+        changed_df = self._mutator.aggregate_data(self.df, group_by, agg_config, date_grouping, rename_mapping)
         self._history.sort_state = None
         return self._apply_changes(
             changed_df,
@@ -415,11 +416,12 @@ class DataHandler:
                 "group_by": group_by,
                 "agg_config": agg_config,
                 "date_grouping": date_grouping,
+                "rename_mapping": rename_mapping
             },
             new_sort_state=None,
         )
 
-    def preview_aggregation(self, group_by: List[str], agg_config: Dict[str, str], date_grouping: Dict[str, str] = None, limit: int = 5,) -> pd.DataFrame:
+    def preview_aggregation(self, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5,) -> pd.DataFrame:
         return self._mutator.preview_aggregation(
             self.df, group_by, agg_config, date_grouping, limit
         )

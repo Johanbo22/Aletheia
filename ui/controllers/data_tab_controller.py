@@ -1020,6 +1020,7 @@ class DataTabController:
                             agg_config=agg_config,
                             date_grouping=date_grouping,
                             result_df=result_df,
+                            rename_mapping=config.get("rename_mapping")
                         )
                         self.refresh_saved_agg_list()
                         self.status_bar.log(f"Saved aggregation: {agg_name}", "SUCCESS")

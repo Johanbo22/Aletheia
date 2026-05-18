@@ -58,6 +58,28 @@ class FillMethod(str, Enum):
     STATIC_VALUE = "static_value"
     LINEAR = "linear"
     TIME = "time"
+###
+# Quantile functions
+def q25(x: pd.Series) -> float:
+    return x.quantile(0.25)
+def q75(x: pd.Series) -> float:
+    return x.quantile(0.75)
+def q90(x: pd.Series) -> float:
+    return x.quantile(0.90)
+QUANTILE_FUNCS: Dict[str, Callable] = {
+    "q25": q25,
+    "q75": q75,
+    "q90": q90
+}
+def resolve_agg_config(agg_config: Dict[str, Union[str, List[str]]]) -> Dict[str, Union[Any, List[Any]]]:
+    """Resolves string aggregation functions to callable functions where necessary."""
+    resolved: Dict[str, Union[Any, List[Any]]] = {}
+    for col, funcs in agg_config.items():
+        if isinstance(funcs, list):
+            resolved[col] = [QUANTILE_FUNCS.get(f, f) for f in funcs]
+        else:
+            resolved[col] = QUANTILE_FUNCS.get(funcs, funcs)
+    return resolved
 
 class DataMutator:
     """
@@ -300,7 +322,7 @@ class DataMutator:
             raise Exception(f"Error sorting data: {str(SortDataError)}")
 
     @require_dataframe
-    def aggregate_data(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, str], date_grouping: Dict[str, str]) -> pd.DataFrame:
+    def aggregate_data(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str], rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         """
         Aggregate df with per column aggregation functions and optional datetime grouping
         """
@@ -320,12 +342,20 @@ class DataMutator:
             if not groupers:
                 raise ValueError("No valid grouping columns provided")
 
-            df = df.groupby(groupers).agg(agg_config).reset_index()
+            resolved_agg_config = resolve_agg_config(agg_config)
+            df = df.groupby(groupers).agg(resolved_agg_config).reset_index()
+
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in df.columns]
+            
+            if rename_mapping:
+                df = df.rename(columns=rename_mapping)
+
             return df
         except Exception as AggregateDataError:
             raise Exception(f"Error aggregating data: {str(AggregateDataError)}")
 
-    def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, str], date_grouping: Dict[str, str] = None, limit: int = 5) -> pd.DataFrame:
+    def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5) -> pd.DataFrame:
         """
         Previews an aggregation without modifying the source DataFrame
         """
@@ -347,7 +377,12 @@ class DataMutator:
             if not groupers or not agg_config:
                 return pd.DataFrame()
 
-            preview_df = df.groupby(groupers).agg(agg_config).reset_index()
+            resolved_agg_config = resolve_agg_config(agg_config)
+            preview_df = df.groupby(groupers).agg(resolved_agg_config).reset_index()
+
+            if isinstance(preview_df.columns, pd.MultiIndex):
+                preview_df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in preview_df.columns]
+
             return preview_df.head(limit)
         except Exception as PreviewAggregationError:
             raise Exception(f"Preview Calculation failed: {str(PreviewAggregationError)}")

@@ -1,7 +1,8 @@
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from dataclasses import dataclass, field
 import pandas as pd
+from core.data_mutator import resolve_agg_config
 
 @dataclass
 class SavedAggregation:
@@ -9,11 +10,12 @@ class SavedAggregation:
     name: str
     description: str
     group_by: List[str]
-    agg_config: Dict[str, str]
+    agg_config: Dict[str, Union[str, List[str]]]
     date_grouping: Optional[Dict[str, str]] = None
     result_df: Optional[pd.DataFrame] = None
     created_at: datetime = field(default_factory=datetime.now)
     row_count: int = 0
+    rename_mapping: Optional[Dict[str, str]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Converts the aggregation metadata to a dictionary for serialization."""
@@ -24,7 +26,8 @@ class SavedAggregation:
             "agg_config": self.agg_config,
             "date_grouping": self.date_grouping,
             "created_at": self.created_at.isoformat(),
-            "row_count": self.row_count
+            "row_count": self.row_count,
+            "rename_mapping": self.rename_mapping
         }
     
     @classmethod
@@ -48,7 +51,8 @@ class SavedAggregation:
             agg_config=dict(agg_config),
             date_grouping=dict(date_grouping_data) if date_grouping_data else None,
             created_at=created_at,
-            row_count=data.get("row_count", 0)
+            row_count=data.get("row_count", 0),
+            rename_mapping=data.get("rename_mapping")
         )
 
 class AggregationManager:
@@ -57,7 +61,7 @@ class AggregationManager:
     def __init__(self) -> None:
         self.saved_aggregations: Dict[str, SavedAggregation] = {}
     
-    def save_aggregation(self, name: str, description: str, group_by: List[str], agg_config: Dict[str, str], result_df: pd.DataFrame, date_grouping: Optional[Dict[str, str]] = None) -> SavedAggregation:
+    def save_aggregation(self, name: str, description: str, group_by: List[str], agg_config: Dict[str, str], result_df: pd.DataFrame, date_grouping: Optional[Dict[str, str]] = None, rename_mapping: Optional[Dict[str, str]] = None) -> SavedAggregation:
         """Saves a new aggregation configuration and its initial result."""
         if name in self.saved_aggregations:
             raise ValueError(f"Aggregation '{name}' already exists")
@@ -69,7 +73,8 @@ class AggregationManager:
             agg_config=dict(agg_config),
             date_grouping=dict(date_grouping) if date_grouping else None,
             result_df=result_df.copy(),
-            row_count=len(result_df)
+            row_count=len(result_df),
+            rename_mapping=rename_mapping
         )
 
         self.saved_aggregations[name] = agg
@@ -113,7 +118,14 @@ class AggregationManager:
             raise KeyError(f"Cannot reapply aggregation. Missing aggregation columns: {missing_agg_cols}")
 
         try:
-            result = df.groupby(agg.group_by, dropna=False).agg(agg.agg_config).reset_index()
+            resolved_agg_config = resolve_agg_config(agg.agg_config)
+            result = df.groupby(agg.group_by, dropna=False).agg(resolved_agg_config).reset_index()
+
+            if isinstance(result.columns, pd.MultiIndex):
+                result.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in
+                                  result.columns]
+            if agg.rename_mapping:
+                result = result.rename(columns=agg.rename_mapping)
         except Exception as error:
             raise RuntimeError(f"Failed to apply Pandas aggregation: {str(error)}")
         

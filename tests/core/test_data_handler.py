@@ -132,3 +132,36 @@ def test_regex_replace_missing_pattern(empty_data_handler: DataHandler) -> None:
             replacement="X"
         )
     assert "regex pattern are required" in str(expected_error.value)
+
+def test_aggregate_data_multiple_functions(empty_data_handler: DataHandler) -> None:
+    """
+    Test that aggregating data with multiple functions for a single column
+    correctly calculates the metrics and flattens the resulting MultiIndex column
+    """
+    test_data: dict[str, list[any]] = {
+        "Category": ["A", "A", "B", "B"],
+        "Sales": [10, 20, 10, 30]
+    }
+    empty_data_handler.df = pd.DataFrame(test_data)
+
+    group_by_cols: list[str] = ["Category"]
+    aggregation_config: dict[str, list[str]] = {"Sales": ["sum", "mean", "max"]}
+
+    resulting_dataframe: pd.DataFrame = empty_data_handler.aggregate_data(
+        group_by=group_by_cols,
+        agg_config=aggregation_config,
+        date_grouping={}
+    )
+
+    expected_columns: list[str] = ["Category", "Sales_sum", "Sales_mean", "Sales_max"]
+    assert list(resulting_dataframe.columns) == expected_columns
+
+    category_a: pd.Series = resulting_dataframe[resulting_dataframe["Category"] == "A"].iloc[0]
+    assert category_a["Sales_sum"] == 30
+    assert category_a["Sales_mean"] == 15.0
+    assert category_a["Sales_max"] == 20
+
+    category_b: pd.Series = resulting_dataframe[resulting_dataframe["Category"] == "B"].iloc[0]
+    assert category_b["Sales_sum"] == 40
+    assert category_b["Sales_mean"] == 20.0
+    assert category_b["Sales_max"] == 30
