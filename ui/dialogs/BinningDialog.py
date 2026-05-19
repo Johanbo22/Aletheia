@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QWidget, QFormLayout, QProgressBar
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QWidget, QFormLayout, QProgressBar, QSizePolicy
 from PyQt6.QtCore import Qt, QRegularExpression, QTimer
 from PyQt6.QtGui import QRegularExpressionValidator
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -6,6 +6,7 @@ from matplotlib.figure import Figure
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
 
+import re
 import pandas as pd
 from typing import Any, Optional
 from enum import Enum
@@ -17,7 +18,10 @@ class BinningPreviewWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("binning_preview_widget")
-        self.setMinimumHeight(180)
+        self.setMinimumHeight(150)
+        self.setMaximumHeight(200)
+        size_policy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.setSizePolicy(size_policy)
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -64,7 +68,8 @@ class BinningPreviewWidget(QWidget):
         self.ax.spines["top"].set_visible(False)
         self.ax.spines["right"].set_visible(False)
         self.ax.spines["left"].set_visible(False)
-        self.ax.spines["bottom"].set_color("#CCCCCC")
+        spine_color = ThemeColors.BORDER_BASE.name()
+        self.ax.spines["bottom"].set_color(spine_color)
         self.ax.set_yticks([])
         
         self.ax.tick_params(axis="x", rotation=45, labelsize=9, bottom=False)
@@ -80,7 +85,7 @@ class BinningPreviewWidget(QWidget):
                     textcoords="offset points",
                     ha="center", va="bottom",
                     fontsize=8,
-                    color="#555555"
+                    color=ThemeColors.TEXT_PRIMARY.name()
                 )
         self.figure.tight_layout()
         self.canvas.draw()
@@ -118,40 +123,40 @@ class BinningDialog(QDialog):
     def init_ui(self) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(12)
-        
+
         # General Config
         general_group = DataPlotStudioGroupBox("General")
         general_group.setObjectName("binning_general_group")
         self.general_layout = QFormLayout(general_group)
         self.general_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        
+
         self.column_combo = DataPlotStudioComboBox()
         self.column_combo.addItems(self.columns)
         self.column_combo.currentIndexChanged.connect(self._auto_generate_name)
         self.general_layout.addRow("Select Numeric Column:", self.column_combo)
-        
+
         self.new_name_input = DataPlotStudioLineEdit()
         self.new_name_input.setPlaceholderText("e.g., Age_Group")
         self.new_name_input.setToolTip("Must be a valid Python identifier. Spaces and special characters are not allowed")
-        
+
         identifier_regex = QRegularExpression(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
         self.new_name_input.setValidator(QRegularExpressionValidator(identifier_regex, self.new_name_input))
         self.general_layout.addRow("New Column Name:", self.new_name_input)
-        
+
         main_layout.addWidget(general_group)
-        
+
         # Binning Strategy group
         method_group = DataPlotStudioGroupBox("Binning Strategy")
         method_group.setObjectName("binning_method_group")
         self.method_layout = QFormLayout(method_group)
         self.method_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        
+
         self.method_combo = DataPlotStudioComboBox()
         self.method_combo.addItems([method.value for method in BinningMethod])
         self.method_combo.setToolTip("Select the statistical strategy for dividing the data into bins")
         self.method_combo.currentIndexChanged.connect(self._update_input_visibility)
         self.method_layout.addRow("Binning Method:", self.method_combo)
-        
+
         self.bin_count_widget = QWidget()
         bin_count_layout = QVBoxLayout(self.bin_count_widget)
         bin_count_layout.setContentsMargins(0, 0, 0, 0)
@@ -160,37 +165,37 @@ class BinningDialog(QDialog):
         self.bin_count_spin.setValue(5)
         bin_count_layout.addWidget(self.bin_count_spin)
         self.method_layout.addRow("Number of Bins:", self.bin_count_widget)
-        
+
         self.custom_edges_widget = QWidget()
         custom_edges_layout = QVBoxLayout(self.custom_edges_widget)
         custom_edges_layout.setContentsMargins(0, 0, 0, 0)
         self.edges_input = DataPlotStudioLineEdit()
         self.edges_input.setPlaceholderText("e.g., 0, 18, 35, 60, 100")
-        
-        edge_regex = QRegularExpression(r"^[0-9.,\s\-]+$")
+
+        edge_regex = QRegularExpression(r"^[0-9.,\s\-]*$")
         self.edges_input.setValidator(QRegularExpressionValidator(edge_regex, self.edges_input))
         custom_edges_layout.addWidget(self.edges_input)
-        
+
         self.catch_all_checkbox = DataPlotStudioCheckBox("Add -∞ and ∞ to edges to catch out-of-bounds data")
         self.catch_all_checkbox.setChecked(True)
         self.catch_all_checkbox.setToolTip("Ensures no data becomes 'NaN' by extending the first and last bins to infinity")
         custom_edges_layout.addWidget(self.catch_all_checkbox)
-        
+
         self.method_layout.addRow("Bin Edges:", self.custom_edges_widget)
         main_layout.addWidget(method_group)
-        
+
         # Labelling group
         labeling_group = DataPlotStudioGroupBox("Labeling")
         labeling_group.setObjectName("binning_labeling_group")
         self.labeling_layout = QFormLayout(labeling_group)
         self.labeling_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
-        
+
         self.labels_strategy_combo = DataPlotStudioComboBox()
         self.labels_strategy_combo.addItems([strategy.value for strategy in LabelStrategy])
         self.labels_strategy_combo.setToolTip("Define how the resulting bins will be named in the new column.")
         self.labels_strategy_combo.currentIndexChanged.connect(self._update_input_visibility)
         self.labeling_layout.addRow("Labeling Properties:", self.labels_strategy_combo)
-        
+
         self.custom_labels_widget = QWidget()
         custom_labels_layout = QVBoxLayout(self.custom_labels_widget)
         custom_labels_layout.setContentsMargins(0, 0, 0, 0)
@@ -198,7 +203,7 @@ class BinningDialog(QDialog):
         self.labels_input.setPlaceholderText("e.g., Low, Medium, High")
         custom_labels_layout.addWidget(self.labels_input)
         self.labeling_layout.addRow("Custom Labels:", self.custom_labels_widget)
-        
+
         self.prefix_labels_widget = QWidget()
         prefix_labels_layout = QVBoxLayout(self.prefix_labels_widget)
         prefix_labels_layout.setContentsMargins(0, 0, 0, 0)
@@ -207,36 +212,36 @@ class BinningDialog(QDialog):
         prefix_labels_layout.addWidget(self.prefix_input)
         self.labeling_layout.addRow("Prefix for Sequential Labels:", self.prefix_labels_widget)
         main_layout.addWidget(labeling_group)
-        
+
         # ADvanced settings
         advanced_group = DataPlotStudioGroupBox("Advanced Options")
         advanced_group.setObjectName("binning_advanced_group")
         advanced_layout = QVBoxLayout(advanced_group)
-        
+
         self.right_inclusive_checkbox = DataPlotStudioCheckBox("Right-inclusive intervals (e.g. (0-10])")
         self.right_inclusive_checkbox.setChecked(True)
         advanced_layout.addWidget(self.right_inclusive_checkbox)
-        
+
         self.drop_original_checkbox = DataPlotStudioCheckBox("Drop Original column after binning")
         self.drop_original_checkbox.setChecked(False)
         advanced_layout.addWidget(self.drop_original_checkbox)
         main_layout.addWidget(advanced_group)
-        
+
         preview_group = DataPlotStudioGroupBox("Distribution Preview")
         preview_group.setObjectName("binning_preview_group")
         preview_layout = QVBoxLayout(preview_group)
-        
+
         self.preview_widget = BinningPreviewWidget()
-        preview_layout.addWidget(self.preview_widget)
+        preview_layout.addWidget(self.preview_widget, 1)
         main_layout.addWidget(preview_group)
-        
+
         # Status labels
         self.hint_label = QLabel()
         self.hint_label.setObjectName("binning_hint_label")
         main_layout.addWidget(self.hint_label)
-        
+
         main_layout.addStretch()
-        
+
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         self.apply_button = DataPlotStudioButton(
@@ -248,22 +253,22 @@ class BinningDialog(QDialog):
         self.apply_button.setDefault(True)
         self.apply_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.apply_button)
-        
+
         self.cancel_button = DataPlotStudioButton("Cancel", parent=self)
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
-        
+
         main_layout.addLayout(button_layout)
-        
+
         self.new_name_input.textChanged.connect(self._validate_form)
         self.edges_input.textChanged.connect(self._validate_form)
         self.labels_input.textChanged.connect(self._validate_form)
         self.prefix_input.textChanged.connect(self._validate_form)
-        
+
         self.bin_count_spin.valueChanged.connect(self._validate_form)
         self.catch_all_checkbox.stateChanged.connect(self._validate_form)
         self.right_inclusive_checkbox.stateChanged.connect(self._validate_form)
-        
+
         self._update_input_visibility()
         self._auto_generate_name()
         self._validate_form()
@@ -319,7 +324,7 @@ class BinningDialog(QDialog):
                 hint_text = hint_text or "Please provide comma-separated bin edges."
             else:
                 try:
-                    bins = [float(x.strip()) for x in edges_str.split(",") if x.strip()]
+                    bins = [float(x.strip()) for x in re.split(r'[,\s]+', edges_str) if x.strip()]
                     if len(bins) < 1:
                         raise ValueError()
                     
