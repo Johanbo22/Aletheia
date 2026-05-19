@@ -18,16 +18,39 @@ class WorkerSignals(QObject):
 
     finished
         object: data (pd.DataFrame)
+    success
+        object: data (pd.DataFrame), str: filepath
     error
         Exception: The exception object
+    error_object
+        object: the error as an object and not Exception
     log
         str: A message to log
     """
     finished = pyqtSignal(object)
+    success = pyqtSignal(object, str)
     error = pyqtSignal(Exception)
+    error_object = pyqtSignal(object)
     log = pyqtSignal(str)
     progress = pyqtSignal(int, str)
-    
+
+class FileReaderWorker(QRunnable):
+    """
+    Worker thread to handle synchronous file reading
+    """
+    def __init__(self, data_handler: DataHandler, file_path: str) -> None:
+        super().__init__()
+        self.data_handler = data_handler
+        self.file_path = file_path
+        self.signals = WorkerSignals()
+
+    def run(self) -> None:
+        try:
+            df = self.data_handler.read_file(self.file_path)
+            self.signals.success.emit(df, self.file_path)
+        except Exception as err:
+            self.signals.error_object.emit(err)
+
 class AggregationWorker(QRunnable):
     """Worker for performing data aggregation"""
     def __init__(self, data_handler: DataHandler, group_by: list[str], agg_config: dict[str, str], date_grouping: dict[str, str]) -> None:

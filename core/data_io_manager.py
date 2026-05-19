@@ -175,10 +175,10 @@ class DataIOManager:
         Read a file and return a DataFrame without modifying its state
         
         :param filepath: Path to the file
-        :param pd.DataFrame: The loaded read-only data
+        :return pd.DataFrame: The loaded read-only data
         """
         try:
-            self._read_local_file(Path(filepath))
+            return self._read_local_file(Path(filepath))
         except Exception as error:
             raise Exception(f"Error reading file: {str(error)}")
     
