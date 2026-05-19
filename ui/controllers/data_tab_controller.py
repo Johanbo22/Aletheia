@@ -1001,8 +1001,9 @@ class DataTabController:
                 agg_config = config["agg_config"]
                 date_grouping = config.get("date_grouping")
                 agg_name = config.get("aggregation_name", "")
+                rename_mapping = config.get("rename_mapping")
 
-                self.data_handler.aggregate_data(group_cols, agg_config, date_grouping)
+                self.data_handler.aggregate_data(group_cols, agg_config, date_grouping, rename_mapping)
                 result_df = self.data_handler.df.copy()
 
                 # ask the user if they want ot save this agg

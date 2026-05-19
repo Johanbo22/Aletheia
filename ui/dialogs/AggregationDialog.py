@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, Q
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, \
     QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListWidgetItem, QListView
+from xlrd import colname
 
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
@@ -55,7 +56,10 @@ class PreviewWorker(QRunnable):
             self.signals.error.emit(self.req_id, str(error))
 
 class AggregationFunctions(str, Enum):
-    """Enumeration of supported pandas aggregation functions."""
+    """
+    Enumeration of supported pandas aggregation functions.
+    These are all the functions that the AggregationDialog of Aletheia currently allows
+    """
     MEAN = "mean"
     SUM = "sum"
     MEDIAN = "median"
@@ -71,6 +75,7 @@ class AggregationFunctions(str, Enum):
     Q75 = "q75"
     Q90 = "q90"
 
+# A dict to assign for tooltip role
 AGGREGATION_TOOLTIPS: dict[AggregationFunctions, str] = {
     AggregationFunctions.MEAN: "Average of all values",
     AggregationFunctions.SUM: "Total sum of all values",
@@ -86,6 +91,28 @@ AGGREGATION_TOOLTIPS: dict[AggregationFunctions, str] = {
     AggregationFunctions.Q25: "25th Percentile (First Quartile)",
     AggregationFunctions.Q75: "75th Percentile (Third Quartile)",
     AggregationFunctions.Q90: "90th Percentile",
+}
+
+# Aggregation functions that require numeric dataa
+NUMERIC_ONLY_FUNCTIONS: set[AggregationFunctions] = {
+    AggregationFunctions.MEAN,
+    AggregationFunctions.SUM,
+    AggregationFunctions.MEDIAN,
+    AggregationFunctions.STD,
+    AggregationFunctions.VAR,
+    AggregationFunctions.Q25,
+    AggregationFunctions.Q75,
+    AggregationFunctions.Q90
+}
+
+# Functions that is safe for all data types
+UNIVERSAL_FUNCTIONS: set[AggregationFunctions] = {
+    AggregationFunctions.MIN,
+    AggregationFunctions.MAX,
+    AggregationFunctions.COUNT,
+    AggregationFunctions.FIRST,
+    AggregationFunctions.LAST,
+    AggregationFunctions.NUNIQUE,
 }
 
 class AggregationDialog(QDialog):
@@ -270,9 +297,10 @@ class AggregationDialog(QDialog):
         self.agg_table.horizontalHeader().setFont(header_font)
         self.agg_table.verticalHeader().setDefaultSectionSize(35)
         
-        self.agg_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.agg_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.agg_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.agg_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         self.agg_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.agg_table.setColumnWidth(1, 140)
         self.agg_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.agg_table.verticalHeader().setVisible(False)
         self.agg_table.setMinimumHeight(MIN_AGG_TABLE_HEIGHT)
@@ -533,6 +561,13 @@ class AggregationDialog(QDialog):
             self.remove_column_from_agg()
         elif action == clear_action:
             self.clear_all_aggregations()
+
+    def _get_allowed_functions(self, col_name: str) -> list[AggregationFunctions]:
+        """Get a list of allowed aggregation functions based on the column type"""
+        if pd.api.types.is_numeric_dtype(self.data_handler.df[col_name]):
+            return list(AggregationFunctions)
+        else:
+            return list(UNIVERSAL_FUNCTIONS)
     
     def _add_specific_column_to_agg(self, col_name: str) -> None:
         """Internal helper to add a specific column by name"""
@@ -544,7 +579,8 @@ class AggregationDialog(QDialog):
         self.agg_table.setItem(row, 0, name_item)
 
         combo = DataPlotStudioComboBox()
-        for index, func in enumerate(AggregationFunctions):
+        allowed_functions = self._get_allowed_functions(col_name)
+        for index, func in enumerate(allowed_functions):
             combo.addItem(func.value)
             combo.setItemData(index, AGGREGATION_TOOLTIPS[func], Qt.ItemDataRole.ToolTipRole)
 

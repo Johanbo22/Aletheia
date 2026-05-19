@@ -355,7 +355,7 @@ class DataMutator:
         except Exception as AggregateDataError:
             raise Exception(f"Error aggregating data: {str(AggregateDataError)}")
 
-    def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5) -> pd.DataFrame:
+    def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5, rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         """
         Previews an aggregation without modifying the source DataFrame
         """
@@ -382,6 +382,9 @@ class DataMutator:
 
             if isinstance(preview_df.columns, pd.MultiIndex):
                 preview_df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in preview_df.columns]
+
+            if rename_mapping:
+                preview_df = preview_df.rename(columns=rename_mapping)
 
             return preview_df.head(limit)
         except Exception as PreviewAggregationError:

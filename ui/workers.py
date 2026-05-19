@@ -53,12 +53,13 @@ class FileReaderWorker(QRunnable):
 
 class AggregationWorker(QRunnable):
     """Worker for performing data aggregation"""
-    def __init__(self, data_handler: DataHandler, group_by: list[str], agg_config: dict[str, str], date_grouping: dict[str, str]) -> None:
+    def __init__(self, data_handler: DataHandler, group_by: list[str], agg_config: dict[str, str], date_grouping: dict[str, str], rename_mapping: dict[str, str] | None = None) -> None:
         super().__init__()
         self.data_handler = data_handler
         self.group_by = group_by
         self.agg_config = agg_config
         self.date_grouping = date_grouping
+        self.rename_mapping = rename_mapping
         self.signals = WorkerSignals()
     
     @pyqtSlot()
@@ -66,7 +67,7 @@ class AggregationWorker(QRunnable):
         try:
             self.signals.progress.emit(10, "Preparing Aggregation...")
             self.signals.log.emit(f"Starting background aggregation task with {len(self.group_by)} groups...")
-            result_df = self.data_handler.preview_aggregation(group_by=self.group_by, agg_config=self.agg_config, date_grouping=self.date_grouping, limit=None)
+            result_df = self.data_handler.aggregate_data(group_by=self.group_by, agg_config=self.agg_config, date_grouping=self.date_grouping, rename_mapping=self.rename_mapping)
             
             self.signals.progress.emit(100, "Aggregation complete")
             self.signals.log.emit("Background aggregation task completed successfully.")

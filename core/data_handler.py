@@ -421,9 +421,9 @@ class DataHandler:
             new_sort_state=None,
         )
 
-    def preview_aggregation(self, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5,) -> pd.DataFrame:
+    def preview_aggregation(self, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5, rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         return self._mutator.preview_aggregation(
-            self.df, group_by, agg_config, date_grouping, limit
+            self.df, group_by, agg_config, date_grouping, limit, rename_mapping
         )
     
     def melt_data(self, id_vars: List[str], value_vars: List[str], var_name: str, value_name: str,) -> pd.DataFrame:
