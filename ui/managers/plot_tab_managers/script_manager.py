@@ -1,4 +1,5 @@
 import traceback
+import copy
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -6,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.dates as mdates
+from matplotlib.colors import to_hex
 from scipy.stats import t as t_dist
 from matplotlib.ticker import MaxNLocator
 from PyQt6.QtWidgets import QMessageBox
@@ -75,7 +77,7 @@ class ScriptManager:
         try:
             def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
                 allowed_modules = {
-                    "pandas", "numpy", "matplotlib", "seaborn", "scipy", "math", "datetime", "random", "re", "io", "typing", "collections", "itertools", "functools"
+                    "pandas", "numpy", "matplotlib", "seaborn", "scipy", "math", "datetime", "random", "re", "io", "typing", "collections", "itertools", "functools", "sqlalchemy", "traceback", "requests"
                 }
                 base_name = name.split(".")[0]
                 if base_name not in allowed_modules:
@@ -126,23 +128,87 @@ class ScriptManager:
             self.plot_tab.status_bar.log(f"Script execution failed: {str(ExecuteScriptError)}", "ERROR")
             traceback.print_exc()
 
-    def _sync_gui_from_ax(self, ax) -> None:
-        """Attempts to update the GUI fields from the resulting plot"""
+    def _sync_gui_from_ax(self, ax: plt.Axes) -> None:
+        """
+        Synchronizes the UI elements by extracting properties from the executed script.
+        Overrides the current plot_config and reloads it back into the canvas.
+        """
+        config = copy.deepcopy(self.plot_tab.get_config())
+        fig = ax.figure
+
         try:
-            title = ax.get_title()
-            if title:
-                self.plot_tab.view.title_input.setText(title)
-                self.plot_tab.view.title_check.setChecked(True)
+            self._sync_label(config, "appearance", "title", ax.get_title())
+            self._sync_label(config, "appearance", "xlabel", ax.get_xlabel())
+            self._sync_label(config, "appearance", "ylabel", ax.get_ylabel())
 
-            xlabel = ax.get_xlabel()
-            if xlabel:
-                self.plot_tab.view.xlabel_input.setText(xlabel)
-                self.plot_tab.view.xlabel_check.setChecked(True)
+            self._sync_axis_limits(config, "x_axis", ax.get_xlim())
+            self._sync_axis_limits(config, "y_axis", ax.get_ylim())
+            config["axes"]["x_axis"]["scale"] = ax.get_xscale()
+            config["axes"]["y_axis"]["scale"] = ax.get_yscale()
 
-            ylabel = ax.get_ylabel()
-            if ylabel:
-                self.plot_tab.view.ylabel_input.setText(ylabel)
-                self.plot_tab.view.ylabel_check.setChecked(True)
+            legend = ax.get_legend()
+            config["legend"]["enabled"] = legend is not None
+            if legend:
+                title_obj = legend.get_title()
+                if title_obj:
+                    config["legend"]["title"] = title_obj.get_text()
 
-        except Exception as GUISyncError:
-            print(f"Warning could not sync GUI from plot: {GUISyncError}")
+            has_grid = bool(ax.xaxis.get_gridlines() or ax.yaxis.get_gridlines())
+            config["grid"]["enabled"] = has_grid
+
+            spines_cfg = config.get("appearance", {}).get("spines", {})
+            for side, spine in ax.spines.items():
+                if side in spines_cfg:
+                    spines_cfg[side]["visible"] = spine.get_visible()
+                    try:
+                        color = spine.get_edgecolor()
+                        if color and color != "none":
+                            spines_cfg[side]["color"] = to_hex(color, keep_alpha=False)
+                    except Exception:
+                        pass
+                    try:
+                        spines_cfg[side]["width"] = spine.get_linewidth()
+                    except Exception:
+                        pass
+
+            try:
+                x_params = ax.xaxis.get_tick_params()
+                x_axis_cfg = config["axes"]["x_axis"]
+                x_axis_cfg["tick_label_size"] = x_params.get("labelsize", x_axis_cfg["tick_label_size"])
+                if "labelrotation" in x_params:
+                    x_axis_cfg["tick_rotation"] = x_params["labelrotation"]
+
+                y_params = ax.yaxis.get_tick_params()
+                y_axis_cfg = config["axes"]["y_axis"]
+                y_axis_cfg["tick_label_size"] = y_params.get("labelsize", y_axis_cfg["tick_label_size"])
+                if "labelrotation" in y_params:
+                    y_axis_cfg["tick_rotation"] = y_params["labelrotation"]
+            except Exception:
+                pass
+
+            if fig:
+                w, h = fig.get_size_inches()
+                fig_cfg = config["appearance"]["figure"]
+                fig_cfg["width"] = float(w)
+                fig_cfg["height"] = float(h)
+                fig_cfg["dpi"] = int(fig.get_dpi())
+
+            self.plot_tab.config_manager.load_config(config)
+        except Exception as sync_error:
+            self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", "WARNING")
+
+    def _sync_label(self, config: dict, section: str, key: str, value: str) -> None:
+        """Sync text labels and enabled them if populated"""
+        if value and str(value).strip():
+            config[section][key]["text"] = str(value)
+            config[section][key]["enabled"] = True
+
+    def _sync_axis_limits(self, config: dict, axis_key: str, limits: tuple) -> None:
+        """Sync axis limits and disable auto-limits"""
+        axis_cfg = config["axes"][axis_key]
+        try:
+            axis_cfg["min"] = float(limits[0])
+            axis_cfg["max"] = float(limits[1])
+            axis_cfg["auto_limits"] = False
+        except Exception:
+            pass

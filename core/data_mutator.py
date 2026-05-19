@@ -90,9 +90,9 @@ class DataMutator:
     when the operation may invalidate it so callers can propagate the change.
     """
     FrequencyMap: Dict[str, str] = {
-        "Year": "Y",
-        "Quarter": "Q",
-        "Month": "M",
+        "Year": "YE",
+        "Quarter": "QE",
+        "Month": "ME",
         "Week": "W",
         "Day": "D",
     }

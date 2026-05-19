@@ -62,16 +62,24 @@ class CodeExporter:
 
     def _clean_value(self, value: Any) -> str:
         """Helper to format values for insertion into code safely."""
+        if hasattr(value, "tolist") and hasattr(value, "dtype"):
+            return self._clean_value(value.tolist())
         if isinstance(value, str):
             return repr(value)
         if value is None:
-            return "None"
+            return "None "
         if isinstance(value, dict):
             items = [f"{self._clean_value(k)}: {self._clean_value(v)}" for k, v in value.items()]
-            return "{" + ", ".join(items) + "}"
+            return "{ " + ",  ".join(items) + "} "
         if isinstance(value, (list, tuple, set)):
-            items = [self._clean_value(v) for v in value]
-            return "[" + ", ".join(items) + "]"
+            cleaned_items = []
+            for v in value:
+                if hasattr(v, 'tolist') and hasattr(v, 'dtype'):
+                    cleaned_items.extend([self._clean_value(x) for x in v.tolist()])
+                else:
+                    cleaned_items.append(self._clean_value(v))
+            cleaned_items = [f"'{str(item).strip('\'"')}'" for item in cleaned_items]
+            return "[" + ",  ".join(cleaned_items) + "]"
         return str(value)
 
     def _generate_header(self) -> str:
@@ -1097,8 +1105,15 @@ class CodeExporter:
 
         x_col = self._clean_value(self._get_cfg(plot_config, "basic.x_column"))
         y_cols_raw = self._get_cfg(plot_config, "basic.y_columns", [])
-        hue = self._get_cfg(plot_config, "basic.hue_column")
-        palette = self._get_cfg(plot_config, "appearance.figure.palette", "deep")
+
+        if not y_cols_raw:
+            y_cols_raw = []
+        if isinstance(y_cols_raw, str):
+            y_cols_raw = [y_cols_raw]
+
+        y_cols_raw = [self._clean_value(c) for c in y_cols_raw if c]
+        hue = self._get_cfg(plot_config, "basic.hue_column ")
+        palette = self._get_cfg(plot_config, "appearance.figure.palette ", "deep ")
 
         lines = [
             "", 
