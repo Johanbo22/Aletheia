@@ -75,9 +75,9 @@ class DataTabController:
                 
                 NewDataFrameAnimation(parent=None, message="Created New Dataframe").start(target_widget=self.view)
             
-        except Exception as CreateNewDatasetError:
+        except (ValueError, TypeError, RuntimeError, MemoryError) as e:
             QMessageBox.critical(
-                self.view, "Error", f"Failed to create dataset: {str(CreateNewDatasetError)}"
+                self.view, "Error", f"Failed to create dataset: {str(e)}"
             )
             FailedAnimation("Failed to Create", parent=None).start(target_widget=self.view)
     
@@ -208,8 +208,8 @@ class DataTabController:
             self._preview_msg_box.buttonClicked.connect(handle_response)
             self._preview_msg_box.show()
             
-        except Exception as RemoveDuplicatesError:
-            self.status_bar.log(f"Failed to prepare duplicate preview {str(RemoveDuplicatesError)}", "ERROR")
+        except (ValueError, TypeError, KeyError) as e:
+            self.status_bar.log(f"Failed to prepare duplicate preview {str(e)}", "ERROR")
     
     def _execute_remove_duplicates(self) -> None:
         try:
@@ -233,12 +233,9 @@ class DataTabController:
                 },
                 level="SUCCESS",
             )
-        except Exception as RemoveDuplicatesError:
-            self.status_bar.log(
-                f"Failed to remove duplicates: {str(RemoveDuplicatesError)}", "ERROR"
-            )
-            self.failed_animation = FailedAnimation("Failed To Remove Rows")
-            self.failed_animation.start(target_widget=self.view)
+        except (ValueError, TypeError, KeyError) as e:
+            self.status_bar.log(f"Failed to remove duplicates: {str(e)}", "ERROR")
+            FailedAnimation("Failed To Remove Rows").start(target_widget=self.view)
     
     def drop_missing(self):
         """Drop rows with missing values"""

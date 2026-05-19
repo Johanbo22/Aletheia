@@ -42,7 +42,7 @@ class StatusBar(QStatusBar):
         super().__init__()
         
         #logger will be set by main app
-        self.logger: Optional[Logger] = Logger()
+        self.logger: Optional[Logger] = Logger.get_instance()
 
         #track changes
         self.recent_actions: List[Any] = []

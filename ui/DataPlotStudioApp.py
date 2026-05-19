@@ -46,7 +46,7 @@ class DataPlotStudio(QMainWindow):
         self.project_manager = ProjectManager()
         self.data_handler = DataHandler()
         self.code_exporter = CodeExporter()
-        self.logger = Logger()
+        self.logger = Logger.get_instance()
 
         self._help_explorer: Optional[HelpExplorerDialog] = None
 

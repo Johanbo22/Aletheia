@@ -26,10 +26,21 @@ class LogEntry:
 
 class Logger:
     """Handles all logging for Aletheia"""
+
+    _instance: Optional["Logger"] = None
     
     def __init__(self, max_entries: int = 1000) -> None:
+        if Logger._instance is not None:
+            raise RuntimeError("Use Logger.get_instance() to get the singleton instance")
         self.max_entries = max_entries
         self.entries: Deque[LogEntry] = deque(maxlen=max_entries)
+
+    @classmethod
+    def get_instance(cls, max_entries: int = 1000) -> "Logger":
+        """Get the singleton logger instance"""
+        if cls._instance is None:
+            cls._instance = Logger(max_entries)
+        return cls._instance
     
     def _add_entry(self, level: str, message: str) -> None:
         """Add log entry"""

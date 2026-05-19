@@ -1,4 +1,5 @@
 import atexit
+import logging
 import pandas as pd
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, Callable, List
@@ -7,6 +8,9 @@ import numpy as np
 from core.data_io_manager import DataIOManager
 from core.data_mutator import DataMutator, DataOperation, FillMethod, StatisticalTest
 from core.history_manager import HistoryManager
+from core.logger import Logger
+
+logger = Logger.get_instance()
 
 class DataHandler:
     """
@@ -114,7 +118,7 @@ class DataHandler:
     def import_file(self, filepath: str) -> pd.DataFrame:
         df = self._io.import_file(filepath)
         self.df = df
-        self.original_df = df.copy()
+        self.original_df = df.copy(deep=False)
         self._reset_history()
         return self.df
     
@@ -128,14 +132,14 @@ class DataHandler:
             gid=gid
         )
         self.df = df
-        self.original_df = df.copy()
+        self.original_df = df.copy(deep=False)
         self._reset_history()
         return self.df
     
     def import_from_database(self, connection_string: str, query: str) -> pd.DataFrame:
         df, _ = self._io.import_from_database(connection_string, query)
         self.df = df
-        self.original_df = df.copy()
+        self.original_df = df.copy(deep=False)
         self._reset_history()
         return self.df
     
@@ -161,7 +165,7 @@ class DataHandler:
                 data = np.full((rows, len(column_names)), fill_value)
             
             self.df = pd.DataFrame(data, index=range(rows), columns=column_names)
-            self.original_df = self.df.copy()
+            self.original_df = self.df.copy(deep=False)
             
             self._io.file_path = None
             self._io.is_temp_file = False
@@ -172,7 +176,8 @@ class DataHandler:
             self._reset_history()
             return self.df
         except Exception as CreateEmptyDataframeError:
-            raise Exception(f"Error creating DataFrame: {str(CreateEmptyDataframeError)}")
+            logger.error(f"Error creating DataFrame: {CreateEmptyDataframeError}", exc_info=True)
+            raise
     
     def export_data(self, filepath: str, format: str = "csv", include_index: bool = False) -> None:
         self._io.export_data(self.df, filepath, format=format, include_index=include_index)
@@ -233,7 +238,7 @@ class DataHandler:
     def reset_data(self) -> None:
         if self.original_df is not None:
             self._reset_history()
-            self.df = self.original_df.copy()
+            self.df = self.original_df.copy(deep=False)
     
     def jump_to_history_index(self, target_index: int) -> None:
         current_index = len(self._history.undo_stack)
@@ -261,9 +266,10 @@ class DataHandler:
 
         operations = self._history.load_pipeline_macro(macro_source)
 
-        df_backup = self.df.copy()
+        df_backup = self.df.copy(deep=False)
         log_backup = self._history.operation_log.copy()
         redo_backup = self._history.redo_stack.copy()
+        sort_state_backup = self._history_sort_state
         current_op_type = "Unknown"
 
         try:
@@ -336,10 +342,13 @@ class DataHandler:
             self.df = df_backup
             self._history.operation_log = log_backup
             self._history.redo_stack = redo_backup
-            raise Exception(
-                f"Macro execution aborted. Data rolled back to original state.\n"
-                f"Reason: Failed on operation '{current_op_type}' -> {str(e)}"
+            self._history_sort_state = sort_state_backup
+            logger.error(
+                f"Macro execution aborted. Data rolled back to original state "
+                f"Failed on operation '{current_op_type}': {e}",
+                exc_info=True
             )
+            raise
     
     def run_statistical_test(self, test_type: "Union[StatisticalTest, str]", col1: str, col2: str) -> Dict[str, Any]:
         return self._mutator.run_statistical_test(self.df, test_type, col1, col2)
@@ -400,8 +409,9 @@ class DataHandler:
                 {"type": "sort", "column": column, "ascending": ascending},
                 new_sort_state=new_sort_state,
             )
-        except Exception as SortDataError:
-            raise Exception(f"Error sorting data: {str(SortDataError)}")
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error(f"Error sorting data: {e}", exc_info=True)
+            raise
     
     def aggregate_data(self, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str], rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         if self.df is None:
@@ -524,5 +534,6 @@ class DataHandler:
                 {"type": action_value, **kwargs},
                 new_sort_state=new_sort_state,
             )
-        except Exception as CleanDataError:
-            raise Exception(f"Error cleaning data: {str(CleanDataError)}")
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error(f"Error cleaning data: {e}", exc_info=True)
+            raise

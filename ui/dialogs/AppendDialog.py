@@ -23,7 +23,7 @@ class AppendDialog(QDialog):
         super().__init__(parent)
         self.data_handler = data_handler
         self.other_df: Optional[pd.DataFrame] = None
-        self.thread_pool = QThreadPool()
+        self.thread_pool = QThreadPool.globalInstance()
         
         self.setWindowTitle("Append / Concatenate Data")
 

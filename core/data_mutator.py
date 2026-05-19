@@ -1,4 +1,6 @@
 import keyword
+import logging
+import re
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Optional, Union, Callable
@@ -11,6 +13,8 @@ try:
 except ImportError:
     stats = None
     IsolationForest = None
+
+logger = logging.getLogger(__name__)
 
 def require_dataframe(func: Callable) -> Callable:
     """Ensures the provided dataframe is not None"""
@@ -144,8 +148,9 @@ class DataMutator:
             handler_method = self._operation_registry[action]
             df, sort_state = handler_method(df=df, sort_state=sort_state, **kwargs)
             return df, sort_state
-        except Exception as CleanDataError:
-            raise Exception(f"Error cleaning data: {str(CleanDataError)}")
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error(f"Error cleaning data: {e}", exc_info=True)
+            raise
 
     def _cast_cell_value(self, value: Any, column_name: str, column_datatype: Any) -> Any:
         """
@@ -201,8 +206,9 @@ class DataMutator:
             casted_value = self._cast_cell_value(value, column_name, column_datatype)
             df.iat[row_index, column_index] = casted_value
             return df
-        except Exception as UpdateCellError:
-            raise Exception(f"Error updating cell: {str(UpdateCellError)}")
+        except (ValueError, IndexError, TypeError) as e:
+            logger.error(f"Error updating cell: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def filter_data(self, df: pd.DataFrame, column: str = None, condition: str = None, value: Any = None, advanced_filters: List[Dict] = None) -> pd.DataFrame:
@@ -295,8 +301,9 @@ class DataMutator:
 
             return df
 
-        except Exception as FilterDataError:
-            raise Exception(f"Error filtering data: {str(FilterDataError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error filtering data: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def sort_data(self, df: pd.DataFrame, column: str, ascending: bool = True, current_sort_state: Optional[tuple] = None) -> tuple[pd.DataFrame, tuple]:
@@ -318,8 +325,9 @@ class DataMutator:
             df = df.sort_values(by=column, ascending=ascending)
             new_sort_state = (column, ascending)
             return df, new_sort_state
-        except Exception as SortDataError:
-            raise Exception(f"Error sorting data: {str(SortDataError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error sorting data: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def aggregate_data(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str], rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
@@ -352,8 +360,9 @@ class DataMutator:
                 df = df.rename(columns=rename_mapping)
 
             return df
-        except Exception as AggregateDataError:
-            raise Exception(f"Error aggregating data: {str(AggregateDataError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error aggregating data: {e}", exc_info=True)
+            raise
 
     def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5, rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         """
@@ -387,8 +396,9 @@ class DataMutator:
                 preview_df = preview_df.rename(columns=rename_mapping)
 
             return preview_df.head(limit)
-        except Exception as PreviewAggregationError:
-            raise Exception(f"Preview Calculation failed: {str(PreviewAggregationError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Preview Calculation failed: {e}", exc_info=True)
+            raise
 
     # DATA TRANSFORMATIONS
     @require_dataframe
@@ -398,8 +408,9 @@ class DataMutator:
             v_vars = value_vars if value_vars else None
             df = pd.melt(df, id_vars=id_vars, value_vars=v_vars, var_name=var_name, value_name=value_name)
             return df
-        except Exception as MeltDataError:
-            raise Exception(f"Error melting data: {str(MeltDataError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error melting data: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def pivot_data(self, df: pd.DataFrame, index: List[str], columns: str, values: List[str], aggfunc: str) -> pd.DataFrame:
@@ -410,8 +421,9 @@ class DataMutator:
                 df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in df.columns]
             df.columns.name = None
             return df
-        except Exception as PivotError:
-            raise Exception(f"Error pivoting data: {str(PivotError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error pivoting data: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def merge_data(self, df: pd.DataFrame, right_df: pd.DataFrame, how: str, left_on: List[str], right_on: List[str], suffixes: tuple = ("_left", "_right")) -> pd.DataFrame:
@@ -419,8 +431,9 @@ class DataMutator:
         try:
             df = pd.merge(df, right_df, how=how, left_on=left_on, right_on=right_on, suffixes=suffixes)
             return df
-        except Exception as MergeDataError:
-            raise Exception(f"Merge operation failed: {str(MergeDataError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Merge operation failed: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def concatenate_data(self, df: pd.DataFrame, other_df: pd.DataFrame, ignore_index: bool = True) -> pd.DataFrame:
@@ -428,8 +441,9 @@ class DataMutator:
         try:
             df = pd.concat([df, other_df], ignore_index=ignore_index)
             return df
-        except Exception as ConcatenateDataError:
-            raise Exception(f"Concatenate operation failed: {str(ConcatenateDataError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Concatenate operation failed: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def create_computed_column(self, df: pd.DataFrame, new_column_name: str, expression: str) -> pd.DataFrame:
@@ -450,10 +464,9 @@ class DataMutator:
 
             df[new_column_name] = df.eval(expression)
             return df
-        except Exception as ComputedColumnError:
-            raise Exception(
-                f"Error computing and creating new column: {str(ComputedColumnError)}"
-            )
+        except (ValueError, KeyError, TypeError, SyntaxError) as e:
+            logger.error(f"Error computing and creating new column: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def bin_column(self, df: pd.DataFrame, column: str, new_column_name: str, method: str, bins: Any, labels: List[str] = None, right_inclusive: bool = True, drop_original: bool = False) -> pd.DataFrame:
@@ -486,8 +499,9 @@ class DataMutator:
                 df = df.drop(columns=[column])
 
             return df
-        except Exception as BinningError:
-            raise Exception(f"Error binning column: {str(BinningError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error binning column: {e}", exc_info=True)
+            raise
 
     @require_dataframe
     def run_statistical_test(self, df: pd.DataFrame, test_type: "Union[StatisticalTest, str]", col1: str, col2: str) -> Dict[str, Any]:
@@ -807,8 +821,9 @@ class DataMutator:
             split_df = df[column].astype(str).str.split(delimiter, expand=True)
             for index, new_col_name in enumerate(new_columns):
                 df[new_col_name] = split_df[index] if index < split_df.shape[1] else None
-        except Exception as SplitError:
-            raise ValueError(f"Error splitting column '{column}': {str(SplitError)}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error splitting column '{column}': {e}", exc_info=True)
+            raise
 
         return df, sort_state
 
@@ -824,10 +839,9 @@ class DataMutator:
 
         try:
             df[column] = df[column].astype(str).str.replace(pattern, replacement, regex=True)
-        except Exception as RegexError:
-            raise ValueError(
-                f"Error applying regex replacement to '{column}': {str(RegexError)}"
-            )
+        except (ValueError, KeyError, TypeError, re.error) as e:
+            logger.error(f"Error applying regex replacement to '{column}': {e}", exc_info=True)
+            raise
 
         return df, sort_state
 
