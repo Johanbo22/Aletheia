@@ -471,6 +471,24 @@ class PlotSettingsPanel(QWidget):
         """
         ann_tab = self.annotations_tab
 
+        # Reference lines
+        self.reference_lines_list = ann_tab.reference_lines_list
+        self.add_ref_line_button = ann_tab.add_ref_line_button
+        self.clear_ref_lines_button = ann_tab.clear_ref_lines_button
+        self.ref_line_type_combo = ann_tab.ref_line_type_combo
+        self.ref_line_y_spin = ann_tab.ref_line_y_spin
+        self.ref_line_x_spin = ann_tab.ref_line_x_spin
+        self.ref_line_slope_spin = ann_tab.ref_line_slope_spin
+        self.ref_line_intercept_spin = ann_tab.ref_line_intercept_spin
+        self.ref_line_color_button = ann_tab.ref_line_color_button
+        self.ref_line_color_label = ann_tab.ref_line_color_label
+        self.ref_line_style_combo = ann_tab.ref_line_style_combo
+        self.ref_line_width_spin = ann_tab.ref_line_width_spin
+        self.ref_line_alpha_spin = ann_tab.ref_line_alpha_spin
+        self.ref_line_label_input = ann_tab.ref_line_label_input
+        self.update_ref_line_button = ann_tab.update_ref_line_button
+        self.delete_ref_line_button = ann_tab.delete_ref_line_button
+
         # Manual Annotations
         self.annotation_text = ann_tab.annotation_text
         self.annotation_x_spin = ann_tab.annotation_x_spin

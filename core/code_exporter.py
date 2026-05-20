@@ -987,6 +987,45 @@ class CodeExporter:
 
         return lines
 
+    def _generate_reference_lines(self, config: Dict[str, Any]) -> List[str]:
+        """Generates code for reference lines (axhline, axvline, axline)"""
+        lines = []
+        ref_lines = self._get_cfg(config, "annotations.reference_lines", [])
+        if not ref_lines:
+            return lines
+
+        lines.append("\n    # --- Reference Lines ---")
+
+        for i, ref_line in enumerate(ref_lines):
+            ref_type = ref_line.get("type", "hline")
+
+            kwargs = {
+                "color": self._clean_value(ref_line.get("color", "black")),
+                "linestyle": self._clean_value(ref_line.get("linestyle", "-")),
+                "linewidth": ref_line.get("linewidth", 1.5),
+                "alpha": ref_line.get("alpha", 1.0),
+                "gid": f"ref_line_{i}"
+            }
+
+            label = ref_line.get("label")
+            if label:
+                kwargs["label"] = self._clean_value(label)
+
+            kwargs_str = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+
+            if ref_type == "hline":
+                y_val = ref_line.get("y", 0.0)
+                lines.append(f"    ax.axhline(y={y_val}, {kwargs_str})")
+            elif ref_type == "vline":
+                x_val = ref_line.get("x", 0.0)
+                lines.append(f"    ax.axvline(x={x_val}, {kwargs_str})")
+            elif ref_type == "axline":
+                slope = ref_line.get("slope", 1.0)
+                intercept = ref_line.get("intercept", 0.0)
+                lines.append(f"    ax.axline((0, {intercept}), slope={slope}, {kwargs_str})")
+
+        return lines
+
     def _generate_legend(self, config: Dict[str, Any]) -> List[str]:
         """Generate legend configuration."""
         lines = []
@@ -1135,6 +1174,7 @@ class CodeExporter:
         lines.extend(self._generate_appearance(plot_config, self._get_cfg(plot_config, "basic.x_column"), y_cols_raw))
         lines.extend(self._generate_axes_config(plot_config))
         lines.extend(self._generate_legend(plot_config))
+        lines.extend(self._generate_reference_lines(plot_config))
 
         lines.extend([
             "\n    try:",

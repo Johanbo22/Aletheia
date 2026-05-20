@@ -4,6 +4,7 @@ from .subplot_manager import SubplotManager
 from .script_manager import ScriptManager
 from .theme_manager import ThemeManager
 from .formatting_manager import PlotFormattingManager
+from .reference_line_manager import ReferenceLineManager
 
 __all__ =  [
     "CanvasInteractionManager",
@@ -12,4 +13,5 @@ __all__ =  [
     "ScriptManager",
     "ThemeManager",
     "PlotFormattingManager",
+    "ReferenceLineManager",
 ]

@@ -24,5 +24,9 @@ review_file.md
 macro.json
 generate_ico.py
 DataPlotStudio.ico
-filetree.txt
+filetree.md
 resources/themes/test.json
+raw_dump.md
+dump_core.md
+dump_main_and_resources.md
+dump_ui.md

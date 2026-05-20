@@ -23,7 +23,7 @@ from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotCleared
 from ui.status_bar import StatusBar
 from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
-from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager
+from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager
 from ui.widgets import DataPlotStudioListWidget, ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
@@ -134,6 +134,7 @@ class PlotTab(PlotTabUI):
         self.theme_manager = ThemeManager(self)
         self.subplot_manager = SubplotManager(self)
         self.annotation_manager = AnnotationManager(self)
+        self.reference_line_manager = ReferenceLineManager(self)
         self.canvas_interaction_manager = CanvasInteractionManager(self)
         self.formatting_manager = PlotFormattingManager(self)
         
@@ -402,6 +403,7 @@ class PlotTab(PlotTabUI):
     def _connect_annotation_tab_signals(self) -> None:
         """Connect signals for the Annotations tab"""
         self.annotation_manager.connect_signals()
+        self.reference_line_manager.connect_signals()
         self.view.table_enable_check.stateChanged.connect(self.on_style_changed)
         self.view.table_type_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.table_location_combo.currentTextChanged.connect(self.on_style_changed)
@@ -2053,8 +2055,9 @@ class PlotTab(PlotTabUI):
         self.status_bar.log_action(status_message, details=plot_details, level="SUCCESS")
 
     def _apply_annotations(self, df=None, x_col=None, y_cols=None):
-        """Apply text annotations"""
+        """Apply text annotations and reference lines"""
         self.annotation_manager.apply_annotations(df, x_col, y_cols)
+        self.reference_line_manager.apply_reference_lines()
 
     def clear_plot(self) -> None:
         """Clear the plot"""
@@ -2094,6 +2097,7 @@ class PlotTab(PlotTabUI):
             self.bar_customizations = {}
 
         self.annotation_manager.clear_annotations()
+        self.reference_line_manager.clear_all_reference_lines()
         self.subplot_manager.clear_configs()
 
         self.plot_clear_animation = PlotClearedAnimation(parent=None, message="Plot Cleared")

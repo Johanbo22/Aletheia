@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QStackedWidget, QGridLayout
 
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioToggleSwitch, DataPlotStudioButton
@@ -21,6 +21,8 @@ class AnnotationsSettingsTab(QWidget):
         scroll_widget.setObjectName("ScrollContent")
         scroll_layout = QVBoxLayout(scroll_widget)
 
+        self._setup_reference_lines_group(scroll_layout)
+        scroll_layout.addSpacing(15)
         self._setup_annotation_tools_group(scroll_layout)
         scroll_layout.addSpacing(15)
         self._setup_datatable_group(scroll_layout)
@@ -31,12 +33,175 @@ class AnnotationsSettingsTab(QWidget):
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
 
+    def _setup_reference_lines_group(self, parent_layout: QVBoxLayout) -> None:
+        group = DataPlotStudioGroupBox("Reference Lines")
+        layout = QVBoxLayout()
+
+        self.reference_lines_list = DataPlotStudioListWidget()
+        self.reference_lines_list.setToolTip("List of active reference lines on the plot")
+        layout.addWidget(self.reference_lines_list)
+
+        ref_buttons_layout = QHBoxLayout()
+
+        self.add_ref_line_button = DataPlotStudioButton(
+            "Add Horizontal Line",
+            parent=self,
+            base_color_hex=ThemeColors.MainColor,
+            text_color_hex="white"
+        )
+        self.add_ref_line_button.setToolTip("Add a reference line based on the selected type below")
+        ref_buttons_layout.addWidget(self.add_ref_line_button)
+
+        layout.addLayout(ref_buttons_layout)
+
+        self.clear_ref_lines_button = DataPlotStudioButton(
+            "Clear All Reference Lines",
+            parent=self,
+            base_color_hex=ThemeColors.DestructiveColor,
+            text_color_hex="white"
+        )
+        self.clear_ref_lines_button.setToolTip("Remove all reference lines from the plot")
+        layout.addWidget(self.clear_ref_lines_button)
+
+        # Editor
+        editor_group = DataPlotStudioGroupBox("Edit Selected Reference Lines")
+        editor_layout = QVBoxLayout()
+
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(QLabel("Type"))
+        self.ref_line_type_combo = DataPlotStudioComboBox()
+        self.ref_line_type_combo.addItems(["Horizontal (axhline)", "Vertical (axvline)", "Diagonal (axline)"])
+        self.ref_line_type_combo.setToolTip("Select the type of reference line")
+        type_layout.addWidget(self.ref_line_type_combo)
+        editor_layout.addLayout(type_layout)
+
+        self.ref_line_params_stack = QStackedWidget()
+
+        h_page = QWidget()
+        h_layout = QHBoxLayout(h_page)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.addWidget(QLabel("Y Position:"))
+        self.ref_line_y_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_y_spin.setRange(-1e9, 1e9)
+        self.ref_line_y_spin.setValue(0.0)
+        self.ref_line_y_spin.setSingleStep(0.1)
+        self.ref_line_y_spin.setToolTip("Y-axis position for horizontal line")
+        h_layout.addWidget(self.ref_line_y_spin)
+        h_layout.addStretch()
+        self.ref_line_params_stack.addWidget(h_page)
+
+        v_page = QWidget()
+        v_layout = QHBoxLayout(v_page)
+        v_layout.setContentsMargins(0, 0, 0, 0)
+        v_layout.addWidget(QLabel("X Position:"))
+        self.ref_line_x_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_x_spin.setRange(-1e9, 1e9)
+        self.ref_line_x_spin.setValue(0.0)
+        self.ref_line_x_spin.setSingleStep(0.1)
+        self.ref_line_x_spin.setToolTip("X-axis position for vertical line")
+        v_layout.addWidget(self.ref_line_x_spin)
+        v_layout.addStretch()
+        self.ref_line_params_stack.addWidget(v_page)
+
+        d_page = QWidget()
+        d_layout = QHBoxLayout(d_page)
+        d_layout.setContentsMargins(0, 0, 0, 0)
+        d_layout.addWidget(QLabel("Slope:"))
+        self.ref_line_slope_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_slope_spin.setRange(-1e6, 1e6)
+        self.ref_line_slope_spin.setValue(1.0)
+        self.ref_line_slope_spin.setSingleStep(0.1)
+        self.ref_line_slope_spin.setToolTip("Slope for diagonal line (axline)")
+        d_layout.addWidget(self.ref_line_slope_spin)
+
+        d_layout.addWidget(QLabel("Intercept:"))
+        self.ref_line_intercept_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_intercept_spin.setRange(-1e9, 1e9)
+        self.ref_line_intercept_spin.setValue(0.0)
+        self.ref_line_intercept_spin.setSingleStep(0.1)
+        self.ref_line_intercept_spin.setToolTip("Y-intercept for diagonal line (axline)")
+        d_layout.addWidget(self.ref_line_intercept_spin)
+        d_layout.addStretch()
+        self.ref_line_params_stack.addWidget(d_page)
+
+        editor_layout.addWidget(self.ref_line_params_stack)
+
+        # Styling layout
+        style_layout = QGridLayout()
+
+        style_layout.addWidget(QLabel("Color:"), 0, 0)
+        color_box = QHBoxLayout()
+        color_box.setContentsMargins(0, 0, 0, 0)
+        self.ref_line_color_button = DataPlotStudioButton("Choose", parent=self)
+        self.ref_line_color_label = QLabel("Black")
+        color_box.addWidget(self.ref_line_color_button)
+        color_box.addWidget(self.ref_line_color_label)
+        style_layout.addLayout(color_box, 0, 1)
+
+        style_layout.addWidget(QLabel("Line Style:"), 0, 2)
+        self.ref_line_style_combo = DataPlotStudioComboBox()
+        self.ref_line_style_combo.addItems(["solid", "dashed", "dashdot", "dotted"])
+        self.ref_line_style_combo.setToolTip("Line style for the reference line")
+        style_layout.addWidget(self.ref_line_style_combo, 0, 3)
+
+        style_layout.addWidget(QLabel("Line Width:"), 1, 0)
+        self.ref_line_width_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_width_spin.setRange(0.1, 20.0)
+        self.ref_line_width_spin.setValue(1.5)
+        self.ref_line_width_spin.setSingleStep(0.1)
+        self.ref_line_width_spin.setToolTip("Line width in points")
+        style_layout.addWidget(self.ref_line_width_spin, 1, 1)
+
+        style_layout.addWidget(QLabel("Alpha:"), 1, 2)
+        self.ref_line_alpha_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_alpha_spin.setRange(0.0, 1.0)
+        self.ref_line_alpha_spin.setValue(1.0)
+        self.ref_line_alpha_spin.setSingleStep(0.1)
+        self.ref_line_alpha_spin.setToolTip("Transparency level (0=transparent, 1=opaque)")
+        style_layout.addWidget(self.ref_line_alpha_spin, 1, 3)
+
+        editor_layout.addLayout(style_layout)
+
+        label_layout = QHBoxLayout()
+        label_layout.addWidget(QLabel("Label:"))
+        self.ref_line_label_input = DataPlotStudioLineEdit()
+        self.ref_line_label_input.setPlaceholderText("Optional label for legend")
+        self.ref_line_label_input.setToolTip("Label for the reference line (appears in legend if enabled)")
+        label_layout.addWidget(self.ref_line_label_input)
+        editor_layout.addLayout(label_layout)
+
+        update_buttons_layout = QHBoxLayout()
+        self.update_ref_line_button = DataPlotStudioButton(
+            "Update Line",
+            parent=self,
+            base_color_hex=ThemeColors.MainColor,
+            text_color_hex="white"
+        )
+        self.update_ref_line_button.setToolTip("Update the selected reference line with current settings")
+        self.update_ref_line_button.setEnabled(False)
+        update_buttons_layout.addWidget(self.update_ref_line_button)
+
+        self.delete_ref_line_button = DataPlotStudioButton(
+            "Delete Line",
+            parent=self,
+            base_color_hex=ThemeColors.DestructiveColor,
+            text_color_hex="white"
+        )
+        self.delete_ref_line_button.setToolTip("Delete the selected reference line")
+        self.delete_ref_line_button.setEnabled(False)
+        update_buttons_layout.addWidget(self.delete_ref_line_button)
+
+        editor_layout.addLayout(update_buttons_layout)
+        editor_group.setLayout(editor_layout)
+        layout.addWidget(editor_group)
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
     def _setup_annotation_tools_group(self, parent_layout: QVBoxLayout) -> None:
         group = DataPlotStudioGroupBox("Annotation Tools")
         layout = QVBoxLayout()
         
         tab_widget = QTabWidget()
-        tab_widget.setMinimumHeight(350)
         
         # Auto Annotations Tab
         auto_tab = QWidget()
@@ -169,7 +334,6 @@ class AnnotationsSettingsTab(QWidget):
 
         manual_layout.addWidget(QLabel("Annotation Text:"))
         self.annotation_text = DataPlotStudioLineEdit()
-        self.annotation_text.setMinimumHeight(20)
         self.annotation_text.setPlaceholderText("Enter text to add to plot")
         manual_layout.addWidget(self.annotation_text)
 
@@ -199,7 +363,6 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout.addWidget(QLabel("Font Color:"))
         color_layout = QHBoxLayout()
         self.annotation_color_button = DataPlotStudioButton("Choose", parent=self)
-        self.annotation_color_button.setMinimumHeight(20)
         self.annotation_color_label = QLabel("Black")
         color_layout.addWidget(self.annotation_color_button)
         color_layout.addWidget(self.annotation_color_label)
@@ -214,7 +377,6 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout.addLayout(background_color_layout)
 
         self.add_annotation_button = DataPlotStudioButton("Add Annotation", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
-        self.add_annotation_button.setMinimumHeight(20)
         manual_layout.addWidget(self.add_annotation_button)
 
         manual_layout.addStretch()

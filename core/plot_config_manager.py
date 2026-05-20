@@ -350,6 +350,7 @@ class PlotConfigManager:
     def _get_annotations_config(self) -> Dict[str, Any]:
         return {
             "text_annotations": self.pt.annotation_manager.annotations,
+            "reference_lines": self.pt.reference_line_manager.get_config(),
             "auto_annotate": {
                 "enabled": self.pt.auto_annotate_check.isChecked(),
                 "column": self.pt.auto_annotate_col_combo.currentText()
@@ -760,6 +761,10 @@ class PlotConfigManager:
         self.pt.annotations_list.clear()
         for ann in self.pt.annotations:
             self.pt.annotations_list.addItem(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")
+
+        # Reference lines
+        ref_lines_cfg = config.get("reference_lines") or []
+        self.pt.reference_line_manager.load_config(ref_lines_cfg)
         
         # Auto annotations
         auto_ann = config.get("auto_annotate") or {}
