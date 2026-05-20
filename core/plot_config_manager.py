@@ -461,9 +461,9 @@ class PlotConfigManager:
         # Viewing angles
         viewing_angles = config.get("viewing_angles", {})
         if hasattr(self.pt, "camera_elevation_spin") and "elevation" in viewing_angles:
-            self.pt.camera_elevation_spin.setValue(viewing_angles.get("elevation", 30))
+            self.pt.camera_elevation_spin.setValue(float(viewing_angles.get("elevation", 30)))
         if hasattr(self.pt, "camera_azimuth_spin") and "azimuth" in viewing_angles:
-            self.pt.camera_azimuth_spin.setValue(viewing_angles.get("azimuth", -60))
+            self.pt.camera_azimuth_spin.setValue(float(viewing_angles.get("azimuth", -60)))
         
         # Colorblind mode
         cb_conf = config.get("colorblind", {})
@@ -474,7 +474,7 @@ class PlotConfigManager:
         title_conf = config.get("title", {})
         self.pt.title_check.setChecked(title_conf.get("enabled", False))
         self.pt.title_input.setText(title_conf.get("text", ""))
-        self.pt.title_size_spin.setValue(title_conf.get("size", 12))
+        self.pt.title_size_spin.setValue(int(title_conf.get("size", 12)))
         self.pt.title_weight_combo.setCurrentText(title_conf.get("weight", "normal"))
         self.pt.title_position_combo.setCurrentText(title_conf.get("location", "center"))
 
@@ -482,25 +482,25 @@ class PlotConfigManager:
         x_label_conf = config.get("xlabel", {})
         self.pt.xlabel_check.setChecked(x_label_conf.get("enabled", False))
         self.pt.xlabel_input.setText(x_label_conf.get("text", ""))
-        self.pt.xlabel_size_spin.setValue(x_label_conf.get("size", 10))
+        self.pt.xlabel_size_spin.setValue(int(x_label_conf.get("size", 10)))
         self.pt.xlabel_weight_combo.setCurrentText(x_label_conf.get("weight", "normal"))
 
         y_label_conf = config.get("ylabel", {})
         self.pt.ylabel_check.setChecked(y_label_conf.get("enabled", False))
         self.pt.ylabel_input.setText(y_label_conf.get("text", ""))
-        self.pt.ylabel_size_spin.setValue(y_label_conf.get("size", 10))
+        self.pt.ylabel_size_spin.setValue(int(y_label_conf.get("size", 10)))
         self.pt.ylabel_weight_combo.setCurrentText(y_label_conf.get("weight", "normal"))
         
         z_label_conf = config.get("zlabel", {})
         self.pt.zlabel_check.setChecked(z_label_conf.get("enabled", True))
         self.pt.zlabel_input.setText(z_label_conf.get("text", ""))
-        self.pt.zlabel_size.setValue(z_label_conf.get("size", 10))
+        self.pt.zlabel_size.setValue(int(z_label_conf.get("size", 10)))
         self.pt.zlabel_weight.setCurrentText(z_label_conf.get("weight", "normal"))
 
         # Spines
         spines = config.get("spines", {})
         self.pt.individual_spines_check.setChecked(spines.get("individual", False))
-        self.pt.global_spine_width_spin.setValue(spines.get("global_width", 1.0))
+        self.pt.global_spine_width_spin.setValue(int(spines.get("global_width", 1.0)))
         
         g_color = spines.get("global_color", "black")
         self.pt.global_spine_color = g_color
@@ -517,16 +517,16 @@ class PlotConfigManager:
             if side in spines:
                 s_conf = spines[side]
                 ctrl_check.setChecked(s_conf.get("visible", True))
-                width_spin.setValue(s_conf.get("width", 1.0))
+                width_spin.setValue(float(s_conf.get("width", 1.0)))
                 color = s_conf.get("color", "black")
                 setattr(self.pt, color_attr, color)
                 btn.updateColors(base_color_hex=color)
         
         # Figure settings
         fig_conf = config.get("figure", {})
-        self.pt.width_spin.setValue(fig_conf.get("width", 10))
-        self.pt.height_spin.setValue(fig_conf.get("height", 6))
-        self.pt.dpi_spin.setValue(fig_conf.get("dpi", 100))
+        self.pt.width_spin.setValue(int(fig_conf.get("width", 10)))
+        self.pt.height_spin.setValue(int(fig_conf.get("height", 6)))
+        self.pt.dpi_spin.setValue(int(fig_conf.get("dpi", 100)))
 
         if "bg_color" in fig_conf:
             self.pt.bg_color = fig_conf["bg_color"] or "white"
@@ -548,16 +548,16 @@ class PlotConfigManager:
         self.pt.x_auto_check.setChecked(x_conf.get("auto_limits", True))
         self.pt.x_invert_axis_check.setChecked(x_conf.get("invert", False))
         self.pt.x_top_axis_check.setChecked(x_conf.get("top_axis", False))
-        self.pt.x_min_spin.setValue(x_conf.get("min", 0.0))
-        self.pt.x_max_spin.setValue(x_conf.get("max", 1.0))
-        self.pt.xtick_label_size_spin.setValue(x_conf.get("tick_label_size", 10))
-        self.pt.xtick_rotation_spin.setValue(x_conf.get("tick_rotation", 0))
-        self.pt.x_max_ticks_spin.setValue(x_conf.get("max_ticks", 10))
+        self.pt.x_min_spin.setValue(float(x_conf.get("min", 0.0)))
+        self.pt.x_max_spin.setValue(float(x_conf.get("max", 1.0)))
+        self.pt.xtick_label_size_spin.setValue(int(x_conf.get("tick_label_size", 10)))
+        self.pt.xtick_rotation_spin.setValue(int(x_conf.get("tick_rotation", 0)))
+        self.pt.x_max_ticks_spin.setValue(int(x_conf.get("max_ticks", 10)))
         self.pt.x_show_minor_ticks_check.setChecked(x_conf.get("minor_ticks_enabled", False))
         self.pt.x_major_tick_direction_combo.setCurrentText(x_conf.get("major_tick_direction", "out"))
-        self.pt.x_major_tick_width_spin.setValue(x_conf.get("major_tick_width", 0.8))
+        self.pt.x_major_tick_width_spin.setValue(float(x_conf.get("major_tick_width", 0.8)))
         self.pt.x_minor_tick_direction_combo.setCurrentText(x_conf.get("minor_tick_direction", "out"))
-        self.pt.x_minor_tick_width_spin.setValue(x_conf.get("minor_tick_width", 0.6))
+        self.pt.x_minor_tick_width_spin.setValue(float(x_conf.get("minor_tick_width", 0.6)))
         self.pt.x_scale_combo.setCurrentText(x_conf.get("scale", "linear"))
         self.pt.x_display_units_combo.setCurrentText(x_conf.get("display_units", "None"))
 
@@ -565,16 +565,16 @@ class PlotConfigManager:
         y_conf = config.get("y_axis", {})
         self.pt.y_auto_check.setChecked(y_conf.get("auto_limits", True))
         self.pt.y_invert_axis_check.setChecked(y_conf.get("invert", False))
-        self.pt.y_min_spin.setValue(y_conf.get("min", 0.0))
-        self.pt.y_max_spin.setValue(y_conf.get("max", 1.0))
-        self.pt.ytick_label_size_spin.setValue(y_conf.get("tick_label_size", 10))
-        self.pt.ytick_rotation_spin.setValue(y_conf.get("tick_rotation", 0))
-        self.pt.y_max_ticks_spin.setValue(y_conf.get("max_ticks", 10))
+        self.pt.y_min_spin.setValue(float(y_conf.get("min", 0.0)))
+        self.pt.y_max_spin.setValue(float(y_conf.get("max", 1.0)))
+        self.pt.ytick_label_size_spin.setValue(int(y_conf.get("tick_label_size", 10)))
+        self.pt.ytick_rotation_spin.setValue(int(y_conf.get("tick_rotation", 0)))
+        self.pt.y_max_ticks_spin.setValue(int(y_conf.get("max_ticks", 10)))
         self.pt.y_show_minor_ticks_check.setChecked(y_conf.get("minor_ticks_enabled", False))
         self.pt.y_major_tick_direction_combo.setCurrentText(y_conf.get("major_tick_direction", "out"))
-        self.pt.y_major_tick_width_spin.setValue(y_conf.get("major_tick_width", 0.8))
+        self.pt.y_major_tick_width_spin.setValue(float(y_conf.get("major_tick_width", 0.8)))
         self.pt.y_minor_tick_direction_combo.setCurrentText(y_conf.get("minor_tick_direction", "out"))
-        self.pt.y_minor_tick_width_spin.setValue(y_conf.get("minor_tick_width", 0.6))
+        self.pt.y_minor_tick_width_spin.setValue(float(y_conf.get("minor_tick_width", 0.6)))
         self.pt.y_scale_combo.setCurrentText(y_conf.get("scale", "linear"))
         self.pt.y_display_units_combo.setCurrentText(y_conf.get("display_units", "None"))
         
@@ -583,16 +583,16 @@ class PlotConfigManager:
         if hasattr(self.pt, "z_auto_check"):
             self.pt.z_auto_check.setChecked(z_conf.get("auto_limits", True))
             self.pt.z_invert_axis_check.setChecked(z_conf.get("invert", False))
-            self.pt.z_min_spin.setValue(z_conf.get("min", 0.0))
-            self.pt.z_max_spin.setValue(z_conf.get("max", 1.0))
-            self.pt.ztick_label_size_spin.setValue(z_conf.get("tick_label_size", 10))
-            self.pt.ztick_rotation_spin.setValue(z_conf.get("tick_rotation", 0))
-            self.pt.z_max_ticks_spin.setValue(z_conf.get("max_ticks", 10))
+            self.pt.z_min_spin.setValue(float(z_conf.get("min", 0.0)))
+            self.pt.z_max_spin.setValue(float(z_conf.get("max", 1.0)))
+            self.pt.ztick_label_size_spin.setValue(int(z_conf.get("tick_label_size", 10)))
+            self.pt.ztick_rotation_spin.setValue(int(z_conf.get("tick_rotation", 0)))
+            self.pt.z_max_ticks_spin.setValue(int(z_conf.get("max_ticks", 10)))
             self.pt.z_show_minor_ticks_check.setChecked(z_conf.get("minor_ticks_enabled", False))
             self.pt.z_major_tick_direction_combo.setCurrentText(z_conf.get("major_tick_direction", "out"))
-            self.pt.z_major_tick_width_spin.setValue(z_conf.get("major_tick_width", 0.8))
+            self.pt.z_major_tick_width_spin.setValue(float(z_conf.get("major_tick_width", 0.8)))
             self.pt.z_minor_tick_direction_combo.setCurrentText(z_conf.get("minor_tick_direction", "out"))
-            self.pt.z_minor_tick_width_spin.setValue(z_conf.get("minor_tick_width", 0.6))
+            self.pt.z_minor_tick_width_spin.setValue(float(z_conf.get("minor_tick_width", 0.6)))
             self.pt.z_scale_combo.setCurrentText(z_conf.get("scale", "linear"))
             self.pt.z_display_units_combo.setCurrentText(z_conf.get("display_units", "None"))
 
@@ -612,14 +612,14 @@ class PlotConfigManager:
         self.pt.legend_loc_combo.setCurrentText(config.get("location", "best"))
         self.pt.legend_title_input.setText(config.get("title", ""))
         self.pt.legend_labels_input.setText(config.get("custom_labels", ""))
-        self.pt.legend_size_spin.setValue(config.get("font_size", 10))
-        self.pt.legend_title_size_spin.setValue(config.get("title_font_size", 12))
-        self.pt.legend_columns_spin.setValue(config.get("columns", 1))
-        self.pt.legend_colspace_spin.setValue(config.get("column_spacing", 0.5))
+        self.pt.legend_size_spin.setValue(int(config.get("font_size", 10)))
+        self.pt.legend_title_size_spin.setValue(int(config.get("title_font_size", 12)))
+        self.pt.legend_columns_spin.setValue(int(config.get("columns", 1)))
+        self.pt.legend_colspace_spin.setValue(float(config.get("column_spacing", 0.5)))
         self.pt.legend_frame_check.setChecked(config.get("frame", True))
         self.pt.legend_fancybox_check.setChecked(config.get("fancy_box", True))
         self.pt.legend_shadow_check.setChecked(config.get("shadow", False))
-        self.pt.legend_edge_width_spin.setValue(config.get("edge_width", 0.8))
+        self.pt.legend_edge_width_spin.setValue(float(config.get("edge_width", 0.8)))
         
         self.pt.legend_bg_color = config.get("bg_color") or "white"
         self.pt.legend_bg_label.setText(self.pt.legend_bg_color)
@@ -654,7 +654,7 @@ class PlotConfigManager:
         def load_grid_section(prefix, conf):
             getattr(self.pt, f"{prefix}_grid_check").setChecked(conf.get("enabled", False))
             getattr(self.pt, f"{prefix}_grid_style_combo").setCurrentText(conf.get("style", "-"))
-            getattr(self.pt, f"{prefix}_grid_linewidth_spin").setValue(conf.get("width", 0.8))
+            getattr(self.pt, f"{prefix}_grid_linewidth_spin").setValue(float(conf.get("width", 0.8)))
             getattr(self.pt, f"{prefix}_grid_alpha_slider").setValue(int(conf.get("alpha", 0.5) * 100))
 
             color = conf.get("color", "gray")
@@ -674,7 +674,7 @@ class PlotConfigManager:
         self.pt.line_customizations = config.get("line_customizations", {})
         
         gl = config.get("global_line") or {}
-        self.pt.linewidth_spin.setValue(gl.get("width", 1.5))
+        self.pt.linewidth_spin.setValue(float(gl.get("width", 1.5)))
         
         # Reverse map linestyle
         style_map = {'-': 'Solid', '--': 'Dashed', '-.': 'Dash-dot', ':': 'Dotted', 'None': 'None'}
@@ -686,8 +686,8 @@ class PlotConfigManager:
         
         gm = config.get("global_marker") or {}
         self.pt.marker_combo.setCurrentText(gm.get("shape", "None"))
-        self.pt.marker_size_spin.setValue(gm.get("size", 6))
-        self.pt.marker_edge_width_spin.setValue(gm.get("edge_width", 1.0))
+        self.pt.marker_size_spin.setValue(int(gm.get("size", 6)))
+        self.pt.marker_edge_width_spin.setValue(float(gm.get("edge_width", 1.0)))
         
         self.pt.marker_color = gm.get("color") or "blue"
         self.pt.marker_color_label.setText(self.pt.marker_color)
@@ -701,8 +701,8 @@ class PlotConfigManager:
         self.pt.bar_customizations = config.get("bar_customizations", {})
         
         gb = config.get("global_bar") or {}
-        self.pt.bar_width_spin.setValue(gb.get("width", 0.8))
-        self.pt.bar_edge_width_spin.setValue(gb.get("edge_width", 1.0))
+        self.pt.bar_width_spin.setValue(float(gb.get("width", 0.8)))
+        self.pt.bar_edge_width_spin.setValue(float(gb.get("edge_width", 1.0)))
         
         self.pt.bar_color = gb.get("color") or "blue"
         self.pt.bar_color_label.setText(self.pt.bar_color)
@@ -713,7 +713,7 @@ class PlotConfigManager:
         self.pt.bar_edge_button.updateColors(base_color_hex=self.pt.bar_edge_color)
         
         hist = config.get("histogram") or {}
-        self.pt.histogram_bins_spin.setValue(hist.get("bins", 30))
+        self.pt.histogram_bins_spin.setValue(int(hist.get("bins", 30)))
         self.pt.histogram_show_normal_check.setChecked(hist.get("show_normal", False))
         self.pt.histogram_show_kde_check.setChecked(hist.get("show_kde", False))
         
@@ -727,10 +727,10 @@ class PlotConfigManager:
                 self.pt.view.error_bar_color_label.setText(self.pt.error_bar_color)
                 self.pt.view.error_bar_color_button.updateColors(base_color_hex=self.pt.error_bar_color)
             if hasattr(self.pt.view, "error_bar_linewidth_spin"):
-                self.pt.view.error_bar_linewidth_spin.setValue(geb.get("linewidth", 1.5))
-                self.pt.view.error_bar_capsize_spin.setValue(geb.get("capsize", 4.0))
+                self.pt.view.error_bar_linewidth_spin.setValue(float(geb.get("linewidth", 1.5)))
+                self.pt.view.error_bar_capsize_spin.setValue(float(geb.get("capsize", 4.0)))
                 self.pt.view.error_bar_alpha_slider.setValue(int(geb.get("alpha", 0.5) * 100))
-                self.pt.view.error_bar_zorder_spin.setValue(geb.get("zorder", 10))
+                self.pt.view.error_bar_zorder_spin.setValue(int(geb.get("zorder", 10)))
         elif "scatter" in config and "error_bars" in config["scatter"]:
             self.pt.error_bars_combo.setCurrentText(config["scatter"].get("error_bars", "None"))
         
@@ -741,16 +741,16 @@ class PlotConfigManager:
         self.pt.show_rmse_check.setChecked(scat.get("show_rmse", False))
         self.pt.show_equation_check.setChecked(scat.get("show_equation", False))
         self.pt.error_bars_combo.setCurrentText(scat.get("error_bars", "None"))
-        self.pt.confidence_level_spin.setValue(scat.get("ci_level", 95))
+        self.pt.confidence_level_spin.setValue(int(scat.get("ci_level", 95)))
         
         pie = config.get("pie") or {}
         self.pt.pie_show_percentages_check.setChecked(pie.get("show_percentages", True))
-        self.pt.pie_start_angle_spin.setValue(pie.get("start_angle", 0))
+        self.pt.pie_start_angle_spin.setValue(int(pie.get("start_angle", 0)))
         self.pt.pie_explode_check.setChecked(pie.get("explode_first", False))
-        self.pt.pie_explode_distance_spin.setValue(pie.get("explode_distance", 0.1))
+        self.pt.pie_explode_distance_spin.setValue(float(pie.get("explode_distance", 0.1)))
         self.pt.pie_shadow_check.setChecked(pie.get("shadow", False))
         self.pt.pie_donut_check.setChecked(pie.get("donut_enabled", False))
-        self.pt.pie_donut_width_spin.setValue(pie.get("donut_width", 0.3))
+        self.pt.pie_donut_width_spin.setValue(float(pie.get("donut_width", 0.3)))
 
         self.pt.toggle_line_selector()
         self.pt.toggle_bar_selector()
@@ -788,8 +788,8 @@ class PlotConfigManager:
         self.pt.table_type_combo.setCurrentText(tab.get("type", "Summary Stats"))
         self.pt.table_location_combo.setCurrentText(tab.get("location", "bottom"))
         self.pt.table_auto_font_size_check.setChecked(tab.get("auto_font_size", True))
-        self.pt.table_font_size_spin.setValue(tab.get("fontsize", 10))
-        self.pt.table_scale_spin.setValue(tab.get("scale", 1.2))
+        self.pt.table_font_size_spin.setValue(int(tab.get("fontsize", 10)))
+        self.pt.table_scale_spin.setValue(float(tab.get("scale", 1.2)))
         
         self.pt.toggle_table_controls()
     
@@ -802,7 +802,7 @@ class PlotConfigManager:
         
         choro = config.get("choropleth", {})
         self.pt.geo_scheme_combo.setCurrentText(choro.get("scheme", "None"))
-        self.pt.geo_k_spin.setValue(choro.get("k", 5))
+        self.pt.geo_k_spin.setValue(int(choro.get("k", 5)))
         
         leg = config.get("legend", {})
         self.pt.geo_legend_check.setChecked(leg.get("enabled", False))
@@ -825,4 +825,4 @@ class PlotConfigManager:
         if hasattr(self.pt, "geo_edge_color_label"):
             self.pt.geo_edge_color_label.setText(self.pt.geo_edge_color)
             self.pt.geo_edge_color_btn.updateColors(base_color_hex=self.pt.geo_edge_color)
-        self.pt.geo_linewidth_spin.setValue(bound.get("linewidth", 1.0))
+        self.pt.geo_linewidth_spin.setValue(float(bound.get("linewidth", 1.0)))

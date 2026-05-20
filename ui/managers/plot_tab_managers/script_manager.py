@@ -174,15 +174,15 @@ class ScriptManager:
             try:
                 x_params = ax.xaxis.get_tick_params()
                 x_axis_cfg = config["axes"]["x_axis"]
-                x_axis_cfg["tick_label_size"] = x_params.get("labelsize", x_axis_cfg["tick_label_size"])
+                x_axis_cfg["tick_label_size"] = int(x_params.get("labelsize", x_axis_cfg["tick_label_size"]))
                 if "labelrotation" in x_params:
-                    x_axis_cfg["tick_rotation"] = x_params["labelrotation"]
+                    x_axis_cfg["tick_rotation"] = int(x_params["labelrotation"])
 
                 y_params = ax.yaxis.get_tick_params()
                 y_axis_cfg = config["axes"]["y_axis"]
-                y_axis_cfg["tick_label_size"] = y_params.get("labelsize", y_axis_cfg["tick_label_size"])
+                y_axis_cfg["tick_label_size"] = int(y_params.get("labelsize", y_axis_cfg["tick_label_size"]))
                 if "labelrotation" in y_params:
-                    y_axis_cfg["tick_rotation"] = y_params["labelrotation"]
+                    y_axis_cfg["tick_rotation"] = int(y_params["labelrotation"])
             except Exception:
                 pass
 
