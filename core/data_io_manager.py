@@ -480,3 +480,20 @@ class DataIOManager:
             "thousands": self.last_gsheet_thousands,
             "gid": self.last_gsheet_gid,
         }
+    
+    def set_data_source_info(self, source_info: Dict[str, Any]) -> None:
+        """
+        Restores the data source state fro a provided dict
+        
+        :param source_info: Dictionary containing the source information
+        """
+        file_path = source_info.get("file_path")
+        self.file_path = Path(file_path) if file_path else None
+        
+        self.is_temp_file = source_info.get("is_temp_file", False)
+        
+        temp_csv_path = source_info.get("temp_csv_path")
+        self.temp_csv_path = Path(temp_csv_path) if temp_csv_path else None
+        
+        self.last_db_connection_string = source_info.get("last_db_connection_string")
+        self.last_db_query = source_info.get("last_db_query")

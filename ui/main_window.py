@@ -4,7 +4,7 @@ from PyQt6.QtCore import QThreadPool, pyqtSlot, QTimer, pyqtSignal, QSettings
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from pathlib import Path
 import traceback
-
+import json
 
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION, SCRIPT_FILE_NAME, LOG_FILE_NAME
 from core.subset_manager import SubsetManager
@@ -16,7 +16,7 @@ from core.data_handler import DataHandler
 from core.project_manager import ProjectManager
 from core.code_exporter import CodeExporter
 from core.logger import Logger
-from ui.status_bar import StatusBar
+from ui.status_bar import LogLevel, StatusBar
 from ui.dialogs import (ProgressDialog, GoogleSheetsDialog, DatabaseConnectionDialog, ExportDialog, GoogleSheetsExportDialog, ConsoleDialog)
 from ui.animations import (FileImportAnimation, FailedAnimation, SavedProjectAnimation, GoogleSheetsImportAnimation, DatabaseImportAnimation, ProjectOpenAnimation, ScriptLogExportAnimation, ExportFileAnimation)
 from ui.icons import IconBuilder, IconType
@@ -261,7 +261,17 @@ class MainWindow(QWidget):
             traceback.print_exc()
     
     def load_project(self, project_data: dict) -> None:
-        """load project data into the UI"""
+        """Load project data into the UI"""
+        metadata = project_data.get("metadata", {})
+        source_info_json = metadata.get("data_source_info")
+        
+        if source_info_json:
+            try:
+                source_info = json.loads(source_info_json)
+                self.data_handler._io.set_data_source_info(source_info)
+            except Exception as error:
+                self.status_bar.log(f"Warning: Could not restore data source info: {str(error)}", LogLevel.ERROR)
+            
         if "data" in project_data and project_data["data"] is not None:
             self.data_handler.df = project_data["data"]
             self.data_handler.original_df = project_data["data"].copy()
@@ -331,11 +341,17 @@ class MainWindow(QWidget):
     
     def get_project_data(self) -> dict:
         """Get the project data for saving"""
+        source_info = self.data_handler.get_data_source()
         return {
             "data": self.data_handler.df,
             "plot_config": self.plot_tab.get_config(),
             "subsets": self.subset_manager.export_subsets(),
-            "metadata": {"version": APPLICATION_VERSION, "name": f"{APPLICATION_NAME} Project"}
+            "metadata": {
+                "version": APPLICATION_VERSION, 
+                "name": f"{APPLICATION_NAME} Project",
+                "data_source_info": json.dumps(source_info),
+            
+            }
         }
         
     def open_python_console(self) -> None:
