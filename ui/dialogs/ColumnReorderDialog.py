@@ -1,15 +1,15 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QDialogButtonBox, QFrame, QPushButton, QHBoxLayout, QGraphicsDropShadowEffect, QSizePolicy
-from PyQt6.QtCore import Qt, QEvent, QTimer, QVariantAnimation
-from PyQt6.QtGui import QIcon, QFont, QColor
-
 import pandas as pd
-from pygments import highlight
+from PyQt6.QtCore import Qt, QEvent, QTimer, QVariantAnimation, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QIcon, QFont, QColor, QBrush, QMouseEvent
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, \
+    QPushButton, QHBoxLayout, QGraphicsDropShadowEffect, QSizePolicy, QApplication
 
 from core.resource_loader import get_resource_path
 from ui.icons.icon_registry import IconBuilder, IconType
-from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
+from ui.widgets import DataPlotStudioButton
 from ui.widgets.ControlElements import DataPlotStudioLineEdit
+
 
 class ColumnReorderDialog(QDialog):
     """
@@ -24,6 +24,31 @@ class ColumnReorderDialog(QDialog):
         self.df = df
         self._original_columns: list[str] = list(df.columns)
         self._animations: list[QVariantAnimation] = []
+
+        self._highlighted_header_item: QTableWidgetItem | None = None
+        self._highlighted_original_font: QFont | None = None
+        self._highlighted_cells: list[QTableWidgetItem] = []
+        self._reset_btn_original_text: str = "Reset Order"
+        self._reset_btn_original_icon: QIcon | None = None
+
+        # A search timer for the search input to prevent scrolling on large datasets during each keystroke
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(250)
+        self._search_timer.timeout.connect(self._perform_search)
+
+        # A reset timer for the reset button to prevent a crash if the dialog is accepted before btn is allowed to reset
+        self._reset_timer = QTimer(self)
+        self._reset_timer.setSingleShot(True)
+        self._reset_timer.setInterval(1500)
+        self._reset_timer.timeout.connect(self._revert_reset_button)
+
+        # An auto-scrolling timer to prevent the slow scroll
+        self._auto_scroll_timer = QTimer(self)
+        self._auto_scroll_timer.setInterval(16)
+        self._auto_scroll_timer.timeout.connect(self._do_auto_scroll)
+        self._scroll_speed: int = 0
+
         self.init_ui()
         
     def init_ui(self) -> None:
@@ -56,10 +81,11 @@ class ColumnReorderDialog(QDialog):
         search_layout.addWidget(search_icon)
         
         self.search_input = DataPlotStudioLineEdit()
+        self.search_input.setObjectName("ColumnReorderSearchInput")
         self.search_input.setPlaceholderText("Search column...")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.setMaximumWidth(220)
-        self.search_input.textChanged.connect(self.jump_to_column)
+        self.search_input.textChanged.connect(self._search_timer.start)
         search_layout.addWidget(self.search_input)
         
         top_bar_layout.addLayout(search_layout)
@@ -73,6 +99,7 @@ class ColumnReorderDialog(QDialog):
         self.table_mimic.setShowGrid(False)
         self.table_mimic.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.table_mimic.setMinimumHeight(200)
+        self.table_mimic.setAutoScroll(False)
         
         table_shadow_effect = QGraphicsDropShadowEffect(self)
         table_shadow_effect.setBlurRadius(15)
@@ -92,7 +119,7 @@ class ColumnReorderDialog(QDialog):
         self.header.setSectionsMovable(True)
         self.header.setHighlightSections(True)
         self.header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.header.setCursor(Qt.CursorShape.OpenHandCursor)
+        self.header.viewport().setCursor(Qt.CursorShape.OpenHandCursor)
         self.header.setMinimumSectionSize(90)
         self.header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
@@ -126,17 +153,62 @@ class ColumnReorderDialog(QDialog):
         
         layout.addLayout(bottom_layout)
     
-    def eventFilter(self, source, event: QEvent) -> bool:
+    def eventFilter(self, source, event: QEvent | QMouseEvent) -> bool:
         if hasattr(self, "header") and source is self.header.viewport():
             if event.type() == QEvent.Type.MouseButtonPress:
                 self.header.setCursor(Qt.CursorShape.ClosedHandCursor)
+            elif event.type() == QEvent.Type.MouseMove:
+                if event.buttons() & Qt.MouseButton.LeftButton:
+                    pos_x = event.pos().x()
+                    viewport_width = self.header.viewport().width()
+                    scroll_margin = 40
+
+                    if pos_x < scroll_margin:
+                        self._scroll_speed = -int(max(1, (scroll_margin - pos_x) / 2))
+                        if not self._auto_scroll_timer.isActive():
+                            self._auto_scroll_timer.start()
+                    elif pos_x > viewport_width - scroll_margin:
+                        self._scroll_speed = int(max(1, (pos_x - (viewport_width - scroll_margin)) / 2))
+                        if not self._auto_scroll_timer.isActive():
+                            self._auto_scroll_timer.start()
+                    else:
+                        self._auto_scroll_timer.stop()
+                        self._scroll_speed = 0
             elif event.type() == QEvent.Type.MouseButtonRelease:
                 self.header.setCursor(Qt.CursorShape.OpenHandCursor)
+                self._auto_scroll_timer.stop()
+                self._scroll_speed = 0
         return super().eventFilter(source, event)
+
+    def _do_auto_scroll(self) -> None:
+        """Handles the continuous scrolling when a header is dragged to the edge of the viewport"""
+        scrollbar = self.table_mimic.horizontalScrollBar()
+        if not scrollbar:
+            return
+
+        current_val = scrollbar.value()
+        new_val = current_val + self._scroll_speed
+
+        new_val = max(scrollbar.minimum(), min(new_val, scrollbar.maximum()))
+
+        if current_val != new_val:
+            scrollbar.setValue(new_val)
+
+            cursor_pos = self.header.viewport().mapFromGlobal(self.header.cursor().pos())
+            move_event = QMouseEvent(
+                QEvent.Type.MouseMove,
+                cursor_pos,
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier
+            )
+            QApplication.postEvent(self.header.viewport(), move_event)
+        else:
+            self._auto_scroll_timer.stop()
     
     def reset_order(self) -> None:
         """
-        Resets the visua order of the headers back to the original dataframe
+        Resets the visual order of the headers back to the original dataframe
         """
         for logical_index in range(self.table_mimic.columnCount()):
             visual_index = self.header.visualIndex(logical_index)
@@ -144,18 +216,45 @@ class ColumnReorderDialog(QDialog):
                 self.header.moveSection(visual_index, logical_index)
         self.update_header_labels()
         
-        reset_btn_original_text = "Reset Order"
-        reset_btn_original_icon = self.reset_btn.icon()
+        self._reset_btn_original_text = "Reset Order"
+        self._reset_btn_original_icon = self.reset_btn.icon()
         
         self.reset_btn.setText("Order Reset!")
         self.reset_btn.setIcon(IconBuilder.build(IconType.Checkmark))
         
-        QTimer.singleShot(1500, lambda: self._revert_reset_button(reset_btn_original_text, reset_btn_original_icon))
+        self._reset_timer.start()
     
-    def _revert_reset_button(self, original_text: str, original_icon: QIcon) -> None:
-        self.reset_btn.setText(original_text)
-        self.reset_btn.setIcon(original_icon)
-    
+    def _revert_reset_button(self) -> None:
+        """Reverts the reset button to its default state"""
+        try:
+            self.reset_btn.setText(self._reset_btn_original_text)
+            if self._reset_btn_original_icon:
+                self.reset_btn.setIcon(self._reset_btn_original_icon)
+        except RuntimeError:
+            pass
+
+    def _perform_search(self) -> None:
+        """Executes the search query after the search timer ends"""
+        self.jump_to_column(self.search_input.text())
+
+    def _clear_previous_highlights(self) -> None:
+        """Stops and clears running animations and restores the original styling"""
+        for anim in self._animations:
+            anim.stop()
+            anim.deleteLater()
+        self._animations.clear()
+
+        if self._highlighted_header_item and self._highlighted_original_font:
+            self._highlighted_header_item.setFont(self._highlighted_original_font)
+
+        for cell in self._highlighted_cells:
+            if cell:
+                cell.setBackground(QBrush())
+
+        self._highlighted_header_item = None
+        self._highlighted_original_font = None
+        self._highlighted_cells = []
+
     def update_header_labels(self) -> None:
         """
         Updates the header label text with its visual index
@@ -178,62 +277,88 @@ class ColumnReorderDialog(QDialog):
         """
         Scrolls to the header of the first column matching the search text
         """
+        self._clear_previous_highlights()
+
         if not text.strip():
+            self.search_input.setProperty("searchState", "default")
+            self.search_input.style().unpolish(self.search_input)
+            self.search_input.style().polish(self.search_input)
             return
-        
+
         search_query = text.lower()
+        match_found = False
+
         for visual_index in range(self.table_mimic.columnCount()):
             logical_index = self.header.logicalIndex(visual_index)
             col_name = self._original_columns[logical_index]
-            
+
             if search_query in col_name.lower():
+                match_found = True
                 x_pos = self.header.sectionPosition(visual_index)
-                self.table_mimic.horizontalScrollBar().setValue(x_pos)
-                
+
+                scroll_bar = self.table_mimic.horizontalScrollBar()
+                scroll_anim = QPropertyAnimation(scroll_bar, b"value", self)
+                scroll_anim.setDuration(400)
+                scroll_anim.setStartValue(scroll_bar.value())
+                scroll_anim.setEndValue(x_pos)
+                scroll_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+                self._animations.append(scroll_anim)
+                scroll_anim.start()
+
                 header_item = self.table_mimic.horizontalHeaderItem(logical_index)
                 cells = [self.table_mimic.item(row, logical_index) for row in range(self.table_mimic.rowCount())]
-                
+
                 original_font = header_item.font() if header_item else QFont()
                 if header_item:
                     highlight_font = QFont(original_font)
                     highlight_font.setBold(True)
                     header_item.setFont(highlight_font)
-                
+
+                    self._highlighted_header_item = header_item
+                    self._highlighted_original_font = original_font
+                    self._highlighted_cells = cells
+
                 anim = QVariantAnimation(self)
-                anim.setDuration(1500)
+                anim.setDuration(1800)
                 try:
-                    start_color = QColor(ThemeColors.MainColor)
+                    base_color = QColor(ThemeColors.MainColor)
                 except Exception:
-                    start_color = QColor("#3b82f6")
-                start_color.setAlpha(120)
-                
+                    base_color = QColor("#3b82f6")
+
+                peak_color = QColor(base_color)
+                peak_color.setAlpha(200)
+                mid_color = QColor(base_color)
+                mid_color.setAlpha(80)
                 end_color = QColor(255, 255, 255, 0)
-                
-                anim.setStartValue(start_color)
-                anim.setEndValue(end_color)
-                
-                def update_beam(color, target_cells=cells):
-                    for cell in target_cells:
-                        if cell:
-                            cell.setBackground(color)
-                
-                anim.valueChanged.connect(update_beam)
-                anim.finished.connect(lambda hi=header_item, of=original_font, a=anim, cs=cells: self._finalize_highlight(hi, of, a, cs))
+
+                anim.setKeyValueAt(0.0, end_color)
+                anim.setKeyValueAt(0.2, peak_color)
+                anim.setKeyValueAt(0.4, mid_color)
+                anim.setKeyValueAt(0.6, peak_color)
+                anim.setKeyValueAt(1.0, end_color)
+
+                anim.valueChanged.connect(lambda color, t_cells=cells: self._update_beam(color, t_cells))
+                anim.finished.connect(lambda a=anim: self._finalize_highlight(a))
+
                 self._animations.append(anim)
                 anim.start()
                 break
-    
-    def _finalize_highlight(self, header_item: QTableWidgetItem, original_font: QFont, anim: QVariantAnimation, cells: list) -> None:
-        if header_item:
-            header_item.setFont(original_font)
-            
-        from PyQt6.QtGui import QBrush
-        for cell in cells:
+
+        state_value = "valid" if match_found else "invalid"
+        self.search_input.setProperty("searchState", state_value)
+        self.search_input.style().unpolish(self.search_input)
+        self.search_input.style().polish(self.search_input)
+
+    def _update_beam(self, color: QColor, target_cells: list) -> None:
+        """Updates the background color of target cells during the highlighting animation"""
+        for cell in target_cells:
             if cell:
-                cell.setBackground(QBrush())
-                
-        if anim in self._animations:
-            self._animations.remove(anim)
+                cell.setBackground(color)
+
+    def _finalize_highlight(self, anim: QVariantAnimation) -> None:
+        """Cleanup callback when animation finishes"""
+        self._clear_previous_highlights()
     
     def _populate_table(self) -> None:
         """

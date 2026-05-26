@@ -33,7 +33,7 @@
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     border-bottom: 3px solid #cbd5e1;
-    margin-right: 2px;
+    margin-right: 4px;
 }
 
 #ColumnReorderMimicTable QHeaderView::section:horizontal:hover {
@@ -46,6 +46,15 @@
     background-color: #e2e8f0;
     border-bottom: 3px solid #2563eb;
     color: #1e3a8a;
+}
+
+#ColumnReorderSearchInput[searchState="invalid"] {
+    border: 1px solid #ef4444;
+    color: #ef4444;
+}
+
+#ColumnReorderSearchInput[searchState="invalid"]:focus {
+    border: 2px solid #ef4444;
 }
 
 #ColumnReorderResetBtn {
