@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPropertyAnimation, QEasingCurve, QPoint
 
 from core.data_handler import DataHandler
 from ui.widgets.ControlElements import DataPlotStudioLineEdit
@@ -31,6 +31,20 @@ class DataSearchBar(QWidget):
         self.search_timer.setSingleShot(True)
         self.search_timer.setInterval(search_timer_ms)
         self.search_timer.timeout.connect(self._execute_search_worker)
+
+        # Animation for when the search bar is requested
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.opacity_effect.setOpacity(0.0)
+        self.setGraphicsEffect(self.opacity_effect)
+
+        animation_duration: int = 200
+        self.opacity_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.opacity_animation.setDuration(animation_duration)
+        self.opacity_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        self.slide_animation = QPropertyAnimation(self, b"pos")
+        self.slide_animation.setDuration(animation_duration)
+        self.slide_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
 
         self._init_ui()
 
@@ -79,20 +93,53 @@ class DataSearchBar(QWidget):
 
     def open_search(self) -> None:
         """
-        Displays the search bar and focus the input
+        Displays the search bar with a slide down animation and focus the input
         """
-        self.show()
+        self.setVisible(True)
+
+        current_pos: QPoint = self.pos()
+        start_pos: QPoint = QPoint(current_pos.x(), current_pos.y() - 50)
+        self.move(start_pos)
+
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(0.0)
+        self.opacity_animation.setEndValue(1.0)
+
+        self.slide_animation.stop()
+        self.slide_animation.setStartValue(start_pos)
+        self.slide_animation.setEndValue(current_pos)
+
+        self.opacity_animation.start()
+        self.slide_animation.start()
+
         self.search_input.setFocus()
         self.search_input.selectAll()
 
     def close_search(self) -> None:
         """
-        Hides the search bar, clears the inputs and requests selection clear
+        Hides the search bar with a slide up animation, clears inputs and requests selection clear
         """
+        current_pos: QPoint = self.pos()
+        end_pos = QPoint(current_pos.x(), current_pos.y() - 50)
+
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(1.0)
+        self.opacity_animation.setEndValue(0.0)
+
+        self.slide_animation.stop()
+        self.slide_animation.setStartValue(current_pos)
+        self.slide_animation.setEndValue(end_pos)
+        self.slide_animation.finished.connect(self._on_close_animation_finished)
+
+        self.opacity_animation.start()
+        self.slide_animation.start()
+
+    def _on_close_animation_finished(self) -> None:
+        """Called when the close animation finishes to hide the widget"""
+        self.slide_animation.finished.disconnect(self._on_close_animation_finished)
         self.hide()
         self.search_input.clear()
         self.clear_selection_requested.emit()
-        self.close_requested.emit()
 
     def _on_search_text_changed(self, text: str) -> None:
         self.pending_search_text = text

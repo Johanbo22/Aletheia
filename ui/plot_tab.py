@@ -1463,7 +1463,7 @@ class PlotTab(PlotTabUI):
 
         #disable flipping axes on certain plots
         incompatible_plots: list[str] = [
-            "Histogram", "Pie", "Heatmap", "KDE", "Stackplot", "Eventplot",
+            "Histogram", "Pie", "Heatmap", "KDE", "Stackplot",
             "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Barbs", "Quiver",
             "Streamplot", "Tricontour", "Tricontourf", "Tripcolor", "Triplot", "2D Histogram", "ECDF", "GeoSpatial", "3D Scatter", "3D Line", "3D Surface"
         ]
