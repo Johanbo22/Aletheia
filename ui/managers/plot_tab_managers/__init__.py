@@ -5,8 +5,10 @@ from .script_manager import ScriptManager
 from .theme_manager import ThemeManager
 from .formatting_manager import PlotFormattingManager
 from .reference_line_manager import ReferenceLineManager
+from .color_manager import ColorManager
 
 __all__ =  [
+    "ColorManager",
     "CanvasInteractionManager",
     "AnnotationManager",
     "SubplotManager",

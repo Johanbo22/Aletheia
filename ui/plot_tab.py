@@ -23,7 +23,7 @@ from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotCleared
 from ui.status_bar import StatusBar
 from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
-from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager
+from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager
 from ui.widgets import DataPlotStudioListWidget, ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
@@ -137,6 +137,7 @@ class PlotTab(PlotTabUI):
         self.reference_line_manager = ReferenceLineManager(self)
         self.canvas_interaction_manager = CanvasInteractionManager(self)
         self.formatting_manager = PlotFormattingManager(self)
+        self.color_manager = ColorManager(self)
         
         # Caching
         self._last_data_signature = None
@@ -192,16 +193,9 @@ class PlotTab(PlotTabUI):
     def _connect_appearance_tab_signals(self) -> None:
         """Connect signals for the Appearance tab"""
         self.view.individual_spines_check.stateChanged.connect(self.toggle_individual_spines)
-        self.view.global_spine_color_button.clicked.connect(self.choose_global_spine_color)
-        self.view.top_spine_color_button.clicked.connect(self.choose_top_spine_color)
-        self.view.bottom_spine_color_button.clicked.connect(self.choose_bottom_spine_color)
-        self.view.left_spine_color_button.clicked.connect(self.choose_left_spine_color)
-        self.view.right_spine_color_button.clicked.connect(self.choose_right_spine_color)
         self.view.all_spines_btn.clicked.connect(self.preset_all_spines)
         self.view.box_only_btn.clicked.connect(self.preset_box_only)
         self.view.no_spines_btn.clicked.connect(self.preset_no_spines)
-        self.view.bg_color_button.clicked.connect(self.choose_bg_color)
-        self.view.face_color_button.clicked.connect(self.choose_face_color)
         self.view.width_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
         self.view.height_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
         self.view.colorblind_check.stateChanged.connect(self.update_colorblind_simulation)
@@ -301,20 +295,13 @@ class PlotTab(PlotTabUI):
     def _connect_legend_grid_tab_signals(self) -> None:
         """Connect signals for the Legend and Grid tab"""
         self.view.legend_check.stateChanged.connect(self.on_legend_toggle)
-        self.view.legend_bg_button.clicked.connect(self.choose_legend_bg_color)
-        self.view.legend_edge_button.clicked.connect(self.choose_legend_edge_color)
         self.view.legend_alpha_slider.valueChanged.connect(lambda v: self.view.legend_alpha_label.setText(f"{v}%"))
         self.view.grid_check.stateChanged.connect(self.on_grid_toggle)
-        self.view.global_grid_color_button.clicked.connect(self.choose_global_grid_color)
         self.view.global_grid_alpha_slider.valueChanged.connect(lambda v: self.view.global_grid_alpha_label.setText(f"{v}%"))
         self.view.independent_grid_check.stateChanged.connect(self.on_independent_grid_toggle)
-        self.view.x_major_grid_color_button.clicked.connect(self.choose_x_major_grid_color)
         self.view.x_major_grid_alpha_slider.valueChanged.connect(lambda v: self.view.x_major_grid_alpha_label.setText(f"{v}%"))
-        self.view.x_minor_grid_color_button.clicked.connect(self.choose_x_minor_grid_color)
         self.view.x_minor_grid_alpha_slider.valueChanged.connect(lambda v: self.view.x_minor_grid_alpha_label.setText(f"{v}%"))
-        self.view.y_major_grid_color_button.clicked.connect(self.choose_y_major_grid_color)
         self.view.y_major_grid_alpha_slider.valueChanged.connect(lambda v: self.view.y_major_grid_alpha_label.setText(f"{v}%"))
-        self.view.y_minor_grid_color_button.clicked.connect(self.choose_y_minor_grid_color)
         self.view.y_minor_grid_alpha_slider.valueChanged.connect(lambda v: self.view.y_minor_grid_alpha_label.setText(f"{v}%"))
         
         self.view.legend_loc_combo.currentTextChanged.connect(self.on_style_changed)
@@ -353,13 +340,8 @@ class PlotTab(PlotTabUI):
         """Connect signals for the customization tab"""
         self.view.multiline_custom_check.stateChanged.connect(self.toggle_line_selector)
         self.view.line_selector_combo.currentTextChanged.connect(self.on_line_selected)
-        self.view.line_color_button.clicked.connect(self.choose_line_color)
-        self.view.marker_color_button.clicked.connect(self.choose_marker_color)
-        self.view.marker_edge_button.clicked.connect(self.choose_marker_edge_color)
         self.view.multibar_custom_check.stateChanged.connect(self.toggle_bar_selector)
         self.view.bar_selector_combo.currentTextChanged.connect(self.on_bar_selected)
-        self.view.bar_color_button.clicked.connect(self.choose_bar_color)
-        self.view.bar_edge_button.clicked.connect(self.choose_bar_edge_color)
         self.view.bar_edge_width_spin.valueChanged.connect(self._update_bar_customization_live)
         self.view.alpha_slider.valueChanged.connect(lambda v: self.view.alpha_label.setText(f"{v}%"))
         
@@ -392,8 +374,7 @@ class PlotTab(PlotTabUI):
         self.view.pie_donut_check.stateChanged.connect(self.on_data_changed)
         self.view.pie_donut_width_spin.valueChanged.connect(self.on_data_changed)
         self.view.error_bars_combo.currentTextChanged.connect(self.on_data_changed)
-        
-        self.view.error_bar_color_button.clicked.connect(self.choose_error_bar_color)
+
         self.view.error_bar_linewidth_spin.valueChanged.connect(self.on_data_changed)
         self.view.error_bar_capsize_spin.valueChanged.connect(self.on_data_changed)
         self.view.error_bar_alpha_slider.valueChanged.connect(lambda v: self.view.error_bar_alpha_label.setText(f"{v}%"))
@@ -413,9 +394,6 @@ class PlotTab(PlotTabUI):
 
     def _connect_geospatial_tab_signals(self) -> None:
         """Connect signals for the Geospatial tab"""
-        self.view.geo_missing_color_btn.clicked.connect(self.choose_geo_missing_color)
-        self.view.geo_edge_color_btn.clicked.connect(self.choose_geo_edge_color)
-        
         self.view.geo_scheme_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
         self.view.geo_k_spin.valueChanged.connect(self._on_geospatial_projection_changed)
         self.view.geo_legend_check.stateChanged.connect(self._on_geospatial_projection_changed)
@@ -434,6 +412,7 @@ class PlotTab(PlotTabUI):
     def _connect_theme_controls(self) -> None:
         """Connect signals for Theme management"""
         self.theme_manager.connect_signals()
+        self.color_manager.connect_signals()
     
     def showEvent(self, event) -> None:
         """Triggered on tab visibility. Clears selectons from plot"""
@@ -526,15 +505,6 @@ class PlotTab(PlotTabUI):
         self.view.individual_spines_container.setVisible(checked)
         self.on_style_changed()
     
-    def choose_global_spine_color(self):
-        """Aplly the color and open diaglo"""
-        color = QColorDialog.getColor(QColor(self.global_spine_color), self)
-        if color.isValid():
-            self.global_spine_color = color.name()
-            self.view.global_spine_color_label.setText(self.global_spine_color)
-            self.view.global_spine_color_button.updateColors(base_color_hex=self.global_spine_color)
-            self.on_style_changed()
-    
     def use_subset(self):
         """Active subset on change"""
         subset_enabled = self.view.use_subset_check.isChecked()
@@ -601,22 +571,6 @@ class PlotTab(PlotTabUI):
             self.status_bar.log(f"Failed to save plot: {str(ExportPlotAsImageError)}", "ERROR")
             QMessageBox.critical(self, "Save Error", f"Could not save plot:\n{str(ExportPlotAsImageError)}")
             traceback.print_exc()
-
-    def choose_geo_missing_color(self):
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.geo_missing_color = color.name()
-            self.view.geo_missing_color_label.setText(self.geo_missing_color)
-            self.view.geo_missing_color_btn.updateColors(base_color_hex=self.geo_missing_color)
-            self._on_geospatial_projection_changed()
-
-    def choose_geo_edge_color(self):
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.geo_edge_color = color.name()
-            self.view.geo_edge_color_label.setText(self.geo_edge_color)
-            self.view.geo_edge_color_btn.updateColors(base_color_hex=self.geo_edge_color)
-            self._on_geospatial_projection_changed()
 
     def activate_subset(self, subset_name: str):
         """Activates the 'Use Subset' checkbox and selects the selected subset"""
@@ -850,51 +804,6 @@ class PlotTab(PlotTabUI):
         self.view.grid_axis_combo.setEnabled(not is_independent)
         self.on_style_changed()
     
-    def choose_global_grid_color(self) -> None:
-        """Choose color for global gridlines"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.global_grid_color = color.name()
-            self.view.global_grid_color_label.setText(self.global_grid_color)
-            self.view.global_grid_color_button.updateColors(base_color_hex=self.global_grid_color)
-            self.on_style_changed()
-
-    def choose_x_major_grid_color(self):
-        """Choose color for x-axis major gridlines"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.x_major_grid_color = color.name()
-            self.view.x_major_grid_color_label.setText(self.x_major_grid_color)
-            self.view.x_major_grid_color_button.updateColors(base_color_hex=self.x_major_grid_color)
-            self.on_style_changed()
-
-    def choose_x_minor_grid_color(self):
-        """Choose the colour for the minor x gridlnies"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.x_minor_grid_color = color.name()
-            self.view.x_minor_grid_color_label.setText(self.x_minor_grid_color)
-            self.view.x_minor_grid_color_button.updateColors(base_color_hex=self.x_minor_grid_color)
-            self.on_style_changed()
-    
-    def choose_y_major_grid_color(self):
-        """Choose color for x-axis major gridlines"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.y_major_grid_color = color.name()
-            self.view.y_major_grid_color_label.setText(self.y_major_grid_color)
-            self.view.y_major_grid_color_button.updateColors(base_color_hex=self.y_major_grid_color)
-            self.on_style_changed()
-
-    def choose_y_minor_grid_color(self):
-        """Choose the colour for the minor x gridlnies"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.y_minor_grid_color = color.name()
-            self.view.y_minor_grid_color_label.setText(self.y_minor_grid_color)
-            self.view.y_minor_grid_color_button.updateColors(base_color_hex=self.y_minor_grid_color)
-            self.on_style_changed()
-    
     def toggle_multi_y(self):
         """Toggle between multi and single y slections"""
         is_multi = self.view.multi_y_check.isChecked()
@@ -933,24 +842,6 @@ class PlotTab(PlotTabUI):
         else:
             y_col_text = self.view.y_column.currentText()
             return [y_col_text] if y_col_text else []
-    
-    def choose_bg_color(self) -> None:
-        """Open color picker for background"""
-        color = QColorDialog.getColor(QColor(self.bg_color), self)
-        if color.isValid():
-            self.bg_color = color.name()
-            self.view.bg_color_label.setText(self.bg_color)
-            self.view.bg_color_button.updateColors(base_color_hex=self.bg_color)
-            self.on_style_changed()
-
-    def choose_face_color(self) -> None:
-        """Open the color picker tool for the face of the plotting axes"""
-        color = QColorDialog.getColor(QColor(self.face_color), self)
-        if color.isValid():
-            self.face_color = color.name()
-            self.view.face_color_label.setText(self.face_color)
-            self.view.face_color_button.updateColors(base_color_hex=self.face_color)
-            self.on_style_changed()
     
     def update_colorblind_simulation(self) -> None:
         """Applies or removes the SVG filter effect from canvas"""
@@ -1096,42 +987,6 @@ class PlotTab(PlotTabUI):
                 self.view.alpha_slider.blockSignals(False)
                 self.view.alpha_label.setText(f"{int(alpha * 100)}%")
     
-    def choose_top_spine_color(self):
-        """Open color picker for top spine"""
-        color = QColorDialog.getColor(QColor(self.top_spine_color), self)
-        if color.isValid():
-            self.top_spine_color = color.name()
-            self.view.top_spine_color_label.setText(self.top_spine_color)
-            self.view.top_spine_color_button.updateColors(base_color_hex=self.top_spine_color)
-            self.on_style_changed()
-    
-    def choose_bottom_spine_color(self):
-        """Open color picker for bottom spine"""
-        color = QColorDialog.getColor(QColor(self.bottom_spine_color), self)
-        if color.isValid():
-            self.bottom_spine_color = color.name()
-            self.view.bottom_spine_color_label.setText(self.bottom_spine_color)
-            self.view.bottom_spine_color_button.updateColors(base_color_hex=self.bottom_spine_color)
-            self.on_style_changed()
-    
-    def choose_left_spine_color(self):
-        """Open color picker for left spine"""
-        color = QColorDialog.getColor(QColor(self.left_spine_color), self)
-        if color.isValid():
-            self.left_spine_color = color.name()
-            self.view.left_spine_color_label.setText(self.left_spine_color)
-            self.view.left_spine_color_button.updateColors(base_color_hex=self.left_spine_color)
-            self.on_style_changed()
-    
-    def choose_right_spine_color(self):
-        """Open color picker for right spine"""
-        color = QColorDialog.getColor(QColor(self.right_spine_color), self)
-        if color.isValid():
-            self.right_spine_color = color.name()
-            self.view.right_spine_color_label.setText(self.right_spine_color)
-            self.view.right_spine_color_button.updateColors(base_color_hex=self.right_spine_color)
-            self.on_style_changed()
-    
     def preset_all_spines(self):
         """Preset: Show all spines"""
         self.view.top_spine_visible_check.setChecked(True)
@@ -1158,90 +1013,6 @@ class PlotTab(PlotTabUI):
         self.view.right_spine_visible_check.setChecked(False)
         self.status_bar.log("Applied preset: No Spines", "INFO")
         self.on_style_changed()
-    
-    def choose_line_color(self) -> None:
-        """Open color picker for line color"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.line_color = color.name()
-            self.view.line_color_label.setText(self.line_color)
-            # Show color preview
-            self.view.line_color_button.updateColors(base_color_hex=self.line_color)
-            self.on_style_changed()
-    
-    def choose_marker_color(self):
-        """Open color picker for marker color"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.marker_color = color.name()
-            self.view.marker_color_label.setText(self.marker_color)
-            self.view.marker_color_button.updateColors(base_color_hex=self.marker_color)
-            self.on_style_changed()
-    
-    def choose_marker_edge_color(self):
-        """Open color picker for marker edge color"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.marker_edge_color = color.name()
-            self.view.marker_edge_label.setText(self.marker_edge_color)
-            self.view.marker_edge_button.updateColors(base_color_hex=self.marker_edge_color)
-            self.on_style_changed()
-    
-    def choose_bar_color(self):
-        """Open color picker for bar color"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.bar_color = color.name()
-            self.view.bar_color_label.setText(self.bar_color)
-            self.view.bar_color_button.updateColors(base_color_hex=self.bar_color)
-            self._update_bar_customization_live()
-            self.on_style_changed()
-    
-    def choose_bar_edge_color(self):
-        """Open color picker for bar edge color"""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.bar_edge_color = color.name()
-            self.view.bar_edge_label.setText(self.bar_edge_color)
-            self.view.bar_edge_button.updateColors(base_color_hex=self.bar_edge_color)
-            self._update_bar_customization_live()
-            self.on_style_changed()
-    
-    def choose_error_bar_color(self):
-        """Open color picker for error bar color"""
-        color = QColorDialog.getColor(QColor(self.error_bar_color), self)
-        if color.isValid():
-            self.error_bar_color = color.name()
-            self.view.error_bar_color_label.setText(self.error_bar_color)
-            self.view.error_bar_color_button.updateColors(base_color_hex=self.error_bar_color)
-            self.on_data_changed()
-    
-    def choose_textbox_bg_color(self):
-        """Open color picker for text box background"""
-        color = QColorDialog.getColor(QColor(self.textbox_bg_color), self)
-        if color.isValid():
-            self.textbox_bg_color = color.name()
-            self.view.textbox_bg_label.setText(self.textbox_bg_color)
-            self.view.textbox_bg_button.updateColors(base_color_hex=self.textbox_bg_color)
-            self.on_style_changed()
-    
-    def choose_legend_bg_color(self):
-        """Open color picker for legend background"""
-        color = QColorDialog.getColor(QColor(self.legend_bg_color), self)
-        if color.isValid():
-            self.legend_bg_color = color.name()
-            self.view.legend_bg_label.setText(self.legend_bg_color)
-            self.view.legend_bg_button.updateColors(base_color_hex=self.legend_bg_color)
-            self.on_style_changed()
-    
-    def choose_legend_edge_color(self):
-        """Open color picker for legend edge color"""
-        color = QColorDialog.getColor(QColor(self.legend_edge_color), self)
-        if color.isValid():
-            self.legend_edge_color = color.name()
-            self.view.legend_edge_label.setText(self.legend_edge_color)
-            self.view.legend_edge_button.updateColors(base_color_hex=self.legend_edge_color)
-            self.on_style_changed()
     
     def update_column_combo(self):
         """Update column ComboBoxes with available columns"""
