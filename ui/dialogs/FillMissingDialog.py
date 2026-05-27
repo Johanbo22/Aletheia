@@ -38,9 +38,18 @@ class FillMissingDialog(QDialog):
         # this is the columns selection UI
         layout.addWidget(QLabel("Target Column:"))
         self.column_combo = DataPlotStudioComboBox()
-        self.column_combo.addItem("All Columns")
-        self.column_combo.addItems(self.columns)
+        columns_with_missing: list[str] = [
+            col for col in self.columns if self.df is not None and col in self.df.columns and self.df[col].isna().any()
+        ]
+        if not columns_with_missing:
+            self.column_combo.addItem("No missing values found")
+            self.column_combo.setEnabled(False)
+        else:
+            self.column_combo.addItem("All Columns")
+            self.column_combo.addItems(columns_with_missing)
+        
         self.column_combo.currentTextChanged.connect(self.update_stats)
+        self.column_combo.currentTextChanged.connect(self.validate_inputs)
         layout.addWidget(self.column_combo)
 
         # Stats frame
@@ -105,7 +114,16 @@ class FillMissingDialog(QDialog):
         value_layout.addWidget(QLabel("Enter Value:"))
         self.value_input = DataPlotStudioLineEdit()
         self.value_input.setPlaceholderText("e.g. 0, Unknown, 1.5")
+        self.value_input.textChanged.connect(self.validate_inputs)
         value_layout.addWidget(self.value_input)
+        
+        # Warning label for mismatch in datatype for static value 
+        self.type_warning_label = QLabel()
+        self.type_warning_label.setObjectName("type_warning_label")
+        self.type_warning_label.setProperty("styleClass", "warning_info_text")
+        self.type_warning_label.setVisible(False)
+        value_layout.addWidget(self.type_warning_label)
+        
         layout.addWidget(self.value_group)
         self.value_group.setVisible(False)
 
@@ -113,25 +131,32 @@ class FillMissingDialog(QDialog):
 
         # btns
         button_layout = QHBoxLayout()
-        apply_btn = DataPlotStudioButton(
+        self.apply_btn = DataPlotStudioButton(
             "Apply Fill",
             parent=self,
             base_color_hex=ThemeColors.MainColor,
             text_color_hex="white",
             font_weight="bold",
         )
-        apply_btn.clicked.connect(self.accept)
+        self.apply_btn.clicked.connect(self.accept)
 
         cancel_btn = DataPlotStudioButton("Cancel", parent=self)
         cancel_btn.clicked.connect(self.reject)
 
-        button_layout.addWidget(apply_btn)
+        button_layout.addWidget(self.apply_btn)
         button_layout.addWidget(cancel_btn)
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
 
         self.update_stats()
+        
+        # Disable form elements if there are no missing data
+        if not columns_with_missing:
+            self.method_combo.setEnabled(False)
+            self.apply_btn.setEnabled(False)
+            self.stats_label.setText("Missing Values: 0 / 0 (0.0%)")
+            self.missing_progress.setValue(0)
 
     def on_method_change(self, text: str):
         """Show or hide the value intput box"""
@@ -144,6 +169,60 @@ class FillMissingDialog(QDialog):
             self.group_check.setEnabled(False)
         else:
             self.group_check.setEnabled(True)
+        
+        self.validate_inputs()
+    
+    def validate_inputs(self, *args) -> None:
+        """Enables and disables the apply button based on a valid input state"""
+        method_text: str = self.method_combo.currentText()
+        self.type_warning_label.setVisible(False)
+        
+        if "Static" not in method_text:
+            self.apply_btn.setEnabled(True)
+            return
+
+        input_text: str = self.value_input.text().strip()
+        if not input_text:
+            self.apply_btn.setEnabled(False)
+            return
+            
+        if self.df is None:
+            self.apply_btn.setEnabled(True)
+            return
+
+        target_col: str = self.column_combo.currentText()
+        if target_col == "All Columns" or target_col not in self.df.columns:
+            self.apply_btn.setEnabled(True)
+            return
+            
+        # Type checking for the specific target column
+        col_dtype = self.df[target_col].dtype
+        type_is_valid: bool = True
+        
+        if pd.api.types.is_numeric_dtype(col_dtype):
+            try:
+                float(input_text)
+            except ValueError:
+                type_is_valid = False
+                self.type_warning_label.setText("Warning: Column expects a number. This will change the data type.")
+                
+        elif pd.api.types.is_bool_dtype(col_dtype):
+            if input_text.lower() not in ["true", "false", "1", "0", "t", "f"]:
+                type_is_valid = False
+                self.type_warning_label.setText("Warning: Column expects True/False. This will change the data type.")
+                
+        elif pd.api.types.is_datetime64_any_dtype(col_dtype):
+            try:
+                pd.to_datetime(input_text)
+            except (ValueError, TypeError):
+                type_is_valid = False
+                self.type_warning_label.setText("Warning: Column expects a date/time. This will change the data type.")
+                
+        if not type_is_valid:
+            self.type_warning_label.setVisible(True)
+
+        # Allow the user to proceed as long as there is text input
+        self.apply_btn.setEnabled(True)
 
     def toggle_group_combo(self, checked: bool):
         """Show or hide the group selection box"""
