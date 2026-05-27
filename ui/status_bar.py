@@ -468,8 +468,7 @@ class StatusBar(QStatusBar):
         if y < screen_geom.top():
             y = button_position.y() + button_height
         
-        self.popup.move(x, y)
-        self.popup.show()
+        self.popup.show_with_animation(QPoint(x, y))
     
     def _show_terminal_context_menu(self, position: QPoint) -> None:
         """Right-click context menu on the terminal bar"""

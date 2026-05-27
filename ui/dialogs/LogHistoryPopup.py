@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QTextEdit, QVBoxLayout, QWidget, QLabel, QApplication, QHBoxLayout, QPushButton, QSizeGrip, QLineEdit, QScrollBar
-from PyQt6.QtCore import Qt, QTimer, QPoint
-from PyQt6.QtGui import QClipboard, QMouseEvent, QKeyEvent
+from PyQt6.QtWidgets import QTextEdit, QVBoxLayout, QWidget, QLabel, QApplication, QHBoxLayout, QPushButton, QSizeGrip, QLineEdit, QGraphicsOpacityEffect, QGraphicsColorizeEffect
+from PyQt6.QtCore import Qt, QTimer, QPoint, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
+from PyQt6.QtGui import QClipboard, QMouseEvent, QKeyEvent, QCloseEvent, QColor
 from typing import List, Optional, Any
 
 class LogHistoryPopup(QWidget):
@@ -24,26 +24,31 @@ class LogHistoryPopup(QWidget):
 
         title_label = QLabel("Log History")
         title_label.setObjectName("HeaderTitle")
+
+        self._filter_debounce_timer = QTimer(self)
+        self._filter_debounce_timer.setSingleShot(True)
+        self._filter_debounce_timer.setInterval(300)
+        self._filter_debounce_timer.timeout.connect(self._animate_filter_transition)
         
         self.search_bar = QLineEdit()
         self.search_bar.setObjectName("SearchBar")
         self.search_bar.setPlaceholderText("Filter logs...")
         self.search_bar.setFixedWidth(180)
-        self.search_bar.textChanged.connect(self._apply_filters)
+        self.search_bar.textChanged.connect(lambda _: self._filter_debounce_timer.start())
         
         self.error_filter_btn = QPushButton("Errors")
         self.error_filter_btn.setObjectName("ErrorFilter")
         self.error_filter_btn.setProperty("class", "FilterPill")
         self.error_filter_btn.setCheckable(True)
         self.error_filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.error_filter_btn.clicked.connect(self._apply_filters)
+        self.error_filter_btn.clicked.connect(lambda _: self._filter_debounce_timer.start())
         
         self.warn_filter_btn = QPushButton("Warnings")
         self.warn_filter_btn.setObjectName("WarningFilter")
         self.warn_filter_btn.setProperty("class", "FilterPill")
         self.warn_filter_btn.setCheckable(True)
         self.warn_filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.warn_filter_btn.clicked.connect(self._apply_filters)
+        self.warn_filter_btn.clicked.connect(lambda _: self._filter_debounce_timer.start())
         
         self.wrap_btn = QPushButton("Wrap")
         self.wrap_btn.setObjectName("WrapToggle")
@@ -84,6 +89,9 @@ class LogHistoryPopup(QWidget):
 
         self.text_view = QTextEdit()
         self.text_view.setReadOnly(True)
+
+        self._text_opacity_effect = QGraphicsOpacityEffect(self.text_view)
+        self.text_view.setGraphicsEffect(self._text_opacity_effect)
         
         self._render_logs(self._full_history)
         
@@ -140,6 +148,30 @@ class LogHistoryPopup(QWidget):
             filtered.append(log)
         
         self._render_logs(filtered)
+
+    def _animate_filter_transition(self) -> None:
+        """Fades out the text view, applies the current filters and fades back int"""
+        if not hasattr(self, "_text_opacity_effect"):
+            self._apply_filters()
+            return
+
+        animation_duration: int = 300
+        self._filter_anim = QPropertyAnimation(self._text_opacity_effect, b"opacity")
+        self._filter_anim.setDuration(animation_duration)
+        self._filter_anim.setStartValue(self._text_opacity_effect.opacity())
+        self._filter_anim.setEndValue(0.0)
+        self._filter_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        def finalize_transition() -> None:
+            self._apply_filters()
+            self._filter_anim.finished.disconnect(finalize_transition)
+            self._filter_anim.setStartValue(0.0)
+            self._filter_anim.setEndValue(1.0)
+            self._filter_anim.setEasingCurve(QEasingCurve.Type.InQuad)
+            self._filter_anim.start()
+
+        self._filter_anim.finished.connect(finalize_transition)
+        self._filter_anim.start()
     
     def append_live_log(self, html_log: str) -> None:
         """Updater from StatusBar"""
@@ -173,18 +205,49 @@ class LogHistoryPopup(QWidget):
         """Copy plain text of the logs to the system clipboard."""
         clipboard: QClipboard = QApplication.clipboard()
         clipboard.setText(self.text_view.toPlainText())
-        
+
         self.copy_btn.setText("Copied!")
-        
+        if not hasattr(self, "_copy_effect"):
+            self._copy_effect = QGraphicsColorizeEffect(self.copy_btn)
+            self.copy_btn.setGraphicsEffect(self._copy_effect)
+
+        self._copy_effect.setColor(QColor("#00ff00"))
+        self._copy_anim = QPropertyAnimation(self._copy_effect, b"strength")
+        self._copy_anim.setDuration(1500)
+        self._copy_anim.setStartValue(1.0)
+        self._copy_anim.setEndValue(0.0)
+        self._copy_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self._copy_anim.start()
+
         QTimer.singleShot(2000, lambda: self.copy_btn.setText("Copy"))
     
     def _clear_logs(self) -> None:
         """Clear local text view and flush the parent status's log history"""
-        self._full_history.clear()
-        self._render_logs(self._full_history)
-        parent = self.parent()
-        if hasattr(parent, "log_history"):
-            parent.log_history.clear()
+        if not self._full_history:
+            return
+
+        animation_duration: int = 300
+        self._clear_anim = QPropertyAnimation(self._text_opacity_effect, b"opacity")
+        self._clear_anim.setDuration(animation_duration)
+        self._clear_anim.setStartValue(1.0)
+        self._clear_anim.setEndValue(0.0)
+        self._clear_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        def finalize_clear() -> None:
+            self._full_history.clear()
+            self._render_logs(self._full_history)
+            parent = self.parent()
+            if hasattr(parent, "log_history"):
+                parent.log_history.clear()
+
+            self._clear_anim.finished.disconnect(finalize_clear)
+            self._clear_anim.setStartValue(0.0)
+            self._clear_anim.setEndValue(1.0)
+            self._clear_anim.setEasingCurve(QEasingCurve.Type.InQuad)
+            self._clear_anim.start()
+
+        self._clear_anim.finished.connect(finalize_clear)
+        self._clear_anim.start()
             
     def _toggle_word_wrap(self) -> None:
         """Toggle between wrapped words and straight text"""
@@ -222,3 +285,60 @@ class LogHistoryPopup(QWidget):
         if event.buttons() == Qt.MouseButton.LeftButton and self._drag_pos is not None:
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Intercepts close request to play the exit animation"""
+        if not hasattr(self, "_is_closing"):
+            self._is_closing = True
+            event.ignore()
+            self._run_close_animation()
+        else:
+            event.accept()
+
+    def show_with_animation(self, target_pos: QPoint) -> None:
+        """Shows the popup with a slide up animation"""
+        start_pos = QPoint(target_pos.x(), target_pos.y() + 15)
+        self.move(start_pos)
+        self.setWindowOpacity(0.0)
+        self.show()
+
+        animation_duration_milliseconds: int = 300
+        self._pos_anim = QPropertyAnimation(self, b"pos")
+        self._pos_anim.setDuration(animation_duration_milliseconds)
+        self._pos_anim.setStartValue(start_pos)
+        self._pos_anim.setEndValue(target_pos)
+        self._pos_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        self._opacity_anim = QPropertyAnimation(self, b"windowOpacity")
+        self._opacity_anim.setDuration(animation_duration_milliseconds)
+        self._opacity_anim.setStartValue(0.0)
+        self._opacity_anim.setEndValue(1.0)
+        self._opacity_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        self._anim_group = QParallelAnimationGroup(self)
+        self._anim_group.addAnimation(self._pos_anim)
+        self._anim_group.addAnimation(self._opacity_anim)
+        self._anim_group.start()
+
+    def _run_close_animation(self) -> None:
+        """Plays the inverse of the show_with_animation when closeEvent is triggered"""
+        self._close_anim_group = QParallelAnimationGroup(self)
+
+        animation_duration_milliseconds: int = 300
+        pos_anim = QPropertyAnimation(self, b"pos")
+        pos_anim.setDuration(animation_duration_milliseconds)
+        pos_anim.setStartValue(self.pos())
+        pos_anim.setEndValue(QPoint(self.pos().x(), self.pos().y() + 15))
+        pos_anim.setEasingCurve(QEasingCurve.Type.InQuad)
+
+        opacity_anim = QPropertyAnimation(self, b"windowOpacity")
+        opacity_anim.setDuration(animation_duration_milliseconds)
+        opacity_anim.setStartValue(self.windowOpacity())
+        opacity_anim.setEndValue(0.0)
+        opacity_anim.setEasingCurve(QEasingCurve.Type.InQuad)
+
+        self._close_anim_group.addAnimation(pos_anim)
+        self._close_anim_group.addAnimation(opacity_anim)
+
+        self._close_anim_group.finished.connect(self.close)
+        self._close_anim_group.start()
