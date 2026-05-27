@@ -94,6 +94,12 @@ class MainWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.setLayout(layout)
+        self._update_tab_visibility()
+
+    def _update_tab_visibility(self) -> None:
+        """Hides the tab bar if no data is loaded"""
+        has_data = self.data_handler.df is not None
+        self.tabs.tabBar().setVisible(has_data)
         
     @pyqtSlot(set)
     def _on_brush_selection_made(self, indices: set) -> None:
@@ -225,6 +231,7 @@ class MainWindow(QWidget):
             self.data_tab.refresh_data_view()
             self.unsaved_changes = False
             self.status_bar.log("New Project Created")
+            self._update_tab_visibility()
     
     def open_project(self) -> None:
         """Open an existing project"""
@@ -291,6 +298,7 @@ class MainWindow(QWidget):
         self.plot_tab.generate_plot()
         
         self._unsaved_changes = False
+        self._update_tab_visibility()
 
     def save_project(self) -> bool:
         """Saves the current project"""
@@ -367,6 +375,7 @@ class MainWindow(QWidget):
         self.plot_tab.update_column_combo()
         self.unsaved_changes = True
         self.status_bar.update_data_stats(self.data_handler.df)
+        self._update_tab_visibility()
     
     def clear_all(self) -> None:
         """Clear all data"""
@@ -379,6 +388,7 @@ class MainWindow(QWidget):
         self.data_tab.controller.refresh_active_subsets()
         self.plot_tab.refresh_subset_list()
         self.status_bar.update_data_stats(None)
+        self._update_tab_visibility()
     
     def _confirm_discard_changes(self) -> bool:
         """Returns True if its safe to proceed, False if not"""
@@ -483,6 +493,7 @@ class MainWindow(QWidget):
         self.plot_tab.update_column_combo()
         self._unsaved_changes = True
         self.status_bar.update_data_stats(loaded_dataframe)
+        self._update_tab_visibility()
         
         self.tabs.setCurrentWidget(self.data_tab)
 
@@ -556,6 +567,7 @@ class MainWindow(QWidget):
         self._unsaved_changes = True
 
         self.status_bar.update_data_stats(loaded_dataframe)
+        self._update_tab_visibility()
         
         self.tabs.setCurrentWidget(self.data_tab)
 
@@ -600,6 +612,7 @@ class MainWindow(QWidget):
                 self.plot_tab.update_column_combo()
                 self._unsaved_changes = True
                 self.status_bar.update_data_stats(self.data_handler.df)
+                self._update_tab_visibility()
 
                 self.status_bar.set_progress(100)
                 self.status_bar.show_progress(False)
