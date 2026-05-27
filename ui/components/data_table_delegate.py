@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QStyle
+from PyQt6.QtCore import Qt, QModelIndex, QObject
 from PyQt6.QtGui import QPainter
 
 class DataTableDelegate(QStyledItemDelegate):
@@ -9,6 +9,10 @@ class DataTableDelegate(QStyledItemDelegate):
     
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         opt = QStyleOptionViewItem(option)
+        
+        if opt.state & QStyle.StateFlag.State_HasFocus:
+            opt.state = opt.state ^ QStyle.StateFlag.State_HasFocus
+        
         opt.rect = opt.rect.adjusted(self.horizontal_padding, 0, -self.horizontal_padding, 0)
         
         opt.displayAlignment = Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft
