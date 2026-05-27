@@ -1,15 +1,17 @@
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFrame, QLabel, 
-    QScrollArea, QVBoxLayout, QWidget, QPushButton
-)
-from pathlib import Path
-import sys
 import importlib.util
+import sys
+from pathlib import Path
 from typing import Optional
+
+from PyQt6.QtCore import Qt, QUrl, QEvent, QObject
+from PyQt6.QtGui import QDesktopServices, QMouseEvent, QHideEvent, QShowEvent
+from PyQt6.QtWidgets import (
+    QDialog, QDialogButtonBox, QFrame, QLabel,
+    QScrollArea, QVBoxLayout, QWidget, QPushButton, QApplication
+)
+
 from core.resource_loader import get_resource_path
-from ui.widgets import DataPlotStudioButton
+
 
 class HelpDialog(QDialog):
     """Dialog window do display help content"""
@@ -26,7 +28,6 @@ class HelpDialog(QDialog):
         # Window
         self.setWindowTitle(f"Help: {title}")
         self.resize(600, 700)
-        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowFlag(Qt.WindowType.Tool, True)
         self.setObjectName("HelpDialogMain")
 
@@ -119,6 +120,37 @@ class HelpDialog(QDialog):
         
         button_layout.addWidget(button_box)
         layout.addWidget(button_container)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        """Installs a global event filter when dialog is shown"""
+        app = QApplication.instance()
+        if app:
+            app.installEventFilter(self)
+        super().showEvent(event)
+
+    def hideEvent(self, event: QHideEvent) -> None:
+        """Removes the global event filter when dialog is hidden."""
+        app = QApplication.instance()
+        if app:
+            app.removeEventFilter(self)
+        super().hideEvent(event)
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """Event filter to capture mouse clicks outside dialog params to execute reject"""
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if isinstance(event, QMouseEvent):
+                clicked_widget = QApplication.widgetAt(event.globalPosition().toPoint())
+                if not clicked_widget or (not self.isAncestorOf(clicked_widget) and clicked_widget is not self):
+                    self.reject()
+                    return True
+        return super().eventFilter(obj, event)
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Handles the window state change, closing if focus is lost to other modals"""
+        if event.type() == QEvent.Type.ActivationChange:
+            if not self.isActiveWindow():
+                self.reject()
+        super().changeEvent(event)
     
     def _load_animation(self, topic_id, path):
         if not Path(path).exists():
