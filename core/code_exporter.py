@@ -1,4 +1,12 @@
 # core/code_exporter.py
+"""
+Code Exporter module for generating runnable Python scripts
+
+This module provides functionality to inspect the UI state and generate
+complete, executable Python scripts that replicate the data loading, processing,
+and visualization steps performed in Aletheia
+"""
+
 from typing import Dict, Any, List, Set, Callable
 from datetime import datetime
 from pathlib import Path

@@ -1,3 +1,10 @@
+"""
+Aggregation Manager is for managing saved data aggregations
+
+Provides methods for storing, retrieving and reapplying
+data aggregation configurations
+"""
+
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from dataclasses import dataclass, field

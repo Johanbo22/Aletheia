@@ -1,4 +1,10 @@
 #core/subset_manager
+"""
+Subset Manager module for managing data subsets and filter configurations.
+
+This module provides the SubsetManager class which handles creating, storing,
+and managing data subsets
+"""
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field

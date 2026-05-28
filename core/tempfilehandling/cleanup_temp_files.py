@@ -1,3 +1,10 @@
+"""
+Cleanup Temp Files module for managing temporary file cleanup operations.
+
+This module provides functions for cleaning up temporary files created by the
+Aletheia application, including session-specific temp files and orphaned files
+from crashed sessions.
+"""
 import os
 from pathlib import Path
 import tempfile

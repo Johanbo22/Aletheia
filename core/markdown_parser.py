@@ -1,3 +1,10 @@
+"""
+Markdown Parser module for parsing changelog and markdown content
+
+This module provides functions to parse markdown changelog text and extract
+specific sections such as fixes and version history and converts it to HTML
+"""
+
 import re
 from enum import Enum
 import logging

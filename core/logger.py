@@ -1,4 +1,11 @@
 # core/logger.py
+"""
+Logger module for Aletheia logging functionality
+
+This modules provides the Logger class which is a singleton that handles all
+logging for Aletheia.
+"""
+
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Deque

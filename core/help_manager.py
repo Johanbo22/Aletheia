@@ -1,3 +1,9 @@
+"""
+Help Manager module for managing help topics and tutorials
+
+This module provides the HelpManager class which handles fetching help topics
+and tutorial content from the SQLite database.
+"""
 import logging
 import sqlite3
 import textwrap

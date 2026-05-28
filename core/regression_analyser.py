@@ -1,3 +1,10 @@
+"""
+Regression Analyser module for regression analysis and error bar calculations.
+
+This module provides classes and functions for performing various types of
+regression analysis (linear, polynomial, exponential, logarithmic) and
+calculating regression metrics including R-squared, RMSE, and confidence intervals.
+"""
 import numpy as np
 import pandas as pd
 from scipy import stats

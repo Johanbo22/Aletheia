@@ -1,3 +1,10 @@
+"""
+Data Mutator module for data transformations and manipulation operations
+
+This module provides the DataMutator class which handles various data operations
+on pandas DataFrames. This modules API redirects to DataHandler to bridge
+"""
+
 import keyword
 import logging
 import re

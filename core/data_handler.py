@@ -1,3 +1,11 @@
+"""
+Data Handler module for managing data operations and states
+
+This module provides the DataHandler class which serves as a bridge between
+the IO, mutator and DiffHistory managers and the to the UI of Aletheia. DataHandler
+gives the public API of data import, export, transformations, state tracking and statistical operations
+"""
+
 import atexit
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, Callable, List

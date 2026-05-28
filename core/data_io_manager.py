@@ -1,3 +1,11 @@
+"""
+Data IO Manager module for handling file and data source operations
+
+This module provides the DataIOManager class which handles all file I/O operations
+including reading and writing local files, Google Sheets import/export, database import and
+temporary file management
+"""
+
 import pandas as pd
 import requests
 from io import StringIO

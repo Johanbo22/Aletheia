@@ -1,3 +1,9 @@
+"""
+Create Temp File module for creating temporary CSV files.
+
+This module provides functions for creating temporary CSV files from DataFrames,
+used primarily when importing data from external sources like Google Sheets and databases.
+"""
 import pandas as pd
 from pathlib import Path
 import tempfile

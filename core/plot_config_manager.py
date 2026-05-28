@@ -1,3 +1,10 @@
+"""
+Plot Config Manager module for managing plot configurations and themes
+
+This module provides the PlotConfigManager class which handles extraction and
+loading of plot configurations from the UI
+"""
+
 from typing import Dict, Any, TYPE_CHECKING, Union
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab

@@ -1,4 +1,11 @@
 # core/project_manager.py
+"""
+Project Manager module for managing project files and autosaves
+
+This module provides the ProjectManager class which handles creating, loading
+saving and managing project files in a compressed package format.
+"""
+
 from pathlib import Path
 from typing import Dict, Any, Optional
 import pandas as pd

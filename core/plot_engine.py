@@ -1,4 +1,11 @@
 # core/plot_engine.py
+"""
+Plot Engine module for managing all plotting functionality
+
+This module provides the PlotEngine class which handles plot generation using
+matplotlib. This class is also responsible for rendering of canvas, ax and figure.
+"""
+
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import matplotlib
