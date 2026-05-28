@@ -47,7 +47,6 @@ class DataTabController:
     def create_new_dataset(self) -> None:
         """Creates a new empty dataset"""
         try:
-            
             dialog = CreateDatasetDialog(self.view)
             if not dialog.exec():
                 return
@@ -71,6 +70,7 @@ class DataTabController:
             )
             if confirm == QMessageBox.StandardButton.Yes:
                 self.data_handler.create_empty_dataframe(rows, columns, column_names=column_names, fill_value=fill_value)
+                self.view.toolbar.set_refresh_visible(False)
                 self.view.refresh_data_view()
                 self.status_bar.log(f"Created new dataset: ({rows}x{columns})", "SUCCESS")
                 
@@ -85,7 +85,20 @@ class DataTabController:
     def refresh_google_sheets(self):
         """Refreshes data from the last imported google sheets document"""
         if not self.data_handler.has_google_sheets_import():
-            QMessageBox.warning(self, "No Import History", "No Google Sheets import data found")
+            QMessageBox.warning(self.view, "No Import History", "No Google Sheets import data found")
+            return
+        
+        reply = QMessageBox.question(
+            self.view,
+            "Confirm Data Refresh",
+            "Refreshing from Google Sheets will overwrite the current dataset.\n\n"
+            "Any modifications will be lost.\n\n"
+            "Are you sure you want to proceed?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.No:
+            self.status_bar.log("Google Sheet refresh cancelled", LogLevel.INFO)
             return
         
         sheet_id = self.data_handler.last_gsheet_id
