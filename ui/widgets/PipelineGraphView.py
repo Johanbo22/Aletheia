@@ -37,12 +37,13 @@ class FocusHighlightItem(QGraphicsObject):
         painter.setPen(QPen(QColor("#3b82f6"), 1.5))
         painter.drawPath(path)
 
-class GraphNode(QGraphicsObject):
-    clicked = pyqtSignal(int)
 
-    def __init__(self, index: int, label: str, operation: dict, is_active: bool, is_undone: bool, parent=None):
+class GraphNode(QGraphicsObject):
+    clicked = pyqtSignal(str)
+
+    def __init__(self, node_id: str, label: str, operation: dict, is_active: bool, is_undone: bool, parent=None):
         super().__init__(parent)
-        self.index = index
+        self.node_id = node_id
         self.label = label
         self.operation = operation
         self.is_active = is_active
@@ -51,11 +52,11 @@ class GraphNode(QGraphicsObject):
 
         self.width = 260.0
         self.height = 48.0
-        
+
         self.setAcceptHoverEvents(True)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
+
         # Cache node rendering to prevent repaint during scrolling
         self.setCacheMode(QGraphicsObject.CacheMode.DeviceCoordinateCache)
         # Setting origin to center for better animation 
@@ -80,7 +81,7 @@ class GraphNode(QGraphicsObject):
         self.shadow = QGraphicsDropShadowEffect()
         self.shadow.setColor(QColor(0, 0, 0, 25))
         self.setGraphicsEffect(self.shadow)
-        
+
         self._update_styling()
 
     def boundingRect(self) -> QRectF:
@@ -100,7 +101,7 @@ class GraphNode(QGraphicsObject):
             self.border_color = QColor(Qt.GlobalColor.transparent)
             self.text_color = QColor("#1E3A8A")
             self.dot_color = QColor("#3B82F6")
-            self.shadow.setEnabled(False) 
+            self.shadow.setEnabled(False)
         elif self.is_undone:
             self.bg_color = QColor("#F8FAFC") if not self.is_hovered else QColor("#F1F5F9")
             self.border_color = QColor("#CBD5E1")
@@ -113,7 +114,7 @@ class GraphNode(QGraphicsObject):
             self.text_color = QColor("#334155")
             self.dot_color = self.border_color
             self.shadow.setEnabled(True)
-        
+
         if not self.is_active:
             if self.is_hovered:
                 self.shadow.setBlurRadius(18)
@@ -141,11 +142,11 @@ class GraphNode(QGraphicsObject):
                 self.shadow.setOffset(0, 1)
                 self.shadow.setBlurRadius(4)
                 self.update()
-            self.clicked.emit(self.index)
+            self.clicked.emit(self.node_id)
             event.accept()
         else:
             super().mousePressEvent(event)
-    
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setScale(1.0)
@@ -155,46 +156,46 @@ class GraphNode(QGraphicsObject):
 
     def paint(self, painter: QPainter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         path = QPainterPath()
         path.addRoundedRect(self.boundingRect(), 8, 8)
-        
+
         painter.fillPath(path, QBrush(self.bg_color))
-        
+
         pen = QPen(self.border_color, 1.5)
         if self.is_undone and not self.is_active:
             pen.setStyle(Qt.PenStyle.DashLine)
         painter.setPen(pen)
         painter.drawPath(path)
-        
+
         dot_radius = 4.5
         dot_x = 18.0
         dot_y = self.height / 2
-        
+
         painter.setBrush(QBrush(self.dot_color))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(dot_x, dot_y), dot_radius, dot_radius)
-        
+
         font = QFont("Inter", 9)
         if self.is_active:
             font.setWeight(QFont.Weight.Bold)
         painter.setFont(font)
         painter.setPen(self.text_color)
-        
+
         metrics = QFontMetrics(font)
         text_width_limit = int(self.width - 45)
         elided_text = metrics.elidedText(self.label, Qt.TextElideMode.ElideRight, text_width_limit)
-        
+
         text_rect = metrics.boundingRect(elided_text)
         x = 34.0
         y = (self.height + text_rect.height()) / 2 - metrics.descent()
-        
+
         painter.drawText(QPointF(x, y), elided_text)
 
 
 class PipelineGraphView(QGraphicsView):
     """A visual node-based representation of the data transformation history."""
-    node_selected = pyqtSignal(int)
+    node_selected = pyqtSignal(str)
 
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
@@ -218,12 +219,11 @@ class PipelineGraphView(QGraphicsView):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setObjectName("PipelineGraphView")
         self.setProperty("styleClass", "transparent_scroll_area")
-        
+
         self.nodes: List[GraphNode] = []
         self.edges: List[QGraphicsPathItem] = []
         self.focus_selector = None
-        self.current_index = 0
-        self.max_index = 0
+        self.current_id = ""
         self._scroll_animation = None
         self._pill_animation = None
         
@@ -279,6 +279,16 @@ class PipelineGraphView(QGraphicsView):
         painter.fillRect(rect, QColor("#F8FAFC"))
         if self._background_brush:
             painter.fillRect(rect, self._background_brush)
+
+    def _get_path_to_root(self, nodes_dict: Dict[str, Any], start_node_id: str) -> List[str]:
+        """Helper to trace the path back to the root node."""
+        path = []
+        curr = start_node_id
+        while curr:
+            path.append(curr)
+            node = nodes_dict.get(curr)
+            curr = node.parent_id if node else None
+        return path
     
     def wheelEvent(self, event: QWheelEvent):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -353,33 +363,7 @@ class PipelineGraphView(QGraphicsView):
             super().mouseReleaseEvent(event)
     
     def keyPressEvent(self, event: QKeyEvent):
-        if event.key() == Qt.Key.Key_Up:
-            if self.current_index > 0:
-                self._handle_node_clicked(self.current_index - 1)
-                event.accept()
-        elif event.key() == Qt.Key.Key_Down:
-            if self.current_index < self.max_index:
-                self._handle_node_clicked(self.current_index + 1)
-                event.accept()
-        elif event.key() == Qt.Key.Key_PageUp:
-            new_index = max(0, self.current_index - 5)
-            if self.current_index != new_index:
-                self._handle_node_clicked(new_index)
-                event.accept()
-        elif event.key() == Qt.Key.Key_PageDown:
-            new_index = min(self.max_index, self.current_index + 5)
-            if self.current_index != new_index:
-                self._handle_node_clicked(new_index)
-                event.accept()
-        elif event.key() == Qt.Key.Key_Home:
-            if self.current_index != 0:
-                self._handle_node_clicked(0)
-                event.accept()
-        elif event.key() == Qt.Key.Key_End:
-            if self.current_index != self.max_index:
-                self._handle_node_clicked(self.max_index)
-                event.accept()
-        elif event.key() == Qt.Key.Key_F:
+        if event.key() == Qt.Key.Key_F:
             scene_rect = self.graph_scene.itemsBoundingRect()
             scene_rect.adjust(-20, -20, 20, 20)
             self.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
@@ -387,144 +371,136 @@ class PipelineGraphView(QGraphicsView):
         else:
             super().keyPressEvent(event)
 
-    def build_graph(self, history_operations: List[Dict[str, Any]], current_index: int, format_func: Callable):
+    def build_graph(self, nodes_dict: Dict[str, Any], root_id: str, current_node_id: str, format_func: Callable):
         """Constructs nodes and paths for the entire operation pipeline."""
-        needs_full_rebuild = len(self.nodes) != len(history_operations) + 1
-        if not needs_full_rebuild:
-            for i, op in enumerate(history_operations):
-                if self.nodes[i+1].operation != op:
-                    needs_full_rebuild = True
-                    break
-
-        if not needs_full_rebuild:
-            self._update_selection_in_place(current_index)
+        if len(self.nodes) == len(nodes_dict):
+            self._update_selection_in_place(nodes_dict, current_node_id)
             return
-
-        # 2. Full Rebuild
         self.graph_scene.clear()
         self.nodes.clear()
         self.edges.clear()
         self.focus_selector = None
-        self.current_index = current_index
-        self.max_index = len(history_operations)
 
-        y_offset = 20.0
-        x_pos = 20.0
-        vertical_spacing = 25.0
+        self.current_id = current_node_id
         active_node_item = None
 
-        # Create initial state node
-        initial_node = GraphNode(0, "0. Initial Data", {}, current_index == 0, current_index < 0)
-        initial_node.setPos(x_pos, y_offset)
-        initial_node.clicked.connect(self._handle_node_clicked)
-        self.graph_scene.addItem(initial_node)
-        self.nodes.append(initial_node)
-        
-        if current_index == 0:
-            active_node_item = initial_node
+        vertical_spacing = 75.0
+        horizontal_spacing = 300.0
 
-        y_offset += initial_node.height + vertical_spacing
-        prev_node = initial_node
+        positions = {}
 
-        for i, operation in enumerate(history_operations):
-            hist_idx = i + 1
-            op_text = format_func(operation)
-            label = f"{hist_idx}. {op_text}"
-            
-            is_active = (hist_idx == current_index)
-            is_undone = (hist_idx > current_index)
+        def calculate_positions(node_id: str, depth: int, branch_index: int):
+            x_pos = 20.0 + (branch_index * horizontal_spacing)
+            y_pos = 20.0 + (depth * vertical_spacing)
+            positions[node_id] = (x_pos, y_pos)
 
-            node = GraphNode(hist_idx, label, operation, is_active, is_undone)
-            node.setPos(x_pos, y_offset)
-            node.clicked.connect(self._handle_node_clicked)
-            self.graph_scene.addItem(node)
-            self.nodes.append(node)
+            node_data = nodes_dict.get(node_id)
+            if not node_data: return
+
+            for i, child_id in enumerate(node_data.children_ids):
+                child_branch = branch_index if i == len(node_data.children_ids) - 1 else branch_index + (i + 1)
+                calculate_positions(child_id, depth + 1, child_branch)
+
+        calculate_positions(root_id, depth=0, branch_index=0)
+
+        max_x, max_y = 0.0, 0.0
+
+        for node_id, (x_pos, y_pos) in positions.items():
+            node_data = nodes_dict[node_id]
+            is_active = (node_id == current_node_id)
+            is_undone = node_id not in self._get_path_to_root(nodes_dict,
+                                                              current_node_id) and node_id != current_node_id
+
+            label = "0. Initial Data" if node_id == root_id else format_func(node_data.diff_record.metadata)
+            graph_node = GraphNode(node_id, label, getattr(node_data.diff_record, 'metadata', {}), is_active, is_undone)
+            graph_node.setPos(x_pos, y_pos)
+            graph_node.clicked.connect(self._handle_node_clicked)
+            self.graph_scene.addItem(graph_node)
+            self.nodes.append(graph_node)
 
             if is_active:
-                active_node_item = node
+                active_node_item = graph_node
 
-            # Draw directional edge connecting the nodes
-            edge = QGraphicsPathItem()
-            path = QPainterPath()
-            start_pt = QPointF(x_pos + node.width / 2, prev_node.y() + prev_node.height)
-            end_pt = QPointF(x_pos + node.width / 2, node.y())
-            
-            path.moveTo(start_pt)
-            ctrl1 = QPointF(start_pt.x(), start_pt.y() + (vertical_spacing / 2))
-            ctrl2 = QPointF(end_pt.x(), end_pt.y() - (vertical_spacing / 2))
-            path.cubicTo(ctrl1, ctrl2, end_pt)
-            
-            edge.setPath(path)
-            
-            # Color the edge blue if it leads to a done/active state, otherwise gray/dashed
-            if is_undone:
-                edge_pen = QPen(QColor("#CBD5E1"), 2, Qt.PenStyle.DashLine)
-            else:
-                edge_pen = QPen(QColor("#3B82F6"), 2.5, Qt.PenStyle.SolidLine)
-            
-            edge.setPen(edge_pen)
-            
-            # Ensure edges render behind the shadow effects and the sliding focus selector
-            edge.setZValue(-2)
-            self.graph_scene.addItem(edge)
-            self.edges.append(edge)
+            max_x = max(max_x, x_pos)
+            max_y = max(max_y, y_pos)
 
-            prev_node = node
-            y_offset += node.height + vertical_spacing
+            if node_data.parent_id and node_data.parent_id in positions:
+                px, py = positions[node_data.parent_id]
+                edge = QGraphicsPathItem()
+                path = QPainterPath()
 
-        # Expand scene to encompass nodes and styling paddings
-        self.setSceneRect(0, 0, x_pos + 260 + 20, y_offset + 20)
+                start_pt = QPointF(px + graph_node.width / 2, py + graph_node.height)
+                end_pt = QPointF(x_pos + graph_node.width / 2, y_pos)
+
+                path.moveTo(start_pt)
+                ctrl1 = QPointF(start_pt.x(), start_pt.y() + (vertical_spacing / 2))
+                ctrl2 = QPointF(end_pt.x(), end_pt.y() - (vertical_spacing / 2))
+                path.cubicTo(ctrl1, ctrl2, end_pt)
+
+                edge.setPath(path)
+                edge.target_node_id = node_id
+
+                is_active_path = is_active or node_id in self._get_path_to_root(nodes_dict, current_node_id)
+                edge_pen = QPen(QColor("#3B82F6" if is_active_path else "#CBD5E1"),
+                                2.5 if is_active_path else 2,
+                                Qt.PenStyle.SolidLine if is_active_path else Qt.PenStyle.DashLine)
+
+                edge.setPen(edge_pen)
+                edge.setZValue(-2)
+                self.graph_scene.addItem(edge)
+                self.edges.append(edge)
+
+        self.setSceneRect(0, 0, max_x + 300, max_y + 100)
 
         if active_node_item:
-            new_y = active_node_item.y()
             self.focus_selector = FocusHighlightItem(260.0, 48.0)
-            self.focus_selector.setPos(x_pos, new_y)
+            self.focus_selector.setPos(active_node_item.pos())
             self.graph_scene.addItem(self.focus_selector)
-
-        # Smoothly focus the viewport on the active state
-        if active_node_item:
             self.center_on_animated(active_node_item)
     
-    def _handle_node_clicked(self, index: int):
-        if self.current_index != index:
-            self._update_selection_in_place(index)
-            self.node_selected.emit(index)
-    
-    def _update_selection_in_place(self, new_index: int):
+    def _handle_node_clicked(self, node_id: str) -> None:
+        if self.current_id != node_id:
+            self.node_selected.emit(node_id)
+
+    def _update_selection_in_place(self, nodes_dict: Dict[str, Any], new_node_id: str):
         if not self.nodes or not self.focus_selector:
             return
-        
-        old_y = self.focus_selector.y()
-        new_y = None
-        self.current_index = new_index
-        
+
+        old_pos = self.focus_selector.pos()
+        new_pos = None
+        self.current_id = new_node_id
+
+        active_path = self._get_path_to_root(nodes_dict, new_node_id)
+
         for node in self.nodes:
-            node.is_active = (node.index == new_index)
-            node.is_undone = (node.index > new_index)
+            node.is_active = (node.node_id == new_node_id)
+            node.is_undone = (node.node_id not in active_path and node.node_id != new_node_id)
             node._update_styling()
             node.update()
-            
+
             if node.is_active:
-                new_y = node.y()
-        
-        for i, edge in enumerate(self.edges):
-            target_idx = i + 1
-            is_undone = target_idx > new_index
-            if is_undone:
+                new_pos = node.pos()
+
+        for edge in self.edges:
+            is_active_path = hasattr(edge, 'target_node_id') and (
+                        edge.target_node_id in active_path or edge.target_node_id == new_node_id)
+            if not is_active_path:
                 edge.setPen(QPen(QColor("#CBD5E1"), 2, Qt.PenStyle.DashLine))
             else:
                 edge.setPen(QPen(QColor("#3B82F6"), 2.5, Qt.PenStyle.SolidLine))
-            
-        if old_y is not None and new_y is not None and old_y != new_y:
+
+        if old_pos is not None and new_pos is not None and old_pos != new_pos:
             if self._pill_animation:
                 self._pill_animation.stop()
-            
+
             self._pill_animation = QPropertyAnimation(self.focus_selector, b"animated_pos")
             self._pill_animation.setDuration(400)
-            self._pill_animation.setStartValue(QPointF(self.focus_selector.x(), old_y))
-            self._pill_animation.setEndValue(QPointF(self.focus_selector.x(), new_y))
+            self._pill_animation.setStartValue(old_pos)
+            self._pill_animation.setEndValue(new_pos)
             self._pill_animation.setEasingCurve(QEasingCurve.Type.OutBack)
             self._pill_animation.start()
-        
-        if 0 <= new_index < len(self.nodes):
-            self.center_on_animated(self.nodes[new_index])
+
+        for node in self.nodes:
+            if node.node_id == new_node_id:
+                self.center_on_animated(node)
+                break

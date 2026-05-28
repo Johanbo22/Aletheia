@@ -444,28 +444,42 @@ class DataTab(QWidget):
             self.status_bar.set_view_context(f"Viewing Subset: {inserted_name}")
         else:
             self.status_bar.set_view_context("", "normal")
-    
+
     def _update_history_list(self) -> None:
-        """Updates the history list"""
+        """Updates the history list and pipeline graph for the branching tree system."""
         panel = self.operations_panel
         if not hasattr(panel, "history_tab") or not hasattr(panel.history_tab, "history_list"):
             return
-        
+
         panel.history_tab.history_list.clear()
-        
+
         history_information = self.data_handler.get_history_info()
-        history_operations = history_information["history"]
-        current_index = history_information["current_index"]
-        
+        nodes_dict = history_information.get("nodes", {})
+        current_node_id = history_information.get("current_node_id")
+        root_id = history_information.get("root_id")
+
+        if not nodes_dict or not current_node_id or not root_id:
+            return
+
+        for node in nodes_dict.values():
+            if node.diff_record and "type" not in node.diff_record.metadata:
+                node.diff_record.metadata["type"] = node.diff_record.operation_type.value
+
+        path_to_current = []
+        curr = current_node_id
+        while curr:
+            path_to_current.append(curr)
+            curr = nodes_dict[curr].parent_id if curr in nodes_dict else None
+        path_to_current.reverse()
+
         item_height = 32
-        
-        def style_item(item: QListWidgetItem, index: int, text: str) -> None:
+
+        def style_item(item: QListWidgetItem, is_active: bool, text: str) -> None:
             item.setSizeHint(QSize(0, item_height))
             font = item.font()
             font.setPointSize(9)
-            
-            if index == current_index:
-                # Active State
+
+            if is_active:
                 item.setText(f"{text}  ← Active")
                 font.setWeight(QFont.Weight.Bold)
                 item.setFont(font)
@@ -478,45 +492,67 @@ class DataTab(QWidget):
                     bg_color = QColor("#dbeafe")
                 item.setForeground(active_color)
                 item.setBackground(bg_color)
-            elif index < current_index:
+            else:
                 item.setText(text)
                 font.setWeight(QFont.Weight.Medium)
                 item.setFont(font)
                 item.setForeground(QColor("#334155"))
-            else:
-                item.setText(text)
-                font.setItalic(True)
-                item.setFont(font)
-                item.setForeground(QColor("#94A3B8"))
-                
-        
+
         initial_item = QListWidgetItem("0. Initial Data")
-        initial_item.setData(Qt.ItemDataRole.UserRole, 0)
+        initial_item.setData(Qt.ItemDataRole.UserRole, root_id)
         initial_item.setIcon(IconBuilder.build(IconType.DataExplorerIcon))
         initial_item.setToolTip("The original data state upon import or creation")
-        
+        style_item(initial_item, root_id == current_node_id, "0. Initial Data")
         panel.history_tab.history_list.addItem(initial_item)
-        
-        for i, operation in enumerate(history_operations):
-            history_index = i + 1
+
+        for i, node_id in enumerate(path_to_current):
+            if node_id == root_id: continue
+
+            node = nodes_dict[node_id]
+            operation = node.diff_record.metadata
             operation_type = operation.get("type", "Unknown")
             operation_text = self._format_operation_text(operation)
-            
-            item = QListWidgetItem(f"{history_index}. {operation_text}")
-            item.setData(Qt.ItemDataRole.UserRole, history_index)
+
+            item = QListWidgetItem(f"{i}. {operation_text}")
+            item.setData(Qt.ItemDataRole.UserRole, node_id)
             item.setIcon(self._get_icon_for_operation(operation_type))
-            
-            details = "".join(f"<li><b>{k}</b>: {v}</li>" for k, v in operation.items() if k != "type")
-            item.setToolTip(f"<b>Operation Details:</b><br><ul style='margin-top: 4px; margin-bottom: 0px;'>{details}</ul>")
-            
-            style_item(item, history_index, f"{history_index}. {operation_text}")
+
+            details = "".join(
+                f"<li><b>{k}</b>: {v}</li>" for k, v in operation.items() if k != "type" and not k.endswith("_index"))
+            item.setToolTip(
+                f"<b>Operation Details:</b><br><ul style='margin-top: 4px; margin-bottom: 0px;'>{details}</ul>")
+
+            style_item(item, node_id == current_node_id, f"{i}. {operation_text}")
             panel.history_tab.history_list.addItem(item)
-        
-        if panel.history_tab.history_list.count() > 0:
-            panel.history_tab.history_list.scrollToItem(panel.history_tab.history_list.item(current_index))
-        
+
+        if current_node_id in nodes_dict:
+            for child_id in nodes_dict[current_node_id].children_ids:
+                child_node = nodes_dict[child_id]
+                operation = child_node.diff_record.metadata
+                operation_type = operation.get("type", "Unknown")
+                operation_text = self._format_operation_text(operation)
+
+                item = QListWidgetItem(f"↳ [Branch] {operation_text}")
+                item.setData(Qt.ItemDataRole.UserRole, child_id)
+                item.setIcon(self._get_icon_for_operation(operation_type))
+
+                font = item.font()
+                font.setItalic(True)
+                font.setPointSize(9)
+                item.setFont(font)
+                item.setForeground(QColor("#94A3B8"))
+                item.setSizeHint(QSize(0, item_height))
+
+                panel.history_tab.history_list.addItem(item)
+
+        for i in range(panel.history_tab.history_list.count()):
+            if panel.history_tab.history_list.item(i).data(Qt.ItemDataRole.UserRole) == current_node_id:
+                panel.history_tab.history_list.scrollToItem(panel.history_tab.history_list.item(i))
+                break
+
         if hasattr(panel.history_tab, "pipeline_graph"):
-            panel.history_tab.pipeline_graph.build_graph(history_operations, current_index, self._format_operation_text)
+            panel.history_tab.pipeline_graph.build_graph(nodes_dict, root_id, current_node_id,
+                                                         self._format_operation_text)
     
     def _get_icon_for_operation(self, operation_type: str) -> QIcon:
         match operation_type:

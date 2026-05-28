@@ -19,7 +19,8 @@ from ui.workers import GoogleSheetsImportWorker, AutoCreateSubsetsWorker
 
 if TYPE_CHECKING:
     from ui.data_tab import DataTab
-    from ui.status_bar import StatusBar
+    from ui.status_bar import StatusBar, LogLevel
+
 
 class DataTabController:
     """
@@ -1884,20 +1885,23 @@ class DataTabController:
             )
             traceback.print_exc()
 
+    def jump_to_history_state(self, target_node_id: str) -> None:
+        """Jumps to a state node in the history tree"""
+        try:
+            self.data_handler.jump_to_history_index(target_node_id)
+            self.view.refresh_data_view()
+
+            self.view.operations_panel.select_history_item_by_index(target_node_id)
+        except Exception as HistoryError:
+            self.status_bar.log(f"Failed to go to state: {str(HistoryError)}", LogLevel.ERROR)
+
     def on_history_clicked(self, item):
-        """Handles the click of history entry"""
+        """Handles the click of a history entry from the history widget"""
         if not item:
             return
 
         target_index = item.data(Qt.ItemDataRole.UserRole)
-        try:
-            self.data_handler.jump_to_history_index(target_index)
-            self.view.refresh_data_view()
-
-            self.view.operations_panel.select_history_item_by_index(target_index)
-
-        except Exception as HistoryError:
-            self.status_bar.log(f"Failed to go to state: {str(HistoryError)}", "ERROR")
+        self.jump_to_history_state(target_index)
         
     def save_pipeline_macro(self) -> None:
         """Saves the current data operations to a JSON file"""

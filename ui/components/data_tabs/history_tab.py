@@ -60,22 +60,18 @@ class HistoryTab(BaseDataTab):
         macro_group.setLayout(macro_layout)
         layout.addWidget(macro_group)
 
-    def _on_graph_node_selected(self, index: int) -> None:
+    def _on_graph_node_selected(self, node_id: str) -> None:
         if not self.controller:
             return
-        for i in range(self.history_list.count()):
-            item = self.history_list.item(i)
-            if item.data(Qt.ItemDataRole.UserRole) == index:
-                self.controller.on_history_clicked(item)
-                break
+        self.controller.jump_to_history_state(node_id)
 
-    def get_selected_history_index(self) -> Optional[int]:
+    def get_selected_history_index(self) -> Optional[str]:
         item = self.history_list.currentItem()
         return item.data(Qt.ItemDataRole.UserRole) if item else None
 
-    def select_history_item_by_index(self, target_index: int) -> None:
+    def select_history_item_by_index(self, target_node_id: str) -> None:
         for i in range(self.history_list.count()):
             list_item = self.history_list.item(i)
-            if list_item.data(Qt.ItemDataRole.UserRole) == target_index:
+            if list_item.data(Qt.ItemDataRole.UserRole) == target_node_id:
                 self.history_list.setCurrentItem(list_item)
                 break
