@@ -361,24 +361,30 @@ QScrollArea[styleClass="transparent_scroll_area"] {
     border: none;
 }
 
-#dpsListWidget {
+#dpsListWidget,
+QTreeWidget {
     border: 1.5px solid #bdc3c7;
     border-radius: 4px;
     padding: 4px;
     background-color: #ffffff;
 }
 
-#dpsListWidget::item {
+#dpsListWidget::item,
+QTreeWidget::item {
     padding: 6px 8px;
     border-radius: 3px;
     margin: 2px 0;
 }
 
-#dpsListWidget::item:hover {
+#dpsListWidget::item:hover,
+QTreeWidget::item:hover {
     background-color: rgba(0, 120, 215, 0.05);
+    color: #111;
+    border-bottom: 2px solid rgba(0, 120, 215, 0.3);
 }
 
-#dpsListWidget::item:selected {
+#dpsListWidget::item:selected,
+QTreeWidget::item:selected {
     background: white;
     color: #0078d7;
     font-weight: bold;

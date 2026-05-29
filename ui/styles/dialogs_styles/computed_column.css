@@ -57,19 +57,3 @@ QLabel#validation_status_label[status="error"] {
     background-color: rgba(255, 85, 85, 0.1);
     border: 1px solid rgba(255, 85, 85, 0.3);
 }
-
-DataPlotStudioListWidget::item:hover,
-QTreeWidget::item:hover {
-    background: rgba(0, 120, 215, 0.05);
-    color: #111;
-    border-bottom: 2px solid rgba(0, 120, 215, 0.3);
-}
-
-DataPlotStudioListWidget::item:selected,
-QTreeWidget::item:selected {
-    background: white;
-    color: #0078d7;
-    font-weight: bold;
-    border: 1px solid #dcdcdc;
-    border-bottom: 2px solid #0078d7;
-}

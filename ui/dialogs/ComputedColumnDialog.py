@@ -2,19 +2,22 @@
 import ast
 import keyword
 import re
+import json
 from enum import Enum
 from typing import NamedTuple
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem
-from PyQt6.QtCore import Qt, QTimer, QSettings
-from PyQt6.QtGui import QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy
+from PyQt6.QtCore import QModelIndex, QPoint, Qt, QTimer, QSettings, QEvent, QObject
+from PyQt6.QtGui import QAction, QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
 from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
 from ui.widgets import DataPlotStudioButton
 from ui.dialogs.CodeEditor import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
+from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioMenu
+from ui.dialogs.AddCustomFunctionDialog import AddCustomFunctionDialog
+from ui.widgets.CustomFunctionDelegate import CustomFunctionDelegate
 
 class ValidationStatus(str, Enum):
     Idle = "idle"
@@ -32,6 +35,8 @@ class ComputedColumnDialog(QDialog):
 
     DialogWidth: int = 900
     DialogHeight: int = 700
+
+    CustomFunctionsSettingsKey: str = "custom_functions"
     
     OperatorDefinitions: list[OperatorDefinition] = [
         OperatorDefinition("+", " + ", 0, 0),
@@ -164,6 +169,7 @@ class ComputedColumnDialog(QDialog):
         self.column_no_results_label = QLabel("No columns match your search")
         self.column_no_results_label.setProperty("styleClass", "no_results_label")
         self.column_no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.column_no_results_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.column_no_results_label.setHidden(True)
         column_layout.addWidget(self.column_no_results_label)
 
@@ -194,17 +200,46 @@ class ComputedColumnDialog(QDialog):
         self.function_search_timer.setInterval(250)
         self.function_search_timer.timeout.connect(self._apply_function_filter)
         self.function_filter_input.textChanged.connect(self.function_search_timer.start)
-        function_layout.addWidget(self.function_filter_input)
+
+        function_search_layout = QHBoxLayout()
+        function_search_layout.setContentsMargins(0, 0, 0, 0)
+        function_search_layout.setSpacing(5)
+        function_search_layout.addWidget(self.function_filter_input)
+
+        self.add_custom_func_btn = DataPlotStudioButton("+", padding="4px")
+        self.add_custom_func_btn.setToolTip("Create a new custom function snippet")
+        self.add_custom_func_btn.setFixedWidth(35)
+        self.add_custom_func_btn.clicked.connect(self._add_custom_function)
+        function_search_layout.addWidget(self.add_custom_func_btn)
+
+        function_layout.addLayout(function_search_layout)
         
         self.function_no_results_label = QLabel("No functions match your search")
         self.function_no_results_label.setProperty("styleClass", "no_results_label")
         self.function_no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.function_no_results_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.function_no_results_label.setHidden(True)
         function_layout.addWidget(self.function_no_results_label)
 
         self.function_tree = QTreeWidget()
+        self.function_tree.setObjectName("ComputedColumnFunctionTree")
         self.function_tree.setHeaderHidden(True)
+        self.function_tree.setAlternatingRowColors(True)
         self.function_tree.itemActivated.connect(self.insert_function)
+
+        # Context menu for deleting custom functions
+        self.function_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.function_tree.customContextMenuRequested.connect(self._show_function_context_menu)
+
+        self.function_tree.setMouseTracking(True)
+        self.function_tree.viewport().setMouseTracking(True)
+
+        self.custom_delegate = CustomFunctionDelegate(self.function_tree)
+        self.custom_delegate.edit_requested.connect(self._edit_custom_function_by_index)
+        self.custom_delegate.delete_requested.connect(self._delete_custom_function_by_index)
+        self.function_tree.setItemDelegate(self.custom_delegate)
+        self.function_tree.viewport().installEventFilter(self)
+
         self.populate_functions()
         function_layout.addWidget(self.function_tree)
 
@@ -326,6 +361,12 @@ class ComputedColumnDialog(QDialog):
             return
         self.write_settings()
         super().reject()
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        """Unset the cursor if the mouse leaves the function tree viewport to prevent a stuck cursor"""
+        if watched == self.function_tree.viewport() and event.type() == QEvent.Type.Leave:
+            self.function_tree.viewport().unsetCursor()
+        return super().eventFilter(watched, event)
     
     def _clear_expression(self) -> None:
         """Clear the expression editor and immediately return focus to it."""
@@ -421,6 +462,7 @@ class ComputedColumnDialog(QDialog):
 
     def populate_functions(self) -> None:
         """Populate the function library with some functions (math, trigs, etc)"""
+        self.function_tree.clear()
         functions = {
             "Math": [
                 ("abs", "Absolute value"), 
@@ -448,14 +490,160 @@ class ComputedColumnDialog(QDialog):
                 (".str.replace('old', 'new')", "Replace occurrences of 'old' with 'new'"),
             ],
         }
+        custom_funcs = self._load_custom_functions()
+        for func in custom_funcs:
+            cat = func.get("category", "Custom Functions")
+            if cat not in functions:
+                functions[cat] = []
+            functions[cat].append((func["name"], func["desc"], func["snippet"]))
+
         for category, funcs in functions.items():
             parent = QTreeWidgetItem(self.function_tree)
             parent.setText(0, category)
             parent.setExpanded(True)
-            for func_name, tooltip in funcs:
+            for func_data in funcs:
+                if len(func_data) == 2:
+                    func_name, tooltip = func_data
+                    snippet = func_name
+                    is_custom = False
+                else:
+                    func_name, tooltip, snippet = func_data
+                    is_custom = True
+
                 item = QTreeWidgetItem(parent)
                 item.setText(0, func_name)
                 item.setToolTip(0, tooltip)
+                item.setData(0, Qt.ItemDataRole.UserRole, snippet)
+                item.setData(0, Qt.ItemDataRole.UserRole + 1, is_custom)
+
+    def _load_custom_functions(self) -> list[dict[str, str]]:
+        """Loads custom functions from the settings"""
+        settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
+        data = settings.value(self.CustomFunctionsSettingsKey, "[]")
+        try:
+            funcs = json.loads(data)
+            for f in funcs:
+                if "category" not in f:
+                    f["category"] = "Custom Functions"
+            return funcs
+        except json.JSONDecodeError:
+            return []
+
+    def _save_custom_function(self, name: str, category: str, desc: str, snippet: str) -> None:
+        """Saves a custom function snippet to settings"""
+        funcs = self._load_custom_functions()
+
+        for func in funcs:
+            if func["name"] == name:
+                func["category"] = category
+                func["desc"] = desc
+                func["snippet"] = snippet
+                break
+        else:
+            funcs.append({"name": name, "category": category, "desc": desc, "snippet": snippet})
+
+        settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
+        settings.setValue(self.CustomFunctionsSettingsKey, json.dumps(funcs))
+        self.populate_functions()
+
+    def _delete_custom_function(self, name: str) -> None:
+        """Deletes a custom function from settings"""
+        reply = QMessageBox.question(
+            self, "Delete Custom Function",
+            f"Are you sure you want to delete the custom function '{name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            funcs = self._load_custom_functions()
+            filtered_funcs = [f for f in funcs if f["name"] != name]
+
+            settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
+            settings.setValue(self.CustomFunctionsSettingsKey, json.dumps(filtered_funcs))
+            self.populate_functions()
+
+    def _add_custom_function(self) -> None:
+        """Opens the AddCustomFunctionDialog and saves a new custom function snippet"""
+        funcs = self._load_custom_functions()
+        categories = sorted(list(set(f.get("category", "Custom Functions") for f in funcs)))
+        built_in = ["Math", "Trigonometry", "String Accessor"]
+        all_categories = sorted(list(set(categories + built_in)))
+        
+        dialog = AddCustomFunctionDialog(existing_categories=all_categories, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            name, category, desc, snippet = dialog.get_function_data()
+            self._save_custom_function(name, category, desc, snippet)
+
+    def _edit_custom_function_by_index(self, index: QModelIndex) -> None:
+        """Wrapper to translate model index from delegate into a tree item to edit function"""
+        item = self.function_tree.itemFromIndex(index)
+        if item:
+            self._edit_custom_function(item)
+
+    def _delete_custom_function_by_index(self, index: QModelIndex) -> None:
+        """Wrapper to translate model index from delegate into a tree item to delete function"""
+        item = self.function_tree.itemFromIndex(index)
+        if item:
+            self._delete_custom_function(item.text(0))
+
+    def _edit_custom_function(self, item: QTreeWidgetItem) -> None:
+        """Opens the AddCustomFunctionDialog to edit an existing custom functions snippet"""
+        old_name = item.text(0)
+        old_desc = item.toolTip(0)
+        old_snippet = item.data(0, Qt.ItemDataRole.UserRole)
+        old_category = item.parent().text(0) if item.parent() else "Custom Functions"
+        
+        funcs = self._load_custom_functions()
+        categories = sorted(list(set(f.get("category", "Custom Functions") for f in funcs)))
+        built_in = ["Math", "Trigonometry", "String Accessor"]
+        all_categories = sorted(list(set(categories + built_in)))
+
+        dialog = AddCustomFunctionDialog(existing_categories=all_categories, parent=self)
+        dialog.setWindowTitle("Edit Custom Function")
+        dialog.save_button.setText("Save Changes")
+
+        dialog.name_input.setText(old_name)
+        dialog.category_input.setCurrentText(old_category)
+        dialog.desc_input.setText(old_desc)
+        dialog.snippet_input.setPlainText(old_snippet)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_name, new_category, new_desc, new_snippet = dialog.get_function_data()
+            funcs = self._load_custom_functions()
+
+            for func in funcs:
+                if func["name"] == old_name:
+                    func["name"] = new_name
+                    func["category"] = new_category
+                    func["desc"] = new_desc
+                    func["snippet"] = new_snippet
+                    break
+            else:
+                funcs.append({"name": new_name, "category": new_category, "desc": new_desc, "snippet": new_snippet})
+            settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
+            settings.setValue(self.CustomFunctionsSettingsKey, json.dumps(funcs))
+            self.populate_functions()
+
+    def _show_function_context_menu(self, position: QPoint) -> None:
+        """Displays the context menu for tree items, allowing for deletion of custom functions"""
+        item = self.function_tree.itemAt(position)
+
+        # Must ignore clicks on empty space or parents
+        if not item or item.childCount() > 0:
+            return
+
+        is_custom = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        if is_custom:
+            menu = DataPlotStudioMenu(self.function_tree)
+
+            edit_action = QAction("Edit Custom Function", self)
+            edit_action.triggered.connect(lambda: self._edit_custom_function(item))
+            menu.addAction(edit_action)
+
+            delete_action = QAction("Delete Custom Function", self)
+            delete_action.triggered.connect(lambda: self._delete_custom_function(item.text(0)))
+            menu.addAction(delete_action)
+            menu.exec(self.function_tree.viewport().mapToGlobal(position))
     
     def _apply_function_filter(self) -> None:
         """Filter the function tree based on query"""
@@ -492,18 +680,20 @@ class ComputedColumnDialog(QDialog):
         self.function_no_results_label.setHidden(visible_count > 0)
 
     def insert_function(self, item: QTreeWidgetItem) -> None:
-        """Insert the selected function into the expression"""
+        """Insert the selected function or snippet into the expression"""
         if item.childCount() > 0:
             item.setExpanded(not item.isExpanded())
             return
 
-        func_text = item.text(0)
-        
-        if not func_text.endswith(")"):
-            func_text += "()"
-        
-        self.insert_text(func_text)
-        
+        snippet = item.data(0, Qt.ItemDataRole.UserRole)
+        is_custom = item.data(0, Qt.ItemDataRole.UserRole + 1)
+
+        if is_custom:
+            self.insert_text(f"{snippet}")
+        else:
+            if not snippet.endswith(")"):
+                snippet += "()"
+            self.insert_text(snippet)
     
     def _apply_column_filter(self) -> None:
         """Filter the column list based on input"""
