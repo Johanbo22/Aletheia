@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QCheckBox, QWidget
 from ui.theme import ThemeColors
 from ui.widgets.mixins import HoverFocusAnimationMixin
 
-class DataPlotStudioToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
+class ToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
     """A toggle switch widget"""
     
     def __init__(self, parent: Optional[QWidget] = None) -> None:

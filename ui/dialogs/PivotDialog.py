@@ -1,12 +1,10 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget, QTableWidget, QTableWidgetItem, QHeaderView
+from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QSplitter, QVBoxLayout, QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QListWidget, QGroupBox, QComboBox, QPushButton
 from typing import List, Dict, Any
 
 import pandas as pd
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioListWidget
 
 class PivotDialog(QDialog):
     """Dialog for performing pivot table operation"""
@@ -45,8 +43,8 @@ class PivotDialog(QDialog):
         index_widget = QWidget()
         index_layout = QVBoxLayout(index_widget)
         index_layout.addWidget(QLabel("Index:"))
-        self.index_list = DataPlotStudioListWidget()
-        self.index_list.setSelectionMode(DataPlotStudioListWidget.SelectionMode.MultiSelection)
+        self.index_list = QListWidget()
+        self.index_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self.index_list.addItems(self.columns)
         index_layout.addWidget(self.index_list)
         splitter.addWidget(index_widget)
@@ -55,8 +53,8 @@ class PivotDialog(QDialog):
         column_widget = QWidget()
         column_layout = QVBoxLayout(column_widget)
         column_layout.addWidget(QLabel("Columns:"))
-        self.columns_list = DataPlotStudioListWidget()
-        self.columns_list.setSelectionMode(DataPlotStudioListWidget.SelectionMode.SingleSelection)
+        self.columns_list = QListWidget()
+        self.columns_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.columns_list.addItems(self.columns)
         column_layout.addWidget(self.columns_list)
         splitter.addWidget(column_widget)
@@ -65,8 +63,8 @@ class PivotDialog(QDialog):
         values_widget = QWidget()
         values_layout = QVBoxLayout(values_widget)
         values_layout.addWidget(QLabel("Values:"))
-        self.values_list = DataPlotStudioListWidget()
-        self.values_list.setSelectionMode(DataPlotStudioListWidget.SelectionMode.MultiSelection)
+        self.values_list = QListWidget()
+        self.values_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self.values_list.addItems(self.columns)
         values_layout.addWidget(self.values_list)
         splitter.addWidget(values_widget)
@@ -75,11 +73,11 @@ class PivotDialog(QDialog):
         layout.addSpacing(15)
         
         # Aggregation settings
-        agg_group = DataPlotStudioGroupBox("Aggregation Settings")
+        agg_group = QGroupBox("Aggregation Settings")
         agg_layout = QHBoxLayout()
         
         agg_layout.addWidget(QLabel("Aggregatation Function:"))
-        self.agg_combo = DataPlotStudioComboBox()
+        self.agg_combo = QComboBox()
         self.agg_combo.addItems(["mean", "sum", "count", "min", "max", "median", "std", "var", "first", "last"])
         agg_layout.addWidget(self.agg_combo)
         
@@ -87,7 +85,7 @@ class PivotDialog(QDialog):
         layout.addWidget(agg_group)
         
         # Preview 
-        preview_group = DataPlotStudioGroupBox("Preview")
+        preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout()
         
         self.preview_label = QLabel("Select parameters and click 'Update Preview'")
@@ -110,23 +108,24 @@ class PivotDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        preview_button = DataPlotStudioButton("Update Preview")
+        preview_button = QPushButton("Update Preview")
         preview_button.clicked.connect(self.update_preview)
         button_layout.addWidget(preview_button)
         
-        apply_button = DataPlotStudioButton("Pivot Data", base_color_hex=ThemeColors.MainColor)
+        apply_button = QPushButton("Pivot Data")
+        apply_button.setObjectName("MainActionButton")
         apply_button.setMinimumWidth(120)
         apply_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(apply_button)
         
-        cancel_button = DataPlotStudioButton("Cancel")
+        cancel_button = QPushButton("Cancel")
         cancel_button.setMinimumWidth(120)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
         
         layout.addLayout(button_layout)
         
-    def get_selected_text(self, list_widget: DataPlotStudioListWidget) -> List[str]:
+    def get_selected_text(self, list_widget: QListWidget) -> List[str]:
         return [item.text() for item in list_widget.selectedItems()]
         
     def update_preview(self):

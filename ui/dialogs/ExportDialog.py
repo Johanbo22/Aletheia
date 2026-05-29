@@ -1,5 +1,5 @@
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QButtonGroup, QAbstractItemView, QListWidgetItem, QMessageBox, QApplication, QWidget, QFrame
+from PyQt6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QButtonGroup, QAbstractItemView, QListWidgetItem, QMessageBox, QApplication, QWidget, QFrame, QRadioButton, QListWidget, QLineEdit, QGroupBox, QComboBox, QCheckBox, QPushButton
 from PyQt6.QtCore import Qt, QTimer
 import pandas as pd
 from typing import Optional, List, Any, Dict
@@ -7,9 +7,7 @@ from pathlib import Path
 
 from core.data_handler import DataHandler
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioRadioButton
 
 class ExportDialog(QDialog):
     """Dialog for exporting data"""
@@ -49,7 +47,7 @@ class ExportDialog(QDialog):
         format_label.setFont(QFont("Consolas", 11, QFont.Weight.Bold))
         format_layout.addWidget(format_label)
         
-        self.format_combo = DataPlotStudioComboBox()
+        self.format_combo = QComboBox()
         self.format_combo.addItems(["CSV", "XLSX", "JSON"])
         self.format_combo.setMinimumWidth(150)
         format_label.setBuddy(self.format_combo)
@@ -58,7 +56,7 @@ class ExportDialog(QDialog):
         layout.addLayout(format_layout)
         
         # Data selection layout
-        selection_group = DataPlotStudioGroupBox("Data Selection", parent=self)
+        selection_group = QGroupBox("Data Selection", parent=self)
         selection_layout = QVBoxLayout()
         selection_layout.setContentsMargins(15, 20, 15, 15)
         selection_layout.setSpacing(12)
@@ -70,12 +68,12 @@ class ExportDialog(QDialog):
         rows_radio_layout = QHBoxLayout()
         self.rows_group = QButtonGroup(self)
         
-        self.rows_radio_all = DataPlotStudioRadioButton("All Rows")
+        self.rows_radio_all = QRadioButton("All Rows")
         self.rows_radio_all.setChecked(True)
         self.rows_group.addButton(self.rows_radio_all)
         rows_radio_layout.addWidget(self.rows_radio_all)
         
-        self.rows_radio_selected = DataPlotStudioRadioButton(f"Selected Rows Only: {len(self.selected_rows)}")
+        self.rows_radio_selected = QRadioButton(f"Selected Rows Only: {len(self.selected_rows)}")
         self.rows_group.addButton(self.rows_radio_selected)
         rows_radio_layout.addWidget(self.rows_radio_selected)
         rows_radio_layout.addStretch()
@@ -102,12 +100,12 @@ class ExportDialog(QDialog):
         cols_radio_layout = QHBoxLayout()
         self.cols_group = QButtonGroup(self)
 
-        self.cols_radio_all = DataPlotStudioRadioButton("All Columns")
+        self.cols_radio_all = QRadioButton("All Columns")
         self.cols_radio_all.setChecked(True)
         self.cols_group.addButton(self.cols_radio_all)
         cols_radio_layout.addWidget(self.cols_radio_all)
 
-        self.cols_radio_specific = DataPlotStudioRadioButton("Specific Columns")
+        self.cols_radio_specific = QRadioButton("Specific Columns")
         self.cols_group.addButton(self.cols_radio_specific)
         cols_radio_layout.addWidget(self.cols_radio_specific)
         cols_radio_layout.addStretch()
@@ -119,7 +117,7 @@ class ExportDialog(QDialog):
         column_tools_layout.setSpacing(8)
         
         tools_row_layout = QHBoxLayout()
-        self.column_filter_input = DataPlotStudioLineEdit()
+        self.column_filter_input = QLineEdit()
         self.column_filter_input.setPlaceholderText("Filter columns...")
         self.column_filter_input.setClearButtonEnabled(True)
         
@@ -131,19 +129,18 @@ class ExportDialog(QDialog):
         self.column_filter_input.textChanged.connect(self._apply_column_filter)
         tools_row_layout.addWidget(self.column_filter_input, stretch=1)
         
-        self.select_alL_button = DataPlotStudioButton("Select all", parent=self)
+        self.select_alL_button = QPushButton("Select all", parent=self)
         self.select_alL_button.clicked.connect(self._select_all_columns)
         tools_row_layout.addWidget(self.select_alL_button)
 
-        self.clear_selection_button = DataPlotStudioButton("Clear", parent=self)
+        self.clear_selection_button = QPushButton("Clear", parent=self)
         self.clear_selection_button.clicked.connect(self._clear_column_selection)
         tools_row_layout.addWidget(self.clear_selection_button)
         
         column_tools_layout.addLayout(tools_row_layout)
 
-        self.column_list = DataPlotStudioListWidget()
+        self.column_list = QListWidget()
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        self.column_list.setMaximumHeight(250)
         column_tools_layout.addWidget(self.column_list)
         
         selection_layout.addWidget(self.column_tools_widget)
@@ -181,12 +178,12 @@ class ExportDialog(QDialog):
         selection_group.setLayout(selection_layout)
         layout.addWidget(selection_group)
         
-        options_group = DataPlotStudioGroupBox("Options", parent=self)
+        options_group = QGroupBox("Options", parent=self)
         options_layout = QVBoxLayout()
         options_layout.setContentsMargins(15, 20, 15, 15)
         options_layout.setSpacing(8)
 
-        self.include_index_check = DataPlotStudioCheckBox("Include Index")
+        self.include_index_check = QCheckBox("Include Index")
         self.include_index_check.setChecked(False)
         options_layout.addWidget(self.include_index_check)
 
@@ -219,20 +216,21 @@ class ExportDialog(QDialog):
         
         button_layout = QHBoxLayout()
         
-        self.clipboard_button = DataPlotStudioButton("Copy to clipboard", parent=self)
+        self.clipboard_button = QPushButton("Copy to clipboard", parent=self)
         self.clipboard_button.setIcon(IconBuilder.build(IconType.Copy))
         self.clipboard_button.setToolTip("Copy the data to system clipboard")
         self.clipboard_button.clicked.connect(self.on_clipboard_clicked)
         button_layout.addWidget(self.clipboard_button)
         
-        self.export_button = DataPlotStudioButton("Export", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.export_button = QPushButton("Export")
+        self.export_button.setObjectName("MainActionButton")
         self.export_button.setIcon(IconBuilder.build(IconType.ExportFle))
         self.export_button.setMinimumWidth(100)
         self.export_button.setDefault(True)
         self.export_button.clicked.connect(self.on_export_clicked)
         button_layout.addWidget(self.export_button)
 
-        self.cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        self.cancel_button = QPushButton("Cancel", parent=self)
         self.cancel_button.setMinimumWidth(100)
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)

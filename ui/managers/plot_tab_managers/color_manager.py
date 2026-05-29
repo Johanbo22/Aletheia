@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING, Optional
 
-from PyQt6.QtWidgets import QColorDialog, QLabel
-from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QColorDialog, QLabel, QPushButton
+from PyQt6.QtGui import QColor, QPixmap, QPainter, QIcon, QPen
+from PyQt6.QtCore import Qt
 
-from ui.widgets import DataPlotStudioButton
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -56,11 +56,39 @@ class ColorManager:
         if color.isValid():
             return color.name()
         return None
+    
+    @staticmethod
+    def update_button_color_swatch(button: QPushButton, color: QColor, swatch_size: int = 16) -> None:
+        """
+        Dynamically generates a solid-color pixmap and applies it as the button's icon.
+        This provides a visual color indicator without violating strict QSS separation of concerns.
 
-    def _update_color_button(self, button: DataPlotStudioButton, label: QLabel, color_hex: str) -> None:
+        :param button: The standard QPushButton target.
+        :param color: The QColor selected by the user.
+        :param swatch_size: The squared pixel size of the generated QPixmap.
+        """
+        pixmap = QPixmap(swatch_size, swatch_size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(color)
+        
+        border_color = QColor("#000000") if color.lightnessF() > 0.8 else QColor("#ffffff")
+        border_pen = QPen(border_color)
+        border_pen.setWidth(1)
+        border_pen.setCosmetic(True)
+        painter.setPen(border_pen)
+        
+        painter.drawRect(0, 0, swatch_size - 1, swatch_size - 1)
+        painter.end()
+        
+        button.setIcon(QIcon(pixmap))
+
+    def _update_color_button(self, button: QPushButton, label: QLabel, color_hex: str) -> None:
         """Updates the button and the associated label"""
         label.setText(color_hex)
-        button.updateColors(base_color_hex=color_hex)
+        self.update_button_color_swatch(button, QColor(color_hex))
 
     def choose_global_spine_color(self) -> None:
         """Open color picker for global spine color."""

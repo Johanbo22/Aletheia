@@ -1,0 +1,11 @@
+/*
+This CSS file governs the styling for the ToggleSwitch
+This ToggleSwitch is rendered at runtime by QPaintEvent and is not styled by
+CSS
+
+The ToggleSwitch disabled state is determined here.
+*/
+
+ToggleSwitch:disabled {
+    color: #a0a0a0;
+}

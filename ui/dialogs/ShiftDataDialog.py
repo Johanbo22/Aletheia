@@ -2,12 +2,10 @@ from typing import List, Dict, Any, Optional
 import keyword
 import pandas as pd
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QGroupBox, QComboBox, QPushButton
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class ShiftDataDialog(QDialog):
     """
@@ -33,24 +31,24 @@ class ShiftDataDialog(QDialog):
         layout.addWidget(info_label)
         layout.addSpacing(10)
         
-        settings_group = DataPlotStudioGroupBox("Shift Parameters")
+        settings_group = QGroupBox("Shift Parameters")
         settings_layout = QFormLayout()
         settings_layout.setSpacing(10)
         
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         self.column_combo.addItems(self.available_columns)
         self.column_combo.setToolTip("Select the column to shift.")
         self.column_combo.currentTextChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Target Column:", self.column_combo)
         
-        self.periods_spin = DataPlotStudioSpinBox()
+        self.periods_spin = QSpinBox()
         self.periods_spin.setRange(-100000, 100000)
         self.periods_spin.setValue(1)
         self.periods_spin.setToolTip("Number of periods to shift. Positive for Lag, Negative for Lead.")
         self.periods_spin.valueChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Periods:", self.periods_spin)
         
-        self.fill_value_input = DataPlotStudioLineEdit()
+        self.fill_value_input = QLineEdit()
         self.fill_value_input.setPlaceholderText("Optional (e.g., 0, None)")
         self.fill_value_input.setToolTip("Value to use for newly introduced missing values. Leave blank for NaN.")
         self.fill_value_input.textChanged.connect(self._on_parameters_changed)
@@ -59,12 +57,12 @@ class ShiftDataDialog(QDialog):
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
         
-        output_group = DataPlotStudioGroupBox("Output")
+        output_group = QGroupBox("Output")
         output_layout = QVBoxLayout()
         output_layout.setSpacing(5)
         
         form_layout = QFormLayout()
-        self.new_name_input = DataPlotStudioLineEdit()
+        self.new_name_input = QLineEdit()
         self.new_name_input.setToolTip("The name of the new column that will store the shifted results.")
         self.new_name_input.textChanged.connect(self._live_validate_name)
         form_layout.addRow("New Column Name:", self.new_name_input)
@@ -78,7 +76,7 @@ class ShiftDataDialog(QDialog):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
         
-        preview_group = DataPlotStudioGroupBox("Preview")
+        preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout()
         self.preview_table = QTableWidget()
         self.preview_table.setColumnCount(2)
@@ -93,12 +91,13 @@ class ShiftDataDialog(QDialog):
         layout.addStretch()
         
         button_layout = QHBoxLayout()
-        self.ok_button = DataPlotStudioButton("Apply", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.ok_button = QPushButton("Apply")
+        self.ok_button.setObjectName("MainActionButton")
         self.ok_button.setIcon(IconBuilder.build(IconType.Checkmark))
         self.ok_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.ok_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
 

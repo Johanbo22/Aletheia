@@ -11,7 +11,7 @@ CodeEditor#computed_column_expression {
     border-radius: 4px;
 }
 
-DataPlotStudioLineEdit[validationState="error"] {
+QLineEdit[validationState="error"] {
     border: 1px solid #ff5555;
     background-color: rgba(255, 85, 85, 0.05);
 }

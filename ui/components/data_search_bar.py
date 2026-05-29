@@ -1,9 +1,7 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect, QLineEdit, QPushButton
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPropertyAnimation, QEasingCurve, QPoint
 
 from core.data_handler import DataHandler
-from ui.widgets.ControlElements import DataPlotStudioLineEdit
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
 from ui.workers import SearchWorker
 
@@ -58,7 +56,7 @@ class DataSearchBar(QWidget):
         search_icon.setPixmap(IconBuilder.build(IconType.Search).pixmap(16, 16))
         search_layout.addWidget(search_icon)
 
-        self.search_input = DataPlotStudioLineEdit(parent=self)
+        self.search_input = QLineEdit(parent=self)
         self.search_input.setPlaceholderText("Find in table (Enter for next)...")
         self.search_input.textChanged.connect(self._on_search_text_changed)
         self.search_input.returnPressed.connect(self.search_next)
@@ -70,19 +68,19 @@ class DataSearchBar(QWidget):
         self.search_count_label.setProperty("styleClass", "muted_text")
         search_layout.addWidget(self.search_count_label)
 
-        self.search_prev_btn = DataPlotStudioButton("", parent=self, padding="4px")
+        self.search_prev_btn = QPushButton("")
         self.search_prev_btn.setIcon(IconBuilder.build(IconType.UpArrow))
         self.search_prev_btn.setToolTip("Previous Match")
         self.search_prev_btn.clicked.connect(self.search_prev)
         search_layout.addWidget(self.search_prev_btn)
 
-        self.search_next_btn = DataPlotStudioButton("", parent=self, padding="4px")
+        self.search_next_btn = QPushButton("")
         self.search_next_btn.setIcon(IconBuilder.build(IconType.DownArrow))
         self.search_next_btn.setToolTip("Next Match (Enter)")
         self.search_next_btn.clicked.connect(self.search_next)
         search_layout.addWidget(self.search_next_btn)
 
-        self.search_close_btn = DataPlotStudioButton("", parent=self, padding="4px")
+        self.search_close_btn = QPushButton("")
         self.search_close_btn.setIcon(IconBuilder.build(IconType.Close))
         self.search_close_btn.setToolTip("Close Search (Esc)")
         self.search_close_btn.clicked.connect(self.close_search)

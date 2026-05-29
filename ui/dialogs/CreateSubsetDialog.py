@@ -1,10 +1,9 @@
 from typing import Dict, Any
 
 from PyQt6.QtCore import QDate
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QLineEdit
 
 from ui.dialogs.FilterAdvancedDialog import FilterAdvancedDialog
-from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 
 class CreateSubsetDialog(FilterAdvancedDialog):
@@ -34,14 +33,14 @@ class CreateSubsetDialog(FilterAdvancedDialog):
         if not self.existing_subset:
             name_layout = QHBoxLayout()
             name_layout.addWidget(QLabel("Subset Name:"))
-            self.name_input = DataPlotStudioLineEdit()
+            self.name_input = QLineEdit()
             self.name_input.setPlaceholderText("e.g., high_values, location_A, etc")
             name_layout.addWidget(self.name_input)
             top_layout.addLayout(name_layout)
 
         desc_layout = QHBoxLayout()
         desc_layout.addWidget(QLabel("Description:"))
-        self.desc_input = DataPlotStudioLineEdit()
+        self.desc_input = QLineEdit()
         self.desc_input.setPlaceholderText("Optional description")
         desc_layout.addWidget(self.desc_input)
         top_layout.addLayout(desc_layout)

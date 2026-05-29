@@ -1,11 +1,9 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QFormLayout, QMenu, QToolButton
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QFormLayout, QMenu, QToolButton, QLineEdit, QComboBox, QCheckBox, QPushButton
 from PyQt6.QtCore import Qt, QTimer
 from typing import Optional
 import re
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioCheckBox, DataPlotStudioMenu
 
 class RegexReplaceDialog(QDialog):
     """
@@ -36,7 +34,7 @@ class RegexReplaceDialog(QDialog):
         form_layout.setSpacing(10)
 
         # Target column
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         self.column_combo.addItems(self.columns)
         self.column_combo.setToolTip("Select the text column for regex replacement")
         self.column_combo.setObjectName("ColumnComboBox")
@@ -47,10 +45,9 @@ class RegexReplaceDialog(QDialog):
         pattern_layout.setContentsMargins(0, 0, 0, 0)
         pattern_layout.setSpacing(5)
 
-        self.pattern_input = DataPlotStudioLineEdit()
+        self.pattern_input = QLineEdit()
         self.pattern_input.setPlaceholderText("e.g., ^[A-Za-z]+ or \\d+")
         self.pattern_input.setToolTip("Enter the Regular Expression pattern to match")
-        self.pattern_input.setObjectName("RegexPatternInput")
         pattern_layout.addWidget(self.pattern_input)
 
         self.preset_btn = QToolButton()
@@ -58,7 +55,7 @@ class RegexReplaceDialog(QDialog):
         self.preset_btn.setObjectName("RegexPresetButton")
         self.preset_btn.setToolTip("Insert common regex patterns")
 
-        preset_menu = DataPlotStudioMenu(self)
+        preset_menu = QMenu(self)
         preset_menu.setObjectName("RegexPresetMenu")
         preset_menu.addAction(r"Numbers Only (\d+)", lambda: self.pattern_input.setText(r"\d+"))
         preset_menu.addAction(r"Letters Only ([A-Za-z]+)", lambda: self.pattern_input.setText(r"[A-Za-z]+"))
@@ -79,15 +76,14 @@ class RegexReplaceDialog(QDialog):
         form_layout.addRow("", self.validation_label)
 
         # Replacement label
-        self.replacement_input = DataPlotStudioLineEdit()
+        self.replacement_input = QLineEdit()
         self.replacement_input.setPlaceholderText("(Leave empty to delete matching text)")
         self.replacement_input.setToolTip("Text to replace the matches with. Leave blank to strip matches")
-        self.replacement_input.setObjectName("ReplacementInput")
         self.replacement_input.textChanged.connect(lambda: self.update_live_preview())
         form_layout.addRow("Replacement Text:", self.replacement_input)
 
         # Options
-        self.ignore_case_checkbox = DataPlotStudioCheckBox("Ignore Case")
+        self.ignore_case_checkbox = QCheckBox("Ignore Case")
         self.ignore_case_checkbox.setObjectName("IgnoreCaseCheckBox")
         self.ignore_case_checkbox.setToolTip("Perform case-insensitive matching")
         self.ignore_case_checkbox.stateChanged.connect(lambda: self.update_live_preview())
@@ -96,9 +92,8 @@ class RegexReplaceDialog(QDialog):
         # Preview section
         form_layout.addRow(QLabel(""))
 
-        self.test_string_input = DataPlotStudioLineEdit()
+        self.test_string_input = QLineEdit()
         self.test_string_input.setPlaceholderText("Enter a sample string to test...")
-        self.test_string_input.setObjectName("TestStringInput")
         self.test_string_input.textChanged.connect(lambda: self.update_live_preview())
         form_layout.addRow("Test String:", self.test_string_input)
 
@@ -115,15 +110,14 @@ class RegexReplaceDialog(QDialog):
 
         # Actions
         btn_layout = QHBoxLayout()
-        self.btn_ok = DataPlotStudioButton("Apply Regex", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
-        self.btn_ok.setObjectName("ApplyRegexButton")
+        self.btn_ok = QPushButton("Apply Regex")
+        self.btn_ok.setObjectName("MainActionButton")
         self.btn_ok.clicked.connect(self.validate_and_accept)
         self.btn_ok.setEnabled(False)
 
         self.pattern_input.textChanged.connect(lambda: self.update_live_preview())
 
-        self.btn_cancel = DataPlotStudioButton("Cancel", parent=self)
-        self.btn_cancel.setObjectName("CancelButton")
+        self.btn_cancel = QPushButton("Cancel", parent=self)
         self.btn_cancel.clicked.connect(self.reject)
 
         btn_layout.addWidget(self.btn_ok)

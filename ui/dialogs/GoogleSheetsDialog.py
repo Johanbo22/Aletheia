@@ -3,14 +3,12 @@ from typing import NamedTuple, Optional
 
 from PyQt6.QtCore import QSettings, Qt, QTimer
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QTabWidget, QFrame
+from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QTabWidget, QFrame, QLineEdit, QGroupBox, QComboBox, QPushButton
 
 from resources.version import APPLICATION_NAME
-from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
 from ui.icons import IconBuilder, IconType
 from core.resource_loader import get_resource_path
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 
 class GoogleSheetsImportConfig(NamedTuple):
     """Payload for Google Sheets import config"""
@@ -66,7 +64,7 @@ class GoogleSheetsDialog(QDialog):
         
         header_layout.addStretch()
         
-        self.help_button = DataPlotStudioButton("How to Import?", parent=self)
+        self.help_button = QPushButton("How to Import?", parent=self)
         self.help_button.setToolTip("View instructions for importing Google Sheets data")
         self.help_button.setIcon(IconBuilder.build(IconType.Information))
         self.help_button.clicked.connect(self.show_instructions)
@@ -75,13 +73,13 @@ class GoogleSheetsDialog(QDialog):
         connection_layout_main.addLayout(header_layout)
         
         # Form layout for inputs
-        connection_group = DataPlotStudioGroupBox("Connection Details", parent=self)
+        connection_group = QGroupBox("Connection Details", parent=self)
         connection_form_layout = QFormLayout()
         connection_form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
         # Shee ID
         sheet_id_label = QLabel("Google Sheet Link or Sheet ID:")
-        self.sheet_id = DataPlotStudioComboBox()
+        self.sheet_id = QComboBox()
         self.sheet_id.setEditable(True)
         self.sheet_id.setToolTip("Paste the full Google Sheets URL or the unique Sheet ID")
         self.sheet_id.lineEdit().setPlaceholderText("Paste URL (e.g., https://docs.google.com/.../edit#gid=0) or ID")
@@ -109,7 +107,7 @@ class GoogleSheetsDialog(QDialog):
         
         # Sheet Name
         sheet_name_label = QLabel("Sheet Name:")
-        self.sheet_name = DataPlotStudioLineEdit()
+        self.sheet_name = QLineEdit()
         self.sheet_name.setToolTip("The name of the sheet you want to import data from")
         self.sheet_name.setPlaceholderText("e.g., Sheet1")
         self.sheet_name.setClearButtonEnabled(True)
@@ -130,7 +128,7 @@ class GoogleSheetsDialog(QDialog):
         advanced_layout_main.setContentsMargins(20, 20, 20, 20)
         advanced_layout_main.setSpacing(15)
 
-        delimiter_group = DataPlotStudioGroupBox("CSV Delimiter Settings", parent=self)
+        delimiter_group = QGroupBox("CSV Delimiter Settings", parent=self)
         delimiter_layout = QVBoxLayout()
 
         delimiter_info = QLabel("Google Sheets exports data as a CSV. Choose the delimiter used in your region.")
@@ -141,7 +139,7 @@ class GoogleSheetsDialog(QDialog):
         # Delimiter settings box
         delimiter_form_layout = QFormLayout()
 
-        self.delimiter_combo = DataPlotStudioComboBox()
+        self.delimiter_combo = QComboBox()
         self.delimiter_combo.addItems([
             "Comma (,) - Standard",
             "Semicolon (;) - European",
@@ -155,7 +153,7 @@ class GoogleSheetsDialog(QDialog):
         delimiter_form_layout.addRow("Delimiter:", self.delimiter_combo)
 
         # Custom delimiter
-        self.custom_delimiter_input = DataPlotStudioLineEdit()
+        self.custom_delimiter_input = QLineEdit()
         self.custom_delimiter_input.setPlaceholderText("Enter single character")
         self.custom_delimiter_input.setMaxLength(1)
         self.custom_delimiter_input.setEnabled(False)
@@ -173,7 +171,7 @@ class GoogleSheetsDialog(QDialog):
         delimiter_form_layout.addRow(parsing_separator)
 
         # Decimal separator
-        self.decimal_combo = DataPlotStudioComboBox()
+        self.decimal_combo = QComboBox()
         self.decimal_combo.addItems([
             "Dot (.) - UK/US",
             "Comma (,) - European",
@@ -183,7 +181,7 @@ class GoogleSheetsDialog(QDialog):
         delimiter_form_layout.addRow("Decimal Separator:", self.decimal_combo)
 
         # Thousands separator
-        self.thousands_combo = DataPlotStudioComboBox()
+        self.thousands_combo = QComboBox()
         self.thousands_combo.addItems([
             "None",
             "Comma (,) - US Style",
@@ -208,14 +206,15 @@ class GoogleSheetsDialog(QDialog):
         button_layout.setContentsMargins(10, 5, 10, 10)
         button_layout.addStretch()
 
-        self.import_button = DataPlotStudioButton("Import", base_color_hex=ThemeColors.MainColor, text_color_hex="white", parent=self)
+        self.import_button = QPushButton("Import")
+        self.import_button.setObjectName("MainActionButton")
         self.import_button.setDefault(True)
         self.import_button.setMinimumWidth(100)
         self.import_button.setEnabled(False)
         self.import_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.import_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.setMinimumWidth(100)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)

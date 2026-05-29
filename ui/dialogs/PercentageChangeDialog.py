@@ -2,12 +2,10 @@ from typing import List, Dict, Any
 import keyword
 import pandas as pd
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QGroupBox, QComboBox, QPushButton
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class PercentageChangeDialog(QDialog):
     """
@@ -34,24 +32,24 @@ class PercentageChangeDialog(QDialog):
         layout.addWidget(info_label)
         layout.addSpacing(10)
         
-        settings_group = DataPlotStudioGroupBox("Percentage Change Parameters")
+        settings_group = QGroupBox("Percentage Change Parameters")
         settings_layout = QFormLayout()
         settings_layout.setSpacing(10)
         
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         self.column_combo.addItems(self.numeric_columns)
         self.column_combo.setToolTip("Select the numeric column to calculate changes for.")
         self.column_combo.currentTextChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Target Column:", self.column_combo)
         
-        self.periods_spin = DataPlotStudioSpinBox()
+        self.periods_spin = QSpinBox()
         self.periods_spin.setRange(1, 100000)
         self.periods_spin.setValue(1)
         self.periods_spin.setToolTip("Periods to shift for forming percent change. (e.g., 1 for Day-over-Day).")
         self.periods_spin.valueChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Periods:", self.periods_spin)
         
-        self.fill_method_combo = DataPlotStudioComboBox()
+        self.fill_method_combo = QComboBox()
         operations = [
             ("Pad / Forward Fill", "pad"),
             ("Backfill", "bfill"),
@@ -66,12 +64,12 @@ class PercentageChangeDialog(QDialog):
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
         
-        output_group = DataPlotStudioGroupBox("Output")
+        output_group = QGroupBox("Output")
         output_layout = QVBoxLayout()
         output_layout.setSpacing(5)
         
         form_layout = QFormLayout()
-        self.new_name_input = DataPlotStudioLineEdit()
+        self.new_name_input = QLineEdit()
         self.new_name_input.setToolTip("The name of the new column that will store the change results.")
         self.new_name_input.textChanged.connect(self._live_validate_name)
         form_layout.addRow("New Column Name:", self.new_name_input)
@@ -85,7 +83,7 @@ class PercentageChangeDialog(QDialog):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
         
-        preview_group = DataPlotStudioGroupBox("Preview")
+        preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout()
         self.preview_table = QTableWidget()
         self.preview_table.setColumnCount(2)
@@ -100,12 +98,13 @@ class PercentageChangeDialog(QDialog):
         layout.addStretch()
         
         button_layout = QHBoxLayout()
-        self.ok_button = DataPlotStudioButton("Apply", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.ok_button = QPushButton("Apply")
+        self.ok_button.setObjectName("MainActionButton")
         self.ok_button.setIcon(IconBuilder.build(IconType.Checkmark))
         self.ok_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.ok_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
 

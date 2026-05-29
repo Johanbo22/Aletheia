@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QHBoxLayout
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, QPushButton
 from PyQt6.QtGui import QIcon
 
 from typing import TYPE_CHECKING, Optional
@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController
 
 from core.resource_loader import get_resource_path
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
 from ui.theme import ThemeColors
 
@@ -30,13 +29,8 @@ class DataOperationsPanel(QWidget):
         top_bar_layout = QHBoxLayout()
         top_bar_layout.setContentsMargins(0, 0, 0, 0)
         
-        reset_button = DataPlotStudioButton(
-            "Reset to Original",
-            parent=self,
-            base_color_hex=ThemeColors.DestructiveColor,
-            text_color_hex="white",
-            typewriter_effect=True
-        )
+        reset_button = QPushButton("Reset to Original")
+        reset_button.setObjectName("DestructiveButton")
         reset_button.setIcon(IconBuilder.build(IconType.Redo))
         reset_button.clicked.connect(self.controller.reset_data)
         top_bar_layout.addWidget(reset_button)

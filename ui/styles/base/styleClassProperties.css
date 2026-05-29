@@ -1,4 +1,7 @@
-/* This css file governs the general styleClass property styling rules set for entire application. Individual dialog styleClasses are set in their own [name].css file */
+/* 
+This css file governs the general styleClass property styling rules set for entire application. 
+Individual dialog styleClasses are set in their own [name].css file 
+*/
 QLabel[styleClass="info_text"] {
     color: #666666;
     font-style: italic;

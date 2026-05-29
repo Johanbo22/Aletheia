@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.colors import to_hex
-from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem
+from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem, QListWidget
 from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
 from PyQt6.QtGui import QColor, QIcon
 
@@ -24,7 +24,7 @@ from ui.status_bar import StatusBar
 from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
 from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager
-from ui.widgets import DataPlotStudioListWidget, ColorBlindnessEffect
+from ui.widgets import ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
 
@@ -440,15 +440,14 @@ class PlotTab(PlotTabUI):
         
         self.category_lists = []
         for category, plot_names in self.plot_categories.items():
-            list_widget = DataPlotStudioListWidget()
-            list_widget.setViewMode(DataPlotStudioListWidget.ViewMode.IconMode)
-            list_widget.setResizeMode(DataPlotStudioListWidget.ResizeMode.Adjust)
-            list_widget.setMovement(DataPlotStudioListWidget.Movement.Static)
+            list_widget = QListWidget()
+            list_widget.setViewMode(QListWidget.ViewMode.IconMode)
+            list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
+            list_widget.setMovement(QListWidget.Movement.Static)
             
             list_widget.setGridSize(QSize(105, 100))
             list_widget.setSpacing(8)
             list_widget.setIconSize(QSize(48, 48))
-            list_widget.setObjectName("plot_type_list")
 
             list_widget.itemClicked.connect(self._on_plot_list_item_clicked)
 
@@ -739,14 +738,14 @@ class PlotTab(PlotTabUI):
         if facecolor:
             self.bar_color = facecolor
             self.view.bar_color_label.setText(facecolor)
-            self.view.bar_color_button.updateColors(base_color_hex=self.bar_color)
+            ColorManager.update_button_color_swatch(self.view.bar_color_button, QColor(self.bar_color))
         
         #edge color
         edgecolor = to_hex(patch.get_edgecolor())
         if edgecolor:
             self.bar_edge_color = edgecolor
             self.view.bar_edge_label.setText(edgecolor)
-            self.view.bar_edge_button.updateColors(base_color_hex=self.bar_edge_color)
+            ColorManager.update_button_color_swatch(self.view.bar_edge_button, QColor(self.bar_edge_color))
 
         #load the bar edge width
         self.view.bar_edge_width_spin.blockSignals(True)
@@ -967,7 +966,7 @@ class PlotTab(PlotTabUI):
             if color:
                 self.line_color = to_hex(color)
                 self.view.line_color_label.setText(self.line_color)
-                self.view.line_color_button.updateColors(base_color_hex=self.line_color)
+                ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.line_color))
 
             #load markers
             marker = line.get_marker()

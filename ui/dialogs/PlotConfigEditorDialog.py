@@ -6,10 +6,6 @@ from PyQt6.QtCore import Qt, QTimer, QRegularExpression
 
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets.AnimatedButton import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioCheckBox
-from ui.widgets.ControlElements import DataPlotStudioGroupBox
-from ui.widgets.ControlElements import DataPlotStudioSlider
 from ui.dialogs import CodeEditor
 
 class JSONHighlighter(QSyntaxHighlighter):
@@ -104,23 +100,23 @@ class PlotConfigEditorDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        self.format_button = DataPlotStudioButton("Format JSON")
+        self.format_button = QPushButton("Format JSON")
         self.format_button.setIcon(IconBuilder.build(IconType.OpenPythonEditor))
         self.format_button.setToolTip("Format JSON spacing (Ctrl+Shift+F)")
         
-        self.color_button = DataPlotStudioButton("Insert color")
+        self.color_button = QPushButton("Insert color")
         self.color_button.setIcon(IconBuilder.build(IconType.PlotAppearance))
         self.color_button.setToolTip("Pick a color and insert its Hex code at the cursor")
         
         
-        self.reset_button = DataPlotStudioButton("Reset")
+        self.reset_button = QPushButton("Reset")
         self.reset_button.setIcon(IconBuilder.build(IconType.RefreshItem))
         self.reset_button.setEnabled(False)
         
-        self.cancel_button = DataPlotStudioButton("Cancel")
+        self.cancel_button = QPushButton("Cancel")
         
-        self.save_button = DataPlotStudioButton("Save As..." if is_protected else "Save", base_color_hex=ThemeColors.MainColor, text_color_hex="white")
-        self.save_button.setIcon(IconBuilder.build(IconType.SaveProjectAs))
+        self.save_button = QPushButton("Save As..." if is_protected else "Save")
+        self.save_button.setObjectName("MainActionButton")
         self.save_button.setToolTip("Save theme configuration (Ctrl+S)")
 
         self.format_button.clicked.connect(self.format_json_content)

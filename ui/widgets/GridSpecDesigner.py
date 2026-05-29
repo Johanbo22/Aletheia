@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QMenu
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMessageBox, QMenu, QSpinBox, QPushButton
 from PyQt6.QtCore import pyqtSignal, Qt, QEvent, QPoint
 from PyQt6.QtGui import QKeyEvent, QColor, QBrush, QFont
 
@@ -6,8 +6,6 @@ from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioMenu, DataPlotStudioSpinBox
 
 @dataclass
 class GridSpan:
@@ -60,12 +58,12 @@ class GridSpecDesignerWidget(QWidget):
         self.main_layout.setSpacing(10)
         
         self.controls_layout = QHBoxLayout()
-        self.rows_spin = DataPlotStudioSpinBox()
+        self.rows_spin = QSpinBox()
         self.rows_spin.setObjectName("gridRowsSpinBox")
         self.rows_spin.setRange(1, 10)
         self.rows_spin.setValue(2)
         
-        self.cols_spin = DataPlotStudioSpinBox()
+        self.cols_spin = QSpinBox()
         self.cols_spin.setObjectName("gridColsSpinBox")
         self.cols_spin.setRange(1, 10)
         self.cols_spin.setValue(2)
@@ -96,19 +94,19 @@ class GridSpecDesignerWidget(QWidget):
         self.grid_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         
         self.actions_layout = QHBoxLayout()
-        self.merge_cells_btn = DataPlotStudioButton("Add / Merge Plot")
+        self.merge_cells_btn = QPushButton("Add / Merge Plot")
         self.merge_cells_btn.setObjectName("mergeCellsBtn")
         self.merge_cells_btn.setToolTip("Create a new plot or merge existing ones in the selected area.")
         
-        self.remove_cells_btn = DataPlotStudioButton("Remove Plot")
+        self.remove_cells_btn = QPushButton("Remove Plot")
         self.remove_cells_btn.setObjectName("removeCellsBtn")
         self.remove_cells_btn.setToolTip("Remove the plot from the selected area, leaving an empty space.")
         
-        self.reset_grid_btn = DataPlotStudioButton("Reset Grid")
+        self.reset_grid_btn = QPushButton("Reset Grid")
         self.reset_grid_btn.setObjectName("resetGridBtn")
         
-        self.apply_layout_btn = DataPlotStudioButton("Apply Layout", base_color_hex=ThemeColors.MainColor, text_color_hex="white")
-        self.apply_layout_btn.setObjectName("applyDashboardLayoutBtn")
+        self.apply_layout_btn = QPushButton("Apply Layout")
+        self.apply_layout_btn.setObjectName("MainActionButton")
         self.apply_layout_btn.setProperty("actionType", "primary")
 
         self.actions_layout.addWidget(self.merge_cells_btn)
@@ -169,7 +167,7 @@ class GridSpecDesignerWidget(QWidget):
         self._redraw_table()
         
     def _show_context_menu(self, position: QPoint) -> None:
-        menu = DataPlotStudioMenu(self)
+        menu = QMenu(self)
         
         merge_action = menu.addAction("Add / Merge Selected")
         remove_action = menu.addAction("Remove Selected")

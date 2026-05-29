@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from PyQt6.QtWidgets import QColorDialog, QMessageBox, QListWidgetItem
 from PyQt6.QtGui import QColor
 
+from ui.managers.plot_tab_managers.color_manager import ColorManager
+
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
 
@@ -49,8 +51,8 @@ class ReferenceLineManager:
         if color.isValid():
             self.ref_line_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.ref_line_color_label.setText(self.ref_line_color)
-            self.view.ref_line_color_button.updateColors(base_color_hex=self.ref_line_color)
-
+            ColorManager.update_button_color_swatch(self.view.ref_line_color_button, QColor(self.ref_line_color))
+            
     def add_reference_line(self) -> None:
         """Adds a reference line based on the currently selected type in the type selection"""
         ref_line_type_text = self.view.ref_line_type_combo.currentText()
@@ -127,7 +129,7 @@ class ReferenceLineManager:
 
         self.ref_line_color = ref_line.get("color", "black")
         self.view.ref_line_color_label.setText(self.ref_line_color)
-        self.view.ref_line_color_button.updateColors(base_color_hex=self.ref_line_color)
+        ColorManager.update_button_color_swatch(self.view.ref_line_color_button, QColor(self.ref_line_color))
 
         mpl_to_ui_style = {"-": "solid", "--": "dashed", "-.": "dashdot", ":": "dotted"}
         self.view.ref_line_style_combo.setCurrentText(mpl_to_ui_style.get(ref_line.get("linestyle", "-"), "solid"))

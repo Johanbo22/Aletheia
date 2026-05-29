@@ -1,8 +1,8 @@
 import sys
 import threading
 import gc
-from PyQt6.QtWidgets import QApplication, QSplashScreen
-from PyQt6.QtCore import QTranslator, QLocale, Qt, QSharedMemory, QCoreApplication
+from PyQt6.QtWidgets import QApplication, QSplashScreen, QPushButton
+from PyQt6.QtCore import QTranslator, QLocale, Qt, QSharedMemory, QCoreApplication, QObject, QEvent
 from PyQt6.QtGui import QGuiApplication, QPixmap
 
 from core.resource_loader import get_resource_path
@@ -12,6 +12,18 @@ from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 # This file handles initialization of application properties
 # The file is imported and used in main.py at init.
 # The functions are called in the order they appear
+
+class GlobalCursorFilter(QObject):
+    """
+    Application wide eventFilter to globally apply UI properties
+    This applies the QCursor.PointingHandCursor for cursor
+    """
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Polish:
+            if isinstance(obj, QPushButton):
+                obj.setCursor(Qt.CursorShape.PointingHandCursor)
+        return False
+
 
 def configure_runtime_environment() -> None:
     """Sets up garbage collection thresholds and HIGH DPI scaling"""
@@ -59,3 +71,12 @@ def register_application_metadata() -> None:
     """Registers the metadata used by OS and QSettings"""
     QCoreApplication.setApplicationName(APPLICATION_NAME)
     QCoreApplication.setApplicationVersion(APPLICATION_VERSION)
+
+def apply_global_ui_filters(app: QApplication) -> None:
+    """
+    Instantiates and installs application-wide event filters.
+    Binds the filter directly to the app instance to prevent Python's 
+    garbage collector from destroying it when this function returns.
+    """
+    app._cursor_filter = GlobalCursorFilter(app)
+    app.installEventFilter(app._cursor_filter)

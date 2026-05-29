@@ -1,12 +1,10 @@
 from typing import Dict, Any
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QAbstractItemView, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QWidget, QPushButton, QMessageBox, QMenu, QApplication
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QAbstractItemView, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QWidget, QPushButton, QMessageBox, QMenu, QApplication, QSpinBox, QLineEdit, QComboBox
 from PyQt6.QtCore import Qt, QRegularExpression, QPoint, QEvent, QObject
 from PyQt6.QtGui import QFont, QColor, QRegularExpressionValidator, QKeyEvent
 
-from ui.widgets import DataPlotStudioButton
 from ui.theme import ThemeColors
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioMenu, DataPlotStudioSpinBox
 
 class CreateDatasetDialog(QDialog):
     """
@@ -79,7 +77,7 @@ class CreateDatasetDialog(QDialog):
         form_layout.setSpacing(16)
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         
-        self.rows_spinbox = DataPlotStudioSpinBox()
+        self.rows_spinbox = QSpinBox()
         self.rows_spinbox.setRange(1, 1_000_000)
         self.rows_spinbox.setValue(10)
         self.rows_spinbox.setSuffix(" rows")
@@ -88,7 +86,7 @@ class CreateDatasetDialog(QDialog):
         self.rows_spinbox.setMinimumHeight(34)
         self.rows_spinbox.setToolTip("Specify the total number of rows to create")
         
-        self.cols_spinbox = DataPlotStudioSpinBox()
+        self.cols_spinbox = QSpinBox()
         self.cols_spinbox.setRange(1, 1_000)
         self.cols_spinbox.setValue(3)
         self.cols_spinbox.setSuffix(" columns")
@@ -99,7 +97,7 @@ class CreateDatasetDialog(QDialog):
         self.cols_spinbox.setToolTip("Specify the total number of columns to create")
         self.cols_spinbox.valueChanged.connect(self._on_column_count_changed)
         
-        self.fill_combo = DataPlotStudioComboBox()
+        self.fill_combo = QComboBox()
         self.fill_combo.setMinimumHeight(34)
         self.fill_combo.addItems(["NaN (Missing Data)", "0 (Zeroes)", "1 (Ones)", '"" (Empty String)'])
         self.fill_combo.setToolTip("Select the initial data state for all cells in the new dataset")
@@ -131,7 +129,7 @@ class CreateDatasetDialog(QDialog):
         
         prefix_layout = QHBoxLayout()
         prefix_layout.setSpacing(8)
-        self.prefix_input = DataPlotStudioLineEdit()
+        self.prefix_input = QLineEdit()
         gen_desc.setBuddy(self.prefix_input)
         self.prefix_input.setText(self._default_prefix)
         self.prefix_input.setPlaceholderText("e.g. Var")
@@ -143,7 +141,7 @@ class CreateDatasetDialog(QDialog):
         prefix_validator = QRegularExpressionValidator(prefix_regex)
         self.prefix_input.setValidator(prefix_validator)
         
-        self.btn_apply_prefix = DataPlotStudioButton("Apply", parent=self)
+        self.btn_apply_prefix = QPushButton("Apply", parent=self)
         self.btn_apply_prefix.setIcon(IconBuilder.build(IconType.EditColumns))
         self.btn_apply_prefix.setMinimumHeight(34)
         self.btn_apply_prefix.clicked.connect(self._apply_prefix_to_table)
@@ -211,17 +209,12 @@ class CreateDatasetDialog(QDialog):
         self.btn_reset.setToolTip("Warning: This will overwrite any custom column names.")
         self.btn_reset.clicked.connect(self._reset_defaults)
         
-        self.btn_cancel = DataPlotStudioButton("Cancel", parent=self)
+        self.btn_cancel = QPushButton("Cancel", parent=self)
         self.btn_cancel.setIcon(IconBuilder.build(IconType.DeleteItem))
         self.btn_cancel.clicked.connect(self.reject)
         
-        self.btn_create = DataPlotStudioButton(
-            "Create Dataset",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white",
-            font_weight="bold"
-        )
+        self.btn_create = QPushButton("Create Dataset")
+        self.btn_create.setObjectName("MainActionButton")
         self.btn_create.setIcon(IconBuilder.build(IconType.Checkmark))
         self.btn_create.setMinimumWidth(160)
         self.btn_create.setDefault(True)
@@ -290,7 +283,7 @@ class CreateDatasetDialog(QDialog):
         self._validate_schema()
         
     def _show_table_context_menu(self, position: QPoint) -> None:
-        menu = DataPlotStudioMenu(self.col_table)
+        menu = QMenu(self.col_table)
         
         action_reset = menu.addAction("Reset Names to Prefix")
         action_reset.setIcon(IconBuilder.build(IconType.Redo))

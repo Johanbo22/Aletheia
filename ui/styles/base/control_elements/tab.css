@@ -1,0 +1,87 @@
+/*
+This CSS file governs the styling associated with the 
+QTabWidget system, and the QTabBar
+
+This file also handles the styling for any QToolButtons on an associated QTabBar
+*/
+
+QTabWidget:focus {
+    outline: none;
+}
+
+QTabWidget::pane {
+    border: 1px solid #dcdcdc;
+    background: white;
+    border-radius: 6px;
+    border-top-left-radius: 0px;
+    top: -1px;
+}
+
+QTabBar {
+    qproperty-drawBase: 0;
+    background: transparent;
+}
+
+QTabBar::tab {
+    background: transparent;
+    color: #666;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    padding: 8px 16px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+QTabBar::tab:hover {
+    background: rgba(0, 120, 215, 0.05);
+    color: #111;
+    border-bottom: 2px solid rgba(0, 120, 215, 0.3);
+}
+
+QTabBar::tab:selected {
+    background: white;
+    color: #0078d7;
+    font-weight: bold;
+    border: 1px solid #dcdcdc;
+    border-bottom: 2px solid #0078d7;
+}
+
+QTabBar::tab:disabled {
+    color: #b0b0b0;
+    background: transparent;
+}
+
+QTabBar::tab:focus {
+    outline: none;
+}
+
+QTabBar::close-button {
+    background: transparent;
+    border-radius: 3px;
+    padding: 2px;
+    margin: 2px;
+}
+
+QTabBar::close-button:hover {
+    background-color: #ffebee;
+}
+
+QTabBar::close-button:pressed {
+    background-color: #ffcdd2;
+}
+
+QTabBar QToolButton {
+    background-color: #f8f9fa;
+    border: 1px solid #dcdcdc;
+    border-radius: 4px;
+    margin: 1px;
+}
+
+QTabBar QToolButton:hover {
+    background-color: #e2e6ea;
+}
+
+QTabBar QToolButton:pressed {
+    background-color: #dae0e5;
+}

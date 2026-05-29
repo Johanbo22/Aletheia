@@ -5,12 +5,10 @@ from zipfile import BadZipFile
 import pandas as pd
 from PyQt6.QtCore import Qt, QThreadPool
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QMessageBox, QDialogButtonBox, \
-    QApplication
+    QApplication, QLineEdit, QCheckBox, QPushButton
 
 from core.data_handler import DataHandler
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioLineEdit
 from ui.workers import FileReaderWorker
 
 
@@ -47,12 +45,12 @@ class AppendDialog(QDialog):
         
         # File selection layout
         file_layout = QHBoxLayout()
-        self.file_path_edit = DataPlotStudioLineEdit()
+        self.file_path_edit = QLineEdit()
         self.file_path_edit.setReadOnly(True)
         self.file_path_edit.setPlaceholderText("No file selected...")
         self.file_path_edit.setClearButtonEnabled(True)
         
-        browse_btn = DataPlotStudioButton("Browse", parent=self)
+        browse_btn = QPushButton("Browse", parent=self)
         browse_btn.setToolTip("Open a file explorer to find the file you want to append")
         browse_btn.clicked.connect(self.browse_file)
         
@@ -63,7 +61,7 @@ class AppendDialog(QDialog):
         layout.addSpacing(10)
         
         # Configuration options
-        self.ignore_index_checkbox = DataPlotStudioCheckBox("Ignore Index")
+        self.ignore_index_checkbox = QCheckBox("Ignore Index")
         self.ignore_index_checkbox.setChecked(True)
         self.ignore_index_checkbox.setToolTip("If checked, the resulting DataFrame will be re-indexed from 0 to n-1\nThis is default")
         layout.addWidget(self.ignore_index_checkbox)
@@ -73,10 +71,11 @@ class AppendDialog(QDialog):
         # Accept/reject buttons
         button_box = QDialogButtonBox(Qt.Orientation.Horizontal, self)
 
-        cancel_btn = DataPlotStudioButton("Cancel", parent=self)
+        cancel_btn = QPushButton("Cancel", parent=self)
         cancel_btn.clicked.connect(self.reject)
 
-        self.append_btn = DataPlotStudioButton("Append Data", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.append_btn = QPushButton("Append Data")
+        self.append_btn.setObjectName("MainActionButton")
         self.append_btn.clicked.connect(self.accept_append)
         self.append_btn.setEnabled(False)
 

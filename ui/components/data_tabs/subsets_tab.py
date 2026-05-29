@@ -1,12 +1,10 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QListWidget, QGroupBox, QComboBox, QPushButton
 from PyQt6.QtCore import Qt
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioListWidget
 
 if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController
@@ -33,14 +31,14 @@ class SubsetsTab(BaseDataTab):
         ))
         layout.addSpacing(10)
 
-        quick_subset_group = DataPlotStudioGroupBox("Quick Subset Creation")
+        quick_subset_group = QGroupBox("Quick Subset Creation")
         quick_subset_layout = QVBoxLayout()
 
         combo_layout = QHBoxLayout()
         combo_label = QLabel("Split data by column values:")
         combo_layout.addWidget(combo_label)
 
-        self.subset_column_combo = DataPlotStudioComboBox()
+        self.subset_column_combo = QComboBox()
         combo_layout.addWidget(self.subset_column_combo)
 
         quick_subset_layout.addLayout(combo_layout)
@@ -55,22 +53,22 @@ class SubsetsTab(BaseDataTab):
         layout.addWidget(quick_subset_group)
         layout.addSpacing(10)
 
-        subset_list_group = DataPlotStudioGroupBox("Active Subsets")
+        subset_list_group = QGroupBox("Active Subsets")
         subset_list_layout = QVBoxLayout()
 
-        self.active_subsets_list = DataPlotStudioListWidget()
+        self.active_subsets_list = QListWidget()
         self.active_subsets_list.setMaximumHeight(150)
         self.active_subsets_list.itemDoubleClicked.connect(self.controller.view_subset_quick)
         subset_list_layout.addWidget(self.active_subsets_list)
 
         subset_list_btns = QHBoxLayout()
         subset_list_btns.addStretch()
-        view_subset_btn = DataPlotStudioButton("View", parent=self)
+        view_subset_btn = QPushButton("View", parent=self)
         view_subset_btn.setIcon(IconBuilder.build(IconType.ViewItem))
         view_subset_btn.clicked.connect(self.controller.view_subset_quick)
         subset_list_btns.addWidget(view_subset_btn)
 
-        self.refresh_subsets_btn = DataPlotStudioButton("Refresh", parent=self)
+        self.refresh_subsets_btn = QPushButton("Refresh", parent=self)
         self.refresh_subsets_btn.setIcon(IconBuilder.build(IconType.RefreshItem))
         self.refresh_subsets_btn.clicked.connect(self.controller.refresh_active_subsets)
         subset_list_btns.addWidget(self.refresh_subsets_btn)
@@ -79,7 +77,7 @@ class SubsetsTab(BaseDataTab):
         layout.addWidget(subset_list_group)
         layout.addSpacing(10)
 
-        inject_group = DataPlotStudioGroupBox("View Subset as Active DataFrame")
+        inject_group = QGroupBox("View Subset as Active DataFrame")
         inject_layout = QVBoxLayout()
 
         inject_info = QLabel("Insert the selected subset into the active DataFrame to work directly with it.")
@@ -88,14 +86,8 @@ class SubsetsTab(BaseDataTab):
         inject_layout.addWidget(inject_info)
         inject_layout.addSpacing(10)
 
-        self.inject_subset_btn = DataPlotStudioButton(
-            "Insert Selected Subset",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white",
-            font_weight="bold",
-            padding="8px",
-        )
+        self.inject_subset_btn = QPushButton("Insert Selected Subset")
+        self.inject_subset_btn.setObjectName("MainActionButton")
         self.inject_subset_btn.clicked.connect(self.controller.inject_subset_to_dataframe)
         inject_layout.addWidget(self.inject_subset_btn)
 
@@ -106,13 +98,8 @@ class SubsetsTab(BaseDataTab):
         inject_layout.addWidget(self.injection_status_label)
         inject_layout.addSpacing(10)
 
-        self.restore_original_btn = DataPlotStudioButton(
-            "Revert to Original Data View",
-            parent=self,
-            base_color_hex=ThemeColors.DestructiveColor,
-            text_color_hex="white",
-            padding="8px",
-        )
+        self.restore_original_btn = QPushButton("Revert to Original Data View")
+        self.restore_original_btn.setObjectName("DestructiveButton")
         self.restore_original_btn.clicked.connect(self.controller.restore_original_dataframe)
         self.restore_original_btn.setEnabled(False)
         inject_layout.addWidget(self.restore_original_btn)

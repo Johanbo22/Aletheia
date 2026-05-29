@@ -1,10 +1,8 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QAbstractItemView, QScrollArea, QFrame, QWidget
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QAbstractItemView, QScrollArea, QFrame, QWidget, QListWidget, QGroupBox, QComboBox
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets.ControlElements import DataPlotStudioComboBox
 from ui.icons import IconType
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioListWidget
 
 if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController
@@ -37,7 +35,7 @@ class ColumnsTab(BaseDataTab):
         column_column_info.setProperty("styleClass", "info_text")
         layout.addWidget(column_column_info)
         
-        self.column_list = DataPlotStudioListWidget()
+        self.column_list = QListWidget()
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.column_list.setMaximumHeight(400)
         layout.addWidget(self.column_list)
@@ -80,7 +78,7 @@ class ColumnsTab(BaseDataTab):
         layout.addSpacing(10)
         
         # Data Type conversion
-        type_group = DataPlotStudioGroupBox("Change Data Type")
+        type_group = QGroupBox("Change Data Type")
         type_layout = QVBoxLayout()
         data_type_info = QLabel("This operation allows you to change the datatype of your selected column")
         data_type_info.setWordWrap(True)
@@ -88,7 +86,7 @@ class ColumnsTab(BaseDataTab):
         type_layout.addWidget(data_type_info)
         type_layout.addWidget(QLabel("Change selected columns DataType to:"))
         
-        self.type_combo = DataPlotStudioComboBox()
+        self.type_combo = QComboBox()
         self.type_combo.addItems([
             "string (object)", "integer (numeric)", "float (numeric)", "category (optimized string)", "datetime (dates/times)"
         ])
@@ -106,14 +104,14 @@ class ColumnsTab(BaseDataTab):
         
         # Text Manipulation
         layout.addSpacing(10)
-        text_group = DataPlotStudioGroupBox("Text Manipulation")
+        text_group = QGroupBox("Text Manipulation")
         text_layout = QVBoxLayout()
         text_info = QLabel("Standardize text data in the selected column.\nRemove whitespace, fix casing etc.")
         text_info.setWordWrap(True)
         text_info.setProperty("styleClass", "info_text")
         text_layout.addWidget(text_info)
 
-        self.text_operation_combo = DataPlotStudioComboBox()
+        self.text_operation_combo = QComboBox()
         self.text_operation_combo.addItems([
             "Trim Whitespace", "Trim leading whitespace", "Trim trailing whitepsace",
             "Convert to lowercase", "Convert to UPPERCASE", "Convert to Title Case",
@@ -149,7 +147,7 @@ class ColumnsTab(BaseDataTab):
         
         # Binning & Normalizatio
         layout.addSpacing(10)
-        binning_group = DataPlotStudioGroupBox("Binning / Discretization")
+        binning_group = QGroupBox("Binning / Discretization")
         binning_layout = QVBoxLayout()
         binning_info = QLabel("Convert continuous numeric variables into categorical buckets.")
         binning_info.setWordWrap(True)
@@ -169,14 +167,14 @@ class ColumnsTab(BaseDataTab):
         layout.addSpacing(10)
         
         # Normalization
-        norm_group = DataPlotStudioGroupBox("Data Normalization and Scaling")
+        norm_group = QGroupBox("Data Normalization and Scaling")
         norm_layout = QVBoxLayout()
         norm_info = QLabel("Scale numeric data to a standard range or distribution")
         norm_info.setWordWrap(True)
         norm_info.setProperty("styleClass", "info_text")
         norm_layout.addWidget(norm_info)
         
-        self.norm_method_combo = DataPlotStudioComboBox()
+        self.norm_method_combo = QComboBox()
         self.norm_method_combo.addItems(["Min-Max Scaling", "Standard Scaling", "Median Scaling"])
         norm_layout.addWidget(self.norm_method_combo)
         

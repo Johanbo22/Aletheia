@@ -1,9 +1,6 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QMessageBox, QFileDialog
+from PyQt6.QtWidgets import QLineEdit, QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QMessageBox, QFileDialog, QPushButton
 from PyQt6.QtGui import QFont
 from typing import Tuple
-
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 class GoogleSheetsExportDialog(QDialog):
     """Dialog for configuring and executing a Google Sheets export"""
@@ -25,11 +22,11 @@ class GoogleSheetsExportDialog(QDialog):
         form_layout = QFormLayout()
         
         # Credentials selecstion
-        self.credentials_input = DataPlotStudioLineEdit()
+        self.credentials_input = QLineEdit()
         self.credentials_input.setPlaceholderText("Select Service Account JSON file...")
         self.credentials_input.setReadOnly(True)
         
-        browse_button = DataPlotStudioButton("Browse...", parent=self)
+        browse_button = QPushButton("Browse...", parent=self)
         browse_button.clicked.connect(self._browse_credentials)
         
         cred_layout = QHBoxLayout()
@@ -39,13 +36,13 @@ class GoogleSheetsExportDialog(QDialog):
         form_layout.addRow(QLabel("Credentials (JSON):"), cred_layout)
         
         # Target Sheet ID
-        self.sheet_id_input = DataPlotStudioLineEdit()
+        self.sheet_id_input = QLineEdit()
         self.sheet_id_input.setPlaceholderText("Paste target Google Sheet ID here")
         self.sheet_id_input.setToolTip("The unique alphanumeric ID found in the Google Sheets URL.")
         form_layout.addRow(QLabel("Target Sheet ID:"), self.sheet_id_input)
 
         # Target Worksheet Name
-        self.sheet_name_input = DataPlotStudioLineEdit()
+        self.sheet_name_input = QLineEdit()
         self.sheet_name_input.setText("Sheet1")
         self.sheet_name_input.setPlaceholderText("e.g., ExportedData")
         self.sheet_name_input.setToolTip("Name of the specific tab. It will be created if it does not exist.")
@@ -66,11 +63,12 @@ class GoogleSheetsExportDialog(QDialog):
         # Dialog Buttons
         button_layout = QHBoxLayout()
         
-        export_button = DataPlotStudioButton("Export Data", parent=self)
+        export_button = QPushButton("Export Data", parent=self)
+        export_button.setObjectName("MainActionButton")
         export_button.clicked.connect(self._validate_and_accept)
         button_layout.addWidget(export_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
 

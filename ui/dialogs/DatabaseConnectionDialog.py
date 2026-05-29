@@ -1,6 +1,6 @@
 from PyQt6.QtGui import QIcon, QPixmap, QFontDatabase, QIntValidator, QShortcut, QKeySequence, QSyntaxHighlighter, QTextCharFormat, QColor, QTextDocument, QFont
 from PyQt6.QtCore import Qt, QThreadPool, QSettings
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QTextEdit, QVBoxLayout, QWidget, QStyle, QTreeWidget, QTreeWidgetItem, QSplitter, QRadioButton, QButtonGroup, QInputDialog
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QTextEdit, QVBoxLayout, QWidget, QStyle, QTreeWidget, QTreeWidgetItem, QSplitter, QRadioButton, QButtonGroup, QInputDialog, QLineEdit, QGroupBox, QComboBox, QPushButton
 
 from pathlib import Path
 import re
@@ -9,9 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from core.resource_loader import get_resource_path
 from resources.version import APPLICATION_NAME
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioRadioButton
 from ui.workers import TestConnectionWorker, FetchSchemaWorker
 
 class SQLSyntaxHighlighter(QSyntaxHighlighter):
@@ -58,21 +56,21 @@ class DatabaseConnectionDialog(QDialog):
         main_layout = QVBoxLayout(self)
 
         # Profile selection
-        profiles_group = DataPlotStudioGroupBox("Saved Connections", parent=self)
+        profiles_group = QGroupBox("Saved Connections", parent=self)
         profiles_layout = QHBoxLayout()
 
         profiles_layout.addWidget(QLabel("Profile:"))
-        self.profiles_combo = DataPlotStudioComboBox()
+        self.profiles_combo = QComboBox()
         self.populate_profiles()
         self.profiles_combo.currentIndexChanged.connect(self.load_profile)
         profiles_layout.addWidget(self.profiles_combo, 1)
 
-        self.save_profile_button = DataPlotStudioButton("Save", parent=self)
+        self.save_profile_button = QPushButton("Save", parent=self)
         self.save_profile_button.setToolTip("Save the current connection details")
         self.save_profile_button.clicked.connect(self.save_profile)
         profiles_layout.addWidget(self.save_profile_button)
 
-        self.delete_profile_button = DataPlotStudioButton("Delete", parent=self)
+        self.delete_profile_button = QPushButton("Delete", parent=self)
         self.delete_profile_button.setToolTip("Delete selected profile")
         self.delete_profile_button.clicked.connect(self.delete_profile)
         profiles_layout.addWidget(self.delete_profile_button)
@@ -81,19 +79,19 @@ class DatabaseConnectionDialog(QDialog):
         main_layout.addWidget(profiles_group)
 
         # Connection mode
-        self.setup_group = DataPlotStudioGroupBox("Connection Setup", parent=self)
+        self.setup_group = QGroupBox("Connection Setup", parent=self)
         setup_layout = QFormLayout(self.setup_group)
         
         self.mode_group = QButtonGroup(self)
         mode_radio_layout = QHBoxLayout()
 
-        self.mode_builder_radio = DataPlotStudioRadioButton("Connection Builder")
+        self.mode_builder_radio = QRadioButton("Connection Builder")
         self.mode_builder_radio.setChecked(True)
         self.mode_builder_radio.toggled.connect(self.toggle_connection_mode)
         self.mode_group.addButton(self.mode_builder_radio)
         mode_radio_layout.addWidget(self.mode_builder_radio)
 
-        self.mode_uri_radio = DataPlotStudioRadioButton("Raw Connection URI")
+        self.mode_uri_radio = QRadioButton("Raw Connection URI")
         self.mode_uri_radio.toggled.connect(self.toggle_connection_mode)
         self.mode_group.addButton(self.mode_uri_radio)
         mode_radio_layout.addWidget(self.mode_uri_radio)
@@ -103,7 +101,7 @@ class DatabaseConnectionDialog(QDialog):
 
         #type selection
         self.db_type_label = QLabel("Database Type:")
-        self.db_type_combo = DataPlotStudioComboBox()
+        self.db_type_combo = QComboBox()
         self.db_type_combo.addItems(["SQLite","DuckDB", "PostgreSQL", "MySQL"])
         self.db_type_combo.currentTextChanged.connect(self.on_db_type_changed)
         setup_layout.addRow(self.db_type_label, self.db_type_combo)
@@ -111,41 +109,41 @@ class DatabaseConnectionDialog(QDialog):
         main_layout.addWidget(self.setup_group)
 
         #connection details
-        self.connection_group = DataPlotStudioGroupBox("Connection Details", parent=self)
+        self.connection_group = QGroupBox("Connection Details", parent=self)
         connection_group_layout = QVBoxLayout(self.connection_group)
         self.connection_layout = QFormLayout()
         connection_group_layout.addLayout(self.connection_layout)
 
         self.host_label = QLabel("Host:")
-        self.host_input = DataPlotStudioLineEdit("localhost")
+        self.host_input = QLineEdit("localhost")
         self.connection_layout.addRow(self.host_label, self.host_input)
 
         self.port_label = QLabel("Port:")
-        self.port_input = DataPlotStudioLineEdit()
+        self.port_input = QLineEdit()
         self.port_validator = QIntValidator(1, 65535, self)
         self.port_input.setValidator(self.port_validator)
         self.connection_layout.addRow(self.port_label, self.port_input)
 
         self.user_label = QLabel("User:")
-        self.user_input = DataPlotStudioLineEdit("postgres")
+        self.user_input = QLineEdit("postgres")
         self.connection_layout.addRow(self.user_label, self.user_input)
 
         self.password_label = QLabel("Password:")
-        self.password_input = DataPlotStudioLineEdit()
-        self.password_input.setEchoMode(DataPlotStudioLineEdit.EchoMode.Password)
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         
         view_icon = IconBuilder.build(IconType.ViewItem)
-        self.toggle_password_action = self.password_input.addAction(view_icon, DataPlotStudioLineEdit.ActionPosition.TrailingPosition)
+        self.toggle_password_action = self.password_input.addAction(view_icon, QLineEdit.ActionPosition.TrailingPosition)
         self.toggle_password_action.triggered.connect(self.toggle_password_visibility)
         self.connection_layout.addRow(self.password_label, self.password_input)
 
         self.dbname_label = QLabel("Database:")
-        self.dbname_input = DataPlotStudioLineEdit("postgres")
+        self.dbname_input = QLineEdit("postgres")
         self.connection_layout.addRow(self.dbname_label, self.dbname_input)
 
         #raw uri
         self.uri_label = QLabel("Connection URI:")
-        self.uri_input = DataPlotStudioLineEdit()
+        self.uri_input = QLineEdit()
         self.uri_input.setPlaceholderText("dialect+driver://username:password@host:port/database")
         self.uri_input.setVisible(False)
         self.uri_label.setVisible(False)
@@ -155,9 +153,9 @@ class DatabaseConnectionDialog(QDialog):
         self.file_db_layout = QHBoxLayout()
         self.file_db_layout.setContentsMargins(0, 0, 0, 0)
         self.file_db_label = QLabel("Database File:")
-        self.file_db_path_input = DataPlotStudioLineEdit()
+        self.file_db_path_input = QLineEdit()
         self.file_db_path_input.setPlaceholderText("Click 'Browse' to select a database file")
-        self.file_db_browse_button = DataPlotStudioButton("Browse", parent=self)
+        self.file_db_browse_button = QPushButton("Browse", parent=self)
         self.file_db_browse_button.clicked.connect(self.browse_file_db)
         self.file_db_layout.addWidget(self.file_db_path_input)
         self.file_db_layout.addWidget(self.file_db_browse_button)
@@ -182,7 +180,7 @@ class DatabaseConnectionDialog(QDialog):
 
         test_connection_layout.addStretch()
 
-        self.test_connection_button = DataPlotStudioButton("Test Connection", parent=self)
+        self.test_connection_button = QPushButton("Test Connection", parent=self)
         self.test_connection_button.clicked.connect(self.test_connection)
         test_connection_layout.addWidget(self.test_connection_button)
 
@@ -194,7 +192,7 @@ class DatabaseConnectionDialog(QDialog):
         self.editors_splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Query editor
-        query_group = DataPlotStudioGroupBox("SQL Query", parent=self)
+        query_group = QGroupBox("SQL Query", parent=self)
         query_layout = QVBoxLayout()
         instructions = (
             "Enter your SQL query below. You can select specific columns and join tables.\n"
@@ -233,16 +231,16 @@ class DatabaseConnectionDialog(QDialog):
         self.editors_splitter.addWidget(query_group)
 
         # Schema viewer
-        schema_group = DataPlotStudioGroupBox("Database Schema", parent=self)
+        schema_group = QGroupBox("Database Schema", parent=self)
         schema_layout = QVBoxLayout()
 
-        self.load_schema_button = DataPlotStudioButton("Load Tables and Columns", parent=self)
+        self.load_schema_button = QPushButton("Load Tables and Columns", parent=self)
         self.load_schema_button.setToolTip("Connect to the database and list all tables and columns")
         self.load_schema_button.clicked.connect(self.fetch_schema)
         schema_layout.addWidget(self.load_schema_button)
         
         # Search bar for schema tree
-        self.schema_search_input = DataPlotStudioLineEdit(parent=self)
+        self.schema_search_input = QLineEdit(parent=self)
         self.schema_search_input.setPlaceholderText("Search tables and columns...")
         self.schema_search_input.textChanged.connect(self.filter_schema_tree)
         self.schema_search_input.setVisible(False)
@@ -783,7 +781,7 @@ class DatabaseConnectionDialog(QDialog):
     
     def toggle_password_visibility(self) -> None:
         """Swaps the echo mode for passwords to view the password currently typed"""
-        if self.password_input.echoMode() == DataPlotStudioLineEdit.EchoMode.Password:
-            self.password_input.setEchoMode(DataPlotStudioLineEdit.EchoMode.Normal)
+        if self.password_input.echoMode() == QLineEdit.EchoMode.Password:
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
         else:
-            self.password_input.setEchoMode(DataPlotStudioLineEdit.EchoMode.Password)
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)

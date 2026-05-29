@@ -1,0 +1,23 @@
+/* 
+This CSS file governs the styling properties of QToolTips and QLabels
+
+If a QLabel is assigned a Property through .setProperty() the assigned value must either exist
+in styleClassProperties.css or in respective *_dialog.css file.
+
+The QLabel styling here is the general styling of a plain QLabel without any ObjectNames() or Property()
+*/
+
+QToolTip {
+    background-color: #2b2b2b;
+    color: #fdfdfd;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 10pt;
+    opacity: 230;
+}
+
+QLabel {
+    font-size: 11pt;
+    color: #333;
+}

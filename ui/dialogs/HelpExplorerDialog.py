@@ -6,13 +6,12 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, QSortFilterProxyModel, QUrl, QModelIndex
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QDesktopServices
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QLineEdit, QTextBrowser, QLabel, QWidget, \
-    QFrame, QSizePolicy, QTreeView
+    QFrame, QSizePolicy, QTreeView, QPushButton
 
 from core.help_manager import HelpManager, HelpTopicDetail
 from core.resource_loader import get_resource_path
 from resources.version import APPLICATION_NAME
 from ui.icons.icon_registry import IconBuilder, IconType
-from ui.widgets import DataPlotStudioButton
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +103,8 @@ class HelpExplorerDialog(QDialog):
         self.content_browser.setOpenExternalLinks(False)
         self.content_browser.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
-        self.link_button = DataPlotStudioButton("Read More")
+        self.link_button = QPushButton("Read More")
         self.link_button.setIcon(IconBuilder.build(IconType.Help))
-        self.link_button.setObjectName("helpExternalLinkButton")
         self.link_button.setVisible(False)
         self.link_button.setCursor(Qt.CursorShape.PointingHandCursor)
         

@@ -1,17 +1,14 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QWidget, QFormLayout, QProgressBar, QSizePolicy
+from PyQt6.QtWidgets import QSpinBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QWidget, QFormLayout, QProgressBar, QSizePolicy, QLineEdit, QGroupBox, QComboBox, QCheckBox, QPushButton
 from PyQt6.QtCore import Qt, QRegularExpression, QTimer
 from PyQt6.QtGui import QRegularExpressionValidator
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 
 import re
 import pandas as pd
 from typing import Any, Optional
 from enum import Enum
-
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class BinningPreviewWidget(QWidget):
     """Displays a vertical bar chart to represent bin distribution"""
@@ -125,17 +122,17 @@ class BinningDialog(QDialog):
         main_layout.setSpacing(12)
 
         # General Config
-        general_group = DataPlotStudioGroupBox("General")
+        general_group = QGroupBox("General")
         general_group.setObjectName("binning_general_group")
         self.general_layout = QFormLayout(general_group)
         self.general_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         self.column_combo.addItems(self.columns)
         self.column_combo.currentIndexChanged.connect(self._auto_generate_name)
         self.general_layout.addRow("Select Numeric Column:", self.column_combo)
 
-        self.new_name_input = DataPlotStudioLineEdit()
+        self.new_name_input = QLineEdit()
         self.new_name_input.setPlaceholderText("e.g., Age_Group")
         self.new_name_input.setToolTip("Must be a valid Python identifier. Spaces and special characters are not allowed")
 
@@ -146,12 +143,12 @@ class BinningDialog(QDialog):
         main_layout.addWidget(general_group)
 
         # Binning Strategy group
-        method_group = DataPlotStudioGroupBox("Binning Strategy")
+        method_group = QGroupBox("Binning Strategy")
         method_group.setObjectName("binning_method_group")
         self.method_layout = QFormLayout(method_group)
         self.method_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
-        self.method_combo = DataPlotStudioComboBox()
+        self.method_combo = QComboBox()
         self.method_combo.addItems([method.value for method in BinningMethod])
         self.method_combo.setToolTip("Select the statistical strategy for dividing the data into bins")
         self.method_combo.currentIndexChanged.connect(self._update_input_visibility)
@@ -160,7 +157,7 @@ class BinningDialog(QDialog):
         self.bin_count_widget = QWidget()
         bin_count_layout = QVBoxLayout(self.bin_count_widget)
         bin_count_layout.setContentsMargins(0, 0, 0, 0)
-        self.bin_count_spin = DataPlotStudioSpinBox()
+        self.bin_count_spin = QSpinBox()
         self.bin_count_spin.setRange(2, 100)
         self.bin_count_spin.setValue(5)
         bin_count_layout.addWidget(self.bin_count_spin)
@@ -169,14 +166,14 @@ class BinningDialog(QDialog):
         self.custom_edges_widget = QWidget()
         custom_edges_layout = QVBoxLayout(self.custom_edges_widget)
         custom_edges_layout.setContentsMargins(0, 0, 0, 0)
-        self.edges_input = DataPlotStudioLineEdit()
+        self.edges_input = QLineEdit()
         self.edges_input.setPlaceholderText("e.g., 0, 18, 35, 60, 100")
 
         edge_regex = QRegularExpression(r"^[0-9.,\s\-]*$")
         self.edges_input.setValidator(QRegularExpressionValidator(edge_regex, self.edges_input))
         custom_edges_layout.addWidget(self.edges_input)
 
-        self.catch_all_checkbox = DataPlotStudioCheckBox("Add -∞ and ∞ to edges to catch out-of-bounds data")
+        self.catch_all_checkbox = QCheckBox("Add -∞ and ∞ to edges to catch out-of-bounds data")
         self.catch_all_checkbox.setChecked(True)
         self.catch_all_checkbox.setToolTip("Ensures no data becomes 'NaN' by extending the first and last bins to infinity")
         custom_edges_layout.addWidget(self.catch_all_checkbox)
@@ -185,12 +182,12 @@ class BinningDialog(QDialog):
         main_layout.addWidget(method_group)
 
         # Labelling group
-        labeling_group = DataPlotStudioGroupBox("Labeling")
+        labeling_group = QGroupBox("Labeling")
         labeling_group.setObjectName("binning_labeling_group")
         self.labeling_layout = QFormLayout(labeling_group)
         self.labeling_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
-        self.labels_strategy_combo = DataPlotStudioComboBox()
+        self.labels_strategy_combo = QComboBox()
         self.labels_strategy_combo.addItems([strategy.value for strategy in LabelStrategy])
         self.labels_strategy_combo.setToolTip("Define how the resulting bins will be named in the new column.")
         self.labels_strategy_combo.currentIndexChanged.connect(self._update_input_visibility)
@@ -199,7 +196,7 @@ class BinningDialog(QDialog):
         self.custom_labels_widget = QWidget()
         custom_labels_layout = QVBoxLayout(self.custom_labels_widget)
         custom_labels_layout.setContentsMargins(0, 0, 0, 0)
-        self.labels_input = DataPlotStudioLineEdit()
+        self.labels_input = QLineEdit()
         self.labels_input.setPlaceholderText("e.g., Low, Medium, High")
         custom_labels_layout.addWidget(self.labels_input)
         self.labeling_layout.addRow("Custom Labels:", self.custom_labels_widget)
@@ -207,27 +204,27 @@ class BinningDialog(QDialog):
         self.prefix_labels_widget = QWidget()
         prefix_labels_layout = QVBoxLayout(self.prefix_labels_widget)
         prefix_labels_layout.setContentsMargins(0, 0, 0, 0)
-        self.prefix_input = DataPlotStudioLineEdit()
+        self.prefix_input = QLineEdit()
         self.prefix_input.setPlaceholderText("e.g., Group (results in Group 1, Group 2...)")
         prefix_labels_layout.addWidget(self.prefix_input)
         self.labeling_layout.addRow("Prefix for Sequential Labels:", self.prefix_labels_widget)
         main_layout.addWidget(labeling_group)
 
         # ADvanced settings
-        advanced_group = DataPlotStudioGroupBox("Advanced Options")
+        advanced_group = QGroupBox("Advanced Options")
         advanced_group.setObjectName("binning_advanced_group")
         advanced_layout = QVBoxLayout(advanced_group)
 
-        self.right_inclusive_checkbox = DataPlotStudioCheckBox("Right-inclusive intervals (e.g. (0-10])")
+        self.right_inclusive_checkbox = QCheckBox("Right-inclusive intervals (e.g. (0-10])")
         self.right_inclusive_checkbox.setChecked(True)
         advanced_layout.addWidget(self.right_inclusive_checkbox)
 
-        self.drop_original_checkbox = DataPlotStudioCheckBox("Drop Original column after binning")
+        self.drop_original_checkbox = QCheckBox("Drop Original column after binning")
         self.drop_original_checkbox.setChecked(False)
         advanced_layout.addWidget(self.drop_original_checkbox)
         main_layout.addWidget(advanced_group)
 
-        preview_group = DataPlotStudioGroupBox("Distribution Preview")
+        preview_group = QGroupBox("Distribution Preview")
         preview_group.setObjectName("binning_preview_group")
         preview_layout = QVBoxLayout(preview_group)
 
@@ -244,17 +241,13 @@ class BinningDialog(QDialog):
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        self.apply_button = DataPlotStudioButton(
-            "Create Bins",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white"
-        )
+        self.apply_button = QPushButton("Create Bins")
+        self.apply_button.setObjectName("MainActionButton")
         self.apply_button.setDefault(True)
         self.apply_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.apply_button)
 
-        self.cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        self.cancel_button = QPushButton("Cancel", parent=self)
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
 

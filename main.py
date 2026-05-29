@@ -20,6 +20,8 @@ def main():
     appInit.configure_runtime_environment()
 
     app = QApplication(sys.argv)
+    
+    appInit.apply_global_ui_filters(app)
     instance_lock: QSharedMemory = appInit.enforce_single_instance()
     splash_screen: QSplashScreen = appInit.display_splash_screen(app)
 

@@ -2,7 +2,6 @@ from typing import Any
 
 from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
-from ui.widgets.ControlElements import DataPlotStudioCheckBox
 from ui.dialogs import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
 
@@ -10,19 +9,17 @@ import sys
 import ast
 from PyQt6.QtCore import Qt, pyqtSignal, QSettings, QEvent, QPoint
 from PyQt6.QtGui import QTextCursor, QColor, QFont, QFontMetrics, QShortcut, QKeySequence, QFontDatabase
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QPlainTextEdit, QMenu, QSplitter, QTreeWidget, QTreeWidgetItem, QWidget, QApplication
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QPlainTextEdit, QMenu, QSplitter, QTreeWidget, QTreeWidgetItem, QWidget, QApplication, QLineEdit, QComboBox, QCheckBox, QPushButton
 
 
 from datetime import datetime
 
-from ui.widgets import DataPlotStudioButton
 from ui.animations.PlotGeneratedAnimation import PlotGeneratedAnimation
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit
 
 class StreamRedirector:
     """Redirects stdout/stderr to a plain text widget from the code editor"""
@@ -265,14 +262,14 @@ class ScriptEditorDialog(QDialog):
 
         #tools
         toolbar = QHBoxLayout()
-        self.auto_sync_check = DataPlotStudioCheckBox("Auto-update from GUI (This will overwrite changes)")
+        self.auto_sync_check = QCheckBox("Auto-update from GUI (This will overwrite changes)")
         self.auto_sync_check.setChecked(True)
         self.auto_sync_check.setToolTip("If checked, changing settings from the GUI will overwrite the code here")
         toolbar.addWidget(self.auto_sync_check)
         
         # snippets menu
         toolbar.addSpacing(10)
-        self.snippet_button = DataPlotStudioButton("Insert Snippet", parent=self, typewriter_effect=True)
+        self.snippet_button = QPushButton("Insert Snippet")
         self.snippet_button.setProperty("menu_button", "true")
         self.snippet_button.setFixedWidth(130)
         self.snippet_button.setToolTip("Insert common plotting code snippets")
@@ -281,7 +278,7 @@ class ScriptEditorDialog(QDialog):
         self.snippet_menu = QMenu(self)
         self.snippet_menu.setObjectName("script_snippet_menu")
         
-        self.theme_button = DataPlotStudioButton("Theme Settings", parent=self, typewriter_effect=True)
+        self.theme_button = QPushButton("Theme Settings")
         self.theme_button.setToolTip("Customize Python syntax highlighting colors")
         self.theme_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.theme_button.setFixedWidth(130)
@@ -316,7 +313,7 @@ class ScriptEditorDialog(QDialog):
 
         toolbar.addSpacing(20)
         toolbar.addWidget(QLabel("History:"))
-        self.history_combo = DataPlotStudioComboBox()
+        self.history_combo = QComboBox()
         self.history_combo.setMinimumWidth(400)
         self.history_combo.addItem("Select to restore...")
         self.history_combo.activated.connect(self.on_history_selected)
@@ -366,13 +363,13 @@ class ScriptEditorDialog(QDialog):
         variable_panel.setContentsMargins(0, 0, 0, 0)
         var_header_layout = QHBoxLayout()
         
-        self.variable_search_bar = DataPlotStudioLineEdit()
+        self.variable_search_bar = QLineEdit()
         self.variable_search_bar.setObjectName("script_variable_search")
         self.variable_search_bar.setPlaceholderText("Search Columns...")
         self.variable_search_bar.textChanged.connect(self.filter_variables)
         var_header_layout.addWidget(self.variable_search_bar)
         
-        self.clear_vars_button = DataPlotStudioButton("Clear Variables", parent=self)
+        self.clear_vars_button = QPushButton("Clear Variables", parent=self)
         self.clear_vars_button.setToolTip("Clear all custom variables fro memory")
         self.clear_vars_button.clicked.connect(self.clear_all_variables)
         var_header_layout.addWidget(self.clear_vars_button)
@@ -402,12 +399,12 @@ class ScriptEditorDialog(QDialog):
         console_header_layout.addWidget(QLabel("Console Output:"))
         console_header_layout.addStretch()
         
-        self.reset_script_button = DataPlotStudioButton("Reset Script", parent=self)
+        self.reset_script_button = QPushButton("Reset Script", parent=self)
         self.reset_script_button.setToolTip("Reset the editor to the default template")
         self.reset_script_button.clicked.connect(self.reset_script_to_default)
         console_header_layout.addWidget(self.reset_script_button)
         
-        self.clear_console_button = DataPlotStudioButton("Clear Console", parent=self)
+        self.clear_console_button = QPushButton("Clear Console", parent=self)
         self.clear_console_button.setToolTip("Clear the console")
         self.clear_console_button.clicked.connect(self.clear_console)
         console_header_layout.addWidget(self.clear_console_button)
@@ -430,7 +427,8 @@ class ScriptEditorDialog(QDialog):
     
         #buttons
         button_layout = QHBoxLayout()
-        self.run_button = DataPlotStudioButton("Run Script", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white", padding="6px", typewriter_effect=True)
+        self.run_button = QPushButton("Run Script")
+        self.run_button.setObjectName("MainActionButton")
         self.run_button.setMinimumHeight(40)
         self.run_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.run_button.setShortcut("Ctrl+Shift+Return")
@@ -438,7 +436,7 @@ class ScriptEditorDialog(QDialog):
         self.run_button.clicked.connect(self.on_run_clicked)
         button_layout.addWidget(self.run_button)
 
-        self.close_button = DataPlotStudioButton("Close", parent=self, typewriter_effect=True)
+        self.close_button = QPushButton("Close")
         self.close_button.setMinimumHeight(40)
         self.close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_button.clicked.connect(self.close)

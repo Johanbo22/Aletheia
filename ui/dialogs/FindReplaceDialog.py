@@ -1,16 +1,8 @@
-from typing import final
-from ui.LineNumberArea import LineNumberArea
-
-
-from PyQt6.QtCore import QRect, Qt, QStringListModel
-from PyQt6.QtGui import QColor, QFont, QPainter, QTextCursor, QTextFormat, QAction, QKeySequence, QTextDocument
-from PyQt6.QtWidgets import QPlainTextEdit, QTextEdit, QCompleter, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox, QWidget
+from PyQt6.QtGui import QTextCursor, QTextDocument
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QCheckBox, QPushButton
 import traceback
 
 from ui.dialogs.CodeEditor import CodeEditor
-from ui.widgets.AnimatedButton import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioCheckBox
-from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 class FindReplaceDialog(QDialog):
     """Floating dialog for find and replace"""
@@ -25,26 +17,26 @@ class FindReplaceDialog(QDialog):
         # Find
         find_layout = QHBoxLayout()
         find_layout.addWidget(QLabel("Find:"))
-        self.find_input = DataPlotStudioLineEdit()
+        self.find_input = QLineEdit()
         find_layout.addWidget(self.find_input)
         layout.addLayout(find_layout)
         
         # Replace
         replace_layout = QHBoxLayout()
         replace_layout.addWidget(QLabel("Replace:"))
-        self.replace_input = DataPlotStudioLineEdit()
+        self.replace_input = QLineEdit()
         replace_layout.addWidget(self.replace_input)
         layout.addLayout(replace_layout)
         
         # options
-        self.case_sensitive_check = DataPlotStudioCheckBox("Case Sensitive")
+        self.case_sensitive_check = QCheckBox("Case Sensitive")
         layout.addWidget(self.case_sensitive_check)
         
         # Buttons
         button_layout = QHBoxLayout()
-        self.find_next_button = DataPlotStudioButton("Find Next")
-        self.replace_button = DataPlotStudioButton("Replace")
-        self.replace_all_button = DataPlotStudioButton("Replace All")
+        self.find_next_button = QPushButton("Find Next")
+        self.replace_button = QPushButton("Replace")
+        self.replace_all_button = QPushButton("Replace All")
         
         button_layout.addWidget(self.find_next_button)
         button_layout.addWidget(self.replace_button)

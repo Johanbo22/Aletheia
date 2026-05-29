@@ -1,9 +1,8 @@
 # ui/menu_bar.py
-from PyQt6.QtWidgets import QMenuBar, QWidget
+from PyQt6.QtWidgets import QMenuBar, QWidget, QMenu
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt
 from core.resource_loader import get_resource_path
-from ui.widgets.ControlElements import DataPlotStudioMenu
 from ui.icons import IconBuilder, IconType
 
 class MenuBar(QMenuBar):
@@ -13,7 +12,7 @@ class MenuBar(QMenuBar):
         super().__init__(parent)
         
         # File Menu
-        file_menu = DataPlotStudioMenu(self.tr("&File"), self)
+        file_menu = QMenu(self.tr("&File"), self)
         self.addMenu(file_menu)
         
         self.file_new = QAction(IconBuilder.build(IconType.NewProject),self.tr("&New Project"), parent)
@@ -36,7 +35,7 @@ class MenuBar(QMenuBar):
         file_menu.addAction(self.file_save_as)
         
         file_menu.addSeparator()
-        import_submenu: DataPlotStudioMenu = DataPlotStudioMenu(self.tr("&Import"), self)
+        import_submenu: QMenu = QMenu(self.tr("&Import"), self)
         file_menu.addMenu(import_submenu)
         
         self.import_file = QAction(IconBuilder.build(IconType.ImportFile), self.tr("&Import from &Local File..."), parent)
@@ -54,7 +53,7 @@ class MenuBar(QMenuBar):
         
         file_menu.addSeparator()
         
-        export_submenu: DataPlotStudioMenu = DataPlotStudioMenu(self.tr("&Export"), self)
+        export_submenu: QMenu = QMenu(self.tr("&Export"), self)
         file_menu.addMenu(export_submenu)
         
         self.export_data_action = QAction(IconBuilder.build(IconType.ExportFle), self.tr("Export &Data..."), parent)
@@ -83,7 +82,7 @@ class MenuBar(QMenuBar):
         file_menu.addAction(self.exit_action)
         
         # Edit Menu
-        edit_menu = DataPlotStudioMenu(self.tr("&Edit"), self)
+        edit_menu = QMenu(self.tr("&Edit"), self)
         self.addMenu(edit_menu)
         
         self.undo_action = QAction(IconBuilder.build(IconType.Undo), self.tr("&Undo"), parent)
@@ -109,7 +108,7 @@ class MenuBar(QMenuBar):
         edit_menu.addAction(self.settings_action)
         
         # View Menu
-        view_menu = DataPlotStudioMenu(self.tr("&View"), self)
+        view_menu = QMenu(self.tr("&View"), self)
         self.addMenu(view_menu)
         
         self.zoom_in_action = QAction(IconBuilder.build(IconType.ZoomIn), self.tr("Zoom &In"), parent)
@@ -123,7 +122,7 @@ class MenuBar(QMenuBar):
         view_menu.addAction(self.zoom_out_action)
         
         # Help Menu
-        help_menu = DataPlotStudioMenu(self.tr("&Help"), self)
+        help_menu = QMenu(self.tr("&Help"), self)
         self.addMenu(help_menu)
         
         self.about_action = QAction(IconBuilder.build(IconType.Information), self.tr("&About"), parent)

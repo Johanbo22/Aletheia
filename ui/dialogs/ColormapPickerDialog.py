@@ -2,11 +2,9 @@ import matplotlib
 from functools import lru_cache
 from PyQt6.QtCore import QSize, Qt, QSettings, QEvent, QObject, QTimer
 from PyQt6.QtGui import QBrush, QColor, QIcon, QLinearGradient, QPainter, QPixmap, QCloseEvent, QResizeEvent, QKeyEvent
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QVBoxLayout, QFrame, QSpinBox, QSizePolicy
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidgetItem, QVBoxLayout, QFrame, QSpinBox, QSizePolicy, QListWidget, QLineEdit, QCheckBox
 
 from resources.version import APPLICATION_NAME
-from ui.widgets.ControlElements import DataPlotStudioCheckBox
-from ui.widgets.ControlElements import DataPlotStudioLineEdit, DataPlotStudioListWidget
 
 
 class ColormapPickerDialog(QDialog):
@@ -46,7 +44,7 @@ class ColormapPickerDialog(QDialog):
         search_label = QLabel("Search:")
         search_label.setObjectName("colormapSearchLabel")
         
-        self.search_input = DataPlotStudioLineEdit()
+        self.search_input = QLineEdit()
         self.search_input.setObjectName("colormapSearchInput")
         self.search_input.setPlaceholderText("Type to filter...")
         self.search_input.setClearButtonEnabled(True)
@@ -54,18 +52,18 @@ class ColormapPickerDialog(QDialog):
         
         options_layout = QHBoxLayout()
 
-        self.reverse_check = DataPlotStudioCheckBox("Reverse colormap")
+        self.reverse_check = QCheckBox("Reverse colormap")
         self.reverse_check.setObjectName("colormapReverseCheckBox")
         self.reverse_check.setToolTip("Flips the gradient direction")
         self.reverse_check.toggled.connect(self._on_item_selection_changed)
         self.reverse_check.setChecked(is_reversed)
         
-        self.grayscale_check = DataPlotStudioCheckBox("Grayscale test")
+        self.grayscale_check = QCheckBox("Grayscale test")
         self.grayscale_check.setObjectName("colormapGrayscaleCheckBox")
         self.grayscale_check.setToolTip("Preivew hos this colormap translates to black-and-white printing")
         self.grayscale_check.toggled.connect(self._on_item_selection_changed)
         
-        self.discrete_check = DataPlotStudioCheckBox("Discrete")
+        self.discrete_check = QCheckBox("Discrete")
         self.discrete_check.setObjectName("colormapDiscreteCheckBox")
         self.discrete_check.setToolTip("Preview the colormap with quantile colorbands")
         self.discrete_check.toggled.connect(self._on_item_selection_changed)
@@ -98,7 +96,7 @@ class ColormapPickerDialog(QDialog):
         self.empty_search_label.setHidden(True)
         layout.addWidget(self.empty_search_label)
 
-        self.list_widget = DataPlotStudioListWidget()
+        self.list_widget = QListWidget()
         self.list_widget.setObjectName("colormapListWidget")
         self.list_widget.setIconSize(QSize(100, 20))
         self.list_widget.setUniformItemSizes(True)

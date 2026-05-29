@@ -1,13 +1,11 @@
-from ui.widgets import DataPlotStudioButton
 from ui.dialogs import CreateSubsetDialog, SubsetDataViewer, ProgressDialog
 from core.data_handler import DataHandler
 from core.subset_manager import SubsetManager
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioMenu
 from ui.workers import AutoCreateSubsetsWorker
 
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QThreadPool
 from PyQt6.QtGui import QFont, QShortcut, QKeySequence
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem, QMessageBox, QSplitter, QTextEdit, QVBoxLayout, QWidget, QMenu, QApplication, QFileDialog, QFormLayout, QFrame, QDialogButtonBox
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem, QMessageBox, QSplitter, QTextEdit, QVBoxLayout, QWidget, QMenu, QApplication, QFileDialog, QFormLayout, QFrame, QDialogButtonBox, QLineEdit, QGroupBox, QPushButton
 
 from typing import Optional, Any
 
@@ -112,10 +110,10 @@ class SubsetManagerDialog(QDialog):
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 5, 0)
         
-        self.list_group = DataPlotStudioGroupBox("Existing Subsets", parent=self)
+        self.list_group = QGroupBox("Existing Subsets", parent=self)
         list_group_layout = QVBoxLayout()
         
-        self.search_bar = DataPlotStudioLineEdit()
+        self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Search subsets...")
         self.search_bar.setClearButtonEnabled(True)
         self.search_bar.setToolTip("Search existing subsets (Ctrl+F)")
@@ -129,7 +127,7 @@ class SubsetManagerDialog(QDialog):
         self.clear_search_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
         self.clear_search_shortcut.activated.connect(self._clear_search_and_focus_list)
 
-        self.subset_list = DataPlotStudioListWidget()
+        self.subset_list = QListWidget()
         self.subset_list.setAlternatingRowColors(True)
         self.subset_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.subset_list.customContextMenuRequested.connect(self.show_context_menu)
@@ -151,14 +149,14 @@ class SubsetManagerDialog(QDialog):
         
         has_data = self.data_handler.df is not None
 
-        self.new_btn = DataPlotStudioButton("New Subset", parent=self)
+        self.new_btn = QPushButton("New Subset", parent=self)
         self.new_btn.clicked.connect(self.create_new_subset)
         self.new_btn.setEnabled(has_data)
         if not has_data:
             self.new_btn.setToolTip("Please load data to create subsets")
         list_buttons.addWidget(self.new_btn)
 
-        self.auto_create_btn = DataPlotStudioButton("Auto create subsets by column", parent=self)
+        self.auto_create_btn = QPushButton("Auto create subsets by column", parent=self)
         self.auto_create_btn.clicked.connect(self.auto_create_subsets)
         self.auto_create_btn.setEnabled(has_data)
         if not has_data:
@@ -176,7 +174,7 @@ class SubsetManagerDialog(QDialog):
         right_widget.setMinimumWidth(400)
         right_layout = QVBoxLayout(right_widget)
 
-        self.details_group = DataPlotStudioGroupBox("Subset Details", parent=self)
+        self.details_group = QGroupBox("Subset Details", parent=self)
         details_layout = QVBoxLayout()
         
         #name
@@ -225,19 +223,19 @@ class SubsetManagerDialog(QDialog):
 
         data_actions_layout = QHBoxLayout()
         
-        self.view_btn = DataPlotStudioButton("View Data", parent=self)
+        self.view_btn = QPushButton("View Data", parent=self)
         self.view_btn.clicked.connect(self.view_subset_data)
         self.view_btn.setToolTip("Open a new window to inspect the filtered dataset.")
         self.view_btn.setEnabled(False)
         data_actions_layout.addWidget(self.view_btn)
 
-        self.plot_btn = DataPlotStudioButton("Plot Subset", parent=self)
+        self.plot_btn = QPushButton("Plot Subset", parent=self)
         self.plot_btn.clicked.connect(self.plot_subset)
         self.plot_btn.setToolTip("Switch to the Plot tab to visualize this specific subset.")
         self.plot_btn.setEnabled(False)
         data_actions_layout.addWidget(self.plot_btn)
         
-        self.export_button = DataPlotStudioButton("Export Subset", parent=self)
+        self.export_button = QPushButton("Export Subset", parent=self)
         self.export_button.clicked.connect(self.export_subset)
         self.export_button.setToolTip("Export the subset to a CSV file")
         self.export_button.setEnabled(False)
@@ -248,20 +246,20 @@ class SubsetManagerDialog(QDialog):
         
         management_actions_layout = QHBoxLayout()
 
-        self.edit_btn = DataPlotStudioButton("Edit", parent=self)
+        self.edit_btn = QPushButton("Edit", parent=self)
         self.edit_btn.clicked.connect(self.edit_subset)
         self.edit_btn.setToolTip("Modify the filter conditions or description.")
         self.edit_btn.setEnabled(False)
         management_actions_layout.addWidget(self.edit_btn)
         
-        self.duplicate_btn = DataPlotStudioButton("Duplicate", parent=self)
+        self.duplicate_btn = QPushButton("Duplicate", parent=self)
         self.duplicate_btn.clicked.connect(self.duplicate_subset)
         self.duplicate_btn.setToolTip("Create an exact copy of this subset's configuration")
         self.duplicate_btn.setEnabled(False)
         management_actions_layout.addWidget(self.duplicate_btn)
 
-        self.delete_btn = DataPlotStudioButton("Delete", parent=self)
-        self.delete_btn.setObjectName("DestructiveDeleteBtn")
+        self.delete_btn = QPushButton("Delete", parent=self)
+        self.delete_btn.setObjectName("DestructiveButton")
         self.delete_btn.clicked.connect(self.delete_subset)
         self.delete_btn.setToolTip("Permanently delete this subset configuration.")
         self.delete_btn.setEnabled(False)
@@ -359,7 +357,7 @@ class SubsetManagerDialog(QDialog):
         self.subset_list.setCurrentItem(item)
         self.on_subset_selected(item)
         
-        menu = DataPlotStudioMenu(self)
+        menu = QMenu(self)
         view_action = menu.addAction("View Data")
         plot_action = menu.addAction("Plot Subset")
         export_action = menu.addAction("Export Subset")

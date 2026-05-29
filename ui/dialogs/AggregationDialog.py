@@ -5,13 +5,10 @@ import pandas as pd
 from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, QRunnable, QSortFilterProxyModel, QModelIndex
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, \
-    QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListWidgetItem, QListView
+    QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListWidgetItem, QListView, QMenu, QLineEdit, QGroupBox, QComboBox, QPushButton
 from xlrd import colname
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, \
-    DataPlotStudioListWidget, DataPlotStudioMenu
 from ui.workers import AggregationWorker
 from ui.icons import IconBuilder, IconType
 
@@ -129,7 +126,7 @@ class AggregationDialog(QDialog):
         self.columns = list(data_handler.df.columns)
 
         self.date_grouping_options = ["None", "Year", "Quarter", "Month", "Week", "Day"]
-        self.date_freq_combos: dict[str, DataPlotStudioComboBox] = {}
+        self.date_freq_combos: dict[str, QComboBox] = {}
         self._preview_request_id: int = 0
         self._current_cancel_token: threading.Event | None = None
         
@@ -152,7 +149,7 @@ class AggregationDialog(QDialog):
         
 
         # first: group-by section
-        group_box = DataPlotStudioGroupBox("Group By")
+        group_box = QGroupBox("Group By")
         group_layout = QVBoxLayout()
 
         group_info = QLabel("Select columns to group by:")
@@ -162,7 +159,7 @@ class AggregationDialog(QDialog):
         group_layout.addWidget(group_info)
         
         # Search bar for the group by list
-        self.group_by_search_input = DataPlotStudioLineEdit()
+        self.group_by_search_input = QLineEdit()
         self.group_by_search_input.setPlaceholderText("Search columns...")
         self.group_by_search_input.setClearButtonEnabled(True)
         self.group_by_search_input.textChanged.connect(self.filter_group_by_columns)
@@ -196,7 +193,7 @@ class AggregationDialog(QDialog):
         group_layout.addWidget(self.date_hint_label)
 
         # Date grouping for datetime cols
-        self.date_group_frame = DataPlotStudioGroupBox("Date Grouping")
+        self.date_group_frame = QGroupBox("Date Grouping")
         self.date_group_frame.setVisible(False)
         self.date_group_layout = QFormLayout()
         self.date_group_frame.setLayout(self.date_group_layout)
@@ -206,7 +203,7 @@ class AggregationDialog(QDialog):
         config_layout.addWidget(group_box, 1)
 
         # Aggregation section
-        agg_box = DataPlotStudioGroupBox("Aggregation Columns")
+        agg_box = QGroupBox("Aggregation Columns")
         agg_layout = QVBoxLayout()
 
         selection_layout = QHBoxLayout()
@@ -216,7 +213,7 @@ class AggregationDialog(QDialog):
         available_layout.addWidget(QLabel("Available Columns:"))
         
         # Search bar to filter columns
-        self.column_search_input = DataPlotStudioLineEdit()
+        self.column_search_input = QLineEdit()
         self.column_search_input.setPlaceholderText("Search columns...")
         self.column_search_input.setClearButtonEnabled(True)
         self.column_search_input.textChanged.connect(self.filter_available_columns)
@@ -260,19 +257,19 @@ class AggregationDialog(QDialog):
         # Buttons
         button_layout = QVBoxLayout()
         button_layout.addStretch()
-        self.button_add = DataPlotStudioButton("Add >", parent=self)
+        self.button_add = QPushButton("Add >", parent=self)
         self.button_add.setToolTip("Add selected columns to aggregation setup")
         self.button_add.setMaximumWidth(120)
         self.button_add.clicked.connect(self.add_column_to_agg)
         button_layout.addWidget(self.button_add)
         
-        self.button_remove = DataPlotStudioButton("< Remove", parent=self)
+        self.button_remove = QPushButton("< Remove", parent=self)
         self.button_remove.setToolTip("Remove selected columns from aggregation setup")
         self.button_remove.setMaximumWidth(120)
         self.button_remove.clicked.connect(self.remove_column_from_agg)
         button_layout.addWidget(self.button_remove)
         
-        self.button_clear_all = DataPlotStudioButton("<< Clear All", parent=self)
+        self.button_clear_all = QPushButton("<< Clear All", parent=self)
         self.button_clear_all.setToolTip("Remove all columns from aggregation setup")
         self.button_clear_all.setMaximumWidth(120)
         self.button_clear_all.clicked.connect(self.clear_all_aggregations)
@@ -324,12 +321,12 @@ class AggregationDialog(QDialog):
         table_and_controls_layout.addWidget(self.agg_table)
         
         reorder_layout = QVBoxLayout()
-        self.btn_move_up = DataPlotStudioButton("", parent=self)
+        self.btn_move_up = QPushButton("", parent=self)
         self.btn_move_up.setIcon(QIcon("icons/ui_styling/arrow-big-up.svg"))
         self.btn_move_up.setToolTip("Move selected column up")
         self.btn_move_up.clicked.connect(self.move_agg_row_up)
         
-        self.btn_move_down = DataPlotStudioButton("", parent=self)
+        self.btn_move_down = QPushButton("", parent=self)
         self.btn_move_down.setIcon(QIcon("icons/ui_styling/arrow-big-down.svg"))
         self.btn_move_down.setToolTip("Move selected column down")
         self.btn_move_down.clicked.connect(self.move_agg_row_down)
@@ -379,7 +376,7 @@ class AggregationDialog(QDialog):
         main_layout.addSpacing(10)
 
         # Save secion
-        self.save_agg_group = DataPlotStudioGroupBox(
+        self.save_agg_group = QGroupBox(
             "Save this aggregation", parent=self
         )
         self.save_agg_group.setCheckable(True)
@@ -387,7 +384,7 @@ class AggregationDialog(QDialog):
         self.save_agg_group.toggled.connect(self._on_save_group_toggled)
 
         save_layout = QFormLayout()
-        self.save_name_input = DataPlotStudioLineEdit()
+        self.save_name_input = QLineEdit()
         self.save_name_input.setPlaceholderText("e.g., 'Sales by Region'")
         self.save_name_input.textChanged.connect(self._re_evaluate_apply_button)
         save_layout.addRow(QLabel("Save as:"), self.save_name_input)
@@ -397,13 +394,14 @@ class AggregationDialog(QDialog):
 
         # buttons for accept and reject
         btn_layout = QHBoxLayout()
-        self.apply_button = DataPlotStudioButton("Apply Aggregation", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.apply_button = QPushButton("Apply Aggregation")
+        self.apply_button.setObjectName("MainActionButton")
         self.apply_button.clicked.connect(self.validate_and_accept)
         self.apply_button.setEnabled(False)
         self.apply_button.setDefault(True)
         btn_layout.addWidget(self.apply_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_button)
 
@@ -441,7 +439,7 @@ class AggregationDialog(QDialog):
             if pd.api.types.is_datetime64_any_dtype(self.data_handler.df[col_name]):
                 show_date_options = True
 
-                combo = DataPlotStudioComboBox()
+                combo = QComboBox()
                 combo.addItems(self.date_grouping_options)
 
                 if col_name in existing_states:
@@ -493,7 +491,7 @@ class AggregationDialog(QDialog):
     
     def _show_available_list_context_menu(self, position: QPoint) -> None:
         """Display a right-click context menu for the available columns list."""
-        menu = DataPlotStudioMenu(self)
+        menu = QMenu(self)
         select_all_action = menu.addAction("Select All")
         
         action = menu.exec(self.available_list_view.viewport().mapToGlobal(position))
@@ -540,7 +538,7 @@ class AggregationDialog(QDialog):
     
     def _show_agg_table_context_menu(self, position: QPoint) -> None:
         """Display a right-click context menu for the aggregation table."""
-        menu = DataPlotStudioMenu(self)
+        menu = QMenu(self)
         
         remove_action = menu.addAction("Remove Selected")
         menu.addSeparator()
@@ -578,7 +576,7 @@ class AggregationDialog(QDialog):
         name_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         self.agg_table.setItem(row, 0, name_item)
 
-        combo = DataPlotStudioComboBox()
+        combo = QComboBox()
         allowed_functions = self._get_allowed_functions(col_name)
         for index, func in enumerate(allowed_functions):
             combo.addItem(func.value)
@@ -593,7 +591,7 @@ class AggregationDialog(QDialog):
         combo.currentTextChanged.connect(self.update_preview)
         self.agg_table.setCellWidget(row, 1, combo)
 
-        out_name_edit = DataPlotStudioLineEdit()
+        out_name_edit = QLineEdit()
         out_name_edit.setPlaceholderText(f"{col_name}_{combo.currentText()}")
         out_name_edit.textChanged.connect(self.update_preview)
         self.agg_table.setCellWidget(row, 2, out_name_edit)

@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QFormLayout, QGridLayout
+from PyQt6.QtWidgets import QDialog, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QFormLayout, QGridLayout, QSpinBox, QGroupBox, QDoubleSpinBox, QComboBox, QCheckBox, QPushButton
 from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QPixmap
 
@@ -7,8 +7,6 @@ from pathlib import Path
 from resources.version import APPLICATION_NAME
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioSpinBox
 
 class PlotExportDialog(QDialog):
     """Dialog for exporting plots"""
@@ -36,7 +34,7 @@ class PlotExportDialog(QDialog):
         content_layout = QHBoxLayout()
         
         # Preview image
-        preview_group = DataPlotStudioGroupBox("Preivew", parent=self)
+        preview_group = QGroupBox("Preivew", parent=self)
         preview_layout = QVBoxLayout()
         self.preview_label = QLabel()
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -57,32 +55,32 @@ class PlotExportDialog(QDialog):
         content_layout.addWidget(preview_group)
         
         settings_layout_main = QVBoxLayout()
-        settings_group = DataPlotStudioGroupBox("Export Settings", parent=self)
+        settings_group = QGroupBox("Export Settings", parent=self)
         settings_inner_layout = QVBoxLayout()
 
         form_layout = QFormLayout()
         form_layout.setSpacing(10)
 
-        self.format_combo = DataPlotStudioComboBox()
+        self.format_combo = QComboBox()
         self.format_combo.addItems(["PNG", "JPEG", "PDF", "SVG", "TIFF", "EPS", "PS", "RAW", "RGBA"])
         form_layout.addRow("Format:", self.format_combo)
         
         dim_layout = QGridLayout()
         dim_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.width_spin = DataPlotStudioDoubleSpinBox()
+        self.width_spin = QDoubleSpinBox()
         self.width_spin.setRange(1.0, 50.0)
         self.width_spin.setSingleStep(0.5)
         self.width_spin.setValue(self.initial_fig_width)
         self.width_spin.setToolTip("Target width in inches.")
         
-        self.height_spin = DataPlotStudioDoubleSpinBox()
+        self.height_spin = QDoubleSpinBox()
         self.height_spin.setRange(1.0, 50.0)
         self.height_spin.setSingleStep(0.5)
         self.height_spin.setValue(self.initial_fig_height)
         self.height_spin.setToolTip("Target height in inches.")
         
-        self.lock_aspect_ratio_check = DataPlotStudioButton("")
+        self.lock_aspect_ratio_check = QPushButton("")
         self.lock_aspect_ratio_check.setIcon(IconBuilder.build(IconType.Locked))
         self.lock_aspect_ratio_check.setCheckable(True)
         self.lock_aspect_ratio_check.setChecked(True)
@@ -103,7 +101,7 @@ class PlotExportDialog(QDialog):
         form_layout.addRow("Size:", dim_layout)
 
         # DPI settings
-        self.dpi_spin = DataPlotStudioSpinBox()
+        self.dpi_spin = QSpinBox()
         self.dpi_spin.setRange(50, 1200)
         self.dpi_spin.setValue(self.fallback_dpi)
         self.dpi_spin.setToolTip("Dots Per Inch (Resolution). Higher is sharper but increases file size.")
@@ -116,13 +114,13 @@ class PlotExportDialog(QDialog):
         settings_inner_layout.addSpacing(10)
 
         # Transparency
-        self.transparent_check = DataPlotStudioCheckBox("Transparent Background")
+        self.transparent_check = QCheckBox("Transparent Background")
         self.transparent_check.setCheckable(True)
         self.transparent_check.setChecked(False)
         self.transparent_check.setToolTip("Save with a transparent background (PNG/PDF/SVG/TIFF)")
         settings_inner_layout.addWidget(self.transparent_check)
         
-        self.tight_layout_check = DataPlotStudioCheckBox("Tight Bounding Box")
+        self.tight_layout_check = QCheckBox("Tight Bounding Box")
         self.tight_layout_check.setCheckable(True)
         self.tight_layout_check.setChecked(True)
         self.tight_layout_check.setToolTip("Automatically trim excess margins around the exported plot.")
@@ -138,12 +136,13 @@ class PlotExportDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        export_button = DataPlotStudioButton("Save", base_color_hex=ThemeColors.MainColor, parent=self)
+        export_button = QPushButton("Save")
+        export_button.setObjectName("MainActionButton")
         export_button.setMinimumWidth(120)
         export_button.clicked.connect(self.on_save_clicked)
         button_layout.addWidget(export_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
 

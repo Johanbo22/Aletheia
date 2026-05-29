@@ -6,8 +6,6 @@ from typing import List, Tuple, Optional, Dict, Any
 import pandas as pd
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
 
 
 class MeltDialog(QDialog):
@@ -79,7 +77,7 @@ class MeltDialog(QDialog):
         layout.addSpacing(15)
 
         #naming
-        naming_group = DataPlotStudioGroupBox("New Column Names")
+        naming_group = QGroupBox("New Column Names")
         naming_layout = QFormLayout()
 
         self.variable_name_input = QLineEdit("variable")
@@ -93,7 +91,7 @@ class MeltDialog(QDialog):
         naming_group.setLayout(naming_layout)
         layout.addWidget(naming_group)
 
-        preview_group = DataPlotStudioGroupBox("Preview")
+        preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout()
 
         self.preview_label = QLabel("Click 'Update Preview' to see changes")
@@ -121,12 +119,13 @@ class MeltDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        apply_button = DataPlotStudioButton("Melt Data", base_color_hex=ThemeColors.MainColor)
+        apply_button = QPushButton("Melt Data")
+        apply_button.setObjectName("MainActionButton")
         apply_button.setMinimumWidth(120)
         apply_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(apply_button)
 
-        cancel_button = DataPlotStudioButton("Cancel")
+        cancel_button = QPushButton("Cancel")
         cancel_button.setMinimumWidth(120)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
@@ -140,7 +139,7 @@ class MeltDialog(QDialog):
         
         self.update_preview()
     
-    def _create_column_selection_panel(self, title: str, hint: str = "") -> Tuple[QWidget, DataPlotStudioListWidget, DataPlotStudioLineEdit]:
+    def _create_column_selection_panel(self, title: str, hint: str = "") -> Tuple[QWidget, QListWidget, QLineEdit]:
         panel_widget = QWidget()
         layout = QVBoxLayout(panel_widget)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -154,17 +153,17 @@ class MeltDialog(QDialog):
         
         header_layout.addStretch()
         
-        list_widget = DataPlotStudioListWidget()
-        list_widget.setSelectionMode(DataPlotStudioListWidget.SelectionMode.MultiSelection)
+        list_widget = QListWidget()
+        list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         list_widget.addItems(self.columns)
         
-        select_all_btn = DataPlotStudioButton("Select All")
+        select_all_btn = QPushButton("Select All")
         select_all_btn.setFlat(True)
         select_all_btn.setProperty("styleClass", "secondary_button")
         select_all_btn.clicked.connect(lambda: self._select_all_visible(list_widget))
         header_layout.addWidget(select_all_btn)
         
-        clear_all_btn = DataPlotStudioButton("Clear All")
+        clear_all_btn = QPushButton("Clear All")
         clear_all_btn.setFlat(True)
         clear_all_btn.setProperty("styleClass", "secondary_button")
         clear_all_btn.clicked.connect(list_widget.clearSelection)
@@ -177,7 +176,7 @@ class MeltDialog(QDialog):
             hint_label.setProperty("styleClass", "muted_text")
             layout.addWidget(hint_label)
         
-        search_input = DataPlotStudioLineEdit()
+        search_input = QLineEdit()
         search_input.setPlaceholderText("Filter columns...")
         search_input.setClearButtonEnabled(True)
         search_input.setProperty("styleClass", "seach_input")
@@ -201,14 +200,14 @@ class MeltDialog(QDialog):
 
         return panel_widget, list_widget, search_input
     
-    def _filter_list_widget(self, text: str, list_widget: DataPlotStudioListWidget) -> None:
+    def _filter_list_widget(self, text: str, list_widget: QListWidget) -> None:
         search_text = text.lower()
         for i in range(list_widget.count()):
             item = list_widget.item(i)
             if item is not None:
                 item.setHidden(search_text not in item.text().lower())
     
-    def _select_all_visible(self, list_widget: DataPlotStudioListWidget) -> None:
+    def _select_all_visible(self, list_widget: QListWidget) -> None:
         for i in range(list_widget.count()):
             item = list_widget.item(i)
             if item is not None and not item.isHidden():

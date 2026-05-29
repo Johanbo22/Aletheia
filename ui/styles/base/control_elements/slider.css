@@ -1,0 +1,52 @@
+/* 
+This CSS file governs styling of QSliders
+*/
+QSlider::groove:horizontal {
+    border: 1px solid #dcdcdc;
+    height: 4px;
+    background: #f0f0f0;
+    margin: 0px 0;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    background: #ffffff;
+    border: 1.5px solid #bdc3c7;
+    width: 16px;
+    height: 16px;
+    margin: -7px 0;
+    border-radius: 9px;
+}
+
+QSlider:hover::handle:horizontal {
+    border-color: #95a5a6;
+}
+
+QSlider:focus::handle:horizontal {
+    border-color: #2563eb;
+}
+
+QSlider::groove:vertical {
+    border: 1px solid #dcdcdc;
+    width: 4px;
+    background: #f0f0f0;
+    margin: 0 0px;
+    border-radius: 2px;
+}
+
+QSlider::handle:vertical {
+    background: #ffffff;
+    border: 1.5px solid #bdc3c7;
+    height: 16px;
+    width: 16px;
+    margin: 0 -7px;
+    border-radius: 9px;
+}
+
+QSlider:hover::handle:vertical {
+    border-color: #95a5a6;
+}
+
+QSlider:focus::handle:vertical {
+    border-color: #2563eb;
+}

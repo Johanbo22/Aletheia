@@ -184,7 +184,6 @@ class DataPlotStudio(QMainWindow):
         
         # Window state signals
         window_menu = self.menuBar().addMenu("&Window")
-        window_menu.setProperty("styleClass", "dpsMenu")
         reset_layout_action = QAction("Reset Window Layout", self)
         reset_layout_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
         reset_layout_action.setToolTip("Restores all docks and tabs to their default position")

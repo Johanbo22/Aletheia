@@ -1,0 +1,39 @@
+/*
+This CSS file governs the styling of QCheckBox
+*/
+QCheckBox {
+    spacing: 8px;
+    font-size: 11pt;
+    color: #333333;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #bdc3c7;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #95a5a6;
+}
+
+QCheckBox::indicator:focus {
+    border-color: #2563eb;
+}
+
+QCheckBox::indicator:checked {
+    border-color: #2563eb;
+    background-color: #2563eb;
+    image: url(icons/ui_styling/checkmark.svg);
+}
+
+QCheckBox::indicator:disabled {
+    background-color: #f0f0f0;
+    border: 1px solid #dcdcdc;
+}
+
+QCheckBox:disabled {
+    color: #888888;
+}

@@ -1,3 +1,8 @@
+QStatusBar {
+    background: #f0f0f0;
+    border-top: 1px solid #c2c2c2;
+}
+
 QStatusBar#main_status_bar {
     background-color: #1e1e1e;
     color: #ffffff;
@@ -84,18 +89,6 @@ QMenu#terminal_context_menu::item {
 QMenu#terminal_context_menu::item:selected {
     background-color: #007acc;
     color: white;
-}
-
-DataPlotStudioButton#status_history_button {
-    background-color: #333;
-    color: #ddd;
-    border: 1px solid #444;
-    font-weight: bold;
-}
-
-DataPlotStudioButton#status_history_button:hover {
-    background-color: #444;
-    color: #fff;
 }
 
 QLabel#status_state_label {

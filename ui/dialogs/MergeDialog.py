@@ -1,12 +1,4 @@
-from PyQt6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QFileDialog,
-    QMessageBox,
-    QFormLayout
-)
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QMessageBox, QFormLayout, QLineEdit, QGroupBox, QComboBox, QPushButton
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 import pandas as pd
@@ -15,10 +7,6 @@ from pathlib import Path
 from core.resource_loader import get_resource_path
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets import (
-    DataPlotStudioButton
-)
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 from ui.widgets.VennDiagramWidget import VennDiagramWidget
 from core.data_handler import DataHandler
 
@@ -41,14 +29,14 @@ class MergeDialog(QDialog):
         layout = QVBoxLayout()
         
         # Dataset selection
-        file_group = DataPlotStudioGroupBox("Select Dataset to Join")
+        file_group = QGroupBox("Select Dataset to Join")
         file_layout = QHBoxLayout()
         
         self.file_label = QLabel("No file selected")
         self.file_label.setObjectName("merge_file_label")
         self.file_label.setProperty("status", "unselected")
         
-        self.browse_button = DataPlotStudioButton("Browse...", parent=self)
+        self.browse_button = QPushButton("Browse...", parent=self)
         self.browse_button.setIcon(IconBuilder.build(IconType.OpenProject))
         self.browse_button.clicked.connect(self.browse_file)
         
@@ -58,12 +46,12 @@ class MergeDialog(QDialog):
         layout.addWidget(file_group)
         
         # Join configs
-        self.config_group = DataPlotStudioGroupBox("Join Configueration")
+        self.config_group = QGroupBox("Join Configueration")
         self.config_group.setEnabled(False)
         config_layout = QFormLayout()
         
         #join Type
-        self.join_type_combo = DataPlotStudioComboBox()
+        self.join_type_combo = QComboBox()
         self.join_type_combo.addItems(["inner", "left", "right", "outer"])
         self.join_type_combo.setToolTip(
             "Inner: Keep only matching rows\n"
@@ -75,20 +63,20 @@ class MergeDialog(QDialog):
         config_layout.addRow("Join Type", self.join_type_combo)
         
         # Keys
-        self.left_on_combo = DataPlotStudioComboBox()
+        self.left_on_combo = QComboBox()
         self.left_on_combo.addItems(list(self.data_handler.df.columns))
         self.left_on_combo.currentIndexChanged.connect(lambda: self.update_preview())
         config_layout.addRow("Join On (Current Data)", self.left_on_combo)
         
-        self.right_on_combo = DataPlotStudioComboBox()
+        self.right_on_combo = QComboBox()
         self.right_on_combo.currentIndexChanged.connect(lambda: self.update_preview())
         config_layout.addRow("Join On (New Data)", self.right_on_combo)
         
         # Suffixes
         suffix_layout = QHBoxLayout()
-        self.left_suffix = DataPlotStudioLineEdit("_x")
+        self.left_suffix = QLineEdit("_x")
         self.left_suffix.setPlaceholderText("Current data suffix")
-        self.right_suffix = DataPlotStudioLineEdit("_y")
+        self.right_suffix = QLineEdit("_y")
         self.right_suffix.setPlaceholderText("New data suffix")
         suffix_layout.addWidget(QLabel("Left:"))
         suffix_layout.addWidget(self.left_suffix)
@@ -108,11 +96,12 @@ class MergeDialog(QDialog):
         
         # Buttons
         button_layout = QHBoxLayout()
-        self.merge_button = DataPlotStudioButton("Merge Data", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.merge_button = QPushButton("Merge Data")
+        self.merge_button.setObjectName("MainActionButton")
         self.merge_button.clicked.connect(self.validate_and_accept)
         self.merge_button.setEnabled(False)
         
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         
         button_layout.addWidget(self.merge_button)

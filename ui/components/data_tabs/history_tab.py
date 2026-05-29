@@ -1,11 +1,9 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QGroupBox, QPushButton
 from PyQt6.QtCore import Qt
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioListWidget
 from ui.widgets.PipelineGraphView import PipelineGraphView
 
 if TYPE_CHECKING:
@@ -24,7 +22,7 @@ class HistoryTab(BaseDataTab):
         history_info.setProperty("styleClass", "info_text")
         layout.addWidget(history_info)
 
-        self.history_list = DataPlotStudioListWidget()
+        self.history_list = QListWidget()
         self.history_list.itemClicked.connect(self.controller.on_history_clicked)
         self.history_list.setVisible(False)
         layout.addWidget(self.history_list)
@@ -38,7 +36,7 @@ class HistoryTab(BaseDataTab):
         history_help.setProperty("styleClass", "muted_text")
         layout.addWidget(history_help)
         
-        macro_group = DataPlotStudioGroupBox("Data Pipeline Macros")
+        macro_group = QGroupBox("Data Pipeline Macros")
         macro_layout = QVBoxLayout()
         macro_info = QLabel("Save your current sequence of data operations as a macro, or apply an existing macro to this dataset")
         macro_info.setWordWrap(True)
@@ -46,12 +44,12 @@ class HistoryTab(BaseDataTab):
         macro_layout.addWidget(macro_info)
         
         macro_buttons_layout = QHBoxLayout()
-        self.save_macro_btn = DataPlotStudioButton("Save Macro", parent=self)
+        self.save_macro_btn = QPushButton("Save Macro", parent=self)
         self.save_macro_btn.setIcon(IconBuilder.build(IconType.SaveProject))
         self.save_macro_btn.clicked.connect(self.controller.save_pipeline_macro)
         macro_buttons_layout.addWidget(self.save_macro_btn)
         
-        self.load_macro_btn = DataPlotStudioButton("Apply Macro", parent=self)
+        self.load_macro_btn = QPushButton("Apply Macro", parent=self)
         self.load_macro_btn.setIcon(IconBuilder.build(IconType.ImportFile))
         self.load_macro_btn.clicked.connect(self.controller.load_pipeline_macro)
         macro_buttons_layout.addWidget(self.load_macro_btn)

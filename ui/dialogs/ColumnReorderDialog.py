@@ -2,13 +2,11 @@ import pandas as pd
 from PyQt6.QtCore import Qt, QEvent, QTimer, QVariantAnimation, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QIcon, QFont, QColor, QBrush, QMouseEvent
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, \
-    QPushButton, QHBoxLayout, QGraphicsDropShadowEffect, QSizePolicy, QApplication
+    QPushButton, QHBoxLayout, QGraphicsDropShadowEffect, QSizePolicy, QApplication, QLineEdit
 
 from core.resource_loader import get_resource_path
 from ui.icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 
 class ColumnReorderDialog(QDialog):
@@ -80,7 +78,7 @@ class ColumnReorderDialog(QDialog):
         search_icon.setPixmap(IconBuilder.build(IconType.Filter).pixmap(16, 16))
         search_layout.addWidget(search_icon)
         
-        self.search_input = DataPlotStudioLineEdit()
+        self.search_input = QLineEdit()
         self.search_input.setObjectName("ColumnReorderSearchInput")
         self.search_input.setPlaceholderText("Search column...")
         self.search_input.setClearButtonEnabled(True)
@@ -143,11 +141,12 @@ class ColumnReorderDialog(QDialog):
         
         bottom_layout.addStretch()
         
-        self.cancel_btn = DataPlotStudioButton("Cancel", parent=self)
+        self.cancel_btn = QPushButton("Cancel", parent=self)
         self.cancel_btn.clicked.connect(self.reject)
         bottom_layout.addWidget(self.cancel_btn)
         
-        self.apply_btn = DataPlotStudioButton("Apply Column Order", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.apply_btn = QPushButton("Apply Column Order")
+        self.apply_btn.setObjectName("MainActionButton")
         self.apply_btn.clicked.connect(self.accept)
         bottom_layout.addWidget(self.apply_btn)
         

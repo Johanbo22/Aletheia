@@ -1,0 +1,25 @@
+/*
+This CSS file governs the styling of QGroupBox
+*/
+QGroupBox {
+    font-size: 14pt;
+    font-weight: bold;
+    border: 1.5px solid #c2c2c2;
+    border-radius: 4px;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+QGroupBox:focus,
+QGroupBox:hover {
+    border: 1.5px solid #2563eb;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 5px;
+    left: 10px;
+    background-color: #ffffff;
+    top: 0px;
+}

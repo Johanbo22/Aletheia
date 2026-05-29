@@ -1,9 +1,8 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QFormLayout
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QFormLayout, QLineEdit, QGroupBox, QComboBox
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
 from ui.icons import IconType
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioGroupBox
 
 if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController
@@ -22,22 +21,22 @@ class FilteringTab(BaseDataTab):
         layout.addWidget(filter_info)
         layout.addSpacing(10)
         
-        quick_filter_group = DataPlotStudioGroupBox("Quick Filter")
+        quick_filter_group = QGroupBox("Quick Filter")
         quick_filter_layout = QVBoxLayout(quick_filter_group)
         quick_filter_layout.setSpacing(12)
         
         form_layout = QFormLayout()
         
-        self.filter_column = DataPlotStudioComboBox()
+        self.filter_column = QComboBox()
         self.filter_column.setToolTip("Select the column you wish to apply a filter to")
         form_layout.addRow(QLabel("Column:"), self.filter_column)
         
-        self.filter_condition = DataPlotStudioComboBox()
+        self.filter_condition = QComboBox()
         self.filter_condition.addItems(["==", "!=", ">", "<", ">=", "<=", "contains"])
         self.filter_condition.setToolTip("Select which conditional to apply to column. N.B. Uses Python Syntax")
         form_layout.addRow(QLabel("Condition:"), self.filter_condition)
         
-        self.filter_value = DataPlotStudioLineEdit()
+        self.filter_value = QLineEdit()
         self.filter_value.setPlaceholderText("Enter evaluation value...")
         self.filter_value.setToolTip("Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
         form_layout.addRow(QLabel("Value:"), self.filter_value)
@@ -61,7 +60,7 @@ class FilteringTab(BaseDataTab):
         ))
         layout.addWidget(quick_filter_group)
         
-        advanced_filter_group = DataPlotStudioGroupBox("Advanced Filter")
+        advanced_filter_group = QGroupBox("Advanced Filter")
         advanced_filter_layout = QVBoxLayout(advanced_filter_group)
         advanced_filter_layout.setSpacing(12)
         

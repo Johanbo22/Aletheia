@@ -1,9 +1,7 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QStackedWidget, QGridLayout
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QStackedWidget, QGridLayout, QSpinBox, QDoubleSpinBox, QListWidget, QLineEdit, QGroupBox, QComboBox, QPushButton
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioToggleSwitch, DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget
-from ui.widgets.ControlElements import DataPlotStudioSpinBox
+from ui.widgets import ToggleSwitch
 
 class AnnotationsSettingsTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -34,42 +32,34 @@ class AnnotationsSettingsTab(QWidget):
         main_layout.addWidget(scroll)
 
     def _setup_reference_lines_group(self, parent_layout: QVBoxLayout) -> None:
-        group = DataPlotStudioGroupBox("Reference Lines")
+        group = QGroupBox("Reference Lines")
         layout = QVBoxLayout()
 
-        self.reference_lines_list = DataPlotStudioListWidget()
+        self.reference_lines_list = QListWidget()
         self.reference_lines_list.setToolTip("List of active reference lines on the plot")
         layout.addWidget(self.reference_lines_list)
 
         ref_buttons_layout = QHBoxLayout()
 
-        self.add_ref_line_button = DataPlotStudioButton(
-            "Add Horizontal Line",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white"
-        )
+        self.add_ref_line_button = QPushButton("Add Horizontal Line")
+        self.add_ref_line_button.setObjectName("MainActionButton")
         self.add_ref_line_button.setToolTip("Add a reference line based on the selected type below")
         ref_buttons_layout.addWidget(self.add_ref_line_button)
 
         layout.addLayout(ref_buttons_layout)
 
-        self.clear_ref_lines_button = DataPlotStudioButton(
-            "Clear All Reference Lines",
-            parent=self,
-            base_color_hex=ThemeColors.DestructiveColor,
-            text_color_hex="white"
-        )
+        self.clear_ref_lines_button = QPushButton("Clear All Reference Lines")
+        self.clear_ref_lines_button.setObjectName("DestructiveButton")
         self.clear_ref_lines_button.setToolTip("Remove all reference lines from the plot")
         layout.addWidget(self.clear_ref_lines_button)
 
         # Editor
-        editor_group = DataPlotStudioGroupBox("Edit Selected Reference Lines")
+        editor_group = QGroupBox("Edit Selected Reference Lines")
         editor_layout = QVBoxLayout()
 
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Type"))
-        self.ref_line_type_combo = DataPlotStudioComboBox()
+        self.ref_line_type_combo = QComboBox()
         self.ref_line_type_combo.addItems(["Horizontal (axhline)", "Vertical (axvline)", "Diagonal (axline)"])
         self.ref_line_type_combo.setToolTip("Select the type of reference line")
         type_layout.addWidget(self.ref_line_type_combo)
@@ -81,7 +71,7 @@ class AnnotationsSettingsTab(QWidget):
         h_layout = QHBoxLayout(h_page)
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.addWidget(QLabel("Y Position:"))
-        self.ref_line_y_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_y_spin = QDoubleSpinBox()
         self.ref_line_y_spin.setRange(-1e9, 1e9)
         self.ref_line_y_spin.setValue(0.0)
         self.ref_line_y_spin.setSingleStep(0.1)
@@ -94,7 +84,7 @@ class AnnotationsSettingsTab(QWidget):
         v_layout = QHBoxLayout(v_page)
         v_layout.setContentsMargins(0, 0, 0, 0)
         v_layout.addWidget(QLabel("X Position:"))
-        self.ref_line_x_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_x_spin = QDoubleSpinBox()
         self.ref_line_x_spin.setRange(-1e9, 1e9)
         self.ref_line_x_spin.setValue(0.0)
         self.ref_line_x_spin.setSingleStep(0.1)
@@ -107,7 +97,7 @@ class AnnotationsSettingsTab(QWidget):
         d_layout = QHBoxLayout(d_page)
         d_layout.setContentsMargins(0, 0, 0, 0)
         d_layout.addWidget(QLabel("Slope:"))
-        self.ref_line_slope_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_slope_spin = QDoubleSpinBox()
         self.ref_line_slope_spin.setRange(-1e6, 1e6)
         self.ref_line_slope_spin.setValue(1.0)
         self.ref_line_slope_spin.setSingleStep(0.1)
@@ -115,7 +105,7 @@ class AnnotationsSettingsTab(QWidget):
         d_layout.addWidget(self.ref_line_slope_spin)
 
         d_layout.addWidget(QLabel("Intercept:"))
-        self.ref_line_intercept_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_intercept_spin = QDoubleSpinBox()
         self.ref_line_intercept_spin.setRange(-1e9, 1e9)
         self.ref_line_intercept_spin.setValue(0.0)
         self.ref_line_intercept_spin.setSingleStep(0.1)
@@ -132,20 +122,20 @@ class AnnotationsSettingsTab(QWidget):
         style_layout.addWidget(QLabel("Color:"), 0, 0)
         color_box = QHBoxLayout()
         color_box.setContentsMargins(0, 0, 0, 0)
-        self.ref_line_color_button = DataPlotStudioButton("Choose", parent=self)
+        self.ref_line_color_button = QPushButton("Choose", parent=self)
         self.ref_line_color_label = QLabel("Black")
         color_box.addWidget(self.ref_line_color_button)
         color_box.addWidget(self.ref_line_color_label)
         style_layout.addLayout(color_box, 0, 1)
 
         style_layout.addWidget(QLabel("Line Style:"), 0, 2)
-        self.ref_line_style_combo = DataPlotStudioComboBox()
+        self.ref_line_style_combo = QComboBox()
         self.ref_line_style_combo.addItems(["solid", "dashed", "dashdot", "dotted"])
         self.ref_line_style_combo.setToolTip("Line style for the reference line")
         style_layout.addWidget(self.ref_line_style_combo, 0, 3)
 
         style_layout.addWidget(QLabel("Line Width:"), 1, 0)
-        self.ref_line_width_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_width_spin = QDoubleSpinBox()
         self.ref_line_width_spin.setRange(0.1, 20.0)
         self.ref_line_width_spin.setValue(1.5)
         self.ref_line_width_spin.setSingleStep(0.1)
@@ -153,7 +143,7 @@ class AnnotationsSettingsTab(QWidget):
         style_layout.addWidget(self.ref_line_width_spin, 1, 1)
 
         style_layout.addWidget(QLabel("Alpha:"), 1, 2)
-        self.ref_line_alpha_spin = DataPlotStudioDoubleSpinBox()
+        self.ref_line_alpha_spin = QDoubleSpinBox()
         self.ref_line_alpha_spin.setRange(0.0, 1.0)
         self.ref_line_alpha_spin.setValue(1.0)
         self.ref_line_alpha_spin.setSingleStep(0.1)
@@ -164,29 +154,21 @@ class AnnotationsSettingsTab(QWidget):
 
         label_layout = QHBoxLayout()
         label_layout.addWidget(QLabel("Label:"))
-        self.ref_line_label_input = DataPlotStudioLineEdit()
+        self.ref_line_label_input = QLineEdit()
         self.ref_line_label_input.setPlaceholderText("Optional label for legend")
         self.ref_line_label_input.setToolTip("Label for the reference line (appears in legend if enabled)")
         label_layout.addWidget(self.ref_line_label_input)
         editor_layout.addLayout(label_layout)
 
         update_buttons_layout = QHBoxLayout()
-        self.update_ref_line_button = DataPlotStudioButton(
-            "Update Line",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white"
-        )
+        self.update_ref_line_button = QPushButton("Update Line")
+        self.update_ref_line_button.setObjectName("MainActionButton")
         self.update_ref_line_button.setToolTip("Update the selected reference line with current settings")
         self.update_ref_line_button.setEnabled(False)
         update_buttons_layout.addWidget(self.update_ref_line_button)
 
-        self.delete_ref_line_button = DataPlotStudioButton(
-            "Delete Line",
-            parent=self,
-            base_color_hex=ThemeColors.DestructiveColor,
-            text_color_hex="white"
-        )
+        self.delete_ref_line_button = QPushButton("Delete Line")
+        self.delete_ref_line_button.setObjectName("DestructiveButton")
         self.delete_ref_line_button.setToolTip("Delete the selected reference line")
         self.delete_ref_line_button.setEnabled(False)
         update_buttons_layout.addWidget(self.delete_ref_line_button)
@@ -198,7 +180,7 @@ class AnnotationsSettingsTab(QWidget):
         parent_layout.addWidget(group)
 
     def _setup_annotation_tools_group(self, parent_layout: QVBoxLayout) -> None:
-        group = DataPlotStudioGroupBox("Annotation Tools")
+        group = QGroupBox("Annotation Tools")
         layout = QVBoxLayout()
         
         tab_widget = QTabWidget()
@@ -207,12 +189,12 @@ class AnnotationsSettingsTab(QWidget):
         auto_tab = QWidget()
         auto_layout = QVBoxLayout(auto_tab)
 
-        self.auto_annotate_check = DataPlotStudioToggleSwitch("Annotate All points")
+        self.auto_annotate_check = ToggleSwitch("Annotate All points")
         self.auto_annotate_check.setToolTip("Automatically set text labels to all data points")
         auto_layout.addWidget(self.auto_annotate_check)
 
         auto_layout.addWidget(QLabel("Label Source Column:"))
-        self.auto_annotate_col_combo = DataPlotStudioComboBox()
+        self.auto_annotate_col_combo = QComboBox()
         self.auto_annotate_col_combo.setMinimumHeight(20)
         self.auto_annotate_col_combo.setToolTip("Select the column to use for the point labels")
         self.auto_annotate_col_combo.addItem("Default (Y-value)")
@@ -224,7 +206,7 @@ class AnnotationsSettingsTab(QWidget):
         
         size_layout = QVBoxLayout()
         size_layout.addWidget(QLabel("Font-size:"))
-        self.auto_annotate_fontsize_spin = DataPlotStudioSpinBox()
+        self.auto_annotate_fontsize_spin = QSpinBox()
         self.auto_annotate_fontsize_spin.setRange(6, 36)
         self.auto_annotate_fontsize_spin.setValue(10)
         self.auto_annotate_fontsize_spin.setEnabled(False)
@@ -232,7 +214,7 @@ class AnnotationsSettingsTab(QWidget):
         
         weight_layout = QVBoxLayout()
         weight_layout.addWidget(QLabel("Font Weight:"))
-        self.auto_annotate_weight_combo = DataPlotStudioComboBox()
+        self.auto_annotate_weight_combo = QComboBox()
         self.auto_annotate_weight_combo.addItems(["normal", "bold", "heavy", "light"])
         self.auto_annotate_weight_combo.setEnabled(False)
         weight_layout.addWidget(self.auto_annotate_weight_combo)
@@ -244,7 +226,7 @@ class AnnotationsSettingsTab(QWidget):
         # Color options
         auto_layout.addWidget(QLabel("Font Color:"))
         color_layout = QHBoxLayout()
-        self.auto_annotate_color_button = DataPlotStudioButton("Choose", parent=self)
+        self.auto_annotate_color_button = QPushButton("Choose", parent=self)
         self.auto_annotate_color_button.setEnabled(False)
         self.auto_annotate_color_label = QLabel("Black")
         color_layout.addWidget(self.auto_annotate_color_button)
@@ -256,7 +238,7 @@ class AnnotationsSettingsTab(QWidget):
         
         x_offset_layout = QVBoxLayout()
         x_offset_layout.addWidget(QLabel("X Offset"))
-        self.auto_annotate_x_offset_spin = DataPlotStudioDoubleSpinBox()
+        self.auto_annotate_x_offset_spin = QDoubleSpinBox()
         self.auto_annotate_x_offset_spin.setRange(-200.0, 200.0)
         self.auto_annotate_x_offset_spin.setValue(0.0)
         self.auto_annotate_x_offset_spin.setEnabled(False)
@@ -264,7 +246,7 @@ class AnnotationsSettingsTab(QWidget):
         
         y_offset_layout = QVBoxLayout()
         y_offset_layout.addWidget(QLabel("Y Offset:"))
-        self.auto_annotate_y_offset_spin = DataPlotStudioDoubleSpinBox()
+        self.auto_annotate_y_offset_spin = QDoubleSpinBox()
         self.auto_annotate_y_offset_spin.setRange(-200.0, 200.0)
         self.auto_annotate_y_offset_spin.setValue(5.0)
         self.auto_annotate_y_offset_spin.setEnabled(False)
@@ -272,7 +254,7 @@ class AnnotationsSettingsTab(QWidget):
 
         rotation_layout = QVBoxLayout()
         rotation_layout.addWidget(QLabel("Rotation (°):"))
-        self.auto_annotate_rotation_spin = DataPlotStudioSpinBox()
+        self.auto_annotate_rotation_spin = QSpinBox()
         self.auto_annotate_rotation_spin.setRange(-360, 360)
         self.auto_annotate_rotation_spin.setValue(0)
         self.auto_annotate_rotation_spin.setEnabled(False)
@@ -291,13 +273,13 @@ class AnnotationsSettingsTab(QWidget):
         textbox_layout = QVBoxLayout(textbox_tab)
 
         textbox_layout.addWidget(QLabel("Text Box Content:"))
-        self.textbox_content = DataPlotStudioLineEdit()
+        self.textbox_content = QLineEdit()
         self.textbox_content.setMinimumHeight(20)
         self.textbox_content.setPlaceholderText("Enter text for text box")
         textbox_layout.addWidget(self.textbox_content)
 
         textbox_layout.addWidget(QLabel("Text Box Position:"))
-        self.textbox_position_combo = DataPlotStudioComboBox()
+        self.textbox_position_combo = QComboBox()
         self.textbox_position_combo.setMinimumHeight(20)
         self.textbox_position_combo.addItems([
             'upper left', 'upper center', 'upper right', 'center left', 
@@ -306,7 +288,7 @@ class AnnotationsSettingsTab(QWidget):
         textbox_layout.addWidget(self.textbox_position_combo)
 
         textbox_layout.addWidget(QLabel("Text Box Style:"))
-        self.textbox_style_combo = DataPlotStudioComboBox()
+        self.textbox_style_combo = QComboBox()
         self.textbox_style_combo.setMinimumHeight(20)
         self.textbox_style_combo.addItems(['round', 'square', 'round,pad=1', 'round4,pad=0.5'])
         self.textbox_style_combo.setItemText(0, 'Rounded')
@@ -315,14 +297,14 @@ class AnnotationsSettingsTab(QWidget):
 
         textbox_layout.addWidget(QLabel("Background Color:"))
         bg_layout = QHBoxLayout()
-        self.textbox_bg_button = DataPlotStudioButton("Choose", parent=self)
+        self.textbox_bg_button = QPushButton("Choose", parent=self)
         self.textbox_bg_button.setMinimumHeight(20)
         self.textbox_bg_label = QLabel("White")
         bg_layout.addWidget(self.textbox_bg_button)
         bg_layout.addWidget(self.textbox_bg_label)
         textbox_layout.addLayout(bg_layout)
 
-        self.textbox_enable_check = DataPlotStudioToggleSwitch("Enable Text Box")
+        self.textbox_enable_check = ToggleSwitch("Enable Text Box")
         textbox_layout.addWidget(self.textbox_enable_check)
 
         textbox_layout.addStretch()
@@ -333,12 +315,12 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout = QVBoxLayout(manual_tab)
 
         manual_layout.addWidget(QLabel("Annotation Text:"))
-        self.annotation_text = DataPlotStudioLineEdit()
+        self.annotation_text = QLineEdit()
         self.annotation_text.setPlaceholderText("Enter text to add to plot")
         manual_layout.addWidget(self.annotation_text)
 
         manual_layout.addWidget(QLabel("X Position (0-1):"))
-        self.annotation_x_spin = DataPlotStudioDoubleSpinBox()
+        self.annotation_x_spin = QDoubleSpinBox()
         self.annotation_x_spin.setMinimumHeight(20)
         self.annotation_x_spin.setRange(0, 1)
         self.annotation_x_spin.setValue(0.5)
@@ -346,7 +328,7 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout.addWidget(self.annotation_x_spin)
 
         manual_layout.addWidget(QLabel("Y Position (0-1):"))
-        self.annotation_y_spin = DataPlotStudioDoubleSpinBox()
+        self.annotation_y_spin = QDoubleSpinBox()
         self.annotation_y_spin.setMinimumHeight(20)
         self.annotation_y_spin.setRange(0, 1)
         self.annotation_y_spin.setValue(0.5)
@@ -354,7 +336,7 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout.addWidget(self.annotation_y_spin)
 
         manual_layout.addWidget(QLabel("Font Size:"))
-        self.annotation_fontsize_spin = DataPlotStudioSpinBox()
+        self.annotation_fontsize_spin = QSpinBox()
         self.annotation_fontsize_spin.setMinimumHeight(20)
         self.annotation_fontsize_spin.setRange(6, 36)
         self.annotation_fontsize_spin.setValue(12)
@@ -362,7 +344,7 @@ class AnnotationsSettingsTab(QWidget):
 
         manual_layout.addWidget(QLabel("Font Color:"))
         color_layout = QHBoxLayout()
-        self.annotation_color_button = DataPlotStudioButton("Choose", parent=self)
+        self.annotation_color_button = QPushButton("Choose", parent=self)
         self.annotation_color_label = QLabel("Black")
         color_layout.addWidget(self.annotation_color_button)
         color_layout.addWidget(self.annotation_color_label)
@@ -370,13 +352,14 @@ class AnnotationsSettingsTab(QWidget):
         
         manual_layout.addWidget(QLabel("Background Color:"))
         background_color_layout = QHBoxLayout()
-        self.annotation_bg_color_button = DataPlotStudioButton("Choose", parent=self)
+        self.annotation_bg_color_button = QPushButton("Choose", parent=self)
         self.annotation_bg_color_label = QLabel("wheat")
         background_color_layout.addWidget(self.annotation_bg_color_button)
         background_color_layout.addWidget(self.annotation_bg_color_label)
         manual_layout.addLayout(background_color_layout)
 
-        self.add_annotation_button = DataPlotStudioButton("Add Annotation", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.add_annotation_button = QPushButton("Add Annotation")
+        self.add_annotation_button.setObjectName("MainActionButton")
         manual_layout.addWidget(self.add_annotation_button)
 
         manual_layout.addStretch()
@@ -387,23 +370,23 @@ class AnnotationsSettingsTab(QWidget):
         parent_layout.addWidget(group)
 
     def _setup_datatable_group(self, parent_layout: QVBoxLayout) -> None:
-        group = DataPlotStudioGroupBox("Data Table")
+        group = QGroupBox("Data Table")
         layout = QVBoxLayout()
 
-        self.table_enable_check = DataPlotStudioToggleSwitch("Show Data Table on plot")
+        self.table_enable_check = ToggleSwitch("Show Data Table on plot")
         self.table_enable_check.setChecked(False)
         layout.addWidget(self.table_enable_check)
 
         controls_layout = QHBoxLayout()
         controls_layout.addWidget(QLabel("Type:"))
-        self.table_type_combo = DataPlotStudioComboBox()
+        self.table_type_combo = QComboBox()
         self.table_type_combo.addItems(["Summary Stats", "First 5 Rows", "Last 5 Rows", "Correlation Matrix"])
         self.table_type_combo.setEnabled(False)
         self.table_type_combo.setVisible(False)
         controls_layout.addWidget(self.table_type_combo)
 
         controls_layout.addWidget(QLabel("Placement:"))
-        self.table_location_combo = DataPlotStudioComboBox()
+        self.table_location_combo = QComboBox()
         self.table_location_combo.addItems(["bottom", "top", "right", "left", "center"])
         self.table_location_combo.setEnabled(False)
         self.table_location_combo.setVisible(False)
@@ -411,13 +394,13 @@ class AnnotationsSettingsTab(QWidget):
         layout.addLayout(controls_layout)
 
         settings_layout = QHBoxLayout()
-        self.table_auto_font_size_check = DataPlotStudioToggleSwitch("Auto Font-Size")
+        self.table_auto_font_size_check = ToggleSwitch("Auto Font-Size")
         self.table_auto_font_size_check.setChecked(False)
         self.table_auto_font_size_check.setEnabled(False)
         settings_layout.addWidget(self.table_auto_font_size_check)
 
         settings_layout.addWidget(QLabel("Font Size:"))
-        self.table_font_size_spin = DataPlotStudioSpinBox()
+        self.table_font_size_spin = QSpinBox()
         self.table_font_size_spin.setRange(4, 40)
         self.table_font_size_spin.setValue(10)
         self.table_font_size_spin.setEnabled(False)
@@ -425,7 +408,7 @@ class AnnotationsSettingsTab(QWidget):
         settings_layout.addWidget(self.table_font_size_spin)
 
         settings_layout.addWidget(QLabel("Scale:"))
-        self.table_scale_spin = DataPlotStudioDoubleSpinBox()
+        self.table_scale_spin = QDoubleSpinBox()
         self.table_scale_spin.setRange(0.5, 5.0)
         self.table_scale_spin.setValue(1.2)
         self.table_scale_spin.setSingleStep(0.1)
@@ -438,13 +421,14 @@ class AnnotationsSettingsTab(QWidget):
         parent_layout.addWidget(group)
 
     def _setup_annotations_list_group(self, parent_layout: QVBoxLayout) -> None:
-        group = DataPlotStudioGroupBox("Annotations List")
+        group = QGroupBox("Annotations List")
         layout = QVBoxLayout()
 
-        self.annotations_list = DataPlotStudioListWidget()
+        self.annotations_list = QListWidget()
         layout.addWidget(self.annotations_list)
 
-        self.clear_annotations_button = DataPlotStudioButton("Clear All Annotations", parent=self, base_color_hex=ThemeColors.DestructiveColor, text_color_hex="white")
+        self.clear_annotations_button = QPushButton("Clear All Annotations")
+        self.clear_annotations_button.setObjectName("DestructiveColor")
         layout.addWidget(self.clear_annotations_button)
 
         group.setLayout(layout)

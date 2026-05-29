@@ -7,8 +7,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFontDatabase, QFont
 
 from ui.PythonHighlighter import SyntaxCategory, DefaultColorScheme, PythonHighlighter
-from ui.widgets.ControlElements import DataPlotStudioComboBox
-from ui.widgets.ControlElements import DataPlotStudioGroupBox
 
 PREDEFINED_SCHEMES: Dict[str, Dict[SyntaxCategory, str]] = {
     "Default (Dracula)": DefaultColorScheme,
@@ -97,12 +95,12 @@ class SyntaxHighlightSettingsDialog(QDialog):
         
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        controls_widget = DataPlotStudioGroupBox("Color Scheme")
+        controls_widget = QGroupBox("Color Scheme")
         controls_layout = QVBoxLayout(controls_widget)
         
         theme_layout = QHBoxLayout()
         theme_layout.addWidget(QLabel("Predefined Theme:"))
-        self.theme_combo = DataPlotStudioComboBox()
+        self.theme_combo = QComboBox()
         self.theme_combo.setObjectName("theme_preset_combo")
         self.theme_combo.addItems(["Custom"] + list(PREDEFINED_SCHEMES.keys()))
         self.theme_combo.currentTextChanged.connect(self._on_theme_changed)
@@ -142,7 +140,7 @@ class SyntaxHighlightSettingsDialog(QDialog):
         controls_layout.addStretch()
         splitter.addWidget(controls_widget)
         
-        preview_widget = DataPlotStudioGroupBox("Preview")
+        preview_widget = QGroupBox("Preview")
         preview_layout = QVBoxLayout(preview_widget)
         
         self.preview_editor = QPlainTextEdit()

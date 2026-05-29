@@ -1,10 +1,7 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QToolBox, QFrame, QTabWidget
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QToolBox, QFrame, QTabWidget, QListWidget, QGroupBox, QComboBox, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 
-from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioToggleSwitch, DataPlotStudioButton, QuickFilterEdit, HelpIcon
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioListWidget, DataPlotStudioSpinBox
+from ui.widgets import ToggleSwitch, QuickFilterEdit
 
 class GeneralSettingsTab(QWidget):
     help_requested = pyqtSignal(str)
@@ -36,7 +33,7 @@ class GeneralSettingsTab(QWidget):
         main_layout.addWidget(scroll)
     
     def _setup_plot_type_group(self, parent_layout: QVBoxLayout) -> None:
-        self.plot_type_group = DataPlotStudioGroupBox("Plot Type")
+        self.plot_type_group = QGroupBox("Plot Type")
         layout = QVBoxLayout()
 
         self.current_plot_label = QLabel("Selected Plot: None")
@@ -48,11 +45,11 @@ class GeneralSettingsTab(QWidget):
         self.plot_type.setMinimumHeight(350)
         layout.addWidget(self.plot_type)
 
-        self.add_subplots_check = DataPlotStudioToggleSwitch("Add subplots")
+        self.add_subplots_check = ToggleSwitch("Add subplots")
         self.add_subplots_check.setChecked(False)
         layout.addWidget(self.add_subplots_check)
 
-        self.use_subset_check = DataPlotStudioToggleSwitch("Use Subset")
+        self.use_subset_check = ToggleSwitch("Use Subset")
         self.use_subset_check.setChecked(False)
         layout.addWidget(self.use_subset_check)
 
@@ -60,7 +57,7 @@ class GeneralSettingsTab(QWidget):
         parent_layout.addWidget(self.plot_type_group)
     
     def _setup_subplot_group(self, parent_layout: QVBoxLayout) -> None:
-        self.subplot_group = DataPlotStudioGroupBox("Subplot Configuration")
+        self.subplot_group = QGroupBox("Subplot Configuration")
         self.subplot_group.setVisible(False)
         layout = QVBoxLayout()
 
@@ -77,10 +74,10 @@ class GeneralSettingsTab(QWidget):
         layout.addWidget(self.grid_designer)
 
         share_layout = QHBoxLayout()
-        self.subplot_sharex_check = DataPlotStudioToggleSwitch("Share X-axis")
+        self.subplot_sharex_check = ToggleSwitch("Share X-axis")
         share_layout.addWidget(self.subplot_sharex_check)
 
-        self.subplot_sharey_check = DataPlotStudioToggleSwitch("Share Y-axis")
+        self.subplot_sharey_check = ToggleSwitch("Share Y-axis")
         share_layout.addWidget(self.subplot_sharey_check)
         layout.addLayout(share_layout)
         
@@ -89,12 +86,12 @@ class GeneralSettingsTab(QWidget):
 
         active_layout = QHBoxLayout()
         active_layout.addWidget(QLabel("Active Subplot:"))
-        self.active_subplot_combo = DataPlotStudioComboBox()
+        self.active_subplot_combo = QComboBox()
         self.active_subplot_combo.addItem("Plot 1")
         active_layout.addWidget(self.active_subplot_combo, 1)
         layout.addLayout(active_layout)
 
-        self.freeze_data_check = DataPlotStudioToggleSwitch("Freeze Data Selection for Subplots")
+        self.freeze_data_check = ToggleSwitch("Freeze Data Selection for Subplots")
         layout.addWidget(self.freeze_data_check)
 
         self.subplot_group.setLayout(layout)
@@ -108,7 +105,7 @@ class GeneralSettingsTab(QWidget):
             self.grid_designer.set_shared_axes(sharex, sharey)
 
     def _setup_data_configuration_group(self, parent_layout: QVBoxLayout) -> None:
-        group = DataPlotStudioGroupBox("Data Configuration")
+        group = QGroupBox("Data Configuration")
         layout = QVBoxLayout()
 
         tab_widget = QTabWidget()
@@ -119,30 +116,30 @@ class GeneralSettingsTab(QWidget):
         
         x_layout = QHBoxLayout()
         x_layout.addWidget(QLabel("X Column:"))
-        self.x_column = DataPlotStudioComboBox()
+        self.x_column = QComboBox()
         x_layout.addWidget(self.x_column, 1)
         var_layout.addLayout(x_layout)
 
         y_lbl_layout = QHBoxLayout()
         y_lbl_layout.addWidget(QLabel("Y Column(s):"))
         y_lbl_layout.addStretch()
-        self.multi_y_check = DataPlotStudioToggleSwitch("Multiple Y Columns")
+        self.multi_y_check = ToggleSwitch("Multiple Y Columns")
         y_lbl_layout.addWidget(self.multi_y_check)
         var_layout.addLayout(y_lbl_layout)
 
-        self.y_column = DataPlotStudioComboBox()
+        self.y_column = QComboBox()
         var_layout.addWidget(self.y_column)
 
-        self.y_columns_list = DataPlotStudioListWidget()
-        self.y_columns_list.setSelectionMode(DataPlotStudioListWidget.SelectionMode.MultiSelection)
+        self.y_columns_list = QListWidget()
+        self.y_columns_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self.y_columns_list.setMaximumHeight(100)
         self.y_columns_list.setVisible(False)
         var_layout.addWidget(self.y_columns_list)
 
         multi_btns = QHBoxLayout()
-        self.select_all_y_btn = DataPlotStudioButton("Select All", parent=self)
+        self.select_all_y_btn = QPushButton("Select All", parent=self)
         self.select_all_y_btn.setVisible(False)
-        self.clear_all_y_btn = DataPlotStudioButton("Clear All", parent=self)
+        self.clear_all_y_btn = QPushButton("Clear All", parent=self)
         self.clear_all_y_btn.setMinimumHeight(28)
         self.clear_all_y_btn.setVisible(False)
         multi_btns.addWidget(self.select_all_y_btn)
@@ -158,13 +155,13 @@ class GeneralSettingsTab(QWidget):
         z_layout = QHBoxLayout(self.z_column_widget)
         z_layout.setContentsMargins(0, 0, 0, 0)
         z_layout.addWidget(QLabel("Z Column:"))
-        self.z_column = DataPlotStudioComboBox()
+        self.z_column = QComboBox()
         z_layout.addWidget(self.z_column, 1)
         var_layout.addWidget(self.z_column_widget)
         self.z_column_widget.setVisible(False)
 
         var_layout.addWidget(QLabel("Hue/Group:"))
-        self.hue_column = DataPlotStudioComboBox()
+        self.hue_column = QComboBox()
         self.hue_column.addItem("None")
         var_layout.addWidget(self.hue_column)
         
@@ -174,16 +171,16 @@ class GeneralSettingsTab(QWidget):
         sec_tab = QWidget()
         sec_layout = QVBoxLayout(sec_tab)
         
-        self.secondary_y_check = DataPlotStudioToggleSwitch("Enable Secondary Y-Axis")
+        self.secondary_y_check = ToggleSwitch("Enable Secondary Y-Axis")
         sec_layout.addWidget(self.secondary_y_check)
         
         sec_layout.addWidget(QLabel("Secondary Y Column:"))
-        self.secondary_y_column = DataPlotStudioComboBox()
+        self.secondary_y_column = QComboBox()
         self.secondary_y_column.setEnabled(False)
         sec_layout.addWidget(self.secondary_y_column)
 
         sec_layout.addWidget(QLabel("Secondary Plot Type:"))
-        self.secondary_plot_type_combo = DataPlotStudioComboBox()
+        self.secondary_plot_type_combo = QComboBox()
         self.secondary_plot_type_combo.setEnabled(False)
         self.secondary_plot_type_combo.addItems(["Line", "Scatter", "Bar", "Area"])
         sec_layout.addWidget(self.secondary_plot_type_combo)
@@ -206,7 +203,7 @@ class GeneralSettingsTab(QWidget):
         subset_info.setProperty("styleClass", "info_text")
         filter_layout.addWidget(subset_info)
 
-        self.subset_combo = DataPlotStudioComboBox()
+        self.subset_combo = QComboBox()
         self.subset_combo.addItem("(Full Dataset)")
         self.subset_combo.setEnabled(False)
         filter_layout.addWidget(self.subset_combo)
@@ -215,7 +212,7 @@ class GeneralSettingsTab(QWidget):
             lambda state: self.subset_combo.setEnabled(state == Qt.CheckState.Checked.value)
         )
 
-        self.refresh_subsets_btn = DataPlotStudioButton("Refresh Subset List", parent=self)
+        self.refresh_subsets_btn = QPushButton("Refresh Subset List", parent=self)
         filter_layout.addWidget(self.refresh_subsets_btn)
         
         filter_layout.addStretch()

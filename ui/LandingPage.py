@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea, QTextBrowser, QDialog, QDialogButtonBox, QGraphicsDropShadowEffect)
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QScrollArea, QTextBrowser, QDialog, QDialogButtonBox, QGraphicsDropShadowEffect, QPushButton)
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QSettings
 from PyQt6.QtGui import QIcon, QAction, QColor, QPixmap
 from pathlib import Path
@@ -7,7 +7,6 @@ from ui.icons import IconBuilder, IconType
 
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors
-from ui.widgets.AnimatedButton import DataPlotStudioButton
 from resources.version import APPLICATION_VERSION, APPLICATION_NAME
 from core.markdown_parser import parse_changelog, ChangelogSection, ParseMode
 
@@ -94,37 +93,46 @@ class LandingPage(QWidget):
         # Buttons
         button_width = 280
 
-        self.button_open = DataPlotStudioButton("Open Existing Project", base_color_hex=ThemeColors.MainColor, text_color_hex="white", padding="12px", typewriter_effect=True)
+        self.button_open = QPushButton("Open Existing Project")
+        self.button_open.setObjectName("MainActionButton")
+        self.button_open.setProperty("size_variant", "large")
         self.button_open.setIcon(IconBuilder.build(IconType.OpenProject))
         self.button_open.setFixedWidth(button_width)
         self.button_open.clicked.connect(self.open_project_clicked.emit)
 
-        self.button_import_file = DataPlotStudioButton("Import from file", base_color_hex=ThemeColors.ButtonDefaultColor, padding="12px", typewriter_effect=True)
+        self.button_import_file = QPushButton("Import from File")
         self.button_import_file.setIcon(IconBuilder.build(IconType.ImportFile))
+        self.button_import_file.setProperty("size_variant", "large")
         self.button_import_file.setFixedWidth(button_width)
         self.button_import_file.clicked.connect(self.import_file_clicked.emit)
 
-        self.button_import_sheet = DataPlotStudioButton("Import from Google Sheets", base_color_hex=ThemeColors.ButtonDefaultColor, padding="12px", typewriter_effect=True)
+        self.button_import_sheet = QPushButton("Import from Google Sheets")
         self.button_import_sheet.setIcon(IconBuilder.build(IconType.ImportGoogleSheets))
+        self.button_import_sheet.setProperty("size_variant", "large")
         self.button_import_sheet.setFixedWidth(button_width)
         self.button_import_sheet.clicked.connect(self.import_sheets_clicked.emit)
 
-        self.button_import_db = DataPlotStudioButton("Import from Database", base_color_hex=ThemeColors.ButtonDefaultColor, padding="12px", typewriter_effect=True)
+        self.button_import_db = QPushButton("Import from Database")
         self.button_import_db.setIcon(IconBuilder.build(IconType.ImportDatabase))
+        self.button_import_db.setProperty("size_variant", "large")
         self.button_import_db.setFixedWidth(button_width)
         self.button_import_db.clicked.connect(self.import_db_clicked.emit)
 
-        self.button_new = DataPlotStudioButton("Create Empty Dataset", base_color_hex=ThemeColors.MainColor, text_color_hex="white", padding="12px", typewriter_effect=True)
+        self.button_new = QPushButton("Create Empty Dataset")
+        self.button_new.setObjectName("MainActionButton")
+        self.button_new.setProperty("size_variant", "large")
         self.button_new.setIcon(IconBuilder.build(IconType.NewProject))
         self.button_new.setFixedWidth(button_width)
         self.button_new.clicked.connect(self.new_dataset_clicked.emit)
         
-        self.button_settings = DataPlotStudioButton("Settings", base_color_hex=ThemeColors.ButtonDefaultColor, padding="12px", typewriter_effect=True)
+        self.button_settings = QPushButton("Settings")
+        self.button_settings.setProperty("size_variant", "large")
         self.button_settings.setIcon(IconBuilder.build(IconType.Settings)) 
         self.button_settings.setFixedWidth(button_width)
         self.button_settings.clicked.connect(self.settings_clicked.emit)
 
-        self.button_quit = DataPlotStudioButton("Quit", base_color_hex="#e0e0e0", text_color_hex="#555555", padding="12px",  typewriter_effect=True)
+        self.button_quit = QPushButton("Quit")
+        self.button_quit.setProperty("size_variant", "large")
         self.button_quit.setIcon(IconBuilder.build(IconType.Quit))
         self.button_quit.setFixedWidth(button_width)
         self.button_quit.clicked.connect(self.quit_clicked.emit)
@@ -168,7 +176,7 @@ class LandingPage(QWidget):
         right_recent_layout.addWidget(create_section_label("Recent Projects"))
         
         self.recent_projects_layout = QVBoxLayout()
-        self.recent_projects_layout.setSpacing(5)
+        self.recent_projects_layout.setSpacing(15)
         self.recent_projects_layout.setContentsMargins(0, 0, 0, 0)
         right_recent_layout.addLayout(self.recent_projects_layout)
         self._populate_recent_projects(button_width)
@@ -317,13 +325,8 @@ class LandingPage(QWidget):
             file_path = Path(file_path_str)
             if file_path.exists():
                 valid_files.append(file_path_str)
-                btn = DataPlotStudioButton(
-                    file_path.name, 
-                    base_color_hex="#f8f9fa", 
-                    text_color_hex="#34495e", 
-                    padding="8px", 
-                    typewriter_effect=False
-                )
+                btn = QPushButton(file_path.name)
+                btn.setProperty("size_variant", "large")
                 btn.setToolTip(str(file_path.absolute()))
                 btn.setIcon(IconBuilder.build(IconType.OpenProject))
                 btn.setFixedWidth(button_width)

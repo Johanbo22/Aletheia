@@ -1,7 +1,7 @@
 # ui/plot_tab_ui.py
 
 from PyQt6.QtWidgets import (
-    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFontComboBox, QStackedWidget, QToolBox, QFrame, QGraphicsDropShadowEffect, QStackedLayout 
+    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFontComboBox, QStackedWidget, QToolBox, QFrame, QGraphicsDropShadowEffect, QStackedLayout, QPushButton 
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve
@@ -10,9 +10,6 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors
-from ui.widgets import (
-    DataPlotStudioButton
-)
 from ui.components.plot_settings_panel import PlotSettingsPanel
 from ui.icons import IconBuilder, IconType
 
@@ -78,43 +75,22 @@ class PlotTabUI(QWidget):
         # Buttons at bottom
         button_layout = QHBoxLayout()
         
-        self.plot_button = DataPlotStudioButton(
-            "Generate Plot",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="#FFFFFF",
-            border_style="none",
-            typewriter_effect=True
-        )
+        self.plot_button = QPushButton("Generate Plot")
+        self.plot_button.setObjectName("MainActionButton")
         self.plot_button.setMinimumHeight(40)
         self.plot_button.setIcon(IconBuilder.build(IconType.GeneratePlot))
         self.plot_button.setShortcut(QKeySequence("Ctrl+Return"))
 
-        self.save_plot_button = DataPlotStudioButton(
-            "Save Plot",
-            parent=self,
-            border_style="none",
-            typewriter_effect=True
-        )
+        self.save_plot_button = QPushButton("Save Plot")
         self.save_plot_button.setMinimumHeight(40)
         self.save_plot_button.setIcon(IconBuilder.build(IconType.SavePlot))
         self.save_plot_button.setToolTip("Export the current plot to PNG, PDF or SVG")
         
-        self.clear_button = DataPlotStudioButton(
-            "Clear",
-            parent=self,
-            text_color_hex="#000000",
-            typewriter_effect=True
-        )
+        self.clear_button = QPushButton("Clear")
         self.clear_button.setMinimumHeight(40)
         self.clear_button.setIcon(IconBuilder.build(IconType.ClearPlot))
         
-        self.editor_button = DataPlotStudioButton(
-            "Open Python Editor",
-            parent=self,
-            border_style="none",
-            typewriter_effect=True
-        )
+        self.editor_button = QPushButton("Open Python Editor")
         self.editor_button.setMinimumHeight(40)
         self.editor_button.setIcon(IconBuilder.build(IconType.OpenPythonEditor))
         self.editor_button.setToolTip("Open the code editor to view/write python code for the plot.")

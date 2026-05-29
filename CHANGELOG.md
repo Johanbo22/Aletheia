@@ -1,8 +1,59 @@
 # Changelog
-All notable changes to this project will be documented in this file.
+All notable changes to Aletheia will be documented in this file.
 
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
+
+## v 0.3.0 [Prerelease]
+### Added
+- Support for selecting multiple aggregation functions for a single column simultaneously via MultiIndex unpacking.
+- Added support for quantile calculation during aggregations.
+- threading.Event as a cancellation token pattern within AggregationDialog to gracefully abort stale async PreviewWorker executions.
+- Worker for Reading files in thread
+- Renameable output columns in AggregationDialog
+- Support of adding lines in plots using Axhline, Axvline, Axline
+- Minor animation for when the SearchBar is called
+- Dynamic form validation to disable the "Apply Fill" button when the "Static Value" method is selected but the input field is empty for the FillMissingDialog
+- FillMissingDialog: validate_inputs acts as a soft warning. The "Apply Fill" button remains enabled, allowing users to intentionally override and change column data types.
+- Animations for the LogHistoryPopup window
+- A Diff system for history states.
+- A buffer management system to handle dataframes in memory
+- Module documentation
+- Added a confirmation dialog for DataTabController.refresh_google_sheets() to prevent accidental data loss.
+### Changed
+- Refactored `AggregationDialog` UI to render individual Date Grouping frequency dropdowns dynamically for each datetime column selected, replacing the single global dropdown configuration.
+- Applied a minimum height constraints to the agg_table widget within AggregationDialog.py to prevent the UI component from shrinking excessively when the user removes all items and the list is empty.
+- Updated the clear_all_aggregations method in AggregationDialog.py to require user confirmation via a QMessageBox before emptying the aggregation configurations
+- Button alignments for host OS in AppendDialog
+- Elided long file formats in the edit bar in AppendDialog
+- The Browse file method in AppendDialog is split up to make use of FileReaderWorker.
+- Updated database for tutorials 
+- Refactored CreateSubsetDialog to use FilterAdvancedDialog UI and reduce technical debt
+- Updated the animation when search for columns in the ColumnReorderDialog to be not instant
+- Populating the target column in FillMissingDialog now filters out columns that do not contain any missing values.
+- FillMissingDialog: The "All Columns" option is now removed, and the entire form is disabled if the dataset contains no missing values whatsoever.
+- The main navigation tabs ("Data Explorer" and "Plot Studio") are now hidden when the application is on the `LandingPage` (i.e., when no project or data is loaded).
+- PipelineGraphViewer can now handle branches of states, allowing for multiple states to be stored.
+- Huge refactor of all ControlElements, All DataPlotStudio* widgets and controls are deprecated.
+### Fixed
+- Fixed a scaling bug on the logo in the About section
+- Fixed a bug in AggregationDialog.remove_column_from_agg where a 'o' was inserted instead of a 0 resulting in a crash when removing items.
+- Fixed a bug in DataMutator.read_file() where the return statement was not given. 
+- Fixed an issue with older pandas API for date mapping frequencies being used for aggregation of datetime data.
+- Fixed updates to the GUI from ScriptEditorDialog
+- Fixed a sizing issue wth the BinningPreviewWidget on smaller screens.
+- Fixed a bug in the regex validation of custom bin edge values.
+- Fixed an overlapping visual bug between the function list and the output name edt box in AggregationDialog.
+- Fixed some float/int conversion errors when reading and writing to plotting configurations while using the ScriptEditor
+- Fixed an issue where the data source filepath was lost when loading a `.ath` project or recovering an autosave.
+- Fixed a buggy scrolling speed in the ColumnReorderDialog
+
+## Removed
+- HistoryManager will be removed, as it no longer serves a function
+- ControlElements file with all DataPlotStudio* control widgets removed
+- Control elements.css file. Control elements now have their own css file instead
+- AnimatedButton has been removed as DataPlotStudioButton is no longer served as a subclass of QPushButton. Relying on QPushButtons instead.
+- Removed the typewriter effect for buttons.
 
 ## v 0.2.1 [Patch]
 ### Changed

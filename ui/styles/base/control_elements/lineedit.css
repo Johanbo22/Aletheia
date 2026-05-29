@@ -1,0 +1,20 @@
+/*
+This CSS file governs the style of QLineEdit
+*/
+QLineEdit {
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+    padding: 1px 18px 1px 3px;
+    min-width: 6em;
+    background-color: #ffffff;
+}
+
+QLineEdit:hover {
+    border-color: #95a5a6;
+}
+
+QLineEdit:focus {
+    border-color: #2563eb;
+    background-color: rgba(82, 139, 255, 0.05);
+    outline: none;
+}

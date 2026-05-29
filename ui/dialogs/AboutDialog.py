@@ -9,7 +9,6 @@ from core.resource_loader import get_resource_path
 from resources.version import APPLICATION_NAME
 from ui.icons import IconBuilder, IconType
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 
 
 class AboutDialog(QDialog):
@@ -230,8 +229,8 @@ class AboutDialog(QDialog):
         copy_info_button.setProperty("styleClass", "dialog_text_link")
         copy_info_button.clicked.connect(self._copy_system_info)
 
-        close_button = DataPlotStudioButton("Close", base_color_hex=ThemeColors.MainColor, text_color_hex="white")
-        close_button.setObjectName("aboutCloseButton")
+        close_button = QPushButton("Close")
+        close_button.setObjectName("MainActionButton")
         close_button.clicked.connect(self.accept)
 
         close_button.setDefault(True)

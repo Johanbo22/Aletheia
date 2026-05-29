@@ -2,12 +2,10 @@ from typing import List, Dict, Any
 import keyword
 import pandas as pd
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QGroupBox, QComboBox, QCheckBox, QPushButton
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class RollingWindowDialog(QDialog):
     """
@@ -34,25 +32,25 @@ class RollingWindowDialog(QDialog):
         layout.addWidget(info_label)
         layout.addSpacing(10)
         
-        settings_group = DataPlotStudioGroupBox("Rolling Parameters")
+        settings_group = QGroupBox("Rolling Parameters")
         settings_layout = QFormLayout()
         settings_layout.setSpacing(10)
         
         # Target colymn
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         self.column_combo.addItems(self.numeric_columns)
         self.column_combo.setToolTip("Select the numeric column to apply the rolling window to.")
         self.column_combo.currentTextChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Target Column:", self.column_combo)
         
         # window size
-        self.window_spin = DataPlotStudioSpinBox()
+        self.window_spin = QSpinBox()
         self.window_spin.setRange(2, 100000)
         self.window_spin.setValue(3)
         self.window_spin.valueChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Window Size:", self.window_spin)
         
-        self.min_periods_spin = DataPlotStudioSpinBox()
+        self.min_periods_spin = QSpinBox()
         self.min_periods_spin.setRange(1, 100000)
         self.min_periods_spin.setValue(1)
         self.min_periods_spin.setSpecialValueText("Default (Window Size)")
@@ -61,12 +59,12 @@ class RollingWindowDialog(QDialog):
         self.min_periods_spin.valueChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Min Periods:", self.min_periods_spin)
         
-        self.center_checkbox = DataPlotStudioCheckBox("Center the window labels")
+        self.center_checkbox = QCheckBox("Center the window labels")
         self.center_checkbox.setToolTip("Set the labels at the center of the window rather than the right edge. Prevents phase shifts.")
         self.center_checkbox.stateChanged.connect(self._on_parameters_changed)
         settings_layout.addRow("Alignment:", self.center_checkbox)
         
-        self.operation_combo = DataPlotStudioComboBox()
+        self.operation_combo = QComboBox()
         operations = [
             ("Moving Average (Mean)", "mean"),
             ("Moving Sum", "sum"),
@@ -84,12 +82,12 @@ class RollingWindowDialog(QDialog):
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
         
-        output_group = DataPlotStudioGroupBox("Output")
+        output_group = QGroupBox("Output")
         output_layout = QVBoxLayout()
         output_layout.setSpacing(5)
         
         form_layout = QFormLayout()
-        self.new_name_input = DataPlotStudioLineEdit()
+        self.new_name_input = QLineEdit()
         self.new_name_input.setToolTip("The name of the new column that will store the rolling results.")
         self.new_name_input.textChanged.connect(self._live_validate_name)
         form_layout.addRow("New Column Name:", self.new_name_input)
@@ -103,7 +101,7 @@ class RollingWindowDialog(QDialog):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
         
-        preview_group = DataPlotStudioGroupBox("Preview")
+        preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout()
         self.preview_table = QTableWidget()
         self.preview_table.setColumnCount(2)
@@ -118,12 +116,13 @@ class RollingWindowDialog(QDialog):
         layout.addStretch()
         
         button_layout = QHBoxLayout()
-        self.ok_button = DataPlotStudioButton("Apply", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.ok_button = QPushButton("Apply")
+        self.ok_button.setObjectName("MainActionButton")
         self.ok_button.setIcon(IconBuilder.build(IconType.Checkmark))
         self.ok_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.ok_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
 

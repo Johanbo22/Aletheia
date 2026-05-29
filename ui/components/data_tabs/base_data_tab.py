@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QFrame
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QFrame, QPushButton
 
 from typing import Optional, Callable, TYPE_CHECKING
 
-from ui.widgets import DataPlotStudioButton, HelpIcon
+from ui.widgets import HelpIcon
 from ui.icons import IconBuilder, IconType
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ class BaseDataTab(QWidget):
         """
         row_layout = QHBoxLayout()
         
-        button = DataPlotStudioButton(title, parent=self)
+        button = QPushButton(title, parent=self)
         button.setToolTip(tooltip)
         
         if icon_type is not None:

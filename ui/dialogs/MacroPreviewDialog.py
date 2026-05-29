@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogButtonBox, QListWidgetItem, QWidget, QFrame, QHBoxLayout
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogButtonBox, QListWidgetItem, QWidget, QFrame, QHBoxLayout, QCheckBox, QPushButton
 from PyQt6.QtCore import Qt, QSize
 
-from ui.widgets import DataPlotStudioButton, DataPlotStudioToggleSwitch
+from ui.widgets import ToggleSwitch
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioListWidget
 
 class MacroPreviewDialog(QDialog):
     """
@@ -50,7 +49,7 @@ class MacroPreviewDialog(QDialog):
         self.main_layout.addWidget(line)
         
         util_layout = QHBoxLayout()
-        self.toggle_all_btn = DataPlotStudioButton("Deselect All")
+        self.toggle_all_btn = QPushButton("Deselect All")
         self.toggle_all_btn.setCheckable(True)
         self.toggle_all_btn.setChecked(True)
         self.toggle_all_btn.clicked.connect(self._toggle_all_checkboxes)
@@ -61,9 +60,9 @@ class MacroPreviewDialog(QDialog):
         util_layout.addWidget(self.toggle_all_btn)
         self.main_layout.addLayout(util_layout)
         
-        self.operations_list = DataPlotStudioListWidget()
+        self.operations_list = QListWidget()
         self.operations_list.setAlternatingRowColors(True)
-        self.operations_list.setSelectionMode(DataPlotStudioListWidget.SelectionMode.NoSelection)
+        self.operations_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
         self.operations_list.setSpacing(2)
         self.main_layout.addWidget(self.operations_list)
         
@@ -82,14 +81,14 @@ class MacroPreviewDialog(QDialog):
         
         self.main_layout.addWidget(self.button_box)
         
-    def _create_item_widget(self, index: int, op_type: str, params_str: str, is_skipped: bool) -> tuple[QWidget, DataPlotStudioCheckBox]:
+    def _create_item_widget(self, index: int, op_type: str, params_str: str, is_skipped: bool) -> tuple[QWidget, QCheckBox]:
         """Creates a custom widget for a single macro operation"""
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(10, 8, 10, 8)
         layout.setSpacing(10)
         
-        checkbox = DataPlotStudioCheckBox()
+        checkbox = QCheckBox()
         checkbox.setChecked(not is_skipped)
         if is_skipped:
             checkbox.setEnabled(False)

@@ -1,13 +1,11 @@
 from PyQt6.QtGui import QFont, QShortcut, QKeySequence
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QStackedWidget, QDateEdit, QSizePolicy, QWidget, QCompleter, QScrollArea, QPushButton, QGraphicsOpacityEffect, QApplication
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QStackedWidget, QDateEdit, QSizePolicy, QWidget, QCompleter, QScrollArea, QPushButton, QGraphicsOpacityEffect, QApplication, QLineEdit, QGroupBox, QDoubleSpinBox, QComboBox
 from PyQt6.QtCore import QDate, QThreadPool, Qt, QTimer, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QPoint
 import pandas as pd
 from typing import List, Dict, Any, Optional
 
 from ui.theme import ThemeColors
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioDoubleSpinBox, DataPlotStudioGroupBox, DataPlotStudioLineEdit
 from ui.workers import FilterWorker
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
 
 
@@ -154,7 +152,7 @@ class FilterAdvancedDialog(QDialog):
         layout.addWidget(self.scroll_area, 1)
         
         add_btn_layout = QHBoxLayout()
-        self.add_filter_btn = DataPlotStudioButton("+ Add Filter", parent=self)
+        self.add_filter_btn = QPushButton("+ Add Filter", parent=self)
         self.add_filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add_filter_btn.setToolTip("Add another filter condition")
         self.add_filter_btn.clicked.connect(self.add_filter_row)
@@ -171,7 +169,7 @@ class FilterAdvancedDialog(QDialog):
         self.preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         preview_layout.addWidget(self.preview_label)
 
-        self.copy_btn = DataPlotStudioButton("Copy Query", parent=self)
+        self.copy_btn = QPushButton("Copy Query", parent=self)
         self.copy_btn.setToolTip("Copy the raw filter query to the system clipboard")
         self.copy_btn.clicked.connect(self._copy_query_to_clipboard)
         self.copy_btn.setVisible(False)
@@ -188,19 +186,21 @@ class FilterAdvancedDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.apply_button = DataPlotStudioButton("Apply Filters", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.apply_button = QPushButton("Apply Filters")
+        self.apply_button.setObjectName("MainActionButton")
         self.apply_button.clicked.connect(self.validate_and_accept)
         self.apply_button.setDefault(True)
         self.apply_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.apply_button.setToolTip("Apply the constructed filter query to the dataset (Enter)")
         button_layout.addWidget(self.apply_button)
 
-        clear_button = DataPlotStudioButton("Clear Filters", parent=self, base_color_hex=ThemeColors.DestructiveColor, text_color_hex="white")
+        clear_button = QPushButton("Clear Filters")
+        clear_button.setObjectName("DestructiveButton")
         clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
         clear_button.clicked.connect(self.clear_fields)
         button_layout.addWidget(clear_button)
 
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
@@ -241,12 +241,12 @@ class FilterAdvancedDialog(QDialog):
     def add_filter_row(self) -> None:
         """ adds a new filter configuration row to the dialog."""
         row_index = len(self.filter_rows)
-        filter_group = DataPlotStudioGroupBox(f"Filter {row_index +1}", parent=self)
+        filter_group = QGroupBox(f"Filter {row_index +1}", parent=self)
         filter_group.setObjectName("FilterGroupBox")
         filter_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         filter_layout = QHBoxLayout()
         
-        logic_combo = DataPlotStudioComboBox()
+        logic_combo = QComboBox()
         logic_combo.addItems(["AND", "OR"])
         logic_combo.setFixedWidth(70)
         logic_combo.setToolTip("Logical operator to combine with preceding filters")
@@ -260,12 +260,12 @@ class FilterAdvancedDialog(QDialog):
         filter_layout.addWidget(logic_combo)
 
         # Column selector
-        column_combo = DataPlotStudioComboBox()
+        column_combo = QComboBox()
         column_combo.addItems(self.columns)
         column_combo.setMinimumWidth(120)
         column_combo.setToolTip("Type to search or select a column")
         column_combo.setEditable(True)
-        column_combo.setInsertPolicy(DataPlotStudioComboBox.InsertPolicy.NoInsert)
+        column_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         column_combo.completer().setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         
         col_label = QLabel("Column:")
@@ -274,10 +274,10 @@ class FilterAdvancedDialog(QDialog):
         filter_layout.addWidget(column_combo, 1)
 
         # Condition selector
-        condition_combo = DataPlotStudioComboBox()
+        condition_combo = QComboBox()
         condition_combo.addItems(list(self.ConditionMap.keys()))
         condition_combo.setMinimumWidth(170)
-        condition_combo.setSizeAdjustPolicy(DataPlotStudioComboBox.SizeAdjustPolicy.AdjustToContents)
+        condition_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         cond_label = QLabel("Condition:")
         cond_label.setFixedWidth(65)
         filter_layout.addWidget(cond_label)
@@ -286,21 +286,21 @@ class FilterAdvancedDialog(QDialog):
         input_stack = QStackedWidget()
 
         # text input
-        text_input = DataPlotStudioLineEdit()
+        text_input = QLineEdit()
         text_input.setPlaceholderText("Enter text...")
         text_input.setClearButtonEnabled(True)
         text_input.returnPressed.connect(self.validate_and_accept)
         input_stack.addWidget(text_input)
         
         # Numerical inputs
-        number_input = DataPlotStudioDoubleSpinBox()
+        number_input = QDoubleSpinBox()
         number_input.setRange(-999999999, 999999999)
         number_input.setDecimals(4)
         number_input.setGroupSeparatorShown(True)
         input_stack.addWidget(number_input)
         
         # categorical INputs
-        category_input = DataPlotStudioComboBox()
+        category_input = QComboBox()
         input_stack.addWidget(category_input)
         
         # date input
@@ -311,7 +311,7 @@ class FilterAdvancedDialog(QDialog):
         input_stack.addWidget(date_input)
         
         # Explicit state for Null checks
-        empty_widget = DataPlotStudioLineEdit()
+        empty_widget = QLineEdit()
         empty_widget.setPlaceholderText("No value required")
         empty_widget.setEnabled(False)
         input_stack.addWidget(empty_widget)
@@ -571,7 +571,7 @@ class FilterAdvancedDialog(QDialog):
                     if combo.lineEdit():
                         combo.lineEdit().clear()
                 combo.setEditable(True)
-                combo.setInsertPolicy(DataPlotStudioComboBox.InsertPolicy.NoInsert)
+                combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
                 if combo.lineEdit():
                     combo.lineEdit().setPlaceholderText("Select or type...")
                     try:

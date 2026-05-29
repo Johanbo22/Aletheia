@@ -1,9 +1,7 @@
-from ui.widgets import DataPlotStudioToggleSwitch
+from ui.widgets import ToggleSwitch
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayout, QLabel, QTabWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayout, QLabel, QTabWidget, QVBoxLayout, QWidget, QSpinBox
 from ui.icons import IconBuilder, IconType
-from ui.widgets.ControlElements import DataPlotStudioSpinBox
-
 
 class SettingsDialog(QDialog):
     """Application settings dialog"""
@@ -24,7 +22,7 @@ class SettingsDialog(QDialog):
         appearance_layout = QFormLayout()
         appearance_layout.setSpacing(15)
 
-        self.dark_mode_check = DataPlotStudioToggleSwitch("Enable Dark Mode")
+        self.dark_mode_check = ToggleSwitch("Enable Dark Mode")
         self.dark_mode_check.setChecked(self.current_settings.get("dark_mode", False))
         self.dark_mode_check.setToolTip("Toggle between dark and light themes")
         appearance_layout.addRow(QLabel("Theme:"), self.dark_mode_check)
@@ -34,7 +32,7 @@ class SettingsDialog(QDialog):
         self.font_combo.setCurrentFont(QFont(current_font))
         appearance_layout.addRow(QLabel("Font Family:"), self.font_combo)
 
-        self.font_size_spin = DataPlotStudioSpinBox()
+        self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(8, 32)
         self.font_size_spin.setValue(self.current_settings.get("font_size", 10))
         appearance_layout.addRow(QLabel("Font Size:"), self.font_size_spin)

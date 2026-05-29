@@ -1,9 +1,8 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import pyqtSignal, Qt
 
 from core.resource_loader import get_resource_path
-from ui.widgets import DataPlotStudioButton
 from ui.icons import IconBuilder, IconType
 from ui.theme import ThemeColors
 
@@ -27,26 +26,16 @@ class DataViewToolbar(QWidget):
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create dataset
-        self.create_new_dataset_button = DataPlotStudioButton(
-            "Create a New Dataset",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white",
-        )
+        self.create_new_dataset_button = QPushButton("Create New Dataset")
+        self.create_new_dataset_button.setObjectName("MainActionButton")
         self.create_new_dataset_button.setIcon(IconBuilder.build(IconType.NewProject))
         self.create_new_dataset_button.setToolTip("Create a new empty DataFrame")
         self.create_new_dataset_button.clicked.connect(self.create_dataset_requested.emit)
         toolbar_layout.addWidget(self.create_new_dataset_button)
 
         # Refresh Data Source
-        self.data_source_refresh_button = DataPlotStudioButton(
-            "Refresh Data",
-            parent=self,
-            base_color_hex="#27ae60",
-            hover_color_hex="#229954",
-            text_color_hex="white",
-            font_weight="bold",
-        )
+        self.data_source_refresh_button = QPushButton("Refresh Data")
+        self.data_source_refresh_button.setObjectName("GoogleSheetReImport")
         self.data_source_refresh_button.setIcon(
             QIcon(get_resource_path("icons/menu_bar/google_sheet.png"))
         )
@@ -58,7 +47,7 @@ class DataViewToolbar(QWidget):
         toolbar_layout.addStretch()
 
         # Python Console
-        self.python_console_button = DataPlotStudioButton("", parent=self)
+        self.python_console_button = QPushButton("", parent=self)
         self.python_console_button.setIcon(QIcon(get_resource_path("icons/menu_bar/python-5.svg")))
         self.python_console_button.setToolTip(
             "Open the Python Console to use commands to directly work with the DataFrame")
@@ -66,12 +55,8 @@ class DataViewToolbar(QWidget):
         toolbar_layout.addWidget(self.python_console_button)
 
         # Edit Mode Toggle
-        self.edit_dataset_toggle_button = DataPlotStudioButton(
-            "Edit Mode: OFF",
-            parent=self,
-            base_color_hex="#95a5a6",
-            text_color_hex="white",
-        )
+        self.edit_dataset_toggle_button = QPushButton("Edit Mode: OFF", parent=self)
+        self.edit_dataset_toggle_button.setObjectName("EditModeButton")
         self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOff))
         self.edit_dataset_toggle_button.setCheckable(True)
         self.edit_dataset_toggle_button.setToolTip("Toggle to edit data directly in the table")
@@ -80,22 +65,17 @@ class DataViewToolbar(QWidget):
 
     def _handle_edit_toggled(self) -> None:
         """
-        Handles the visual update for the the edit button and emits the new state
+        Handles the visual update for the the edit button and emits the new state.
+        Color state is handled by CSS via the :checked pseudo-class.
         """
         self.is_editing = self.edit_dataset_toggle_button.isChecked()
 
         if self.is_editing:
             self.edit_dataset_toggle_button.setText("Edit Mode: ON")
             self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOn))
-            self.edit_dataset_toggle_button.updateColors(
-                base_color_hex="#E74C3C", hover_color_hex="#C0392B"
-            )
         else:
             self.edit_dataset_toggle_button.setText("Edit Mode: OFF")
             self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOff))
-            self.edit_dataset_toggle_button.updateColors(
-                base_color_hex="#95A5A6", hover_color_hex="#7F8C8D"
-            )
         self.edit_mode_toggled.emit(self.is_editing)
 
     def set_refresh_visible(self, visible: bool) -> None:

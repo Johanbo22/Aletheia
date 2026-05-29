@@ -8,6 +8,7 @@ from PyQt6.QtGui import QColor, QCursor
 from matplotlib.text import Text
 
 from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
+from ui.managers.plot_tab_managers.color_manager import ColorManager
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -59,7 +60,7 @@ class AnnotationManager:
         if color.isValid():
             self.annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.annotation_color_label.setText(self.annotation_color)
-            self.view.annotation_color_button.updateColors(base_color_hex=self.annotation_color)
+            ColorManager.update_button_color_swatch(self.view.annotation_color_button, QColor(self.annotation_color))
             self.plot_tab.on_style_changed()
 
     def choose_annotation_bg_color(self) -> None:
@@ -72,7 +73,7 @@ class AnnotationManager:
         if color.isValid():
             self.annotation_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            self.view.annotation_bg_color_button.updateColors(base_color_hex=self.annotation_bg_color)
+            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button, QColor(self.annotation_bg_color))
             self.plot_tab.on_style_changed()
 
     def choose_auto_annotate_color(self) -> None:
@@ -85,7 +86,8 @@ class AnnotationManager:
         if color.isValid():
             self.auto_annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.auto_annotate_color_label.setText(self.auto_annotation_color)
-            self.view.auto_annotate_color_button.updateColors(base_color_hex=self.auto_annotation_color)
+            ColorManager.update_button_color_swatch(self.view.auto_annotate_color_button, QColor(self.auto_annotation_color))
+            
             self.plot_tab.on_style_changed()
 
     def toggle_auto_annotate(self) -> None:
@@ -132,8 +134,8 @@ class AnnotationManager:
 
             self.annotation_bg_color = ann.get("bg_color", "wheat")
             self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            self.view.annotation_bg_color_button.updateColors(base_color_hex=self.annotation_bg_color)
-
+            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button, QColor(self.annotation_bg_color))
+            
             self.plot_tab.on_style_changed()
 
     def clear_annotations(self) -> None:

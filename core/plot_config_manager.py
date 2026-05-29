@@ -9,7 +9,8 @@ from typing import Dict, Any, TYPE_CHECKING, Union
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
     from ui.components.plot_settings_panel import PlotSettingsPanel
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
+from ui.managers.plot_tab_managers.color_manager import ColorManager
 from resources.version import APPLICATION_VERSION
 
 class PlotConfigManager:
@@ -513,8 +514,8 @@ class PlotConfigManager:
         self.pt.global_spine_color = g_color
         if hasattr(self.pt, "global_spine_color_label"):
             self.pt.global_spine_color_label.setText(g_color)
-            self.pt.global_spine_color_button.updateColors(base_color_hex=g_color)
-
+            ColorManager.update_button_color_swatch(button=self.pt.global_spine_color_button, color=QColor(g_color))
+            
         for side, ctrl_check, width_spin, color_attr, btn in [
             ("top", self.pt.top_spine_visible_check, self.pt.top_spine_width_spin, "top_spine_color", self.pt.top_spine_color_button),
             ("bottom", self.pt.bottom_spine_visible_check, self.pt.bottom_spine_width_spin, "bottom_spine_color", self.pt.bottom_spine_color_button),
@@ -527,7 +528,7 @@ class PlotConfigManager:
                 width_spin.setValue(float(s_conf.get("width", 1.0)))
                 color = s_conf.get("color", "black")
                 setattr(self.pt, color_attr, color)
-                btn.updateColors(base_color_hex=color)
+                ColorManager.update_button_color_swatch(btn, QColor(color))
         
         # Figure settings
         fig_conf = config.get("figure", {})
@@ -538,12 +539,12 @@ class PlotConfigManager:
         if "bg_color" in fig_conf:
             self.pt.bg_color = fig_conf["bg_color"] or "white"
             self.pt.bg_color_label.setText(self.pt.bg_color)
-            self.pt.bg_color_button.updateColors(base_color_hex=self.pt.bg_color)
+            ColorManager.update_button_color_swatch(button=self.pt.bg_color_button, color=QColor(self.pt.bg_color))
         
         if "face_facecolor" in fig_conf:
             self.pt.face_color = fig_conf["face_facecolor"] or "white"
             self.pt.face_color_label.setText(self.pt.face_color)
-            self.pt.face_color_button.updateColors(self.pt.face_color)
+            ColorManager.update_button_color_swatch(button=self.pt.face_color_button, color=QColor(self.pt.face_color))
         
         self.pt.palette_combo.setCurrentText(fig_conf.get("palette", "viridis"))
         self.pt.tight_layout_check.setChecked(fig_conf.get("tight_layout", True))
@@ -630,11 +631,11 @@ class PlotConfigManager:
         
         self.pt.legend_bg_color = config.get("bg_color") or "white"
         self.pt.legend_bg_label.setText(self.pt.legend_bg_color)
-        self.pt.legend_bg_button.updateColors(base_color_hex=self.pt.legend_bg_color)
+        ColorManager.update_button_color_swatch(button=self.pt.legend_bg_button, color=QColor(self.pt.legend_bg_color))
         
         self.pt.legend_edge_color = config.get("edge_color") or "black"
         self.pt.legend_edge_label.setText(self.pt.legend_edge_color)
-        self.pt.legend_edge_button.updateColors(base_color_hex=self.pt.legend_edge_color)
+        ColorManager.update_button_color_swatch(button=self.pt.legend_edge_button, color=QColor(self.pt.legend_edge_color))
         
         alpha = config.get("alpha", 0.8)
         self.pt.legend_alpha_slider.setValue(int(alpha * 100))
@@ -655,7 +656,7 @@ class PlotConfigManager:
         self.pt.global_grid_color = g_color
         if hasattr(self.pt.view, "global_grid_color_label"):
             self.pt.view.global_grid_color_label.setText(g_color)
-            self.pt.view.global_grid_color_button.updateColors(base_color_hex=g_color)
+            ColorManager.update_button_color_swatch(button=self.pt.global_grid_color_button, color=QColor(g_color))
 
         # A function to color buttons correctly
         def load_grid_section(prefix, conf):
@@ -667,7 +668,8 @@ class PlotConfigManager:
             color = conf.get("color", "gray")
             setattr(self.pt, f"{prefix}_grid_color", color)
             getattr(self.pt, f"{prefix}_grid_color_label").setText(color)
-            getattr(self.pt, f"{prefix}_grid_color_button").updateColors(base_color_hex=color)
+            target_button = getattr(self.pt, f"{prefix}_grid_color_button")
+            ColorManager.update_button_color_swatch(target_button, QColor(color))
         
         if "x_major" in config: load_grid_section("x_major", config["x_major"])
         if "x_minor" in config: load_grid_section("x_minor", config["x_minor"])
@@ -689,7 +691,7 @@ class PlotConfigManager:
         
         self.pt.line_color = gl.get("color") or "blue"
         self.pt.line_color_label.setText(self.pt.line_color)
-        self.pt.line_color_button.updateColors(base_color_hex=self.pt.line_color)
+        ColorManager.update_button_color_swatch(button=self.pt.line_color_button, color=QColor(self.pt.line_color))
         
         gm = config.get("global_marker") or {}
         self.pt.marker_combo.setCurrentText(gm.get("shape", "None"))
@@ -698,11 +700,11 @@ class PlotConfigManager:
         
         self.pt.marker_color = gm.get("color") or "blue"
         self.pt.marker_color_label.setText(self.pt.marker_color)
-        self.pt.marker_color_button.updateColors(base_color_hex=self.pt.marker_color)
+        ColorManager.update_button_color_swatch(button=self.pt.marker_color_button, color=QColor(self.pt.marker_color))
         
         self.pt.marker_edge_color = gm.get("edge_color") or "black"
         self.pt.marker_edge_label.setText(self.pt.marker_edge_color)
-        self.pt.marker_edge_button.updateColors(base_color_hex=self.pt.marker_edge_color)
+        ColorManager.update_button_color_swatch(button=self.pt.marker_edge_button, color=QColor(self.pt.marker_edge_color))
         
         self.pt.multibar_custom_check.setChecked(config.get("multi_bar_custom", False))
         self.pt.bar_customizations = config.get("bar_customizations", {})
@@ -713,11 +715,11 @@ class PlotConfigManager:
         
         self.pt.bar_color = gb.get("color") or "blue"
         self.pt.bar_color_label.setText(self.pt.bar_color)
-        self.pt.bar_color_button.updateColors(base_color_hex=self.pt.bar_color)
+        ColorManager.update_button_color_swatch(button=self.pt.bar_color_button, color=QColor(self.pt.bar_color))
         
         self.pt.bar_edge_color = gb.get("edge_color") or "black"
         self.pt.bar_edge_label.setText(self.pt.bar_edge_color)
-        self.pt.bar_edge_button.updateColors(base_color_hex=self.pt.bar_edge_color)
+        ColorManager.update_button_color_swatch(button=self.pt.bar_edge_button, color=QColor(self.pt.bar_edge_color))
         
         hist = config.get("histogram") or {}
         self.pt.histogram_bins_spin.setValue(int(hist.get("bins", 30)))
@@ -732,7 +734,7 @@ class PlotConfigManager:
             self.pt.error_bar_color = geb.get("color", "black")
             if hasattr(self.pt.view, "error_bar_color_label"):
                 self.pt.view.error_bar_color_label.setText(self.pt.error_bar_color)
-                self.pt.view.error_bar_color_button.updateColors(base_color_hex=self.pt.error_bar_color)
+                ColorManager.update_button_color_swatch(button=self.pt.error_bar_color_button, color=QColor(self.pt.error_bar_color))
             if hasattr(self.pt.view, "error_bar_linewidth_spin"):
                 self.pt.view.error_bar_linewidth_spin.setValue(float(geb.get("linewidth", 1.5)))
                 self.pt.view.error_bar_capsize_spin.setValue(float(geb.get("capsize", 4.0)))
@@ -787,7 +789,7 @@ class PlotConfigManager:
         
         self.pt.textbox_bg_color = tb.get("bg_color") or "white"
         self.pt.textbox_bg_label.setText(self.pt.textbox_bg_color)
-        self.pt.textbox_bg_button.updateColors(base_color_hex=self.pt.textbox_bg_color)
+        ColorManager.update_button_color_swatch(button=self.pt.textbox_bg_button, color=QColor(self.pt.textbox_bg_color))
         
         # Table
         tab = config.get("table") or {}
@@ -823,7 +825,7 @@ class PlotConfigManager:
         self.pt.geo_missing_color = missing.get("color", "lightgray")
         if hasattr(self.pt, "geo_missing_color_label"):
             self.pt.geo_missing_color_label.setText(self.pt.geo_missing_color)
-            self.pt.geo_missing_color_btn.updateColors(base_color_hex=self.pt.geo_missing_color)
+            ColorManager.update_button_color_swatch(button=self.pt.geo_missing_color_btn, color=QColor(self.pt.geo_missing_color))
         self.pt.geo_hatch_combo.setCurrentText(missing.get("hatch", "None"))
         
         bound = config.get("boundary", {})
@@ -831,5 +833,5 @@ class PlotConfigManager:
         self.pt.geo_edge_color = bound.get("color", "black")
         if hasattr(self.pt, "geo_edge_color_label"):
             self.pt.geo_edge_color_label.setText(self.pt.geo_edge_color)
-            self.pt.geo_edge_color_btn.updateColors(base_color_hex=self.pt.geo_edge_color)
+            ColorManager.update_button_color_swatch(button=self.pt.geo_edge_color_btn, color=QColor(self.pt.geo_edge_color))
         self.pt.geo_linewidth_spin.setValue(float(bound.get("linewidth", 1.0)))

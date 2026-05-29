@@ -26,20 +26,20 @@ QPushButton[styleClass="remove_filter_btn"]:pressed {
     background-color: #fcd4d7;
 }
 
-DataPlotStudioLineEdit[validationState="error"] {
+QLineEdit[validationState="error"] {
     border: 1px solid #d73a49;
     background-color: #fff5f5;
     color: #cb2431;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox {
+QGroupBox#FilterGroupBox {
     border: 1px solid #e1e4d8;
     border-radius: 6px;
     margin-top: 10px;
     background-color: #ffffff;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox::title {
+QGroupBox#FilterGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
     padding: 0 5px;
@@ -48,37 +48,37 @@ DataPlotStudioGroupBox#FilterGroupBox::title {
     font-weight: bold;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox[logicStyle="root"] {
+QGroupBox#FilterGroupBox[logicStyle="root"] {
     border: 1px solid #e1e4e8;
     border-left: 3px solid #28a745;
     background-color: #ffffff;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox[logicStyle="root"]:hover {
+QGroupBox#FilterGroupBox[logicStyle="root"]:hover {
     border: 1px solid #b3d4fc;
     border-left: 3px solid #28a745;
     background-color: #fafdff;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox[logicStyle="and"] {
+QGroupBox#FilterGroupBox[logicStyle="and"] {
     border: 1px solid #e1e4e8;
     border-left: 3px solid #005cc5;
     background-color: #ffffff;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox[logicStyle="and"]:hover {
+QGroupBox#FilterGroupBox[logicStyle="and"]:hover {
     border: 1px solid #b3d4fc;
     border-left: 3px solid #005cc5;
     background-color: #fafdff;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox[logicStyle="or"] {
+QGroupBox#FilterGroupBox[logicStyle="or"] {
     border: 1px solid #e1e4e8;
     border-left: 3px solid #6f42c1;
     background-color: #ffffff;
 }
 
-DataPlotStudioGroupBox#FilterGroupBox[logicStyle="or"]:hover {
+QGroupBox#FilterGroupBox[logicStyle="or"]:hover {
     border: 1px solid #b3d4fc;
     border-left: 3px solid #6f42c1;
     background-color: #fafdff;

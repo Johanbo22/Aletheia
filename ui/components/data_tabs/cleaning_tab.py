@@ -1,8 +1,7 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QGroupBox
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets.ControlElements import DataPlotStudioGroupBox
 from ui.icons import IconType
 
 if TYPE_CHECKING:
@@ -25,7 +24,7 @@ class CleaningTab(BaseDataTab):
         clean_info.setProperty("styleClass", "info_text")
         layout.addWidget(clean_info)
 
-        basic_group = DataPlotStudioGroupBox("Basic Operations")
+        basic_group = QGroupBox("Basic Operations")
         basic_layout = QVBoxLayout()
         
         basic_layout.addLayout(self._create_operation_row(
@@ -65,7 +64,7 @@ class CleaningTab(BaseDataTab):
 
         layout.addSpacing(10)
         
-        outlier_group = DataPlotStudioGroupBox("Outlier Detection Tools")
+        outlier_group = QGroupBox("Outlier Detection Tools")
         outlier_layout = QVBoxLayout()
         
         outlier_layout.addLayout(self._create_operation_row(

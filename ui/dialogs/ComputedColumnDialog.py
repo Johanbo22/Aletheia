@@ -6,16 +6,14 @@ import json
 from enum import Enum
 from typing import NamedTuple
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy, QMenu, QListWidget, QLineEdit, QGroupBox, QPushButton
 from PyQt6.QtCore import QModelIndex, QPoint, Qt, QTimer, QSettings, QEvent, QObject
 from PyQt6.QtGui import QAction, QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
 from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
 from ui.dialogs.CodeEditor import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
-from ui.widgets.ControlElements import DataPlotStudioGroupBox, DataPlotStudioLineEdit, DataPlotStudioListWidget, DataPlotStudioMenu
 from ui.dialogs.AddCustomFunctionDialog import AddCustomFunctionDialog
 from ui.widgets.CustomFunctionDelegate import CustomFunctionDelegate
 
@@ -71,11 +69,11 @@ class ComputedColumnDialog(QDialog):
         layout = QVBoxLayout()
 
         # Input boxes
-        input_group = DataPlotStudioGroupBox("Column Details")
+        input_group = QGroupBox("Column Details")
         input_layout = QVBoxLayout()
 
         input_layout.addWidget(QLabel("New Column Name"))
-        self.name_input = DataPlotStudioLineEdit()
+        self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Total_Price")
         self.name_input.setToolTip("Enter a valid, unique Python identifier (no spaces or special characters) as name")
         self.name_input.setClearButtonEnabled(True)
@@ -99,7 +97,7 @@ class ComputedColumnDialog(QDialog):
         self.highlighter = PythonHighlighter(self.expression_input.document())
         expression_layout.addWidget(self.expression_input)
         
-        clear_expression_button = DataPlotStudioButton("Clear")
+        clear_expression_button = QPushButton("Clear")
         clear_expression_button.setToolTip("Clear the expression editor")
         clear_expression_button.clicked.connect(self._clear_expression)
         expression_layout.addWidget(clear_expression_button, alignment=Qt.AlignmentFlag.AlignTop)
@@ -113,7 +111,7 @@ class ComputedColumnDialog(QDialog):
 
         # three rows of operators: artihmetic, comparison, logical
         for operator in self.OperatorDefinitions:
-            operator_button = DataPlotStudioButton(operator.label)
+            operator_button = QPushButton(operator.label)
             operator_button.setToolTip(f"Insert '{operator.label}'")
             
             operator_button.clicked.connect(
@@ -153,7 +151,7 @@ class ComputedColumnDialog(QDialog):
         insert_column_info.setWordWrap(True)
         column_layout.addWidget(insert_column_info)
         
-        self.column_filter_input = DataPlotStudioLineEdit()
+        self.column_filter_input = QLineEdit()
         self.column_filter_input.setPlaceholderText("Search columns...")
         self.column_filter_input.setClearButtonEnabled(True)
         
@@ -173,7 +171,7 @@ class ComputedColumnDialog(QDialog):
         self.column_no_results_label.setHidden(True)
         column_layout.addWidget(self.column_no_results_label)
 
-        self.column_list = DataPlotStudioListWidget()
+        self.column_list = QListWidget()
         self.column_list.setAlternatingRowColors(True)
         self.column_list.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.column_list.addItems(self.columns)
@@ -191,7 +189,7 @@ class ComputedColumnDialog(QDialog):
         insert_func_info.setProperty("styleClass", "list_header_info")
         function_layout.addWidget(insert_func_info)
         
-        self.function_filter_input = DataPlotStudioLineEdit()
+        self.function_filter_input = QLineEdit()
         self.function_filter_input.setPlaceholderText("Search functions...")
         self.function_filter_input.setClearButtonEnabled(True)
         
@@ -206,7 +204,7 @@ class ComputedColumnDialog(QDialog):
         function_search_layout.setSpacing(5)
         function_search_layout.addWidget(self.function_filter_input)
 
-        self.add_custom_func_btn = DataPlotStudioButton("+", padding="4px")
+        self.add_custom_func_btn = QPushButton("+")
         self.add_custom_func_btn.setToolTip("Create a new custom function snippet")
         self.add_custom_func_btn.setFixedWidth(35)
         self.add_custom_func_btn.clicked.connect(self._add_custom_function)
@@ -256,17 +254,12 @@ class ComputedColumnDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        self.create_button = DataPlotStudioButton(
-            "Create Column",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white",
-            typewriter_effect=True,
-        )
+        self.create_button = QPushButton("Create Column")
+        self.create_button.setObjectName("MainActionButton")
         self.create_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.create_button)
 
-        self.cancel_button = DataPlotStudioButton("Cancel", parent=self)
+        self.cancel_button = QPushButton("Cancel", parent=self)
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
 
@@ -634,7 +627,7 @@ class ComputedColumnDialog(QDialog):
 
         is_custom = item.data(0, Qt.ItemDataRole.UserRole + 1)
         if is_custom:
-            menu = DataPlotStudioMenu(self.function_tree)
+            menu = QMenu(self.function_tree)
 
             edit_action = QAction("Edit Custom Function", self)
             edit_action.triggered.connect(lambda: self._edit_custom_function(item))

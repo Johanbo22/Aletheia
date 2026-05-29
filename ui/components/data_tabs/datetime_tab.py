@@ -1,10 +1,8 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QVBoxLayout, QLabel, QGroupBox, QComboBox
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.widgets.ControlElements import DataPlotStudioComboBox
 from ui.icons import IconType
-from ui.widgets.ControlElements import DataPlotStudioGroupBox
 
 if TYPE_CHECKING:
     from ui.controllers.data_tab_controller import DataTabController
@@ -22,15 +20,15 @@ class DatetimeTab(BaseDataTab):
         dt_info.setProperty("styleClass", "info_text")
         layout.addWidget(dt_info)
         
-        extract_group = DataPlotStudioGroupBox("Extract Date Components")
+        extract_group = QGroupBox("Extract Date Components")
         extract_layout = QVBoxLayout()
         
         extract_layout.addWidget(QLabel("Source Date Columns:"))
-        self.dt_source_combo = DataPlotStudioComboBox()
+        self.dt_source_combo = QComboBox()
         extract_layout.addWidget(self.dt_source_combo)
         
         extract_layout.addWidget(QLabel("Date Component to Extract:"))
-        self.dt_component_combo = DataPlotStudioComboBox()
+        self.dt_component_combo = QComboBox()
         self.dt_component_combo.addItems(["Year", "Month", "Month Name", "Day", "Day of Week", "Quarter", "Hour"])
         extract_layout.addWidget(self.dt_component_combo)
         
@@ -46,19 +44,19 @@ class DatetimeTab(BaseDataTab):
         
         layout.addSpacing(10)
         
-        duration_group = DataPlotStudioGroupBox("Calculate Duration Difference")
+        duration_group = QGroupBox("Calculate Duration Difference")
         duration_layout = QVBoxLayout()
         
         duration_layout.addWidget(QLabel("Start Date Columns:"))
-        self.dt_start_combo = DataPlotStudioComboBox()
+        self.dt_start_combo = QComboBox()
         duration_layout.addWidget(self.dt_start_combo)
         
         duration_layout.addWidget(QLabel("End Date Column:"))
-        self.dt_end_combo = DataPlotStudioComboBox()
+        self.dt_end_combo = QComboBox()
         duration_layout.addWidget(self.dt_end_combo)
         
         duration_layout.addWidget(QLabel("Result Unit:"))
-        self.dt_unit_combo = DataPlotStudioComboBox()
+        self.dt_unit_combo = QComboBox()
         self.dt_unit_combo.addItems(["Days", "Weeks", "Hours", "Minutes", "Seconds"])
         duration_layout.addWidget(self.dt_unit_combo)
 

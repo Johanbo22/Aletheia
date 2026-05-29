@@ -1,17 +1,7 @@
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from PyQt6.QtWidgets import (
-    QDialog,
-    QHBoxLayout,
-    QLabel,
-    QVBoxLayout,
-    QWidget,
-    QProgressBar,
-    QFrame,
-)
-import pandas as pd
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget, QProgressBar, QFrame, QLineEdit, QComboBox, QCheckBox, QPushButton
 
-from ui.widgets.ControlElements import DataPlotStudioCheckBox, DataPlotStudioComboBox, DataPlotStudioLineEdit
+import pandas as pd
 
 class FillMissingDialog(QDialog):
     """Dialog for the user to manipulate their data using the fill missing tool"""
@@ -37,7 +27,7 @@ class FillMissingDialog(QDialog):
 
         # this is the columns selection UI
         layout.addWidget(QLabel("Target Column:"))
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         columns_with_missing: list[str] = [
             col for col in self.columns if self.df is not None and col in self.df.columns and self.df[col].isna().any()
         ]
@@ -73,7 +63,7 @@ class FillMissingDialog(QDialog):
 
         # the user selects the method here
         layout.addWidget(QLabel("Fill Method:"))
-        self.method_combo = DataPlotStudioComboBox()
+        self.method_combo = QComboBox()
         self.method_combo.addItems(
             [
                 "Forward Fill (Previous Values)",
@@ -92,14 +82,14 @@ class FillMissingDialog(QDialog):
         layout.addSpacing(10)
 
         # grouping option
-        self.group_check = DataPlotStudioCheckBox("Group By another Column")
+        self.group_check = QCheckBox("Group By another Column")
         self.group_check.setToolTip(
             "Calculate the fill value based on groups (e.g., Mean_Salary byt Job_title)"
         )
         self.group_check.toggled.connect(self.toggle_group_combo)
         layout.addWidget(self.group_check)
 
-        self.group_combo = DataPlotStudioComboBox()
+        self.group_combo = QComboBox()
         self.group_combo.addItems(self.columns)
         self.group_combo.setEnabled(False)
         self.group_combo.setVisible(False)
@@ -112,7 +102,7 @@ class FillMissingDialog(QDialog):
         value_layout = QVBoxLayout(self.value_group)
         value_layout.setContentsMargins(0, 0, 0, 0)
         value_layout.addWidget(QLabel("Enter Value:"))
-        self.value_input = DataPlotStudioLineEdit()
+        self.value_input = QLineEdit()
         self.value_input.setPlaceholderText("e.g. 0, Unknown, 1.5")
         self.value_input.textChanged.connect(self.validate_inputs)
         value_layout.addWidget(self.value_input)
@@ -131,16 +121,11 @@ class FillMissingDialog(QDialog):
 
         # btns
         button_layout = QHBoxLayout()
-        self.apply_btn = DataPlotStudioButton(
-            "Apply Fill",
-            parent=self,
-            base_color_hex=ThemeColors.MainColor,
-            text_color_hex="white",
-            font_weight="bold",
-        )
+        self.apply_btn = QPushButton("Apply Fill")
+        self.apply_btn.setObjectName("MainActionButton")
         self.apply_btn.clicked.connect(self.accept)
 
-        cancel_btn = DataPlotStudioButton("Cancel", parent=self)
+        cancel_btn = QPushButton("Cancel", parent=self)
         cancel_btn.clicked.connect(self.reject)
 
         button_layout.addWidget(self.apply_btn)

@@ -2,10 +2,8 @@ import keyword
 from enum import Enum, auto
 from typing import Optional, List, Tuple
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QLineEdit, QPushButton
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioLineEdit
 
 
 class ValidationState(Enum):
@@ -28,9 +26,9 @@ class RenameColumnDialog(QDialog):
 
         self.column_name: str = column_name
         self.existing_columns: List[str] = existing_columns if existing_columns else []
-        self.new_name_input: Optional[DataPlotStudioLineEdit] = None
+        self.new_name_input: Optional[QLineEdit] = None
         self.error_label: Optional[QLabel] = None
-        self.rename_button: Optional[DataPlotStudioButton] = None
+        self.rename_button: Optional[QPushButton] = None
         self.init_ui()
 
     def init_ui(self):
@@ -44,7 +42,7 @@ class RenameColumnDialog(QDialog):
         current_name_label.setObjectName("current_name_label")
         old_name_layout.addWidget(current_name_label)
         
-        old_name_display = DataPlotStudioLineEdit()
+        old_name_display = QLineEdit()
         old_name_display.setObjectName("current_name_display")
         old_name_display.setText(self.column_name)
         old_name_display.setReadOnly(True)
@@ -57,7 +55,7 @@ class RenameColumnDialog(QDialog):
         new_name_label.setObjectName("new_name_label")
         new_name_layout.addWidget(new_name_label)
         
-        self.new_name_input = DataPlotStudioLineEdit()
+        self.new_name_input = QLineEdit()
         self.new_name_input.setObjectName("new_name_input")
         self.new_name_input.setPlaceholderText(f"Enter new name for '{self.column_name}'")
         self.new_name_input.setMinimumWidth(200)
@@ -76,16 +74,15 @@ class RenameColumnDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        self.rename_button = DataPlotStudioButton("Rename", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
-        self.rename_button.setObjectName("rename_submit_button")
+        self.rename_button = QPushButton("Rename")
+        self.rename_button.setObjectName("MainActonButton")
         self.rename_button.setMinimumWidth(100)
         self.rename_button.setEnabled(False)
         self.rename_button.setDefault(True)
         self.rename_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.rename_button)
         
-        cancel_button = DataPlotStudioButton("Cancel", parent=self)
-        cancel_button.setObjectName("rename_cancel_button")
+        cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.setMinimumWidth(100)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)

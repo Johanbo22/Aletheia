@@ -1,5 +1,3 @@
-from ui.widgets.AnimatedButton import DataPlotStudioButton
-
 import time
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont

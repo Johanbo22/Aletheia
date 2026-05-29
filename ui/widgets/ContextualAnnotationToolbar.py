@@ -1,10 +1,11 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QLabel, QSpinBox
+from email.charset import QP
+
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QLabel, QSpinBox, QPushButton
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication, QMouseEvent
 
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioSpinBox
+from ui.managers.plot_tab_managers.color_manager import ColorManager
 
 class ContextualAnnotationToolbar(QWidget):
     """
@@ -59,7 +60,7 @@ class ContextualAnnotationToolbar(QWidget):
         self.size_spin.valueChanged.connect(self._schedule_update)
         layout.addWidget(self.size_spin)
 
-        self.bold_btn = DataPlotStudioButton("B")
+        self.bold_btn = QPushButton("B")
         self.bold_btn.setCheckable(True)
         self.bold_btn.setToolTip("Bold")
         font = self.bold_btn.font()
@@ -68,7 +69,7 @@ class ContextualAnnotationToolbar(QWidget):
         self.bold_btn.toggled.connect(self._schedule_update)
         layout.addWidget(self.bold_btn)
 
-        self.italic_btn = DataPlotStudioButton("I")
+        self.italic_btn = QPushButton("I")
         self.italic_btn.setCheckable(True)
         self.italic_btn.setToolTip("Italic")
         font = self.italic_btn.font()
@@ -77,18 +78,18 @@ class ContextualAnnotationToolbar(QWidget):
         self.italic_btn.toggled.connect(self._schedule_update)
         layout.addWidget(self.italic_btn)
         
-        self.color_btn = DataPlotStudioButton("A")
+        self.color_btn = QPushButton("A")
         self.color_btn.setToolTip("Text Color")
         self.color_btn.clicked.connect(self._choose_color)
         layout.addWidget(self.color_btn)
         
-        self.bg_color_btn = DataPlotStudioButton("Bg")
+        self.bg_color_btn = QPushButton("Bg")
         self.bg_color_btn.setToolTip("Background color")
         self.bg_color_btn.clicked.connect(self._choose_bg_color)
         layout.addWidget(self.bg_color_btn)
         
-        self.delete_btn = DataPlotStudioButton("Delete", base_color_hex=ThemeColors.DestructiveColor, text_color_hex="white")
-        self.delete_btn.setObjectName("DeleteAnnButton")
+        self.delete_btn = QPushButton("Delete")
+        self.delete_btn.setObjectName("DestructiveButton")
         self.delete_btn.clicked.connect(self._emit_delete)
         layout.addWidget(self.delete_btn)
         
@@ -108,8 +109,8 @@ class ContextualAnnotationToolbar(QWidget):
         self.bold_btn.setChecked(ann_data.get("fontweight", "normal") == "bold")
         self.italic_btn.setChecked(ann_data.get("fontstyle", "normal") == "italic")
         
-        self.color_btn.updateColors(base_color_hex=self.current_color)
-        self.bg_color_btn.updateColors(base_color_hex=self.current_bg_color)
+        ColorManager.update_button_color_swatch(self.color_btn, QColor(self.current_color))
+        ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.curreng_bg_color))
 
         self.text_edit.setFocus()
         self.text_edit.selectAll()
@@ -121,7 +122,8 @@ class ContextualAnnotationToolbar(QWidget):
         color = QColorDialog.getColor(QColor(self.current_color), self, options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
         if color.isValid():
             self.current_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            self.color_btn.updateColors(base_color_hex=self.current_color)
+            ColorManager.update_button_color_swatch(self.color_btn, QColor(self.current_color))
+            
             self._emit_update()
 
     
@@ -130,7 +132,8 @@ class ContextualAnnotationToolbar(QWidget):
         color = QColorDialog.getColor(QColor(self.current_bg_color), self, options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
         if color.isValid():
             self.current_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            self.bg_color_btn.updateColors(base_color_hex=self.current_bg_color)
+            ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.current_bg_color))
+            
             self._emit_update()
 
     def _schedule_update(self) -> None:

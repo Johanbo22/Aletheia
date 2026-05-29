@@ -1,10 +1,8 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QFormLayout, QGraphicsOpacityEffect
+from PyQt6.QtWidgets import QSpinBox, QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QMessageBox, QFormLayout, QGraphicsOpacityEffect, QComboBox, QPushButton
 from PyQt6.QtCore import Qt, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve
 from typing import Optional
 from enum import Enum
 from ui.theme import ThemeColors
-from ui.widgets import DataPlotStudioButton
-from ui.widgets.ControlElements import DataPlotStudioComboBox, DataPlotStudioLineEdit, DataPlotStudioSpinBox
 
 class DelimiterPreset(Enum):
     SPACE = ("Space", " ")
@@ -49,20 +47,20 @@ class SplitColumnDialog(QDialog):
         form_layout = QFormLayout()
         form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
-        self.column_combo = DataPlotStudioComboBox()
+        self.column_combo = QComboBox()
         self.column_combo.addItems(self.columns)
         self.column_combo.setToolTip("Select the text column you want to split")
         self.column_combo.setObjectName("SplitColumnCombo")
         form_layout.addRow("Column to Split:", self.column_combo)
 
         # Delimiter selection
-        self.preset_combo = DataPlotStudioComboBox()
+        self.preset_combo = QComboBox()
         self.preset_combo.setObjectName("SplitPresetCombo")
         for preset in DelimiterPreset:
             self.preset_combo.addItem(preset.display_name, userData=preset)
         self.preset_combo.currentIndexChanged.connect(self._on_preset_changed)
 
-        self.delimiter_input = DataPlotStudioLineEdit()
+        self.delimiter_input = QLineEdit()
         self.delimiter_input.setPlaceholderText("Enter custom delimiter...")
         self.delimiter_input.setToolTip("The character(s) separating the values")
         self.delimiter_input.setObjectName("SplitDelimiterInput")
@@ -76,14 +74,14 @@ class SplitColumnDialog(QDialog):
         delimiter_layout.addWidget(self.delimiter_input)
         form_layout.addRow("Delimiter:", delimiter_layout)
 
-        self.auto_gen_spinbox = DataPlotStudioSpinBox()
+        self.auto_gen_spinbox = QSpinBox()
         self.auto_gen_spinbox.setObjectName("SplitAutoGenSpinBox")
         self.auto_gen_spinbox.setRange(2, 50)
         self.auto_gen_spinbox.setToolTip("Automatically generate sequential column names")
         self.auto_gen_spinbox.valueChanged.connect(self._auto_generate_names)
         form_layout.addRow("Auto-Generate names:", self.auto_gen_spinbox)
 
-        self.new_columns_input = DataPlotStudioLineEdit()
+        self.new_columns_input = QLineEdit()
         self.new_columns_input.setPlaceholderText("e.g., First Name, Last Name")
         self.new_columns_input.setToolTip("Enter the names for the new columns, separated by commas")
         self.new_columns_input.setObjectName("SplitNewColumnsInput")
@@ -118,10 +116,11 @@ class SplitColumnDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self.btn_cancel = DataPlotStudioButton("Cancel", parent=self)
+        self.btn_cancel = QPushButton("Cancel", parent=self)
         self.btn_cancel.clicked.connect(self.reject)
 
-        self.btn_ok = DataPlotStudioButton("Apply Split", parent=self, base_color_hex=ThemeColors.MainColor, text_color_hex="white")
+        self.btn_ok = QPushButton("Apply Split")
+        self.btn_ok.setObjectName("MainActionButton")
         self.btn_ok.clicked.connect(self.accept)
 
         btn_layout.addWidget(self.btn_cancel)

@@ -1,14 +1,13 @@
 # ui/status_bar.py
 from re import I
 
-from PyQt6.QtWidgets import QStatusBar, QLabel, QLineEdit, QProgressBar, QApplication, QFrame, QMenu
+from PyQt6.QtWidgets import QStatusBar, QLabel, QLineEdit, QProgressBar, QApplication, QFrame, QMenu, QPushButton
 from PyQt6.QtCore import Qt, QPoint, QTimer, QEvent
 from PyQt6.QtGui import QAction, QCursor
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 from core.logger import Logger
-from ui.widgets.AnimatedButton import DataPlotStudioButton
 from ui.dialogs.LogHistoryPopup import LogHistoryPopup
 
 class LogLevel(Enum):
@@ -104,11 +103,11 @@ class StatusBar(QStatusBar):
         self.terminal.customContextMenuRequested.connect(self._show_terminal_context_menu)
 
         # Open history button
-        self.history_button = DataPlotStudioButton("≡", base_color_hex="#333", hover_color_hex="#444", text_color_hex="#ddd", padding="4px")
+        self.history_button = QPushButton("≡")
+        self.history_button.setObjectName("ViewLogHistory")
         self.history_button.setToolTip("View Log History")
         self.history_button.setFixedWidth(24)
         self.history_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.history_button.setObjectName("status_history_button")
         self.history_button.clicked.connect(self.show_log_history)
         
         self.error_count: int = 0
