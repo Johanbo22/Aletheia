@@ -10,7 +10,7 @@ import numpy as np
 from typing import Any, Callable, Dict, List
 
 from PyQt6.QtCore import Qt, QEvent, QSettings, QStringListModel
-from PyQt6.QtGui import QTextCursor, QColor, QFontDatabase, QFont, QKeyEvent
+from PyQt6.QtGui import QTextCursor, QColor, QFontDatabase, QFont, QKeyEvent, QKeySequence, QGuiApplication
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPlainTextEdit, QCompleter
 
 from core.data_handler import DataHandler
@@ -44,6 +44,7 @@ class ConsoleDialog(QDialog):
         }
         self._is_executing: bool = False
         self.multiline_buffer: List[str] = []
+        self._input_start_position: int = 0
         
         self._init_ui()
         self._setup_autocompletion()
@@ -135,6 +136,9 @@ class ConsoleDialog(QDialog):
                 return
             elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 self.completer.popup().hide()
+
+        cursor: QTextCursor = self.console_output.textCursor()
+
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             if event.key() == Qt.Key.Key_L:
                 self._clear_console()
@@ -145,8 +149,34 @@ class ConsoleDialog(QDialog):
                     self._cancel_current_line()
                     event.accept()
                     return
+            elif event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+                self.console_output.zoomIn(1)
+                event.accept()
+                return
+            elif event.key() in (Qt.Key.Key_Minus):
+                self.console_output.zoomOut(1)
+                event.accept()
+                return
+        if event.matches(QKeySequence.StandardKey.Paste):
+            self._handle_paste_event()
+            event.accept()
+            return
 
-        if event.key() == Qt.Key.Key_Up:
+        if event.key() == Qt.Key.Key_Backspace:
+            if cursor.position() <= self._input_start_position:
+              event.accept()
+              return
+        elif event.key() == Qt.Key.Key_Left:
+            if cursor.position() <= self._input_start_position:
+                event.accept()
+                return
+        elif event.key() == Qt.Key.Key_Home:
+            move_mode = QTextCursor.MoveMode.KeepAnchor if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else QTextCursor.MoveMode.MoveAnchor
+            cursor.setPosition(self._input_start_position, move_mode)
+            self.console_output.setTextCursor(cursor)
+            event.accept()
+            return
+        elif event.key() == Qt.Key.Key_Up:
             self._navigate_history(-1)
             event.accept()
             return
@@ -158,6 +188,11 @@ class ConsoleDialog(QDialog):
             self._execute_current_line()
             event.accept()
             return
+
+        if event.text() and cursor.position() < self._input_start_position:
+            if not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)):
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                self.console_output.setTextCursor(cursor)
 
         self._original_key_press(event)
 
@@ -194,6 +229,25 @@ class ConsoleDialog(QDialog):
         
         self.console_output.blockSignals(False)
         self._append_console_prompt()
+
+    def _handle_paste_event(self) -> None:
+        """Processes pasted text and evaluating as multiline"""
+        clipboard = QGuiApplication.clipboard()
+        text: str = clipboard.text()
+
+        if not text:
+            return
+
+        cursor: QTextCursor = self.console_output.textCursor()
+        if cursor.position() < self._input_start_position:
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.console_output.setTextCursor(cursor)
+
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            self.console_output.insertPlainText(line)
+            if i < len(lines) - 1:
+                self._execute_current_line()
         
     def _execute_current_line(self) -> None:
         self._is_executing = True
@@ -256,11 +310,16 @@ class ConsoleDialog(QDialog):
         font.setItalic(False)
         font.setBold(False)
         fmt.setFont(font)
-        
         cursor.setCharFormat(fmt)
         cursor.insertText("... ")
+
+        fmt.setForeground(QColor("#f8f8f2"))
+        font.setBold(False)
+        fmt.setFont(font)
+        cursor.setCharFormat(fmt)
         
         self.console_output.setTextCursor(cursor)
+        self._input_start_position = self.console_output.textCursor().position()
         self.console_output.setCurrentCharFormat(fmt)
         self.console_output.blockSignals(False)
         
@@ -400,15 +459,9 @@ class ConsoleDialog(QDialog):
     def _replace_console_input(self, new_text: str) -> None:
         self.console_output.blockSignals(True)
         cursor: QTextCursor = self.console_output.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        cursor.movePosition(QTextCursor.MoveOperation.StartOfLine, QTextCursor.MoveMode.KeepAnchor)
-
-        line_text: str = cursor.selectedText()
-        if line_text.startswith(">>>"):
-            cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
-            prompt_len: int = len(">>> ") if line_text.startswith(">>> ") else len(">>>")
-            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.MoveAnchor, prompt_len)
-            cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
+        cursor.setPosition(self._input_start_position, QTextCursor.MoveMode.MoveAnchor)
+        cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
+        cursor.removeSelectedText()
 
         fmt = cursor.charFormat()
         fmt.setForeground(QColor("#f8f8f2"))
@@ -448,11 +501,16 @@ class ConsoleDialog(QDialog):
         font.setItalic(False)
         font.setBold(False)
         fmt.setFont(font)
-        
         cursor.setCharFormat(fmt)
         cursor.insertText(">>> ")
+
+        fmt.setForeground(QColor("#f8f8f2"))
+        font.setBold(False)
+        fmt.setFont(font)
+        cursor.setCharFormat(fmt)
         
         self.console_output.setTextCursor(cursor)
+        self._input_start_position = self.console_output.textCursor().position()
         self.console_output.setCurrentCharFormat(fmt)
         self.console_output.blockSignals(False)
     
