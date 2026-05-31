@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, QLineEdit, QPushButton, QGroupBox, QLabel
-from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, QLineEdit, QPushButton, QGroupBox, QLabel, QGraphicsOpacityEffect
+from PyQt6.QtGui import QIcon, QShortcut, QKeySequence
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 
 from core.help_manager import HelpManager
 from ui.dialogs import HelpDialog
@@ -31,7 +32,9 @@ class PlotSettingsPanel(QWidget):
         self.settings_search_input.setClearButtonEnabled(True)
         self.settings_search_input.textChanged.connect(self._filter_settings)
         header_layout.addWidget(self.settings_search_input)
-        
+        self.setup_animation_for_search_bar()
+        self.setup_search_bar_shortcuts()
+
         layout.addLayout(header_layout)
 
         self.custom_tabs = QTabWidget()
@@ -93,6 +96,32 @@ class PlotSettingsPanel(QWidget):
         self._expose_geospatial_tab_widgets()
 
         layout.addWidget(self.custom_tabs)
+
+    def setup_animation_for_search_bar(self) -> None:
+        """Setups the opacity and slide animations for the settings search"""
+        self.opacity_effect = QGraphicsOpacityEffect(self.settings_search_input)
+        self.opacity_effect.setOpacity(0.0)
+        self.settings_search_input.setGraphicsEffect(self.opacity_effect)
+
+        animation_duration: int = 200
+        self.opacity_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.opacity_animation.setDuration(animation_duration)
+        self.opacity_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        self.slide_animation = QPropertyAnimation(self.settings_search_input, b"maximumHeight")
+        self.slide_animation.setDuration(animation_duration)
+        self.slide_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        self.settings_search_input.setMaximumHeight(0)
+        self.settings_search_input.setVisible(False)
+
+    def setup_search_bar_shortcuts(self) -> None:
+        """Sets up the keyboard shortcuts for activating and closing settings searching"""
+        self.search_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self)
+        self.search_shortcut.activated.connect(self.open_search)
+
+        self.close_shortcut = QShortcut(QKeySequence("Esc"), self.settings_search_input)
+        self.close_shortcut.activated.connect(self.close_search)
     
     def _expose_general_tab_widgets(self) -> None:
         self.plot_type_group = self.basic_tab.plot_type_group
@@ -579,6 +608,44 @@ class PlotSettingsPanel(QWidget):
                 pass
         except Exception:
             pass
+
+    def open_search(self) -> None:
+        """Displays the search bar with the slide animation and focuses input"""
+        self.settings_search_input.setVisible(True)
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(0.0)
+        self.opacity_animation.setEndValue(1.0)
+
+        self.slide_animation.stop()
+        self.slide_animation.setStartValue(0)
+        target_height: int = max(self.settings_search_input.sizeHint().height(), 28)
+        self.slide_animation.setEndValue(target_height)
+
+        self.opacity_animation.start()
+        self.slide_animation.start()
+
+        self.settings_search_input.setFocus()
+        self.settings_search_input.selectAll()
+
+    def close_search(self) -> None:
+        """Hides the search bar with a slide animation and clears the input"""
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(1.0)
+        self.opacity_animation.setEndValue(0.0)
+
+        self.slide_animation.stop()
+        self.slide_animation.setStartValue(self.settings_search_input.height())
+        self.slide_animation.setEndValue(0)
+        self.slide_animation.finished.connect(self._on_close_animation_finished)
+
+        self.opacity_animation.start()
+        self.slide_animation.start()
+
+    def _on_close_animation_finished(self) -> None:
+        """Called when the close animation finished to hide the widget"""
+        self.slide_animation.finished.disconnect(self._on_close_animation_finished)
+        self.settings_search_input.hide()
+        self.settings_search_input.clear()
     
     def _filter_settings(self, search_text: str) -> None:
         """
