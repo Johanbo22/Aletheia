@@ -247,7 +247,7 @@ class DataTableModel(QAbstractTableModel):
         try:
             val: Any = self._data.iat[row, col]
         except Exception as error:
-            print(error)
+            return None
             
         is_missing = pd.api.types.is_scalar(val) and pd.isna(val)
         # Skip retrieval if there are no conditional formatting set

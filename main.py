@@ -1,23 +1,20 @@
 # main.py
 import os
 import sys
-import traceback
+from pathlib import Path
 
 from PyQt6.QtCore import QSharedMemory
 from PyQt6.QtWidgets import QApplication, QSplashScreen
 
 import appInit
+from core.error_handler import GlobalErrorHandler
 from ui.DataPlotStudioApp import DataPlotStudio
-
-
-def global_exception_handler(exc_type, exc_value, exc_traceback) -> None:
-    print("UNHANDLED EXCEPTION", file=sys.stderr)
-    traceback.print_exception(exc_type, exc_value, exc_traceback)
-
-sys.excepthook = global_exception_handler
 
 def main():
     appInit.configure_runtime_environment()
+
+    error_handler = GlobalErrorHandler(crash_report_dir=Path("crash_reports"))
+    error_handler.setup_hooks()
 
     app = QApplication(sys.argv)
     

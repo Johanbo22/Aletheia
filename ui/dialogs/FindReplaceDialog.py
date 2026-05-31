@@ -2,7 +2,7 @@ from PyQt6.QtGui import QTextCursor, QTextDocument
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QCheckBox, QPushButton
 import traceback
 
-from ui.dialogs.CodeEditor import CodeEditor
+from ui.widgets.CodeEditor import CodeEditor
 
 class FindReplaceDialog(QDialog):
     """Floating dialog for find and replace"""

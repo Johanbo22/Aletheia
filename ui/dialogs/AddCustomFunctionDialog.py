@@ -1,8 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QLineEdit, QComboBox, QPushButton
-from PyQt6.QtCore import Qt
 
-from ui.theme import ThemeColors
-from ui.dialogs.CodeEditor import CodeEditor
+from ui.widgets.CodeEditor import CodeEditor
 
 class AddCustomFunctionDialog(QDialog):
     """

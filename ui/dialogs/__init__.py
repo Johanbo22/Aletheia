@@ -1,5 +1,5 @@
 from .AggregationDialog import AggregationDialog
-from .CodeEditor import CodeEditor
+from ui.widgets.CodeEditor import CodeEditor
 from .ColormapPickerDialog import ColormapPickerDialog
 from .CreateSubsetDialog import CreateSubsetDialog
 from .DatabaseConnectionDialog import DatabaseConnectionDialog

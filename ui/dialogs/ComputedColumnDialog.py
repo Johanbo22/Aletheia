@@ -11,8 +11,7 @@ from PyQt6.QtCore import QModelIndex, QPoint, Qt, QTimer, QSettings, QEvent, QOb
 from PyQt6.QtGui import QAction, QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
 from resources.version import APPLICATION_NAME
-from ui.theme import ThemeColors
-from ui.dialogs.CodeEditor import CodeEditor
+from ui.widgets.CodeEditor import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
 from ui.dialogs.AddCustomFunctionDialog import AddCustomFunctionDialog
 from ui.widgets.CustomFunctionDelegate import CustomFunctionDelegate
