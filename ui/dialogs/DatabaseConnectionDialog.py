@@ -1,16 +1,18 @@
-from PyQt6.QtGui import QIcon, QPixmap, QFontDatabase, QIntValidator, QShortcut, QKeySequence, QSyntaxHighlighter, QTextCharFormat, QColor, QTextDocument, QFont
-from PyQt6.QtCore import Qt, QThreadPool, QSettings
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QTextEdit, QVBoxLayout, QWidget, QStyle, QTreeWidget, QTreeWidgetItem, QSplitter, QRadioButton, QButtonGroup, QInputDialog, QLineEdit, QGroupBox, QComboBox, QPushButton
-
-from pathlib import Path
 import re
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import SQLAlchemyError
+from pathlib import Path
+
+from PyQt6.QtCore import QSettings, QThreadPool, Qt
+from PyQt6.QtGui import QColor, QFont, QFontDatabase, QIntValidator, QKeySequence, QPixmap, QShortcut, \
+    QSyntaxHighlighter, QTextCharFormat, QTextDocument
+from PyQt6.QtSql import QSqlDatabase
+from PyQt6.QtWidgets import QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, \
+    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QRadioButton, QSplitter, QStackedWidget, \
+    QStyle, QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QTabWidget
 
 from core.resource_loader import get_resource_path
 from resources.version import APPLICATION_NAME
 from ui.icons import IconBuilder, IconType
-from ui.workers import TestConnectionWorker, FetchSchemaWorker
+from ui.workers import FetchSchemaWorker, TestConnectionWorker
 
 class SQLSyntaxHighlighter(QSyntaxHighlighter):
     """Syntax highlighting for SQL syntax"""
@@ -55,6 +57,12 @@ class DatabaseConnectionDialog(QDialog):
 
         main_layout = QVBoxLayout(self)
 
+        self.tab_widget = QTabWidget(self)
+
+        # Connection Tab
+        self.connection_tab = QWidget()
+        connection_tab_layout = QVBoxLayout(self.connection_tab)
+
         # Profile selection
         profiles_group = QGroupBox("Saved Connections", parent=self)
         profiles_layout = QHBoxLayout()
@@ -76,7 +84,7 @@ class DatabaseConnectionDialog(QDialog):
         profiles_layout.addWidget(self.delete_profile_button)
 
         profiles_group.setLayout(profiles_layout)
-        main_layout.addWidget(profiles_group)
+        connection_tab_layout.addWidget(profiles_group)
 
         # Connection mode
         self.setup_group = QGroupBox("Connection Setup", parent=self)
@@ -106,62 +114,24 @@ class DatabaseConnectionDialog(QDialog):
         self.db_type_combo.currentTextChanged.connect(self.on_db_type_changed)
         setup_layout.addRow(self.db_type_label, self.db_type_combo)
         
-        main_layout.addWidget(self.setup_group)
+        connection_tab_layout.addWidget(self.setup_group)
 
         #connection details
         self.connection_group = QGroupBox("Connection Details", parent=self)
         connection_group_layout = QVBoxLayout(self.connection_group)
-        self.connection_layout = QFormLayout()
-        connection_group_layout.addLayout(self.connection_layout)
 
-        self.host_label = QLabel("Host:")
-        self.host_input = QLineEdit("localhost")
-        self.connection_layout.addRow(self.host_label, self.host_input)
+        self.connection_stack = QStackedWidget(self)
+        self.connection_stack.setObjectName("connectionStack")
 
-        self.port_label = QLabel("Port:")
-        self.port_input = QLineEdit()
-        self.port_validator = QIntValidator(1, 65535, self)
-        self.port_input.setValidator(self.port_validator)
-        self.connection_layout.addRow(self.port_label, self.port_input)
+        self.server_page = self._create_server_page()
+        self.file_page = self._create_file_page()
+        self.uri_page = self._create_uri_page()
 
-        self.user_label = QLabel("User:")
-        self.user_input = QLineEdit("postgres")
-        self.connection_layout.addRow(self.user_label, self.user_input)
+        self.connection_stack.addWidget(self.server_page)
+        self.connection_stack.addWidget(self.file_page)
+        self.connection_stack.addWidget(self.uri_page)
 
-        self.password_label = QLabel("Password:")
-        self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        
-        view_icon = IconBuilder.build(IconType.ViewItem)
-        self.toggle_password_action = self.password_input.addAction(view_icon, QLineEdit.ActionPosition.TrailingPosition)
-        self.toggle_password_action.triggered.connect(self.toggle_password_visibility)
-        self.connection_layout.addRow(self.password_label, self.password_input)
-
-        self.dbname_label = QLabel("Database:")
-        self.dbname_input = QLineEdit("postgres")
-        self.connection_layout.addRow(self.dbname_label, self.dbname_input)
-
-        #raw uri
-        self.uri_label = QLabel("Connection URI:")
-        self.uri_input = QLineEdit()
-        self.uri_input.setPlaceholderText("dialect+driver://username:password@host:port/database")
-        self.uri_input.setVisible(False)
-        self.uri_label.setVisible(False)
-        self.connection_layout.addRow(self.uri_label, self.uri_input)
-
-        # SQLITE and duckDB specific
-        self.file_db_layout = QHBoxLayout()
-        self.file_db_layout.setContentsMargins(0, 0, 0, 0)
-        self.file_db_label = QLabel("Database File:")
-        self.file_db_path_input = QLineEdit()
-        self.file_db_path_input.setPlaceholderText("Click 'Browse' to select a database file")
-        self.file_db_browse_button = QPushButton("Browse", parent=self)
-        self.file_db_browse_button.clicked.connect(self.browse_file_db)
-        self.file_db_layout.addWidget(self.file_db_path_input)
-        self.file_db_layout.addWidget(self.file_db_browse_button)
-        self.file_db_widget = QWidget()
-        self.file_db_widget.setLayout(self.file_db_layout)
-        self.connection_layout.addRow(self.file_db_label, self.file_db_widget)
+        connection_group_layout.addWidget(self.connection_stack)
 
         # A test connection button
         self.test_connection_wrapper = QWidget()
@@ -186,7 +156,12 @@ class DatabaseConnectionDialog(QDialog):
 
         connection_group_layout.addWidget(self.test_connection_wrapper)
 
-        main_layout.addWidget(self.connection_group)
+        connection_tab_layout.addWidget(self.connection_group)
+        connection_tab_layout.addStretch()
+
+        # Query and Schema tab
+        self.query_tab = QWidget()
+        query_tab_layout = QVBoxLayout(self.query_tab)
 
         # Editor grouping with a splitter instead of hardlocked widgets
         self.editors_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -211,6 +186,9 @@ class DatabaseConnectionDialog(QDialog):
         if fixed_font.pointSize() < 10:
             fixed_font.setPointSize(10)
         self.query_editor.setFont(fixed_font)
+        font_metrics = self.query_editor.fontMetrics()
+        self.query_editor.setTabStopDistance(float(font_metrics.horizontalAdvance(' ') * 4))
+
         self.query_editor.setMinimumHeight(150)
         query_layout.addWidget(self.query_editor)
 
@@ -242,6 +220,7 @@ class DatabaseConnectionDialog(QDialog):
         # Search bar for schema tree
         self.schema_search_input = QLineEdit(parent=self)
         self.schema_search_input.setPlaceholderText("Search tables and columns...")
+        self.schema_search_input.setClearButtonEnabled(True)
         self.schema_search_input.textChanged.connect(self.filter_schema_tree)
         self.schema_search_input.setVisible(False)
         schema_layout.addWidget(self.schema_search_input)
@@ -261,12 +240,18 @@ class DatabaseConnectionDialog(QDialog):
         self.editors_splitter.setStretchFactor(0, 3)
         self.editors_splitter.setStretchFactor(1, 2)
 
-        main_layout.addWidget(self.editors_splitter, stretch=1)
+        query_tab_layout.addWidget(self.editors_splitter, stretch=1)
+
+        self.tab_widget.addTab(self.connection_tab, "1. Connection Settings")
+        self.tab_widget.addTab(self.query_tab, "2. Query && Schema")
+
+        main_layout.addWidget(self.tab_widget)
 
         #buttons
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         
         ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button.setObjectName("MainActionButton")
         if ok_button:
             ok_button.setToolTip("Accept and Import (Ctrl+Enter)")
         
@@ -284,35 +269,176 @@ class DatabaseConnectionDialog(QDialog):
 
         self.on_db_type_changed("SQLite")
         self.on_query_changed()
-    
+
+    def _create_server_page(self) -> QWidget:
+        """Creates the form layout for server-based databases (PostgreSQL, MySQL)."""
+        page = QWidget()
+        page.setObjectName("serverDatabasePage")
+        layout = QFormLayout(page)
+
+        self.host_label = QLabel("Host:")
+        self.host_input = QLineEdit("localhost")
+        self.host_input.setObjectName("hostInput")
+        self.host_input.textChanged.connect(self.invalidate_connection_state)
+        layout.addRow(self.host_label, self.host_input)
+
+        self.port_label = QLabel("Port:")
+        self.port_input = QLineEdit()
+        self.port_input.setObjectName("portInput")
+        self.port_validator = QIntValidator(1, 65535, self)
+        self.port_input.setValidator(self.port_validator)
+        self.port_input.textChanged.connect(self.invalidate_connection_state)
+        layout.addRow(self.port_label, self.port_input)
+
+        self.user_label = QLabel("User:")
+        self.user_input = QLineEdit("postgres")
+        self.user_input.setObjectName("userInput")
+        self.user_input.textChanged.connect(self.invalidate_connection_state)
+        layout.addRow(self.user_label, self.user_input)
+
+        self.password_label = QLabel("Password:")
+        self.password_input = QLineEdit()
+        self.password_input.setObjectName("passwordInput")
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.textChanged.connect(self.invalidate_connection_state)
+
+        view_icon = IconBuilder.build(IconType.ViewItem)
+        self.toggle_password_action = self.password_input.addAction(view_icon, QLineEdit.ActionPosition.TrailingPosition)
+        self.toggle_password_action.triggered.connect(self.toggle_password_visibility)
+        layout.addRow(self.password_label, self.password_input)
+
+        self.dbname_label = QLabel("Database:")
+        self.dbname_input = QLineEdit("postgres")
+        self.dbname_input.setObjectName("dbnameInput")
+        self.dbname_input.textChanged.connect(self.invalidate_connection_state)
+        layout.addRow(self.dbname_label, self.dbname_input)
+
+        return page
+
+    def _create_file_page(self) -> QWidget:
+        """Creates the layout for file-based databases (SQLite, DuckDB)."""
+        page = QWidget()
+        page.setObjectName("fileDatabasePage")
+        layout = QFormLayout(page)
+
+        self.file_db_label = QLabel("Database File:")
+
+        file_layout = QHBoxLayout()
+        file_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.file_db_path_input = QLineEdit()
+        self.file_db_path_input.setObjectName("fileDbPathInput")
+        self.file_db_path_input.setPlaceholderText("Click 'Browse' to select a database file")
+        self.file_db_path_input.textChanged.connect(self.invalidate_connection_state)
+
+        self.file_db_browse_button = QPushButton("Browse", parent=self)
+        self.file_db_browse_button.setObjectName("fileDbBrowseButton")
+        self.file_db_browse_button.clicked.connect(self.browse_file_db)
+
+        file_layout.addWidget(self.file_db_path_input)
+        file_layout.addWidget(self.file_db_browse_button)
+
+        layout.addRow(self.file_db_label, file_layout)
+        return page
+
+    def _create_uri_page(self) -> QWidget:
+        """Creates the layout for raw URI connections."""
+        page = QWidget()
+        page.setObjectName("uriDatabasePage")
+        layout = QFormLayout(page)
+
+        self.uri_label = QLabel("Connection URI:")
+        self.uri_input = QLineEdit()
+        self.uri_input.setObjectName("uriInput")
+        self.uri_input.setPlaceholderText("dialect+driver://username:password@host:port/database")
+        self.uri_input.textChanged.connect(self.invalidate_connection_state)
+        layout.addRow(self.uri_label, self.uri_input)
+
+        return page
+
+    def invalidate_connection_state(self) -> None:
+        """Clears the schema and connecton status if inputs change after a successful test"""
+        if self.connection_status_label.text() == "Connection successful":
+            self.connection_status_label.clear()
+            self.connection_status_label.setProperty("status", "")
+            self.connection_status_label.style().unpolish(self.connection_status_label)
+            self.connection_status_label.style().polish(self.connection_status_label)
+
+            self.schema_tree.clear()
+            self.schema_search_input.clear()
+            self.schema_search_input.setVisible(False)
+            self.load_schema_button.setEnabled(True)
+
     def test_connection(self) -> None:
         """Tests the database connection before loading the schema"""
         try:
             self.setCursor(Qt.CursorShape.WaitCursor)
             self.test_connection_button.setEnabled(False)
             self.test_connection_button.setText("Testing...")
-            self.db_icon_label.setText("Testing...")
             
             self.connection_status_label.setText("Connecting...")
             self.connection_status_label.setProperty("status", "")
             self.connection_status_label.style().unpolish(self.connection_status_label)
             self.connection_status_label.style().polish(self.connection_status_label)
 
-            connection_string = self._build_connection_string()
+            db_type = self.db_type_combo.currentText()
+            is_uri_mode = self.mode_uri_radio.isChecked()
 
-            worker = TestConnectionWorker(connection_string)
-            worker.signals.finished.connect(self.on_test_connection_success)
-            worker.signals.error.connect(self.on_test_connection_error)
+            if is_uri_mode or db_type == "DuckDB":
+                connection_string = self._build_connection_string()
+                worker = TestConnectionWorker(connection_string)
+                worker.signals.finished.connect(self.on_test_connection_success)
+                worker.signals.error.connect(self.on_test_connection_error)
+                self.threadpool.start(worker)
+                return
 
-            self.threadpool.start(worker)
+            self._test_qtsql_connection(db_type)
         
         except ValueError as InputError:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            self.test_connection_button.setEnabled(True)
-            self.test_connection_button.setText("Test Connection")
-            self.db_icon_label.clear()
-            self.connection_status_label.setText("")
+            self._reset_test_ui_state()
             QMessageBox.warning(self, "Input Error", str(InputError))
+
+    def _test_qtsql_connection(self, db_type: str) -> None:
+        """Handles connection to database using QtSql drivers"""
+        driver_map = {
+            "SQLite": "QSQLITE",
+            "PostgreSQL": "QPSQL",
+            "MySQL": "QMYSQL"
+        }
+        driver_name = driver_map.get(db_type)
+        connection_name = "test_connection_probe"
+
+        if QSqlDatabase.contains(connection_name):
+            QSqlDatabase.removeDatabase(connection_name)
+
+        db = QSqlDatabase.addDatabase(driver_name, connection_name)
+
+        if db_type == "SQLite":
+            db_path = self.file_db_path_input.text().strip()
+            if not db_path:
+                raise ValueError("Please provide a path to the SQLite database file")
+            db.setDatabaseName(db_path)
+        else:
+            db.setHostName(self.host_input.text().strip())
+            db.setPort(int(self.port_input.text().strip() or 0))
+            db.setDatabaseName(self.dbname_input.text().strip())
+            db.setUserName(self.user_input.text().strip())
+            db.setPassword(self.password_input.text().strip())
+
+        if db.open():
+            self.on_test_connection_success()
+            db.close()
+        else:
+            self.on_test_connection_error(db.lastError().text())
+
+        QSqlDatabase.removeDatabase(connection_name)
+
+    def _reset_test_ui_state(self) -> None:
+        """Resets the UI elements for the test connection phase"""
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self.test_connection_button.setEnabled(True)
+        self.test_connection_button.setText("Test Connection")
+        self.connection_status_label.setText("")
 
     def on_test_connection_success(self) -> None:
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -324,6 +450,9 @@ class DatabaseConnectionDialog(QDialog):
         self.connection_status_label.setProperty("status", "valid")
         self.connection_status_label.style().unpolish(self.connection_status_label)
         self.connection_status_label.style().polish(self.connection_status_label)
+
+        # Start loading the schema in the background
+        self.fetch_schema()
     
     def on_test_connection_error(self, error) -> None:
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -437,6 +566,12 @@ class DatabaseConnectionDialog(QDialog):
             insert_text = f"{table_name}.{col_name}"
         else:
             insert_text = format_identifier(item.text(0))
+
+        cursor = self.query_editor.textCursor()
+
+        text_before_cursor = self.query_editor.toPlainText()[:cursor.position()].rstrip()
+        if text_before_cursor and re.search(r'[\w"\'*]$', text_before_cursor):
+            insert_text = f", {insert_text}"
         
         self.query_editor.insertPlainText(insert_text + " ")
         self.query_editor.setFocus()
@@ -540,30 +675,22 @@ class DatabaseConnectionDialog(QDialog):
         self.query_status_icon.setVisible(True)
         self.query_status_label.setVisible(True)
 
+        ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_button:
+            ok_button.setEnabled(valid)
+
     def on_db_type_changed(self, db_type: str) -> None:
-        """Show or hide fields based on db type"""
+        """Switches the visible page in the stacked widget based on database type."""
         if self.mode_uri_radio.isChecked():
             return
 
         is_file_db = (db_type in ["SQLite", "DuckDB"])
 
-        #toggle server fields
-        self.host_label.setVisible(not is_file_db)
-        self.host_input.setVisible(not is_file_db)
-        self.port_label.setVisible(not is_file_db)
-        self.port_input.setVisible(not is_file_db)
-        self.user_label.setVisible(not is_file_db)
-        self.user_input.setVisible(not is_file_db)
-        self.password_label.setVisible(not is_file_db)
-        self.password_input.setVisible(not is_file_db)
-        self.dbname_label.setVisible(not is_file_db)
-        self.dbname_input.setVisible(not is_file_db)
+        if is_file_db:
+            self.connection_stack.setCurrentWidget(self.file_page)
+        else:
+            self.connection_stack.setCurrentWidget(self.server_page)
 
-        #toggle SQLITE fields
-        self.file_db_label.setVisible(is_file_db)
-        self.file_db_widget.setVisible(is_file_db)
-
-        #set defaults on port and usr
         if db_type == "PostgreSQL":
             self.port_input.setText("5432")
             self.user_input.setText("postgres")
@@ -575,20 +702,20 @@ class DatabaseConnectionDialog(QDialog):
         elif db_type == "DuckDB":
             self.file_db_path_input.setPlaceholderText("Click 'Browse' to select a DuckDB file (.db, .duckdb)")
         elif db_type == "SQLite":
-            self.file_db_path_input.setPlaceholderText("Click 'Browse' to select a SQLite file (.db, .sqlite, .sqlite3)")
+            self.file_db_path_input.setPlaceholderText(
+                "Click 'Browse' to select a SQLite file (.db, .sqlite, .sqlite3)")
 
-        # Update the icon
         icon_map = {
-            "SQLite": "icons/database_icons/sqlite.svg",
-            "DuckDB": "icons/database_icons/duckdb-logo.svg",
+            "SQLite"    : "icons/database_icons/sqlite.svg",
+            "DuckDB"    : "icons/database_icons/duckdb-logo.svg",
             "PostgreSQL": "icons/database_icons/postgresql-inc.svg",
-            "MySQL": "icons/database_icons/mysql-3.svg"
+            "MySQL"     : "icons/database_icons/mysql-3.svg"
         }
         icon_path = icon_map.get(db_type, "")
 
         if not Path(icon_path).exists():
             icon_path = get_resource_path("icons/menu_bar/database.svg")
-        
+
         if Path(icon_path).exists():
             pixmap = QPixmap(icon_path)
             scaled_pixmap = pixmap.scaledToHeight(24, Qt.TransformationMode.SmoothTransformation)
@@ -596,6 +723,7 @@ class DatabaseConnectionDialog(QDialog):
             self.db_icon_label.setToolTip(f"{db_type} Database")
         else:
             self.db_icon_label.clear()
+
 
     def browse_file_db(self) -> None:
         """Open a file dialog to find a local SQLite database file"""
@@ -656,27 +784,11 @@ class DatabaseConnectionDialog(QDialog):
         """Switches the UI states"""
         is_uri_mode = self.mode_uri_radio.isChecked()
 
-        self.uri_label.setVisible(is_uri_mode)
-        self.uri_input.setVisible(is_uri_mode)
-
-        builder_visible = not is_uri_mode
-
-        self.db_type_combo.setVisible(builder_visible)
-        self.db_type_label.setVisible(builder_visible)
+        self.db_type_combo.setVisible(not is_uri_mode)
+        self.db_type_label.setVisible(not is_uri_mode)
 
         if is_uri_mode:
-            self.host_label.setVisible(False)
-            self.host_input.setVisible(False)
-            self.port_label.setVisible(False)
-            self.port_input.setVisible(False)
-            self.user_label.setVisible(False)
-            self.user_input.setVisible(False)
-            self.password_label.setVisible(False)
-            self.password_input.setVisible(False)
-            self.dbname_label.setVisible(False)
-            self.dbname_input.setVisible(False)
-            self.file_db_label.setVisible(False)
-            self.file_db_widget.setVisible(False)
+            self.connection_stack.setCurrentWidget(self.uri_page)
         else:
             self.on_db_type_changed(self.db_type_combo.currentText())
     
