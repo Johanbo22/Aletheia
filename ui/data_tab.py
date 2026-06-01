@@ -326,6 +326,9 @@ class DataTab(QWidget):
         if hasattr(self, "model") and isinstance(self.model, DataTableModel):
             self.model.update_data()
             self.data_table.setSortingEnabled(False)
+
+            if self.data_table.model() is not self.model:
+                self.data_table.setModel(self.model)
         else:
             self.model = DataTableModel(self.data_handler, editable=self.is_editing, float_precision=self.current_precision, conditional_rules=self.current_formatting_rules)
             self.model.set_bool_render_style(getattr(self, "current_render_bools", True))
@@ -624,6 +627,8 @@ class DataTab(QWidget):
     def clear(self):
         """Clear the data tab"""
         self.data_table.setModel(None)
+        if hasattr(self, "model"):
+            del self.model
         self.stats_text.setHtml("")
         if hasattr(self, "test_results_text"):
             self.set_test_results_greeting()
