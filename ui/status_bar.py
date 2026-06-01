@@ -1,8 +1,9 @@
 # ui/status_bar.py
 from re import I
 
-from PyQt6.QtWidgets import QStatusBar, QLabel, QLineEdit, QProgressBar, QApplication, QFrame, QMenu, QPushButton
-from PyQt6.QtCore import Qt, QPoint, QTimer, QEvent
+from PyQt6.QtWidgets import QStatusBar, QLabel, QLineEdit, QProgressBar, QApplication, QFrame, QMenu, QPushButton, \
+    QGraphicsOpacityEffect, QWidget
+from PyQt6.QtCore import Qt, QPoint, QTimer, QEvent, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QAction, QCursor
 from datetime import datetime
 from enum import Enum
@@ -155,6 +156,48 @@ class StatusBar(QStatusBar):
         self.addPermanentWidget(self.memory_bar)
         self.addPermanentWidget(self._create_separator())
         self.addPermanentWidget(self.stats_label)
+
+        self._setup_fade_effect(self.issue_counter_label)
+        self._setup_fade_effect(self.source_label)
+        self._setup_fade_effect(self.view_context_label)
+
+    def _setup_fade_effect(self, widget: QWidget) -> None:
+        """Initializes a QGraphicsOpacityEffect and QPropertyAnimation on a widget"""
+        effect = QGraphicsOpacityEffect(widget)
+        effect.setOpacity(1.0 if widget.isVisible() else 0.0)
+        widget.setGraphicsEffect(effect)
+
+        anim = QPropertyAnimation(effect, b"opacity", self)
+        anim.setDuration(250)
+        anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        widget.setProperty("fade_anim", anim)
+
+    def _fade_widget(self, widget: QWidget, show: bool) -> None:
+        """Transitions a widgets opacity to show or hide it"""
+        effect = widget.graphicsEffect()
+        anim = widget.property("fade_anim")
+
+        if not effect or not isinstance(anim, QPropertyAnimation):
+            widget.setVisible(show)
+            return
+
+        anim.stop()
+        try:
+            anim.finished.disconnect()
+        except TypeError:
+            pass
+
+        if show:
+            if not widget.isVisible():
+                effect.setOpacity(0.0)
+                widget.show()
+            anim.setStartValue(effect.opacity())
+            anim.setEndValue(1.0)
+        else:
+            anim.setStartValue(effect.opacity())
+            anim.setEndValue(0.0)
+            anim.finished.connect(widget.hide)
+        anim.start()
     
     def _create_separator(self) -> QFrame:
         """Creates a vertical line to separate bar components"""
@@ -385,7 +428,7 @@ class StatusBar(QStatusBar):
     def _update_issue_counters(self) -> None:
         """updates the issue trackers"""
         if self.error_count == 0 and self.warning_count == 0:
-            self.issue_counter_label.hide()
+            self._fade_widget(self.issue_counter_label, False)
             return
         
         parts = []
@@ -395,7 +438,7 @@ class StatusBar(QStatusBar):
             parts.append(f"<span style='color: #ffaa00;'>\u26A0 {self.warning_count}</span>")
         
         self.issue_counter_label.setText(" ".join(parts))
-        self.issue_counter_label.show()
+        self._fade_widget(self.issue_counter_label, True)
     
     def clear_issue_counters(self) -> None:
         """Reset counters"""
@@ -514,16 +557,15 @@ class StatusBar(QStatusBar):
             
             self.source_label.setText(elided_text)
             self.source_label.setToolTip(f"{full_text}\n\nClick to copy full path")
-            self.source_label.show()
+            self._fade_widget(self.source_label, True)
         else:
-            self.source_label.clear()
-            self.source_label.hide()
+            self._fade_widget(self.source_label, False)
+            self._full_source_path = ""
     
     def set_view_context(self, context_text: str, context_type: str = "subset") -> None:
-        """update the view context label to match current viewing"""
+        """Update the view context label to match current viewing"""
         if not context_text or context_type == "normal":
-            self.view_context_label.clear()
-            self.view_context_label.hide()
+            self._fade_widget(self.view_context_label, False)
             return
         
         metrics = self.view_context_label.fontMetrics()
@@ -531,7 +573,7 @@ class StatusBar(QStatusBar):
         
         self.view_context_label.setText(elided_text)
         self.view_context_label.setToolTip(f"Context: {context_text}")
-        self.view_context_label.show()
+        self._fade_widget(self.view_context_label, True)
 
         # Colors
         self.view_context_label.setProperty("contextType", context_type)
