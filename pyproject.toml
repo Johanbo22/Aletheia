@@ -19,7 +19,7 @@ dependencies = [
     "pyqt6-sip==13.10.2",
     "pyqt6-webengine==6.10.0",
     "pyqt6-webengine-qt6==6.10.1",
-    "requests==2.32.3",
+    "requests==2.33.0",
     "scikit-learn==1.6.1",
     "scipy==1.14.1",
     "seaborn==0.13.2",
