@@ -1012,6 +1012,7 @@ class CodeExporter:
                 "linestyle": self._clean_value(ref_line.get("linestyle", "-")),
                 "linewidth": ref_line.get("linewidth", 1.5),
                 "alpha": ref_line.get("alpha", 1.0),
+                "zorder": ref_line.get("zorder", 10),
                 "gid": f"ref_line_{i}"
             }
 
@@ -1049,6 +1050,7 @@ class CodeExporter:
             kwargs = {
                 "color": self._clean_value(ref_span.get("color", "blue")),
                 "alpha": ref_span.get("alpha", 0.3),
+                "zorder": ref_span.get("zorder", -1),
                 "gid"  : f"ref_span_{i}",
                 "edgecolor": "'none'"
             }

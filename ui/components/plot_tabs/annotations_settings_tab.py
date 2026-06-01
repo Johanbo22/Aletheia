@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QStackedWidget, QGridLayout, QSpinBox, QDoubleSpinBox, QListWidget, QLineEdit, QGroupBox, QComboBox, QPushButton
 
+from ui.icons import IconBuilder
 from ui.theme import ThemeColors
 from ui.widgets import ToggleSwitch
 
@@ -32,44 +33,43 @@ class AnnotationsSettingsTab(QWidget):
         main_layout.addWidget(scroll)
 
     def _setup_reference_lines_group(self, parent_layout: QVBoxLayout) -> None:
-        group = QGroupBox("Reference Annotations")
-        layout = QVBoxLayout()
-
         tabs = QTabWidget()
 
-        # First a tab with the ReferenceLines
+        # Lines Tab
         lines_tab = QWidget()
         lines_layout = QVBoxLayout(lines_tab)
 
+        active_label_line = QLabel("Active Lines:")
+        lines_layout.addWidget(active_label_line)
         self.reference_lines_list = QListWidget()
         self.reference_lines_list.setToolTip("List of active reference lines on the plot")
         lines_layout.addWidget(self.reference_lines_list)
 
-        ref_buttons_layout = QHBoxLayout()
-
-        self.add_ref_line_button = QPushButton("Add Horizontal Line")
+        lines_toolbar = QHBoxLayout()
+        self.add_ref_line_button = QPushButton("+ Add New Line")
         self.add_ref_line_button.setObjectName("MainActionButton")
-        self.add_ref_line_button.setToolTip("Add a reference line based on the selected type below")
-        ref_buttons_layout.addWidget(self.add_ref_line_button)
 
-        lines_layout.addLayout(ref_buttons_layout)
+        self.delete_ref_line_button = QPushButton("- Delete Selected")
+        self.delete_ref_line_button.setObjectName("DestructiveButton")
+        self.delete_ref_line_button.setEnabled(False)
 
-        self.clear_ref_lines_button = QPushButton("Clear All Reference Lines")
+        self.clear_ref_lines_button = QPushButton("Clear All")
         self.clear_ref_lines_button.setObjectName("DestructiveButton")
-        self.clear_ref_lines_button.setToolTip("Remove all reference lines from the plot")
-        lines_layout.addWidget(self.clear_ref_lines_button)
 
-        # Editor
-        editor_group = QGroupBox("Edit Selected Reference Lines")
-        editor_layout = QVBoxLayout()
+        lines_toolbar.addWidget(self.add_ref_line_button)
+        lines_toolbar.addWidget(self.delete_ref_line_button)
+        lines_toolbar.addWidget(self.clear_ref_lines_button)
+        lines_layout.addLayout(lines_toolbar)
 
-        type_layout = QHBoxLayout()
-        type_layout.addWidget(QLabel("Type"))
+        lines_layout.addSpacing(10)
+        lines_layout.addWidget(QLabel("<b>Line Properties</b>"))
+
+        lines_editor = QGridLayout()
+
+        lines_editor.addWidget(QLabel("Type:"), 0, 0)
         self.ref_line_type_combo = QComboBox()
         self.ref_line_type_combo.addItems(["Horizontal (axhline)", "Vertical (axvline)", "Diagonal (axline)"])
-        self.ref_line_type_combo.setToolTip("Select the type of reference line")
-        type_layout.addWidget(self.ref_line_type_combo)
-        editor_layout.addLayout(type_layout)
+        lines_editor.addWidget(self.ref_line_type_combo, 0, 1, 1, 3)
 
         self.ref_line_params_stack = QStackedWidget()
 
@@ -81,7 +81,6 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_y_spin.setRange(-1e9, 1e9)
         self.ref_line_y_spin.setValue(0.0)
         self.ref_line_y_spin.setSingleStep(0.1)
-        self.ref_line_y_spin.setToolTip("Y-axis position for horizontal line")
         h_layout.addWidget(self.ref_line_y_spin)
         h_layout.addStretch()
         self.ref_line_params_stack.addWidget(h_page)
@@ -94,7 +93,6 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_x_spin.setRange(-1e9, 1e9)
         self.ref_line_x_spin.setValue(0.0)
         self.ref_line_x_spin.setSingleStep(0.1)
-        self.ref_line_x_spin.setToolTip("X-axis position for vertical line")
         v_layout.addWidget(self.ref_line_x_spin)
         v_layout.addStretch()
         self.ref_line_params_stack.addWidget(v_page)
@@ -106,111 +104,107 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_slope_spin = QDoubleSpinBox()
         self.ref_line_slope_spin.setRange(-1e6, 1e6)
         self.ref_line_slope_spin.setValue(1.0)
-        self.ref_line_slope_spin.setSingleStep(0.1)
-        self.ref_line_slope_spin.setToolTip("Slope for diagonal line (axline)")
         d_layout.addWidget(self.ref_line_slope_spin)
-
         d_layout.addWidget(QLabel("Intercept:"))
         self.ref_line_intercept_spin = QDoubleSpinBox()
         self.ref_line_intercept_spin.setRange(-1e9, 1e9)
         self.ref_line_intercept_spin.setValue(0.0)
-        self.ref_line_intercept_spin.setSingleStep(0.1)
-        self.ref_line_intercept_spin.setToolTip("Y-intercept for diagonal line (axline)")
         d_layout.addWidget(self.ref_line_intercept_spin)
         d_layout.addStretch()
         self.ref_line_params_stack.addWidget(d_page)
 
-        editor_layout.addWidget(self.ref_line_params_stack)
+        lines_editor.addWidget(self.ref_line_params_stack, 1, 0, 1, 4)
 
-        # Styling layout
-        style_layout = QGridLayout()
-
-        style_layout.addWidget(QLabel("Color:"), 0, 0)
+        lines_editor.addWidget(QLabel("Color:"), 2, 0)
         color_box = QHBoxLayout()
         color_box.setContentsMargins(0, 0, 0, 0)
         self.ref_line_color_button = QPushButton("Choose", parent=self)
         self.ref_line_color_label = QLabel("Black")
         color_box.addWidget(self.ref_line_color_button)
         color_box.addWidget(self.ref_line_color_label)
-        style_layout.addLayout(color_box, 0, 1)
+        lines_editor.addLayout(color_box, 2, 1)
 
-        style_layout.addWidget(QLabel("Line Style:"), 0, 2)
+        lines_editor.addWidget(QLabel("Style:"), 2, 2)
         self.ref_line_style_combo = QComboBox()
         self.ref_line_style_combo.addItems(["solid", "dashed", "dashdot", "dotted"])
-        self.ref_line_style_combo.setToolTip("Line style for the reference line")
-        style_layout.addWidget(self.ref_line_style_combo, 0, 3)
+        lines_editor.addWidget(self.ref_line_style_combo, 2, 3)
 
-        style_layout.addWidget(QLabel("Line Width:"), 1, 0)
+        lines_editor.addWidget(QLabel("Width:"), 3, 0)
         self.ref_line_width_spin = QDoubleSpinBox()
         self.ref_line_width_spin.setRange(0.1, 20.0)
         self.ref_line_width_spin.setValue(1.5)
         self.ref_line_width_spin.setSingleStep(0.1)
-        self.ref_line_width_spin.setToolTip("Line width in points")
-        style_layout.addWidget(self.ref_line_width_spin, 1, 1)
+        lines_editor.addWidget(self.ref_line_width_spin, 3, 1)
 
-        style_layout.addWidget(QLabel("Alpha:"), 1, 2)
+        lines_editor.addWidget(QLabel("Alpha:"), 3, 2)
         self.ref_line_alpha_spin = QDoubleSpinBox()
         self.ref_line_alpha_spin.setRange(0.0, 1.0)
         self.ref_line_alpha_spin.setValue(1.0)
         self.ref_line_alpha_spin.setSingleStep(0.1)
-        self.ref_line_alpha_spin.setToolTip("Transparency level (0=transparent, 1=opaque)")
-        style_layout.addWidget(self.ref_line_alpha_spin, 1, 3)
+        lines_editor.addWidget(self.ref_line_alpha_spin, 3, 3)
 
-        editor_layout.addLayout(style_layout)
+        lines_editor.addWidget(QLabel("Z-Order:"), 4, 0)
+        self.ref_line_zorder_spin = QSpinBox()
+        self.ref_line_zorder_spin.setRange(-100, 100)
+        self.ref_line_zorder_spin.setValue(10)
+        self.ref_line_zorder_spin.setToolTip("Higher values draw on top of lower values.")
+        lines_editor.addWidget(self.ref_line_zorder_spin, 4, 1)
 
-        label_layout = QHBoxLayout()
-        label_layout.addWidget(QLabel("Label:"))
+        lines_editor.addWidget(QLabel("Label:"), 5, 0)
         self.ref_line_label_input = QLineEdit()
         self.ref_line_label_input.setPlaceholderText("Optional label for legend")
-        self.ref_line_label_input.setToolTip("Label for the reference line (appears in legend if enabled)")
-        label_layout.addWidget(self.ref_line_label_input)
-        editor_layout.addLayout(label_layout)
+        lines_editor.addWidget(self.ref_line_label_input, 5, 1, 1, 3)
 
-        update_buttons_layout = QHBoxLayout()
-        self.update_ref_line_button = QPushButton("Update Line")
+        lines_layout.addLayout(lines_editor)
+
+        line_edit_actions = QHBoxLayout()
+        self.deselect_ref_line_button = QPushButton("Cancel / Deselect")
+        self.deselect_ref_line_button.setEnabled(False)
+        self.update_ref_line_button = QPushButton("Apply Changes")
         self.update_ref_line_button.setObjectName("MainActionButton")
-        self.update_ref_line_button.setToolTip("Update the selected reference line with current settings")
         self.update_ref_line_button.setEnabled(False)
-        update_buttons_layout.addWidget(self.update_ref_line_button)
 
-        self.delete_ref_line_button = QPushButton("Delete Line")
-        self.delete_ref_line_button.setObjectName("DestructiveButton")
-        self.delete_ref_line_button.setToolTip("Delete the selected reference line")
-        self.delete_ref_line_button.setEnabled(False)
-        update_buttons_layout.addWidget(self.delete_ref_line_button)
+        line_edit_actions.addWidget(self.deselect_ref_line_button)
+        line_edit_actions.addWidget(self.update_ref_line_button)
+        lines_layout.addLayout(line_edit_actions)
 
-        editor_layout.addLayout(update_buttons_layout)
-        editor_group.setLayout(editor_layout)
-        lines_layout.addWidget(editor_group)
         tabs.addTab(lines_tab, "Lines")
 
         # Spans Tab
         spans_tab = QWidget()
         spans_layout = QVBoxLayout(spans_tab)
 
+        active_label_span = QLabel("Active Spans:")
+        spans_layout.addWidget(active_label_span)
         self.reference_spans_list = QListWidget()
         self.reference_spans_list.setToolTip("List of active reference spans on the plot")
         spans_layout.addWidget(self.reference_spans_list)
 
-        span_buttons_layout = QHBoxLayout()
-        self.add_ref_span_button = QPushButton("Add Horizontal Span")
+        spans_toolbar = QHBoxLayout()
+        self.add_ref_span_button = QPushButton("+ Add New Span")
         self.add_ref_span_button.setObjectName("MainActionButton")
-        span_buttons_layout.addWidget(self.add_ref_span_button)
-        spans_layout.addLayout(span_buttons_layout)
 
-        self.clear_ref_spans_button = QPushButton("Clear All Reference Spans")
+        self.delete_ref_span_button = QPushButton("- Delete Selected")
+        self.delete_ref_span_button.setObjectName("DestructiveButton")
+        self.delete_ref_span_button.setEnabled(False)
+
+        self.clear_ref_spans_button = QPushButton("Clear All")
         self.clear_ref_spans_button.setObjectName("DestructiveButton")
-        spans_layout.addWidget(self.clear_ref_spans_button)
 
-        span_editor_group = QGroupBox("Edit Selected Reference Span")
-        span_editor_layout = QVBoxLayout()
+        spans_toolbar.addWidget(self.add_ref_span_button)
+        spans_toolbar.addWidget(self.delete_ref_span_button)
+        spans_toolbar.addWidget(self.clear_ref_spans_button)
+        spans_layout.addLayout(spans_toolbar)
 
-        span_type_layout = QHBoxLayout()
-        span_type_layout.addWidget(QLabel("Type:"))
+        spans_layout.addSpacing(10)
+        spans_layout.addWidget(QLabel("<b>Span Properties</b>"))
+
+        spans_editor = QGridLayout()
+
+        spans_editor.addWidget(QLabel("Type:"), 0, 0)
         self.ref_span_type_combo = QComboBox()
         self.ref_span_type_combo.addItems(["Horizontal (axhspan)", "Vertical (axvspan)"])
-        span_type_layout.addWidget(self.ref_span_type_combo)
-        span_editor_layout.addLayout(span_type_layout)
+        spans_editor.addWidget(self.ref_span_type_combo, 0, 1, 1, 3)
 
         self.ref_span_params_stack = QStackedWidget()
 
@@ -244,53 +238,52 @@ class AnnotationsSettingsTab(QWidget):
         span_v_layout.addWidget(self.ref_span_xmax_spin)
         self.ref_span_params_stack.addWidget(span_v_page)
 
-        span_editor_layout.addWidget(self.ref_span_params_stack)
+        spans_editor.addWidget(self.ref_span_params_stack, 1, 0, 1, 4)
 
-        span_style_layout = QGridLayout()
-        span_style_layout.addWidget(QLabel("Color:"), 0, 0)
+        spans_editor.addWidget(QLabel("Color:"), 2, 0)
         span_color_box = QHBoxLayout()
         span_color_box.setContentsMargins(0, 0, 0, 0)
         self.ref_span_color_button = QPushButton("Choose", parent=self)
         self.ref_span_color_label = QLabel("blue")
         span_color_box.addWidget(self.ref_span_color_button)
         span_color_box.addWidget(self.ref_span_color_label)
-        span_style_layout.addLayout(span_color_box, 0, 1)
+        spans_editor.addLayout(span_color_box, 2, 1)
 
-        span_style_layout.addWidget(QLabel("Alpha:"), 0, 2)
+        spans_editor.addWidget(QLabel("Alpha:"), 2, 2)
         self.ref_span_alpha_spin = QDoubleSpinBox()
         self.ref_span_alpha_spin.setRange(0.0, 1.0)
         self.ref_span_alpha_spin.setValue(0.3)
         self.ref_span_alpha_spin.setSingleStep(0.1)
-        span_style_layout.addWidget(self.ref_span_alpha_spin, 0, 3)
+        spans_editor.addWidget(self.ref_span_alpha_spin, 2, 3)
 
-        span_editor_layout.addLayout(span_style_layout)
+        spans_editor.addWidget(QLabel("Z-Order:"), 3, 0)
+        self.ref_span_zorder_spin = QSpinBox()
+        self.ref_span_zorder_spin.setRange(-100, 100)
+        self.ref_span_zorder_spin.setValue(-1)
+        self.ref_span_zorder_spin.setToolTip("Background spans should use negative Z-Order")
+        spans_editor.addWidget(self.ref_span_zorder_spin, 3, 1)
 
-        span_label_layout = QHBoxLayout()
-        span_label_layout.addWidget(QLabel("Label:"))
+        spans_editor.addWidget(QLabel("Label:"), 4, 0)
         self.ref_span_label_input = QLineEdit()
         self.ref_span_label_input.setPlaceholderText("Optional label for legend")
-        span_label_layout.addWidget(self.ref_span_label_input)
-        span_editor_layout.addLayout(span_label_layout)
+        spans_editor.addWidget(self.ref_span_label_input, 4, 1, 1, 3)
 
-        span_update_buttons_layout = QHBoxLayout()
-        self.update_ref_span_button = QPushButton("Update Span")
+        spans_layout.addLayout(spans_editor)
+
+        span_edit_actions = QHBoxLayout()
+        self.deselect_ref_span_button = QPushButton("Cancel / Deselect")
+        self.deselect_ref_span_button.setEnabled(False)
+        self.update_ref_span_button = QPushButton("Apply Changes")
         self.update_ref_span_button.setObjectName("MainActionButton")
         self.update_ref_span_button.setEnabled(False)
-        span_update_buttons_layout.addWidget(self.update_ref_span_button)
 
-        self.delete_ref_span_button = QPushButton("Delete Span")
-        self.delete_ref_span_button.setObjectName("DestructiveButton")
-        self.delete_ref_span_button.setEnabled(False)
-        span_update_buttons_layout.addWidget(self.delete_ref_span_button)
+        span_edit_actions.addWidget(self.deselect_ref_span_button)
+        span_edit_actions.addWidget(self.update_ref_span_button)
+        spans_layout.addLayout(span_edit_actions)
 
-        span_editor_layout.addLayout(span_update_buttons_layout)
-        span_editor_group.setLayout(span_editor_layout)
-        spans_layout.addWidget(span_editor_group)
         tabs.addTab(spans_tab, "Spans")
 
-        layout.addWidget(tabs)
-        group.setLayout(layout)
-        parent_layout.addWidget(group)
+        parent_layout.addWidget(tabs)
 
     def _setup_annotation_tools_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Annotation Tools")

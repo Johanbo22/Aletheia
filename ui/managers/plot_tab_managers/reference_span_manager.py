@@ -34,6 +34,7 @@ class ReferenceSpanManager:
         self.view.annotations_tab.reference_spans_list.itemClicked.connect(self.on_reference_span_selected)
         self.view.annotations_tab.update_ref_span_button.clicked.connect(self.update_selected_reference_span)
         self.view.annotations_tab.delete_ref_span_button.clicked.connect(self.delete_selected_reference_span)
+        self.view.annotations_tab.deselect_ref_span_button.clicked.connect(self.deselect_reference_span)
 
         self.view.annotations_tab.ref_span_color_button.clicked.connect(self.choose_ref_span_color)
         self.view.annotations_tab.ref_span_type_combo.currentTextChanged.connect(self.on_ref_span_type_changed)
@@ -57,11 +58,13 @@ class ReferenceSpanManager:
         """Adds a reference span based on the current selected type"""
         ref_span_type_text = self.view.annotations_tab.ref_span_type_combo.currentText()
         alpha = self.view.annotations_tab.ref_span_alpha_spin.value()
+        zorder = self.view.annotations_tab.ref_span_zorder_spin.value()
         label = self.view.annotations_tab.ref_span_label_input.text().strip() or None
 
         ref_span_data: Dict[str, Any] = {
             "color": self.ref_span_color,
             "alpha": alpha,
+            "zorder": zorder,
             "label": label,
         }
 
@@ -102,7 +105,19 @@ class ReferenceSpanManager:
 
             self.view.annotations_tab.update_ref_span_button.setEnabled(True)
             self.view.annotations_tab.delete_ref_span_button.setEnabled(True)
+            self.view.annotations_tab.deselect_ref_span_button.setEnabled(True)
+            self.view.annotations_tab.add_ref_span_button.setEnabled(False)
             self.status_bar.log(f"Selected reference span: {ref_span['type']}")
+
+    def deselect_reference_span(self) -> None:
+        """Deselects the current span and returns the UI to creation mode"""
+        self.view.annotations_tab.reference_spans_list.clearSelection()
+        self.selected_ref_span_index = -1
+        self.view.annotations_tab.update_ref_span_button.setEnabled(False)
+        self.view.annotations_tab.delete_ref_span_button.setEnabled(False)
+        self.view.annotations_tab.deselect_ref_span_button.setEnabled(False)
+        self.view.annotations_tab.add_ref_span_button.setEnabled(True)
+        self.status_bar.log("Deselected Reference span")
 
     def _populate_editor_from_ref_span(self, ref_span: Dict[str, Any]) -> None:
         """Populates the editor UI with the selected reference span's properties"""
@@ -124,6 +139,7 @@ class ReferenceSpanManager:
 
         self.view.annotations_tab.ref_span_alpha_spin.setValue(ref_span.get("alpha", 0.3))
         self.view.annotations_tab.ref_span_label_input.setText(ref_span.get("label", "") or "")
+        self.view.annotations_tab.ref_span_zorder_spin.setValue(ref_span.get("zorder", -1))
 
     def update_selected_reference_span(self) -> None:
         """Updates the selected reference span with new properties"""
@@ -141,6 +157,7 @@ class ReferenceSpanManager:
             "type": new_type,
             "color": self.ref_span_color,
             "alpha": self.view.annotations_tab.ref_span_alpha_spin.value(),
+            "zorder": self.view.annotations_tab.ref_span_zorder_spin.value(),
             "label": label
         }
 
@@ -217,8 +234,9 @@ class ReferenceSpanManager:
         for i, ref_span in enumerate(self.reference_spans):
             span_type = ref_span["type"]
             kwargs = {
-                "color": ref_span.get("color", "blue"),
+                "facecolor": ref_span.get("color", "blue"),
                 "alpha": ref_span.get("alpha", 0.3),
+                "zorder": ref_span.get("zorder", -1),
                 "label": ref_span.get("label"),
                 "gid": f"ref_span_{i}",
                 "edgecolor": "none"
