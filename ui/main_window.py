@@ -439,12 +439,18 @@ class MainWindow(QWidget):
             self.autosave_indicator.move(self.rect().width() - self.autosave_indicator.width() - 20, 20)
     
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
-        """Handle the drag event for filre imports"""
+        """
+        Handle the drag enter event for file imports and project loading
+        """
         if event.mimeData().hasUrls():
             urls = event.mimeData().urls()
             if urls and urls[0].isLocalFile():
                 filepath = Path(urls[0].toLocalFile())
                 valid_extensions = {".csv", ".xlsx", ".xls", ".txt", ".json", ".geojson", ".shp", ".gpkg"}
+
+                project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+                valid_extensions.add(project_ext)
+
                 if filepath.suffix.lower() in valid_extensions:
                     event.accept()
                     return
@@ -455,7 +461,13 @@ class MainWindow(QWidget):
         urls = event.mimeData().urls()
         if urls and urls[0].isLocalFile():
             filepath = urls[0].toLocalFile()
-            self.load_file_from_path(filepath)
+            path_obj = Path(filepath)
+            project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+
+            if path_obj.suffix.lower() == project_ext:
+                self._load_project_from_path(filepath)
+            else:
+                self.load_file_from_path(filepath)
     
     def load_file_from_path(self, filepath: str) -> None:
         """Process and import file from a path string"""
