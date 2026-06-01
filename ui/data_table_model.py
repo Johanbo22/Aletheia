@@ -84,7 +84,10 @@ class DataTableModel(QAbstractTableModel):
         }
         for rule in rules:
             op_str: str = rule.get("operator", "")
-            target: float = rule.get("value", 0.0)
+            try:
+                target: float = float(rule.get("operator", 0.0))
+            except (ValueError, TypeError):
+                target = 0.0
             color_hex: str = rule.get("color", "#000000")
             
             op_func = op_map.get(op_str)
@@ -374,8 +377,8 @@ class DataTableModel(QAbstractTableModel):
         return None
     
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
-        """data ypdater"""
-        if not index.isValid() or role != Qt.ItemDataRole.EditRole or not self.editable:
+        """Data Updater"""
+        if not index.isValid() or not self.editable:
             return False
         
         if role == Qt.ItemDataRole.CheckStateRole:
@@ -538,6 +541,7 @@ class DataTableModel(QAbstractTableModel):
 
             self.data_handler.sort_data(col_name, ascending)
             self._data = self.data_handler.df
+            self.highlighted_rows.clear()
             self._update_column_alignments()
         except Exception as SortError:
             print(f"Error sorting data: {str(SortError)}")

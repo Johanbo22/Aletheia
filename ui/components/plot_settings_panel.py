@@ -702,7 +702,7 @@ class PlotSettingsPanel(QWidget):
                         has_match = True
                         break
                     
-                    if hasattr(self, "text") and callable(child.text):
+                    if hasattr(child, "text") and callable(child.text):
                         child_text = child.text()
                         if isinstance(child_text, str) and search_text in child_text.lower():
                             has_match = True

@@ -207,6 +207,10 @@ class MainWindow(QWidget):
         
         if isinstance(recent_files, str):
             recent_files = [recent_files]
+        elif isinstance(recent_files, tuple):
+            recent_files = list[recent_files]
+        elif isinstance(recent_files, list):
+            recent_files = []
         
         standardized_path = str(Path(filepath).absolute())
         
@@ -647,12 +651,14 @@ class MainWindow(QWidget):
         is_temp = source_info.get("is_temp_file", False)
 
         if not data_filepath:
-            QMessageBox.warning(
+            reply = QMessageBox.question(
                 self,
-                "Warning",
-                "No data source filepath found"
+                "No data file",
+                "No local data source file was found. The exported script may lack a direct file-loading step. Continue anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
             )
-            return
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
         
         if is_temp:
             if QMessageBox.question(
@@ -730,9 +736,10 @@ class MainWindow(QWidget):
         dialog = ExportDialog(self, data_handler=self.data_handler, selected_rows=selected_rows, selected_columns=selected_cols)
         if dialog.exec():
             config = dialog.get_export_config()
-            if config["filepath"]:
+            if config["filepath"] or config.get("to_clipboard", False):
                 try:
-                    self.status_bar.log(f"Export complete to {config['filepath']}")
+                    target_name = "Clipboard" if config.get("to_clipboard", False) else config.get("filepath")
+                    self.status_bar.log(f"Export complete to {target_name}")
                     if not config.get("to_clipboard", False):
                         self.export_animation = ExportFileAnimation(parent=self, message="Export complete", extension=config["format"])
                         self.export_animation.start(target_widget=self)
@@ -771,6 +778,9 @@ class MainWindow(QWidget):
                     self.status_bar.log_action("Exported data to Google Sheets", level="SUCCESS", details={"sheet_id": sheet_id})
             
             except Exception as ExportSheetsError:
+                if self.progress_dialog:
+                    self.progress_dialog.accept()
+                    self.progress_dialog = None
                 QMessageBox.critical(self, "Export Error", f"An error occurred during export:\n\n{str(ExportSheetsError)}")
                 traceback.print_exc()
             finally:

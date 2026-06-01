@@ -259,17 +259,20 @@ class PlotDataPrepWorker(QRunnable):
         if data.dtype == "object":
             if data.empty:
                 return False
-            sample_val = data.dropna().head(1)
-            if sample_val.empty:
+
+            sample_vals = data.dropna().head(3)
+            if sample_vals.empty:
                 return False
-            val = sample_val.iloc[0]
-            if not isinstance(val, str):
-                return False
-            try:
-                pd.to_datetime(val, utc=True)
-                return True
-            except (ValueError, TypeError):
-                return False
+            for val in sample_vals:
+                if not isinstance(val, str):
+                    return False
+                if val.replace(".", "", 1).isdigit():
+                    return False
+                try:
+                    pd.to_datetime(val, utc=True)
+                except (ValueError, TypeError):
+                    return False
+            return True
         return False
     
     @pyqtSlot()
@@ -290,7 +293,7 @@ class PlotDataPrepWorker(QRunnable):
 
             if len(processed_df) > MAX_PLOT_POINTS and self.plot_type in PLOTS_TO_SAMPLE:
                 self.signals.log.emit(f"Dataset is too large ({len(processed_df)} rows) for '{self.plot_type}'. Plotting a random sample of {MAX_PLOT_POINTS:,} points.")
-                processed_df = processed_df.sample(n=MAX_PLOT_POINTS, random_state=42)
+                processed_df = processed_df.sample(n=MAX_PLOT_POINTS, random_state=42).sort_index()
             
             self.signals.progress.emit(75, "Converting datetime columns...")
             if self.x_col and self.x_col in processed_df.columns:

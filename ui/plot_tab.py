@@ -588,6 +588,7 @@ class PlotTab(PlotTabUI):
         
         if target_index == -1:
             self.status_bar.log(f"Cannot activate subset: Subset '{subset_name}' not found", "WARNING")
+            return
 
         self.view.use_subset_check.setChecked(True)
         self.view.subset_combo.setCurrentIndex(target_index)
@@ -633,7 +634,7 @@ class PlotTab(PlotTabUI):
     def get_active_dataframe(self):
         """Get the active dataframe (full dataset or selected subset)"""
         # Check if subset UI exists
-        if not hasattr(self, 'use_subset_check') or not hasattr(self, 'subset_combo'):
+        if not hasattr(self.view, 'use_subset_check') or not hasattr(self.view, 'subset_combo'):
             return self.data_handler.df
         
         # Check if user wants to use subset
@@ -1100,6 +1101,9 @@ class PlotTab(PlotTabUI):
         self.view.secondary_y_column.blockSignals(False)
         self.view.y_columns_list.blockSignals(False)
         self.view.auto_annotate_col_combo.blockSignals(False)
+
+        if current_x != self.view.x_column.currentText() or current_y != self.view.y_column.currentText():
+            self.on_data_changed()
     
     def toggle_table_controls(self):
         """Enable and disable table controls for the user"""
@@ -1668,6 +1672,10 @@ class PlotTab(PlotTabUI):
 
             if animate:
                 PlotGeneratedAnimation(parent=self, message="Plot Generated").start(target_widget=self)
+        except InterruptedError:
+            self.status_bar.log(f"Plot generation cancelled", "INFO")
+            if progress_dialog:
+                progress_dialog.accept()
         except Exception as CreateMainPlotError:
             if progress_dialog:
                 progress_dialog.accept()
