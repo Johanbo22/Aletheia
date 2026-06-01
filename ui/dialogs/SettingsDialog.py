@@ -1,7 +1,9 @@
-from ui.widgets import ToggleSwitch
-from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayout, QLabel, QTabWidget, QVBoxLayout, QWidget, QSpinBox
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayout, QLabel, QSpinBox, \
+    QTabWidget, QVBoxLayout, QWidget
+from PyQt6.QtGui import QFont
+
 from ui.icons import IconBuilder, IconType
+from ui.widgets import ToggleSwitch
 
 class SettingsDialog(QDialog):
     """Application settings dialog"""
@@ -17,6 +19,26 @@ class SettingsDialog(QDialog):
         settings_layout = QVBoxLayout(self)
 
         setting_tabs = QTabWidget()
+
+        general_tab = QWidget()
+        general_layout = QFormLayout(general_tab)
+        general_layout.setSpacing(15)
+
+        self.autosave_check = ToggleSwitch("Enable Autosave")
+        self.autosave_check.setChecked(self.current_settings.get("enable_autosave", True))
+        self.autosave_check.setToolTip("Automatically save the project at set intervals")
+        general_layout.addRow(QLabel("Autosave:"), self.autosave_check)
+
+        self.autosave_interval_spin = QSpinBox()
+        self.autosave_interval_spin.setRange(1, 120)
+        self.autosave_interval_spin.setSuffix(" minutes")
+        self.autosave_interval_spin.setValue(self.current_settings.get("autosave_interval", 5))
+        self.autosave_interval_spin.setEnabled(self.autosave_check.isChecked())
+
+        self.autosave_check.toggled.connect(self.autosave_interval_spin.setEnabled)
+        general_layout.addRow(QLabel("Autosave Interval:"), self.autosave_interval_spin)
+
+        setting_tabs.addTab(general_tab, IconBuilder.build(IconType.Settings), "General")
 
         appearance_tab = QWidget()
         appearance_layout = QFormLayout()
@@ -51,6 +73,8 @@ class SettingsDialog(QDialog):
 
     def get_settings(self):# -> dict[str, Any]:
         return {
+            "enable_autosave"  : self.autosave_check.isChecked(),
+            "autosave_interval": self.autosave_interval_spin.value(),
             "dark_mode": self.dark_mode_check.isChecked(),
             "font_family": self.font_combo.currentFont().family(),
             "font_size": self.font_size_spin.value()

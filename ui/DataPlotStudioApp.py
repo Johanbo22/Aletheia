@@ -62,7 +62,9 @@ class DataPlotStudio(QMainWindow):
         self.settings = {
             "dark_mode": app_settings.value("dark_mode", False, type=bool),
             "font_family": app_settings.value("font_family", "Consolas", type=str),
-            "font_size": app_settings.value("font_size", 10, type=int)
+            "font_size": app_settings.value("font_size", 10, type=int),
+            "enable_autosave"  : app_settings.value("enable_autosave", True, type=bool),
+            "autosave_interval": app_settings.value("autosave_interval", 5, type=int),
         }
         self.apply_settings(self.settings)
 
@@ -324,6 +326,7 @@ class DataPlotStudio(QMainWindow):
         if not self._current_settings:
             return
         self.apply_settings(self._current_settings)
+        self.main_widget.apply_autosave_settings(self._current_settings)
         self.status_bar_widget.log("Styles reloaded", "INFO")
     
     def get_dark_theme(self):

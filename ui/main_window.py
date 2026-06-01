@@ -59,6 +59,20 @@ class MainWindow(QWidget):
         self.autosave_indicator = AutosaveIndicator(self)
         
         QTimer.singleShot(0, self._check_recovery)
+
+    def apply_autosave_settings(self, settings: dict) -> None:
+        """
+        Applies system-level configurations related to autosaving to the main loop
+        """
+        self.autosave_enabled = settings.get("enable_autosave", True)
+        interval_minutes = settings.get("autosave_interval", 5)
+
+        self.autosave_interval_ms = interval_minutes * 60 * 1000
+        if self.autosave_enabled:
+            self.autosave_timer.start(self.autosave_interval_ms)
+        else:
+            self.autosave_timer.stop()
+            self.project_manager.cleanup_autosave()
     
     def init_ui(self) -> None:
         """Init the main ui"""
@@ -133,6 +147,8 @@ class MainWindow(QWidget):
         """
         Executes the autosave if there are unsaved changes
         """
+        if not self.autosave_enabled:
+            return
         if self.unsaved_changes and self.data_handler.df is not None:
             self.autosave_indicator.show_indicator()
             QApplication.processEvents()

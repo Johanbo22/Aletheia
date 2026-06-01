@@ -89,6 +89,7 @@ class IconType(Enum):
     Menu = auto()
     AppIcon = auto()
     Connect = auto()
+    BugReport = auto()
 
 @lru_cache(maxsize=1)
 def _load_icon_database() -> dict[str, str | list[str]]:
