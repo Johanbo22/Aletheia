@@ -49,7 +49,7 @@ class ReferenceLineManager:
             options=QColorDialog.ColorDialogOption.ShowAlphaChannel
         )
         if color.isValid():
-            self.ref_line_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
+            self.ref_line_color = color.name()
             self.view.ref_line_color_label.setText(self.ref_line_color)
             ColorManager.update_button_color_swatch(self.view.ref_line_color_button, QColor(self.ref_line_color))
             
@@ -228,7 +228,7 @@ class ReferenceLineManager:
 
         lines_to_remove = []
         for child in self.plot_engine.current_ax.get_children():
-            gid = getattr(child, "_gid", None)
+            gid = child.get_gid()
             if gid and str(gid).startswith("ref_line"):
                 lines_to_remove.append(child)
 

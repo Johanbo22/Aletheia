@@ -32,12 +32,18 @@ class AnnotationsSettingsTab(QWidget):
         main_layout.addWidget(scroll)
 
     def _setup_reference_lines_group(self, parent_layout: QVBoxLayout) -> None:
-        group = QGroupBox("Reference Lines")
+        group = QGroupBox("Reference Annotations")
         layout = QVBoxLayout()
+
+        tabs = QTabWidget()
+
+        # First a tab with the ReferenceLines
+        lines_tab = QWidget()
+        lines_layout = QVBoxLayout(lines_tab)
 
         self.reference_lines_list = QListWidget()
         self.reference_lines_list.setToolTip("List of active reference lines on the plot")
-        layout.addWidget(self.reference_lines_list)
+        lines_layout.addWidget(self.reference_lines_list)
 
         ref_buttons_layout = QHBoxLayout()
 
@@ -46,12 +52,12 @@ class AnnotationsSettingsTab(QWidget):
         self.add_ref_line_button.setToolTip("Add a reference line based on the selected type below")
         ref_buttons_layout.addWidget(self.add_ref_line_button)
 
-        layout.addLayout(ref_buttons_layout)
+        lines_layout.addLayout(ref_buttons_layout)
 
         self.clear_ref_lines_button = QPushButton("Clear All Reference Lines")
         self.clear_ref_lines_button.setObjectName("DestructiveButton")
         self.clear_ref_lines_button.setToolTip("Remove all reference lines from the plot")
-        layout.addWidget(self.clear_ref_lines_button)
+        lines_layout.addWidget(self.clear_ref_lines_button)
 
         # Editor
         editor_group = QGroupBox("Edit Selected Reference Lines")
@@ -175,7 +181,114 @@ class AnnotationsSettingsTab(QWidget):
 
         editor_layout.addLayout(update_buttons_layout)
         editor_group.setLayout(editor_layout)
-        layout.addWidget(editor_group)
+        lines_layout.addWidget(editor_group)
+        tabs.addTab(lines_tab, "Lines")
+
+        # Spans Tab
+        spans_tab = QWidget()
+        spans_layout = QVBoxLayout(spans_tab)
+
+        self.reference_spans_list = QListWidget()
+        self.reference_spans_list.setToolTip("List of active reference spans on the plot")
+        spans_layout.addWidget(self.reference_spans_list)
+
+        span_buttons_layout = QHBoxLayout()
+        self.add_ref_span_button = QPushButton("Add Horizontal Span")
+        self.add_ref_span_button.setObjectName("MainActionButton")
+        span_buttons_layout.addWidget(self.add_ref_span_button)
+        spans_layout.addLayout(span_buttons_layout)
+
+        self.clear_ref_spans_button = QPushButton("Clear All Reference Spans")
+        self.clear_ref_spans_button.setObjectName("DestructiveButton")
+        spans_layout.addWidget(self.clear_ref_spans_button)
+
+        span_editor_group = QGroupBox("Edit Selected Reference Span")
+        span_editor_layout = QVBoxLayout()
+
+        span_type_layout = QHBoxLayout()
+        span_type_layout.addWidget(QLabel("Type:"))
+        self.ref_span_type_combo = QComboBox()
+        self.ref_span_type_combo.addItems(["Horizontal (axhspan)", "Vertical (axvspan)"])
+        span_type_layout.addWidget(self.ref_span_type_combo)
+        span_editor_layout.addLayout(span_type_layout)
+
+        self.ref_span_params_stack = QStackedWidget()
+
+        span_h_page = QWidget()
+        span_h_layout = QHBoxLayout(span_h_page)
+        span_h_layout.setContentsMargins(0, 0, 0, 0)
+        span_h_layout.addWidget(QLabel("Y Min:"))
+        self.ref_span_ymin_spin = QDoubleSpinBox()
+        self.ref_span_ymin_spin.setRange(-1e9, 1e9)
+        self.ref_span_ymin_spin.setValue(0.0)
+        span_h_layout.addWidget(self.ref_span_ymin_spin)
+        span_h_layout.addWidget(QLabel("Y Max:"))
+        self.ref_span_ymax_spin = QDoubleSpinBox()
+        self.ref_span_ymax_spin.setRange(-1e9, 1e9)
+        self.ref_span_ymax_spin.setValue(1.0)
+        span_h_layout.addWidget(self.ref_span_ymax_spin)
+        self.ref_span_params_stack.addWidget(span_h_page)
+
+        span_v_page = QWidget()
+        span_v_layout = QHBoxLayout(span_v_page)
+        span_v_layout.setContentsMargins(0, 0, 0, 0)
+        span_v_layout.addWidget(QLabel("X Min:"))
+        self.ref_span_xmin_spin = QDoubleSpinBox()
+        self.ref_span_xmin_spin.setRange(-1e9, 1e9)
+        self.ref_span_xmin_spin.setValue(0.0)
+        span_v_layout.addWidget(self.ref_span_xmin_spin)
+        span_v_layout.addWidget(QLabel("X Max:"))
+        self.ref_span_xmax_spin = QDoubleSpinBox()
+        self.ref_span_xmax_spin.setRange(-1e9, 1e9)
+        self.ref_span_xmax_spin.setValue(1.0)
+        span_v_layout.addWidget(self.ref_span_xmax_spin)
+        self.ref_span_params_stack.addWidget(span_v_page)
+
+        span_editor_layout.addWidget(self.ref_span_params_stack)
+
+        span_style_layout = QGridLayout()
+        span_style_layout.addWidget(QLabel("Color:"), 0, 0)
+        span_color_box = QHBoxLayout()
+        span_color_box.setContentsMargins(0, 0, 0, 0)
+        self.ref_span_color_button = QPushButton("Choose", parent=self)
+        self.ref_span_color_label = QLabel("blue")
+        span_color_box.addWidget(self.ref_span_color_button)
+        span_color_box.addWidget(self.ref_span_color_label)
+        span_style_layout.addLayout(span_color_box, 0, 1)
+
+        span_style_layout.addWidget(QLabel("Alpha:"), 0, 2)
+        self.ref_span_alpha_spin = QDoubleSpinBox()
+        self.ref_span_alpha_spin.setRange(0.0, 1.0)
+        self.ref_span_alpha_spin.setValue(0.3)
+        self.ref_span_alpha_spin.setSingleStep(0.1)
+        span_style_layout.addWidget(self.ref_span_alpha_spin, 0, 3)
+
+        span_editor_layout.addLayout(span_style_layout)
+
+        span_label_layout = QHBoxLayout()
+        span_label_layout.addWidget(QLabel("Label:"))
+        self.ref_span_label_input = QLineEdit()
+        self.ref_span_label_input.setPlaceholderText("Optional label for legend")
+        span_label_layout.addWidget(self.ref_span_label_input)
+        span_editor_layout.addLayout(span_label_layout)
+
+        span_update_buttons_layout = QHBoxLayout()
+        self.update_ref_span_button = QPushButton("Update Span")
+        self.update_ref_span_button.setObjectName("MainActionButton")
+        self.update_ref_span_button.setEnabled(False)
+        span_update_buttons_layout.addWidget(self.update_ref_span_button)
+
+        self.delete_ref_span_button = QPushButton("Delete Span")
+        self.delete_ref_span_button.setObjectName("DestructiveButton")
+        self.delete_ref_span_button.setEnabled(False)
+        span_update_buttons_layout.addWidget(self.delete_ref_span_button)
+
+        span_editor_layout.addLayout(span_update_buttons_layout)
+        span_editor_group.setLayout(span_editor_layout)
+        spans_layout.addWidget(span_editor_group)
+        tabs.addTab(spans_tab, "Spans")
+
+        layout.addWidget(tabs)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 

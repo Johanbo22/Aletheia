@@ -1034,6 +1034,42 @@ class CodeExporter:
 
         return lines
 
+    def _generate_reference_spans(self, config: Dict[str, Any]) -> List[str]:
+        """Generates code for reference spans (axhspan, axvspan)"""
+        lines = []
+        ref_spans = self._get_cfg(config, "annotations.reference_spans", [])
+        if not ref_spans:
+            return lines
+
+        lines.append("\n    # --- Reference Spans ---")
+
+        for i, ref_span in enumerate(ref_spans):
+            span_type = ref_span.get("type", "hspan")
+
+            kwargs = {
+                "color": self._clean_value(ref_span.get("color", "blue")),
+                "alpha": ref_span.get("alpha", 0.3),
+                "gid"  : f"ref_span_{i}",
+                "edgecolor": "'none'"
+            }
+
+            label = ref_span.get("label")
+            if label:
+                kwargs["label"] = self._clean_value(label)
+
+            kwargs_str = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+
+            if span_type == "hspan":
+                ymin = ref_span.get("ymin", 0.0)
+                ymax = ref_span.get("ymax", 1.0)
+                lines.append(f"    ax.axhspan({ymin}, {ymax}, {kwargs_str})")
+            elif span_type == "vspan":
+                xmin = ref_span.get("xmin", 0.0)
+                xmax = ref_span.get("xmax", 1.0)
+                lines.append(f"    ax.axvspan({xmin}, {xmax}, {kwargs_str})")
+
+        return lines
+
     def _generate_legend(self, config: Dict[str, Any]) -> List[str]:
         """Generate legend configuration."""
         lines = []
@@ -1183,6 +1219,7 @@ class CodeExporter:
         lines.extend(self._generate_axes_config(plot_config))
         lines.extend(self._generate_legend(plot_config))
         lines.extend(self._generate_reference_lines(plot_config))
+        lines.extend(self._generate_reference_spans(plot_config))
 
         lines.extend([
             "\n    try:",

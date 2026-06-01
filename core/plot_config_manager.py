@@ -359,6 +359,7 @@ class PlotConfigManager:
         return {
             "text_annotations": self.pt.annotation_manager.annotations,
             "reference_lines": self.pt.reference_line_manager.get_config(),
+            "reference_spans": self.pt.reference_span_manager.get_config(),
             "auto_annotate": {
                 "enabled": self.pt.auto_annotate_check.isChecked(),
                 "column": self.pt.auto_annotate_col_combo.currentText()
@@ -774,6 +775,10 @@ class PlotConfigManager:
         # Reference lines
         ref_lines_cfg = config.get("reference_lines") or []
         self.pt.reference_line_manager.load_config(ref_lines_cfg)
+
+        # Reference Spans
+        ref_spans_cfg = config.get("reference_spans") or []
+        self.pt.reference_span_manager.load_config(ref_spans_cfg)
         
         # Auto annotations
         auto_ann = config.get("auto_annotate") or {}
