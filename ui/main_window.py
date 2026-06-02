@@ -155,8 +155,11 @@ class MainWindow(QWidget):
                 self.autosave_indicator.show_indicator()
                 QApplication.processEvents()
                 self.project_manager.auto_save(self.get_project_data())
+                self.status_bar.log("Project autosaved", LogLevel.SUCCESS)
             except Exception as e:
-                self.status_bar.log(f"Autosave failed: {str(e)}", "ERROR")
+                self.status_bar.log(f"Autosave failed: {str(e)}", LogLevel.ERROR)
+            finally:
+                QApplication.processEvents()
     
     @pyqtSlot()
     def _check_recovery(self) -> None:
@@ -547,6 +550,7 @@ class MainWindow(QWidget):
         self.status_bar.show_progress(False)
         if self.progress_dialog:
             self.progress_dialog.accept()
+            self.progress_dialog.deleteLater()
             self.progress_dialog = None
         QMessageBox.critical(self, "Error", f"Failed to import file: {str(error)}")
         self.status_bar.log(f"Import failed: {str(error)}", "ERROR")
@@ -702,8 +706,10 @@ class MainWindow(QWidget):
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Export code")
         dialog.setText("What would you like to export?")
-        button_data = dialog.addButton("Data Only", QMessageBox.ButtonRole.YesRole)
-        button_plot = dialog.addButton("Data + Plot", QMessageBox.ButtonRole.NoRole)
+        dialog.setInformativeText("You can export just the data manipulation pipeline, or include the current Plotting configuration as well")
+
+        button_data = dialog.addButton("Data Pipeline Only", QMessageBox.ButtonRole.YesRole)
+        button_plot = dialog.addButton("Data + Plotting logic", QMessageBox.ButtonRole.NoRole)
         dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
         dialog.exec()
 
@@ -824,6 +830,9 @@ class MainWindow(QWidget):
     def undo(self) -> None:
         if self.data_handler.undo():
             self.data_tab.refresh_data_view()
+            self.plot_tab.update_column_combo()
+            self.status_bar.update_data_stats(self.data_handler.df)
+            self.unsaved_changes = True
             self.status_bar.log("Undo: Previous state restored")
         else:
             self.status_bar.log("Nothing to undo")
@@ -831,6 +840,9 @@ class MainWindow(QWidget):
     def redo(self) -> None:
         if self.data_handler.redo():
             self.data_tab.refresh_data_view()
+            self.plot_tab.update_column_combo()
+            self.status_bar.update_data_stats(self.data_handler.df)
+            self.unsaved_changes = True
             self.status_bar.log("Redo: Action restored")
         else:
             self.status_bar.log("Nothing to redo")

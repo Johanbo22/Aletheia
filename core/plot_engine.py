@@ -17,6 +17,7 @@ import matplotlib.ticker as ticker
 
 from core.regression_analyser import RegressionMetrics
 from ui.status_bar import LogLevel
+from core.logger import Logger
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -463,7 +464,7 @@ class PlotEngine:
         if axis == self.current_ax.xaxis:
             plt.setp(self.current_ax.get_xticklabels(), rotation=45, ha="right")
 
-    def _helper_is_datetime_column(self, plot_tab: "PlotTab", data) -> bool:
+    def _helper_is_datetime_column(self, plot_tab: "PlotTab", data: Any) -> bool:
         """Check if data is datetime"""
         if data is None:
             return False
@@ -475,20 +476,16 @@ class PlotEngine:
                 if data.dtype == "object":
                     if data.empty:
                         return False
-                    sample_val = None
-                    for val in data.head(50):
-                        if val is not None:
-                            sample_val = val
-                            break
-                    if sample_val is None:
+
+                    valid_samples = data.dropna().head(50)
+                    if valid_samples.empty:
                         return False
-                    
-                    if not isinstance(sample_val, str):
-                        return False
+
                     try:
-                        pd.to_datetime(sample_val, utc=True)
-                        return True
-                    except:
+                        converted = pd.to_datetime(valid_samples, errors="coerce")
+                        if converted.notna().mean() > 0.5:
+                            return True
+                    except Exception:
                         pass
             elif hasattr(data, "dtype"):
                 return pd.api.types.is_datetime64_any_dtype(data.dtype)
@@ -667,7 +664,8 @@ class PlotEngine:
             )
         
         if plot_tab.ylabel_check.isChecked():
-            xlabel_to_use = plot_tab.ylabel_input.text() or (y_cols[0] if len(y_cols) == 1 else str(y_cols))
+            default_ylabel = y_cols[0] if len(y_cols) == 1 else ", ".join(y_cols)
+            xlabel_to_use = plot_tab.ylabel_input.text() or default_ylabel
             self.current_ax.set_xlabel(
                 xlabel_to_use,
                 fontsize=plot_tab.ylabel_size_spin.value(),
@@ -676,7 +674,7 @@ class PlotEngine:
             )
         
         if plot_tab.title_check.isChecked():
-            title_to_use = plot_tab.title_input.text() if plot_tab.title_input.text() else plot_tab.plot_type.currentIndex()
+            title_to_use = plot_tab.title_input.text() if plot_tab.title_input.text() else plot_tab.plot_type.currentText()
             self.current_ax.set_title(
                 title_to_use,
                 fontsize=plot_tab.title_size_spin.value(),
@@ -727,7 +725,8 @@ class PlotEngine:
         except Exception as error:
             plot_tab.status_bar.log(f"Regression analysis failed: {str(error)}", "ERROR")
             import traceback
-            print(f"Regression error: {traceback.format_exc()}")
+            logger = Logger.get_instance()
+            logger.error(f"Regression error: {traceback.print_exc()}")
     
     def _render_regression_line(self, x_line: np.ndarray, y_line: np.ndarray, reg_type: Any, flipped: bool) -> None:
         plot_args = (x_line, y_line) if not flipped else (y_line, x_line)
