@@ -23,7 +23,7 @@ from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotCleared
 from ui.status_bar import StatusBar
 from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
-from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager
+from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager
 from ui.widgets import ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
@@ -135,6 +135,7 @@ class PlotTab(PlotTabUI):
         self.subplot_manager = SubplotManager(self)
         self.annotation_manager = AnnotationManager(self)
         self.reference_line_manager = ReferenceLineManager(self)
+        self.reference_span_manager = ReferenceSpanManager(self)
         self.canvas_interaction_manager = CanvasInteractionManager(self)
         self.formatting_manager = PlotFormattingManager(self)
         self.color_manager = ColorManager(self)
@@ -385,6 +386,7 @@ class PlotTab(PlotTabUI):
         """Connect signals for the Annotations tab"""
         self.annotation_manager.connect_signals()
         self.reference_line_manager.connect_signals()
+        self.reference_span_manager.connect_signals()
         self.view.table_enable_check.stateChanged.connect(self.on_style_changed)
         self.view.table_type_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.table_location_combo.currentTextChanged.connect(self.on_style_changed)
@@ -1836,6 +1838,7 @@ class PlotTab(PlotTabUI):
         """Apply text annotations and reference lines"""
         self.annotation_manager.apply_annotations(df, x_col, y_cols)
         self.reference_line_manager.apply_reference_lines()
+        self.reference_span_manager.apply_reference_spans()
 
     def clear_plot(self) -> None:
         """Clear the plot"""

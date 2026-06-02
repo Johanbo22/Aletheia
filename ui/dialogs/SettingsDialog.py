@@ -1,3 +1,5 @@
+from typing import Any
+
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayout, QLabel, QSpinBox, \
     QTabWidget, QVBoxLayout, QWidget
 from PyQt6.QtGui import QFont
@@ -71,7 +73,7 @@ class SettingsDialog(QDialog):
 
         self.setLayout(settings_layout)
 
-    def get_settings(self):# -> dict[str, Any]:
+    def get_settings(self) -> dict[str, Any]:
         return {
             "enable_autosave"  : self.autosave_check.isChecked(),
             "autosave_interval": self.autosave_interval_spin.value(),
