@@ -153,8 +153,9 @@ class ScriptManager:
                 if title_obj:
                     config["legend"]["title"] = title_obj.get_text()
 
-            has_grid = bool(ax.xaxis.get_gridlines() or ax.yaxis.get_gridlines())
-            config["grid"]["enabled"] = has_grid
+            x_grid_on: bool = any(line.get_visible() for line in ax.xaxis.get_gridlines())
+            y_grid_on: bool = any(line.get_visible() for line in ax.yaxis.get_gridlines())
+            config["grid"]["enabled"] = x_grid_on or y_grid_on
 
             spines_cfg = config.get("appearance", {}).get("spines", {})
             for side, spine in ax.spines.items():

@@ -36,6 +36,7 @@ class ReferenceLineManager:
         self.view.reference_lines_list.itemClicked.connect(self.on_reference_line_selected)
         self.view.update_ref_line_button.clicked.connect(self.update_selected_reference_line)
         self.view.delete_ref_line_button.clicked.connect(self.delete_selected_reference_line)
+        self.view.annotations_tab.deselect_ref_line_button.clicked.connect(self.deselect_reference_line)
 
         self.view.ref_line_color_button.clicked.connect(self.choose_ref_line_color)
         self.view.ref_line_type_combo.currentTextChanged.connect(self.on_ref_line_type_changed)
@@ -49,7 +50,7 @@ class ReferenceLineManager:
             options=QColorDialog.ColorDialogOption.ShowAlphaChannel
         )
         if color.isValid():
-            self.ref_line_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
+            self.ref_line_color = color.name()
             self.view.ref_line_color_label.setText(self.ref_line_color)
             ColorManager.update_button_color_swatch(self.view.ref_line_color_button, QColor(self.ref_line_color))
             
@@ -59,6 +60,7 @@ class ReferenceLineManager:
         line_style = self._get_matplotlib_linestyle(self.view.ref_line_style_combo.currentText())
         line_width = self.view.ref_line_width_spin.value()
         alpha = self.view.ref_line_alpha_spin.value()
+        zorder = self.view.annotations_tab.ref_line_zorder_spin.value()
         label = self.view.ref_line_label_input.text().strip() or None
 
         ref_line_data: Dict[str, Any] = {
@@ -66,6 +68,7 @@ class ReferenceLineManager:
             "linestyle": line_style,
             "linewidth": line_width,
             "alpha": alpha,
+            "zorder": zorder,
             "label": label
         }
         list_text = ""
@@ -111,8 +114,20 @@ class ReferenceLineManager:
 
             self.view.update_ref_line_button.setEnabled(True)
             self.view.delete_ref_line_button.setEnabled(True)
+            self.view.annotations_tab.deselect_ref_line_button.setEnabled(True)
+            self.view.add_ref_line_button.setEnabled(False)
 
             self.status_bar.log(f"Selected reference line: {ref_line['type']}")
+
+    def deselect_reference_line(self) -> None:
+        """Deselects the current line and returns the UI to creation mode"""
+        self.view.reference_lines_list.clearSelection()
+        self.selected_ref_line_index = -1
+        self.view.update_ref_line_button.setEnabled(False)
+        self.view.delete_ref_line_button.setEnabled(False)
+        self.view.annotations_tab.deselect_ref_line_button.setEnabled(False)
+        self.view.add_ref_line_button.setEnabled(True)
+        self.status_bar.log("Deselected Reference Line")
 
     def _populate_editor_from_ref_line(self, ref_line: Dict[str, Any]) -> None:
         """Populate the editor UI with the selected reference line's properties"""
@@ -136,6 +151,7 @@ class ReferenceLineManager:
 
         self.view.ref_line_width_spin.setValue(ref_line.get("linewidth", 1.5))
         self.view.ref_line_alpha_spin.setValue(ref_line.get("alpha", 1.0))
+        self.view.annotations_tab.ref_line_zorder_spin.setValue(ref_line.get("zorder", 10))
         self.view.ref_line_label_input.setText(ref_line.get("label", "") or "")
 
     def update_selected_reference_line(self) -> None:
@@ -157,6 +173,7 @@ class ReferenceLineManager:
             "linestyle": line_style,
             "linewidth": self.view.ref_line_width_spin.value(),
             "alpha": self.view.ref_line_alpha_spin.value(),
+            "zorder": self.view.annotations_tab.ref_line_zorder_spin.value(),
             "label": label
         }
 
@@ -228,7 +245,7 @@ class ReferenceLineManager:
 
         lines_to_remove = []
         for child in self.plot_engine.current_ax.get_children():
-            gid = getattr(child, "_gid", None)
+            gid = child.get_gid()
             if gid and str(gid).startswith("ref_line"):
                 lines_to_remove.append(child)
 

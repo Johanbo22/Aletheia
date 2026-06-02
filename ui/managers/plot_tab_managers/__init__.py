@@ -6,8 +6,10 @@ from .theme_manager import ThemeManager
 from .formatting_manager import PlotFormattingManager
 from .reference_line_manager import ReferenceLineManager
 from .color_manager import ColorManager
+from .reference_span_manager import ReferenceSpanManager
 
 __all__ =  [
+    "ReferenceSpanManager",
     "ColorManager",
     "CanvasInteractionManager",
     "AnnotationManager",
