@@ -52,6 +52,7 @@ class MainWindow(QWidget):
         self._connect_subset_managers()
         
         # Setup of autosave timers
+        self.autosave_enabled: bool = True
         self.autosave_interval_ms: int = 5 * 60 * 1000
         self.autosave_timer = QTimer()
         self.autosave_timer.timeout.connect(self._perform_autosave)
@@ -147,12 +148,15 @@ class MainWindow(QWidget):
         """
         Executes the autosave if there are unsaved changes
         """
-        if not self.autosave_enabled:
+        if not getattr(self, "autosave_enabled", True):
             return
         if self.unsaved_changes and self.data_handler.df is not None:
-            self.autosave_indicator.show_indicator()
-            QApplication.processEvents()
-            self.project_manager.auto_save(self.get_project_data())
+            try:
+                self.autosave_indicator.show_indicator()
+                QApplication.processEvents()
+                self.project_manager.auto_save(self.get_project_data())
+            except Exception as e:
+                self.status_bar.log(f"Autosave failed: {str(e)}", "ERROR")
     
     @pyqtSlot()
     def _check_recovery(self) -> None:
@@ -224,9 +228,9 @@ class MainWindow(QWidget):
         if isinstance(recent_files, str):
             recent_files = [recent_files]
         elif isinstance(recent_files, tuple):
-            recent_files = list[recent_files]
+            recent_files = list(recent_files)
         elif isinstance(recent_files, list):
-            recent_files = []
+            recent_files = list(recent_files) if recent_files else []
         
         standardized_path = str(Path(filepath).absolute())
         
