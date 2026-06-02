@@ -83,7 +83,6 @@ class AppearanceSettingsTab(QWidget):
 
         layout.addWidget(QLabel("Font Family:"))
         self.font_family_combo = QFontComboBox()
-        self.font_family_combo.setCurrentFont(QFont("Arial"))
         layout.addWidget(self.font_family_combo)
 
         latex_layout = QHBoxLayout()
@@ -244,7 +243,6 @@ class AppearanceSettingsTab(QWidget):
         layout.addSpacing(10)
 
         presets_label = QLabel("Quick Presets")
-        presets_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         layout.addWidget(presets_label)
 
         presets_btn_layout = QHBoxLayout()
@@ -263,7 +261,6 @@ class AppearanceSettingsTab(QWidget):
         layout.addSpacing(15)
 
         global_label = QLabel("Global Spine Settings")
-        global_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         layout.addWidget(global_label)
 
         global_layout = QHBoxLayout()
