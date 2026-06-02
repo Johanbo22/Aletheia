@@ -279,7 +279,7 @@ class DataHandler:
         df_backup = self.df.copy(deep=False)
         log_backup = self._history.operation_log.copy()
         redo_backup = self._history.redo_stack.copy()
-        sort_state_backup = self._history_sort_state
+        sort_state_backup = self.sort_state
         current_op_type = "Unknown"
 
         try:
@@ -352,7 +352,7 @@ class DataHandler:
             self.df = df_backup
             self._history.operation_log = log_backup
             self._history.redo_stack = redo_backup
-            self._history_sort_state = sort_state_backup
+            self.sort_state = sort_state_backup
             logger.error(
                 f"Macro execution aborted. Data rolled back to original state "
                 f"Failed on operation '{current_op_type}': {e}",
