@@ -1,4 +1,5 @@
 # main.py
+import gc
 import os
 import sys
 from pathlib import Path
@@ -34,6 +35,8 @@ def main():
 
     window.showMaximized()
     splash_screen.finish(window)
+    
+    gc.collect()
 
     sys.exit(app.exec())
 

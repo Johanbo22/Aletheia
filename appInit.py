@@ -1,6 +1,5 @@
 import sys
 import threading
-import gc
 from PyQt6.QtWidgets import QApplication, QSplashScreen, QPushButton
 from PyQt6.QtCore import QTranslator, QLocale, Qt, QSharedMemory, QCoreApplication, QObject, QEvent
 from PyQt6.QtGui import QGuiApplication, QPixmap
@@ -26,8 +25,7 @@ class GlobalCursorFilter(QObject):
 
 
 def configure_runtime_environment() -> None:
-    """Sets up garbage collection thresholds and HIGH DPI scaling"""
-    gc.set_threshold(500000, 50, 50)
+    """Sets up HIGH DPI scaling"""
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
 def enforce_single_instance() -> QSharedMemory:
