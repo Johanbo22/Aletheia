@@ -129,6 +129,8 @@ class IconBuilder:
         {content}
     </svg>"""
     
+    _cache: dict[tuple[IconType, int, str], QIcon] = {}
+    
     @classmethod
     def build(cls, icon_type: IconType, resolution: int = 960, color: str = None) -> QIcon:
         """
@@ -139,6 +141,10 @@ class IconBuilder:
             return cls._build_native_app_icon(resolution)
         if color is None:
             color = ThemeColors.TEXT_PRIMARY.name()
+            
+        cache_key = (icon_type, resolution, color)
+        if cache_key in cls._cache:
+            return cls._cache[cache_key]
         
         icon_data = _get_icon_content(icon_type=icon_type)
         
@@ -167,6 +173,7 @@ class IconBuilder:
         icon.addPixmap(pixmap, QIcon.Mode.Normal, QIcon.State.Off)
         icon.addPixmap(disabled_pixmap, QIcon.Mode.Disabled, QIcon.State.Off)
         
+        cls._cache[cache_key] = icon
         return icon
     
     @classmethod
