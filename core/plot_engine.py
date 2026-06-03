@@ -205,7 +205,18 @@ class PlotEngine:
             
             if sharex or sharey:
                 for ax in self.axes_flat:
-                    ax.label_outer()
+                    ss = ax.get_subplotspec()
+                    if ss is not None:
+                        if sharex and not ss.is_last_row():
+                            for label in ax.get_xticklabels(which="both"):
+                                label.set_visible(False)
+                            ax.xaxis.get_offset_text().set_visible(False)
+                            ax.set_xlabel("")
+                        if sharey and not ss.is_first_col():
+                            for label in ax.get_yticklabels(which="both"):
+                                label.set_visible(False)
+                            ax.yaxis.get_offset_text().set_visible(False)
+                            ax.set_ylabel("")
             
         self.current_figure.tight_layout()
 
@@ -345,7 +356,19 @@ class PlotEngine:
         
         if getattr(self, '_sharex', False) or getattr(self, '_sharey', False):
             for ax in self.axes_flat:
-                ax.label_outer()
+                if hasattr(ax, "get_subplotspec"):
+                    ss = ax.get_subplotspec()
+                    if ss is not None:
+                        if getattr(self, '_sharex', False) and not ss.is_last_row():
+                            for label in ax.get_xticklabels(which="both"):
+                                label.set_visible(False)
+                            ax.xaxis.get_offset_text().set_visible(False)
+                            ax.set_xlabel("")
+                        if getattr(self, '_sharey', False) and not ss.is_first_col():
+                            for label in ax.get_yticklabels(which="both"):
+                                label.set_visible(False)
+                            ax.yaxis.get_offset_text().set_visible(False)
+                            ax.set_ylabel("")
     
     def _handle_secondary_axis(self, df: pd.DataFrame, x: str, secondary_y: str, secondary_plot_type: str, **kwargs) -> Any:
         """

@@ -303,6 +303,11 @@ class StatusBar(QStatusBar):
         """Visually reset the status bar to prevent stale messages"""
         self.terminal.setText("")
         self.terminal.setToolTip("Click to view log history")
+
+        self.terminal.setProperty("logLevel", "IDLE")
+        self.terminal.style().unpolish(self.terminal)
+        self.terminal.style().polish(self.terminal)
+
         self.status_label.setText("Idle")
         self.status_label.setProperty("logLevel", "IDLE")
         self.status_label.style().unpolish(self.status_label)

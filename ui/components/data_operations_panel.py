@@ -4,7 +4,7 @@ from PyQt6.QtGui import QIcon
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from ui.controllers.data_tab_controller import DataTabController
+    from controller.data_tab_controller import DataTabController
 
 from core.resource_loader import get_resource_path
 from ui.icons import IconBuilder, IconType

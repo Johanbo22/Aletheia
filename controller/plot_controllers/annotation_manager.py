@@ -8,7 +8,7 @@ from PyQt6.QtGui import QColor, QCursor
 from matplotlib.text import Text
 
 from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
-from ui.managers.plot_tab_managers.color_manager import ColorManager
+from controller.plot_controllers.color_manager import ColorManager
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab

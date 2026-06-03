@@ -326,10 +326,13 @@ class DataMutator:
             return df, current_sort_state
 
         try:
-            if column not in df.columns:
-                raise ValueError(f"Column '{column}' not found")
+            if column == "[Index]":
+                df = df.sort_index(ascending=ascending)
+            else:
+                if column not in df.columns:
+                    raise ValueError(f"Column '{column}' not found")
+                df = df.sort_values(by=column, ascending=ascending)
 
-            df = df.sort_values(by=column, ascending=ascending)
             new_sort_state = (column, ascending)
             return df, new_sort_state
         except (ValueError, KeyError, TypeError) as e:

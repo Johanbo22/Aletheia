@@ -259,16 +259,20 @@ class GridSpecDesignerWidget(QWidget):
         
         for r in range(rows):
             for c in range(cols):
-                empty_item = QTableWidgetItem()
-                self.grid_table.setItem(r, c, empty_item)
-                
-                empty_widget = QLabel("Empty Space")
-                empty_widget.setObjectName(f"emptyCellWidget_{r}_{c}")
-                empty_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                empty_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-                empty_widget.setProperty("styleClass", "empty_plot_cell")
-                
-                self.grid_table.setCellWidget(r, c, empty_widget)
+                is_covered = any(
+                    span.row_start <= r < span.row_end and span.col_start <= c < span.col_end for span in self._defined_spans
+                )
+                if not is_covered:
+                    empty_item = QTableWidgetItem()
+                    self.grid_table.setItem(r, c, empty_item)
+
+                    empty_widget = QLabel("Empty Space")
+                    empty_widget.setObjectName(f"emptyCellWidget_{r}_{c}")
+                    empty_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    empty_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+                    empty_widget.setProperty("styleClass", "empty_plot_cell")
+
+                    self.grid_table.setCellWidget(r, c, empty_widget)
 
         self._defined_spans.sort(key=lambda span: (span.row_start, span.col_start))
 

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from PyQt6.QtWidgets import QColorDialog, QMessageBox, QListWidgetItem
 from PyQt6.QtGui import QColor
 
-from ui.managers.plot_tab_managers.color_manager import ColorManager
+from controller.plot_controllers.color_manager import ColorManager
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab

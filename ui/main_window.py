@@ -801,24 +801,7 @@ class MainWindow(QWidget):
     
     def export_data_dialog(self) -> None:
         """Export the dataframe to a new file"""
-        if self.data_handler.df is None:
-            QMessageBox.warning(self, "Warning", "No Data to export")
-            return
-
-        selected_rows, selected_cols = self.data_tab.get_selection_state()
-        dialog = ExportDialog(self, data_handler=self.data_handler, selected_rows=selected_rows, selected_columns=selected_cols)
-        if dialog.exec():
-            config = dialog.get_export_config()
-            if config["filepath"] or config.get("to_clipboard", False):
-                try:
-                    target_name = "Clipboard" if config.get("to_clipboard", False) else config.get("filepath")
-                    self.status_bar.log(f"Export complete to {target_name}")
-                    if not config.get("to_clipboard", False):
-                        self.export_animation = ExportFileAnimation(parent=self, message="Export complete", extension=config["format"])
-                        self.export_animation.start(target_widget=self)
-                except Exception as ExportDataError:
-                    QMessageBox.critical(self, "Error", f"Failed to export data: {str(ExportDataError)}")
-                    traceback.print_exc()
+        self.data_tab.controller.export_data()
     
     def export_google_sheets(self) -> None:
         if self.data_handler.df is None:
@@ -883,8 +866,8 @@ class MainWindow(QWidget):
             self.status_bar.log("Nothing to redo")
     
     def zoom_in(self) -> None:
-        if self.tabs.currentWidget() != self.plot_tab:
-            QMessageBox.information(self, "Info", "Zoom only works in Plot Studio")
+        """Zooms into the canvas"""
+        if not self.plot_tab.isVisible():
             return
         
         fig = self.plot_tab.plot_engine.current_figure
@@ -894,8 +877,8 @@ class MainWindow(QWidget):
         self.status_bar.log("Zoomed in")
     
     def zoom_out(self) -> None:
-        if self.tabs.currentWidget() != self.plot_tab:
-            QMessageBox.information(self, "Info", "Zoom only works in Plot Studio")
+        """Zooms out of the canvas"""
+        if not self.plot_tab.isVisible():
             return
         
         fig = self.plot_tab.plot_engine.current_figure
@@ -908,11 +891,7 @@ class MainWindow(QWidget):
         """
         Resets the plot zoom to default starting dimensions
         """
-        if self.tabs.currentWidget() != self.plot_tab:
-            QMessageBox.information(
-                self, "Info",
-                "Zoom reset only works in Plot Studio"
-            )
+        if not self.plot_tab.isVisible():
             return
 
         DEFAULT_WIDTH_INCHES: float = 12.0

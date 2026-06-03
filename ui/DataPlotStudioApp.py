@@ -177,12 +177,24 @@ class DataPlotStudio(QMainWindow):
             new_index = self.main_widget.tabs.addTab(self.main_widget.plot_tab, self.plot_tab_icon, self.plot_tab_text)
             self.main_widget.tabs.tabBar().setTabButton(new_index, QTabBar.ButtonPosition.RightSide, self._create_undock_button())
             self.main_widget.tabs.setCurrentIndex(new_index)
+
+    def _update_view_menu_visibility(self, *args) -> None:
+        """Updates the visibility of the View menu based on the current"""
+        is_plot_active = False
+        if self.plot_dock.isVisible():
+            is_plot_active = True
+        elif self.main_widget.tabs.currentWidget() == self.main_widget.plot_tab:
+            is_plot_active = True
+
+        self.menu_bar.view_menu.menuAction().setVisible(is_plot_active)
     
     def _connect_signals(self) -> None:
         """Routing signals to the main widget"""
         self.main_widget.window_title_changed.connect(self.setWindowTitle)
         self.main_widget.data_tab.request_python_console.connect(self.main_widget.open_python_console)
         self.main_widget.data_tab.request_open_settings.connect(self.open_settings)
+
+        self.main_widget.tabs.currentChanged.connect(self._update_view_menu_visibility)
         
         # Window state signals
         window_menu = self.menuBar().addMenu("&Window")
@@ -221,6 +233,8 @@ class DataPlotStudio(QMainWindow):
         self.menu_bar.settings_action.triggered.connect(self.open_settings)
         self.menu_bar.about_action.triggered.connect(self.show_about)
         self.menu_bar.explore_help_action.triggered.connect(self.show_help_explorer)
+
+        self._update_view_menu_visibility()
     
     def _reset_window_layout(self) -> None:
         """Panic button for lost docks: returns the UI to a tabbed starting state."""

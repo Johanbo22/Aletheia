@@ -25,7 +25,7 @@ from ui.icons import IconBuilder, IconType
 from ui.animations import (
     EditModeToggleAnimation
 )
-from ui.controllers.data_tab_controller import DataTabController
+from controller.data_tab_controller import DataTabController
 from ui.workers import SearchWorker
 
 
@@ -388,11 +388,14 @@ class DataTab(QWidget):
         if hasattr(panel, "transform_tab") and hasattr(panel.transform_tab, "sort_column_combo"):
             current_sort = panel.transform_tab.sort_column_combo.currentText()
             panel.transform_tab.sort_column_combo.clear()
+            panel.transform_tab.sort_column_combo.addItem("[Index]")
             panel.transform_tab.sort_column_combo.addItems(columns)
-            if current_sort and current_sort in columns:
+            if current_sort and (current_sort == "[Index]" or current_sort in columns):
                 panel.transform_tab.sort_column_combo.setCurrentText(current_sort)
             elif (self.data_handler.sort_state and self.data_handler.sort_state[0] in columns):
                 panel.transform_tab.sort_column_combo.setCurrentText(self.data_handler.sort_state[0])
+            elif self.data_handler.sort_state and self.data_handler.sort_state[0] is None:
+                panel.transform_tab.sort_column_combo.setCurrentText("[Index]")
                 
         if hasattr(panel, "subsets_tab") and hasattr(panel.subsets_tab, "subset_column_combo"):
             try:

@@ -7,7 +7,7 @@ from ui.icons import IconBuilder, IconType
 from ui.theme import ThemeColors
 
 if TYPE_CHECKING:
-    from ui.controllers.data_tab_controller import DataTabController
+    from controller.data_tab_controller import DataTabController
 
 class SubsetsTab(BaseDataTab):
     def __init__(self, parent=None, controller: Optional["DataTabController"] = None) -> None:

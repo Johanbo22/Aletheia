@@ -23,7 +23,7 @@ from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotCleared
 from ui.status_bar import StatusBar
 from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
-from ui.managers.plot_tab_managers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager
+from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager
 from ui.widgets import ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel

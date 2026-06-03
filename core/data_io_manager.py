@@ -395,8 +395,11 @@ class DataIOManager:
         if df is None:
             raise ValueError("No data loaded")
         try:
+            format = format.lower()
             if format == "csv":
                 df.to_csv(filepath, index=include_index)
+            elif format == "tsv":
+                df.to_csv(filepath, sep='\t', index=include_index)
             elif format == "xlsx":
                 df.to_excel(filepath, index=include_index)
             elif format == "json":
@@ -404,6 +407,16 @@ class DataIOManager:
                     df.to_json(filepath, orient="columns", indent=4)
                 else:
                     df.to_json(filepath, orient="records", indent=4)
+            elif format == "html":
+                df.to_html(filepath, index=include_index)
+            elif format == "markdown":
+                df.to_markdown(filepath, index=include_index)
+            elif format == "xml":
+                df.to_xml(filepath, index=include_index)
+            elif format == "parquet":
+                df.to_parquet(filepath, index=include_index)
+            else:
+                raise ValueError(f"Unsupported export format: {format}")
         except Exception as ExportDataError:
             raise Exception(f"Error exporting data: {str(ExportDataError)}")
     

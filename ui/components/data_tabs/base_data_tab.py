@@ -6,7 +6,7 @@ from ui.widgets import HelpIcon
 from ui.icons import IconBuilder, IconType
 
 if TYPE_CHECKING:
-    from ui.controllers.data_tab_controller import DataTabController
+    from controller.data_tab_controller import DataTabController
     
 class BaseDataTab(QWidget):
     """

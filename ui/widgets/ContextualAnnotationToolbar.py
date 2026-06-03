@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint
 from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication, QMouseEvent
 
 from ui.theme import ThemeColors
-from ui.managers.plot_tab_managers.color_manager import ColorManager
+from controller.plot_controllers.color_manager import ColorManager
 
 class ContextualAnnotationToolbar(QWidget):
     """

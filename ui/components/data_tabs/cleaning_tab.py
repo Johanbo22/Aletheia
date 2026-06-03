@@ -5,7 +5,7 @@ from ui.components.data_tabs.base_data_tab import BaseDataTab
 from ui.icons import IconType
 
 if TYPE_CHECKING:
-    from ui.controllers.data_tab_controller import DataTabController
+    from controller.data_tab_controller import DataTabController
 
 class CleaningTab(BaseDataTab):
     """

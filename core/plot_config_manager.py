@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
     from ui.components.plot_settings_panel import PlotSettingsPanel
 from PyQt6.QtGui import QFont, QColor
-from ui.managers.plot_tab_managers.color_manager import ColorManager
+from controller.plot_controllers.color_manager import ColorManager
 from resources.version import APPLICATION_VERSION
 
 class PlotConfigManager:

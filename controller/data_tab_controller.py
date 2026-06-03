@@ -1,19 +1,21 @@
 import traceback
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 import weakref
 
 from PyQt6.QtWidgets import QMessageBox, QInputDialog, QApplication, QFileDialog, QDialog
 from PyQt6.QtCore import Qt, QThreadPool
 import pandas as pd
+from pathlib import Path
 
 from core.data_handler import DataHandler
 from core.aggregation_manager import AggregationManager
 from core.help_manager import HelpManager
 from core.subset_manager import SubsetManager
 
-from ui.animations import AggregationAnimation, CalculationAnimation, DataFilterAnimation, DataTypeChangeAnimation, DropColumnAnimation, MeltDataAnimation, OutlierDetectionAnimation, RenameColumnAnimation, DropMissingValueAnimation, FillMissingValuesAnimation, RemoveRowAnimation, ResetToOriginalStateAnimation, FailedAnimation, NewDataFrameAnimation, FileImportAnimation, SubsetDataAnimation
+from ui.animations import AggregationAnimation, CalculationAnimation, DataFilterAnimation, DataTypeChangeAnimation, DropColumnAnimation, MeltDataAnimation, OutlierDetectionAnimation, RenameColumnAnimation, DropMissingValueAnimation, FillMissingValuesAnimation, RemoveRowAnimation, ResetToOriginalStateAnimation, FailedAnimation, NewDataFrameAnimation, FileImportAnimation, SubsetDataAnimation, ExportFileAnimation
 
 from ui.dialogs import RenameColumnDialog,FilterAdvancedDialog,AggregationDialog,FillMissingDialog,HelpDialog,MeltDialog,OutlierDetectionDialog,PivotDialog,MergeDialog,BinningDialog,ComputedColumnDialog,SubsetDataViewer,SubsetManagerDialog,ProgressDialog,SplitColumnDialog,RegexReplaceDialog,AppendDialog, MacroPreviewDialog, ColumnReorderDialog, RollingWindowDialog, ShiftDataDialog, PercentageChangeDialog, CreateDatasetDialog
+from ui.dialogs.ExportDialog import ExportConfig, ExportDialog
 
 from ui.workers import GoogleSheetsImportWorker, AutoCreateSubsetsWorker
 
@@ -1477,7 +1479,10 @@ class DataTabController:
         ascending = (order_text == "Ascending")
 
         try:
-            col_index = list(self.data_handler.df.columns).index(column)
+            if column == "[Index]":
+                col_index = -1
+            else:
+                col_index = list(self.data_handler.df.columns).index(column)
             order = (
                 Qt.SortOrder.AscendingOrder
                 if ascending
@@ -2051,3 +2056,115 @@ class DataTabController:
             except Exception as StatisticalTestError:
                 QMessageBox.critical(self.view, "Error", f"Failed to run statistical test:\n{str(StatisticalTestError)}")
                 self.status_bar.log(f"Statistical test failed: {str(StatisticalTestError)}", "ERROR")
+
+    def export_data(self) -> None:
+        """Handles exporting the dataframe to a file or clipboard"""
+        if self.data_handler.df is None:
+            QMessageBox.warning(self.view, "Warning", "No data to export")
+            return
+
+        selected_rows, selected_cols = self.view.get_selection_state()
+        dialog = ExportDialog(self.view, data_handler=self.data_handler, selected_rows=selected_rows, selected_columns=selected_cols)
+
+        if dialog.exec():
+            config: ExportConfig = dialog.get_export_config()
+            df_to_export = self._prepare_export_dataframe(config, selected_rows)
+
+            if df_to_export is None:
+                return
+
+            if config.to_clipboard:
+                self._export_to_clipboard(df_to_export, config.include_index)
+            else:
+                self._export_to_file(df_to_export, config)
+
+    def _prepare_export_dataframe(self, config: ExportConfig, selected_rows: list[int]) -> Optional[pd.DataFrame]:
+        """Slices the current dataframe based on export configuration."""
+        df = self.data_handler.df.copy()
+
+        if config.selected_rows_only and selected_rows:
+            try:
+                df = df.iloc[selected_rows]
+            except IndexError as error:
+                QMessageBox.warning(self.view, "Selection Error",
+                                    f"Error slicing selected rows. They may be out of bounds.\n{str(error)}")
+                return None
+            except Exception as error:
+                QMessageBox.critical(self.view, "Slicing Error",
+                                     f"An unexpected error occurred while filtering rows:\n{str(error)}")
+                return None
+
+        if config.specific_columns:
+            if not config.selected_columns:
+                QMessageBox.warning(self.view, "No Columns Selected", "Please select at least one column to export.")
+                return None
+            df = df[config.selected_columns]
+
+        return df
+
+    def _export_to_clipboard(self, df: pd.DataFrame, include_index: bool) -> None:
+        """Executes clipboard export."""
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            df.to_clipboard(excel=True, index=include_index)
+            rows, cols = df.shape
+
+            QMessageBox.information(
+                self.view,
+                "Copied",
+                f"Copied {rows:,} rows and {cols:,} columns to clipboard\nYou can paste this into Excel or Google Sheets"
+            )
+            self.status_bar.log("Export complete to Clipboard", "SUCCESS")
+        except Exception as clipboard_error:
+            QMessageBox.critical(self.view, "Error", f"Failed to copy to clipboard: {str(clipboard_error)}")
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def _export_to_file(self, df: pd.DataFrame, config: ExportConfig) -> None:
+        """Executes file export based on dialog configuration."""
+        format_config = ExportDialog.EXPORT_CONFIG.get(config.format, {})
+
+        file_filter = format_config.get("filter", "All Files (*.*)")
+        default_ext = format_config.get("ext", "")
+
+        filepath, _ = QFileDialog.getSaveFileName(
+            self.view,
+            "Export Data",
+            f"export{default_ext}",
+            file_filter
+        )
+
+        if not filepath:
+            return
+
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+
+            method_name = format_config.get("method")
+            if not method_name:
+                raise ValueError(f"No export method defined for {config.format}")
+
+            export_kwargs = format_config.get("kwargs", {}).copy()
+
+            if config.format == "JSON":
+                export_kwargs["orient"] = "columns" if config.include_index else "records"
+            else:
+                export_kwargs["index"] = config.include_index
+
+            try:
+                export_func = getattr(df, method_name)
+                export_func(filepath, **export_kwargs)
+            except ImportError:
+                error_msg = format_config.get("error_msg", f"Missing dependency for {config.format} export.")
+                raise ImportError(error_msg)
+
+            QMessageBox.information(self.view, "Success", f"Data exported to {Path(filepath).name}")
+            self.status_bar.log(f"Export complete to {filepath}", "SUCCESS")
+
+            ExportFileAnimation(parent=self.view, message="Export complete", extension=config.format).start(
+                target_widget=self.view)
+
+        except Exception as error:
+            QMessageBox.critical(self.view, "Export Error", f"Failed to export data: {str(error)}")
+        finally:
+            QApplication.restoreOverrideCursor()

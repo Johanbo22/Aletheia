@@ -530,13 +530,13 @@ class DataTableModel(QAbstractTableModel):
         # Validate column index to prevent error on empty dataframe
         # Suppresses sorting errors for index -1 is out of bounds when 
         # creating a new project with 0x0 row/cols
-        if column < 0 or column >= len(self._data.columns):
+        if column < -1 or column >= len(self._data.columns) or (column == -1 and self._data.empty):
             return
         
         self.layoutAboutToBeChanged.emit()
 
         try:
-            col_name = self._data.columns[column]
+            col_name = "[Index]" if column == -1 else self._data.columns[column]
             ascending = (order == Qt.SortOrder.AscendingOrder)
 
             self.data_handler.sort_data(col_name, ascending)

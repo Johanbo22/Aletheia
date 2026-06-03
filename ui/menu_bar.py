@@ -108,23 +108,23 @@ class MenuBar(QMenuBar):
         edit_menu.addAction(self.settings_action)
         
         # View Menu
-        view_menu = QMenu(self.tr("&View"), self)
-        self.addMenu(view_menu)
+        self.view_menu = QMenu(self.tr("&View"), self)
+        self.addMenu(self.view_menu)
         
         self.zoom_in_action = QAction(IconBuilder.build(IconType.ZoomIn), self.tr("Zoom &In"), parent)
         self.zoom_in_action.setShortcut("Ctrl++")
         self.zoom_in_action.setStatusTip(self.tr("Zoom into the plot"))
-        view_menu.addAction(self.zoom_in_action)
+        self.view_menu.addAction(self.zoom_in_action)
         
         self.zoom_out_action = QAction(IconBuilder.build(IconType.ZoomOut), self.tr("Zoom &Out"), parent)
         self.zoom_out_action.setShortcut("Ctrl+-")
         self.zoom_out_action.setStatusTip(self.tr("Zoom out from the plot"))
-        view_menu.addAction(self.zoom_out_action)
+        self.view_menu.addAction(self.zoom_out_action)
 
         self.reset_action = QAction(IconBuilder.build(IconType.RefreshItem), self.tr("&Reset"), parent)
         self.reset_action.setShortcut("Ctrl+Shift+Z")
         self.reset_action.setStatusTip(self.tr("Reset the zoom level to default"))
-        view_menu.addAction(self.reset_action)
+        self.view_menu.addAction(self.reset_action)
         
         # Help Menu
         help_menu = QMenu(self.tr("&Help"), self)

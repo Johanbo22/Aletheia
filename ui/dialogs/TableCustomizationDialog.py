@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from resources.version import APPLICATION_NAME
 from ui.widgets import ToggleSwitch
-from ui.managers.plot_tab_managers.color_manager import ColorManager
+from controller.plot_controllers.color_manager import ColorManager
 
 DIALOG_WIDTH: int = 600
 DIALOG_HEIGHT: int = 500

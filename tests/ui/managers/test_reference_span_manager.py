@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from PyQt6.QtWidgets import QListWidgetItem
 
-from ui.managers.plot_tab_managers.reference_span_manager import ReferenceSpanManager
+from controller.plot_controllers.reference_span_manager import ReferenceSpanManager
 
 @pytest.fixture
 def mock_plot_tab():

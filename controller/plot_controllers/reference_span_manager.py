@@ -3,7 +3,7 @@ from typing import Dict, Any, List, TYPE_CHECKING
 from PyQt6.QtWidgets import QColorDialog, QMessageBox, QListWidgetItem
 from PyQt6.QtGui import QColor
 
-from ui.managers.plot_tab_managers import ColorManager
+from controller.plot_controllers import ColorManager
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
