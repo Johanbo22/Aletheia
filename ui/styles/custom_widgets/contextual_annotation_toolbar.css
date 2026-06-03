@@ -25,6 +25,12 @@
     background-color: #ffffff;
 }
 
+#ContextualToolbar QLineEdit:disabled {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    border-color: #e5e7eb;
+}
+
 #ContextualToolbar QSpinBox {
     background-color: #f9fafb;
     border: 1px solid #e5e7eb;
@@ -38,6 +44,12 @@
 #ContextualToolbar QSpinBox:focus {
     border: 1px solid #3b82f6;
     background-color: #ffffff;
+}
+
+#ContextualToolbar QSpinBox:disabled {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    border-color: #e5e7eb;
 }
 
 #ContextualToolbar QSpinBox::up-button,
@@ -62,6 +74,11 @@
     font-weight: 500;
 }
 
+#ContextualToolbar QPushButton:focus {
+    border: 1px dashed #3b82f6;
+    outline: none;
+}
+
 #ContextualToolbar QPushButton:hover {
     background-color: #e5e7eb;
     border-color: #d1d5db;
@@ -70,4 +87,10 @@
 #ContextualToolbar QPushButton:pressed {
     background-color: #d1d5db;
     border-color: #9ca3af;
+}
+
+#ContextualToolbar QPushButton:disabled {
+    background-color: #f9fafb;
+    color: #9ca3af;
+    border-color: #e5e7eb;
 }

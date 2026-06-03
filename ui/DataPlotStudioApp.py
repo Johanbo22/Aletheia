@@ -215,6 +215,7 @@ class DataPlotStudio(QMainWindow):
         # View menu
         self.menu_bar.zoom_in_action.triggered.connect(self.main_widget.zoom_in)
         self.menu_bar.zoom_out_action.triggered.connect(self.main_widget.zoom_out)
+        self.menu_bar.reset_action.triggered.connect(self.main_widget.zoom_reset)
 
         # App level
         self.menu_bar.settings_action.triggered.connect(self.open_settings)

@@ -110,7 +110,7 @@ class ContextualAnnotationToolbar(QWidget):
         self.italic_btn.setChecked(ann_data.get("fontstyle", "normal") == "italic")
         
         ColorManager.update_button_color_swatch(self.color_btn, QColor(self.current_color))
-        ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.curreng_bg_color))
+        ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.current_bg_color))
 
         self.text_edit.setFocus()
         self.text_edit.selectAll()

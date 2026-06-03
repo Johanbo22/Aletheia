@@ -61,6 +61,7 @@ QPushButton#ErrorFilter {
 }
 
 QPushButton#ErrorFilter:hover {
+    background-color: rgba(255, 0, 0, 0.15);
     border-color: #ff5555;
     color: #ff5555;
 }
@@ -76,6 +77,7 @@ QPushButton#WarningFilter {
 }
 
 QPushButton#WarningFilter:hover {
+    background-color: rgba(255, 170, 0, 0.15);
     border-color: #ffaa00;
     color: #ffaa00;
 }
@@ -87,11 +89,13 @@ QPushButton#WarningFilter:checked {
 }
 
 QPushButton#WrapToggle {
+    background-color: #333333;
     color: #aaaaaa;
     border-color: #454545;
 }
 
 QPushButton#WrapToggle:hover {
+    background-color: #333333;
     color: #ffffff;
     border-color: #888888;
 }

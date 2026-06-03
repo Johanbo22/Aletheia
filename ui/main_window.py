@@ -1,6 +1,6 @@
 #ui/main_window.py
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QFileDialog, QMessageBox, QApplication, QTabWidget)
-from PyQt6.QtCore import QThreadPool, pyqtSlot, QTimer, pyqtSignal, QSettings
+from PyQt6.QtCore import QThreadPool, pyqtSlot, QTimer, pyqtSignal, QSettings, Qt
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from pathlib import Path
 import traceback
@@ -171,7 +171,8 @@ class MainWindow(QWidget):
             reply = QMessageBox.question(
                 self, 
                 "Recover Project",
-                "Last session was not existed properly. Would you like to recover the unsaved data?",
+                "It looks like the application closed unexpectedly during your last session.\n\n"
+                "Would you like to recover your unsaved work?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
@@ -182,7 +183,11 @@ class MainWindow(QWidget):
                     self.status_bar.log("Session recovered", "SUCCESS")
                     self.unsaved_changes = True
                 except Exception as err:
-                    QMessageBox.warning(self, "Recovery Failed", f"Could not recover the session: {str(err)}")
+                    QMessageBox.warning(
+                        self,
+                        "Recovery Failed",
+                        f"Unfortunately, the session data could not be recovered:\n\n{str(err)}\n\nThe corrupted autosave will be cleared."
+                    )
                     self.project_manager.cleanup_autosave()
             else:
                 self.project_manager.cleanup_autosave()
@@ -210,7 +215,12 @@ class MainWindow(QWidget):
                 project_name = Path(project_path).name
                 base_title = f"{APPLICATION_NAME} - {project_name}"
             else:
-                base_title = f"{APPLICATION_NAME} - Untitled Project"
+                source_info = self.data_handler.get_data_source()
+                if source_info and source_info.get("file_path"):
+                    file_name = Path(source_info.get("file_path")).name
+                    base_title = f"{APPLICATION_NAME} - {file_name} (Unsaved Project)"
+                else:
+                    base_title = f"{APPLICATION_NAME} - Untitled Project"
             
             indicator = " *" if self._unsaved_changes else ""
             title = f"{base_title}{indicator}"
@@ -349,8 +359,10 @@ class MainWindow(QWidget):
                 )
                 if not filepath:
                     return False
-                
+
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             saved_path = self.project_manager.save_project(project_data, filepath)
+            QApplication.processEvents()
 
             self.saved_animation = SavedProjectAnimation("Project Saved", parent=None)
             self.saved_animation.start(target_widget=self)
@@ -359,7 +371,7 @@ class MainWindow(QWidget):
                 self._unsaved_changes = False
                 self.project_manager.cleanup_autosave()
                 op_name = "save_project_as" if force_dialog else "save_project"
-                self.status_bar.log_action(f"Project Saved: {Path(saved_path).name}",details={"filepath": saved_path, "operation": op_name}, level="SUCCESS")
+                self.status_bar.log_action(f"Project Saved: {Path(saved_path).name}",details={"filepath": saved_path, "operation": op_name}, level=LogLevel.SUCCESS)
                 self._update_recent_projects(saved_path)
 
                 return True
@@ -368,11 +380,12 @@ class MainWindow(QWidget):
         except Exception as SaveProjectError:
             if "cancelled" in str(SaveProjectError).lower():
                 return False
-            self.failed_operation_animation = FailedAnimation("Save failed", parent=None)
-            self.failed_operation_animation.start(target_widget=self)
+            FailedAnimation("Save failed", parent=None).start(target_widget=self)
             QMessageBox.critical(self, "Save Error", f"Failed to save project: {str(SaveProjectError)}")
             self.status_bar.log(f"Save failed: {str(SaveProjectError)}", "ERROR")
             return False
+        finally:
+            QApplication.restoreOverrideCursor()
     
     def get_project_data(self) -> dict:
         """Get the project data for saving"""
@@ -394,6 +407,10 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Warning", "Please load data before opening the console.")
             return
 
+        if hasattr(self, "console_dialog") and self.console_dialog is not None and self.console_dialog.isVisible():
+            self.console_dialog.raise_()
+            self.console_dialog.activateWindow()
+
         self.console_dialog = ConsoleDialog(self.data_handler, self._on_console_sync, self)
         self.console_dialog.show()
     
@@ -406,6 +423,19 @@ class MainWindow(QWidget):
     
     def clear_all(self) -> None:
         """Clear all data"""
+        if self.data_handler.df is not None:
+            reply = QMessageBox.question(
+                self, "Confirm Clear Workspace",
+                "Are you sure you want to clear all data, subsets, and plot configurations?\n\nThis action cannot be undone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+            if not self._confirm_discard_changes():
+                return
+
         self.data_handler.df = None
         self.data_handler.original_df = None
         self.data_tab.clear()
@@ -416,6 +446,9 @@ class MainWindow(QWidget):
         self.plot_tab.refresh_subset_list()
         self.status_bar.update_data_stats(None)
         self._update_tab_visibility()
+
+        self.unsaved_changes = False
+        self.status_bar.log("Workspace cleared", LogLevel.INFO)
     
     def _confirm_discard_changes(self) -> bool:
         """Returns True if its safe to proceed, False if not"""
@@ -459,6 +492,8 @@ class MainWindow(QWidget):
                 valid_extensions.add(project_ext)
 
                 if filepath.suffix.lower() in valid_extensions:
+                    self.activateWindow()
+                    event.setDropAction(Qt.DropAction.CopyAction)
                     event.accept()
                     return
         event.ignore()
@@ -868,3 +903,22 @@ class MainWindow(QWidget):
         fig.set_size_inches(max(w * 0.9, 4), max(h * 0.9, 3))
         self.plot_tab.canvas.draw()
         self.status_bar.log("Zoomed out")
+
+    def zoom_reset(self) -> None:
+        """
+        Resets the plot zoom to default starting dimensions
+        """
+        if self.tabs.currentWidget() != self.plot_tab:
+            QMessageBox.information(
+                self, "Info",
+                "Zoom reset only works in Plot Studio"
+            )
+            return
+
+        DEFAULT_WIDTH_INCHES: float = 12.0
+        DEFAULT_HEIGHT_INCHES: float = 8.0
+
+        fig = self.plot_tab.plot_engine.current_figure
+        fig.set_size_inches(DEFAULT_WIDTH_INCHES, DEFAULT_HEIGHT_INCHES)
+        self.plot_tab.canvas.draw()
+        self.status_bar.log("Zoom reset to default")

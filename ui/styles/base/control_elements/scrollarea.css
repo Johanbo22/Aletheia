@@ -25,6 +25,10 @@ QScrollArea {
     border: none;
 }
 
+QScrollArea:focus {
+    outline: none;
+}
+
 QScrollBar:vertical {
     border: none;
     background: transparent;
@@ -43,6 +47,14 @@ QScrollBar::handle:vertical:hover {
     background: rgba(100, 100, 100, 0.6);
 }
 
+QScrollBar::handle:vertical:pressed {
+    background: rgba(80, 80, 80, 0.8);
+}
+
+QScrollBar::handle:vertical:disabled {
+    background: rgba(200, 200, 200, 0.3);
+}
+
 QScrollBar:horizontal {
     border: none;
     background: transparent;
@@ -59,6 +71,14 @@ QScrollBar::handle:horizontal {
 
 QScrollBar::handle:horizontal:hover {
     background: rgba(100, 100, 100, 0.6);
+}
+
+QScrollBar::handle:horizontal:pressed {
+    background: rgba(80, 80, 80, 0.8);
+}
+
+QScrollBar::handle:horizontal:disabled {
+    background: rgba(200, 200, 200, 0.3);
 }
 
 QScrollBar::add-line:vertical,

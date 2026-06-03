@@ -25,7 +25,7 @@ QCheckBox::indicator:focus {
 
 QCheckBox::indicator:checked {
     border-color: #2563eb;
-    background-color: #2563eb;
+    background-color: rgba(82, 139, 255, 0.05);
     image: url(icons/ui_styling/checkmark.svg);
 }
 

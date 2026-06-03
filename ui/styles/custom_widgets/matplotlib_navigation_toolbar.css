@@ -11,6 +11,7 @@
 #MatplotlibToolbar QToolButton {
     background-color: transparent;
     border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
     border-radius: 4px;
     padding: 6px;
     margin: 1px;
@@ -19,6 +20,7 @@
 #MatplotlibToolbar QToolButton:hover {
     background: rgba(0, 120, 215, 0.05);
     color: #111;
+    border: 1px solid transparent;
     border-bottom: 2px solid rgba(0, 120, 215, 0.3);
 }
 
@@ -28,7 +30,19 @@
 
 #MatplotlibToolbar QToolButton:checked {
     background-color: #e6f2ff;
-    border: 1px solid #0078d7;
+    border-bottom: 2px solid #0078d7;
+}
+
+#MatplotlibToolbar QToolButton:focus {
+    border: 1px dashed #2563eb;
+    border-bottom: 2px dashed #2563eb;
+    outline: none;
+}
+
+#MatplotlibToolbar QToolButton:disabled {
+    background-color: transparent;
+    color: #95a5a6;
+    border-color: transparent;
 }
 
 #MatplotlibToolbar::separator {

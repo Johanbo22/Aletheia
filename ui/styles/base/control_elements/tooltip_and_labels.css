@@ -21,3 +21,7 @@ QLabel {
     font-size: 11pt;
     color: #333;
 }
+
+QLabel:disabled {
+    color: #95a5a6;
+}

@@ -3,14 +3,24 @@ This CSS file governs the shared styling of:
 QListView
 QListWidget
 QTreeWidget
+QTableView
 */
 QListWidget,
 QListView,
-QTreeWidget {
-    border: 1.5px solid #bdc3c7;
+QTreeWidget,
+QTableView {
+    border: 1px solid #bdc3c7;
     border-radius: 4px;
     padding: 4px;
     background-color: #ffffff;
+}
+
+QListWidget:focus,
+QListView:focus,
+QTreeWidget:focus,
+QTableView:focus {
+    border: 1px solid #2563eb;
+    outline: none;
 }
 
 QListWidget::item,
@@ -19,6 +29,8 @@ QTreeWidget::item {
     padding: 6px 8px;
     border-radius: 3px;
     margin: 2px 0;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
 }
 
 QListWidget::item:hover,
@@ -26,6 +38,7 @@ QListView::item:hover,
 QTreeWidget::item:hover {
     background-color: rgba(0, 120, 215, 0.05);
     color: #111;
+    border: 1px solid transparent;
     border-bottom: 2px solid rgba(0, 120, 215, 0.3);
 }
 
@@ -37,4 +50,40 @@ QTreeWidget::item:selected {
     font-weight: bold;
     border: 1px solid #dcdcdc;
     border-bottom: 2px solid #0078d7;
+}
+
+QListWidget::indicator,
+QListView::indicator,
+QTreeWidget::indicator,
+QTableView::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+    background-color: #ffffff;
+    margin-right: 4px;
+}
+
+QListWidget::indicator:hover,
+QListView::indicator:hover,
+QTreeWidget::indicator:hover,
+QTableView::indicator:hover {
+    border-color: #95a5a6;
+}
+
+QListWidget::indicator:checked,
+QListView::indicator:checked,
+QTreeWidget::indicator:checked,
+QTableView::indicator:checked {
+    background-color: rgba(82, 139, 255, 0.05);
+    border-color: #2563eb;
+    image: url(icons/ui_styling/checkmark.svg);
+}
+
+QListWidget::indicator:disabled,
+QListView::indicator:disabled,
+QTreeWidget::indicator:disabled,
+QTableView::indicator:disabled {
+    background-color: #f2f4f6;
+    border-color: #dcdcdc;
 }

@@ -11,18 +11,18 @@ QSlider::groove:horizontal {
 
 QSlider::handle:horizontal {
     background: #ffffff;
-    border: 1.5px solid #bdc3c7;
+    border: 1px solid #bdc3c7;
     width: 16px;
     height: 16px;
     margin: -7px 0;
     border-radius: 9px;
 }
 
-QSlider:hover::handle:horizontal {
+QSlider::handle:horizontal:hover {
     border-color: #95a5a6;
 }
 
-QSlider:focus::handle:horizontal {
+QSlider::handle:horizontal:focus {
     border-color: #2563eb;
 }
 
@@ -36,17 +36,28 @@ QSlider::groove:vertical {
 
 QSlider::handle:vertical {
     background: #ffffff;
-    border: 1.5px solid #bdc3c7;
+    border: 1px solid #bdc3c7;
     height: 16px;
     width: 16px;
     margin: 0 -7px;
     border-radius: 9px;
 }
 
-QSlider:hover::handle:vertical {
+QSlider::handle:vertical:hover {
     border-color: #95a5a6;
 }
 
-QSlider:focus::handle:vertical {
+QSlider::handle:vertical:focus {
     border-color: #2563eb;
+}
+
+QSlider::handle:horizontal:disabled,
+QSlider::handle:vertical:disabled {
+    background: #f2f4f6;
+    border-color: #dcdcdc;
+}
+
+QSlider::groove:horizontal:disabled,
+QSlider::groove:vertical:disabled {
+    background: #e9ecef;
 }

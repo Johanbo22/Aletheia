@@ -18,3 +18,9 @@ QLineEdit:focus {
     background-color: rgba(82, 139, 255, 0.05);
     outline: none;
 }
+
+QLineEdit:disabled {
+    background-color: #f2f4f6;
+    color: #95a5a6;
+    border-color: #dcdcdc;
+}

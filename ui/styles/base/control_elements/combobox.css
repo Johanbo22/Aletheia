@@ -2,7 +2,7 @@
 This CSS file governs the styling of QComboBox
 */
 QComboBox {
-    border: 1.5px solid #bdc3c7;
+    border: 1px solid #bdc3c7;
     border-radius: 3px;
     padding: 1px 35px 1px 3px;
     min-width: 6em;
@@ -20,6 +20,12 @@ QComboBox:on {
     background-color: rgba(82, 139, 255, 0.05);
 }
 
+QComboBox:disabled {
+    background-color: #f2f4f6;
+    color: #95a5a6;
+    border-color: #dcdcdc;
+}
+
 QComboBox QLineEdit {
     background: transparent;
     border: none;
@@ -28,10 +34,8 @@ QComboBox QLineEdit {
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 15px;
-    border-left-width: 1px;
-    border-left-color: #bdc3c7;
-    border-left-style: solid;
+    width: 20px;
+    border-left: 1px solid #bdc3c7;
     border-top-right-radius: 3px;
     border-bottom-right-radius: 3px;
     background-color: #f0f0f0;
@@ -45,11 +49,4 @@ QComboBox::down-arrow {
     image: url(icons/ui_styling/arrow-down-to-line.svg);
     width: 9px;
     height: 9px;
-}
-
-QComboBox::drop-down {
-    subcontrol-origin: padding;
-    subcontrol-position: top right;
-    width: 20px;
-    border-left: 1px solid transparent;
 }

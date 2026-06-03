@@ -17,11 +17,17 @@ QToolBox#plot_type_toolbox::tab:hover {
     color: #2563eb;
 }
 
+QToolBox#plot_type_toolbox::tab:focus {
+    border: 1px solid #2563eb;
+    outline: none;
+}
+
 QToolBox#plot_type_toolbox::tab:selected {
     background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #eff6ff, stop: 1 #e0e7ff);
     color: #1e40af;
     border: 1px solid #bfdbfe;
     border-left: 4px solid #3b82f6;
+    padding-left: 12px;
 }
 
 #CanvasContainer {

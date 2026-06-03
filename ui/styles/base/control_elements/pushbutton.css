@@ -2,20 +2,24 @@
 This CSS file governs the styling of QPushButton
 Contains styling parameters for 3 main button objects:
 
-DEFAULT BUTTON
-MainActionButton
-DestructiveButton
+    DEFAULT BUTTON
+    MainActionButton
+    DestructiveButton
 
 This CSS file will also hold any buttons that require a unique ObjectName 
 not stored in a *_dialog.css file, custom_widget or component_style css file. 
 */
-/* DEFAULT BUTTON*/
+/*  DEFAULT BUTTON 
+    The default button is not targeted by any ObjectName or setProperty() 
+    Will always work as a secondary action button unless a Destructive objectName is assigned
+*/
 QPushButton {
     background-color: #e0e0e0;
     color: #000000;
     font-weight: bold;
     padding: 8px;
-    border: none;
+    min-width: 30px;
+    border: 1px solid transparent;
     border-radius: 4px;
 }
 
@@ -25,6 +29,11 @@ QPushButton:hover {
 
 QPushButton:pressed {
     background-color: #b2b2b2;
+}
+
+QPushButton:checked {
+    background-color: #c8c8c8;
+    border: 1px inset #999999;
 }
 
 QPushButton:focus {
@@ -42,12 +51,22 @@ QPushButton[size_variant="large"] {
     padding: 12px;
 }
 
+QPushButton[flat="true"] {
+    background-color: transparent;
+    border: 1px solid transparent;
+}
+
+QPushButton[flat="true"]:hover {
+    background-color: rgba(204, 204, 204, 128);
+}
+
 /*
 The MainActionButton Styling
 */
 QPushButton#MainActionButton {
     background-color: #2196f3;
     color: #ffffff;
+    border: 2px solid transparent;
 }
 
 QPushButton#MainActionButton:hover {
@@ -73,6 +92,7 @@ The DesctructiveButton styling
 QPushButton#DestructiveButton {
     background-color: #e74c3c;
     color: #ffffff;
+    border: 2px solid transparent;
 }
 
 QPushButton#DestructiveButton:hover {
@@ -97,16 +117,20 @@ QPushButton#ViewLogHistory {
     background-color: #333;
     color: #ddd;
     padding: 4px;
+    border: 1px solid transparent;
+    border-radius: 3px;
 }
 
 QPushButton#ViewLogHistory:hover {
-    background-color: #333;
+    background-color: #4d4d4d;
 }
 
 /* Unique Google Sheet reimport button*/
 QPushButton#GoogleSheetReImport {
     background-color: #27ae60;
-    color: "white";
+    color: white;
+    border: 1px solid transparent;
+    border-radius: 4px;
 }
 
 QPushButton#GoogleSheetReImport:hover {

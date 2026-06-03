@@ -59,17 +59,34 @@ QLineEdit#status_terminal {
     padding: 4px;
 }
 
+QLineEdit#status_terminal:focus {
+    outline: none;
+    border: 1px solid #555;
+}
+
+QLineEdit#status_terminal[logLevel="IDLE"] {
+    background-color: transparent;
+    color: #888888;
+    border: 1px solid #555555;
+}
+
 QLineEdit#status_terminal[logLevel="SUCCESS"],
 QLineEdit#status_terminal[logLevel="INFO"] {
+    background-color: transparent;
     color: #00ff00;
+    border: 1px solid #00ff00;
 }
 
 QLineEdit#status_terminal[logLevel="WARNING"] {
-    color: #ffaa00;
+    background-color: #ffaa00;
+    color: #1e1e1e;
+    border: 1px solid #ffaa00;
 }
 
 QLineEdit#status_terminal[logLevel="ERROR"] {
-    color: #ff0000;
+    background-color: #ff0000;
+    color: #ffffff;
+    border: 1px solid #ff0000;
 }
 
 QLineEdit#status_terminal[errorFlash="true"] {
@@ -78,17 +95,29 @@ QLineEdit#status_terminal[errorFlash="true"] {
 
 QMenu#terminal_context_menu {
     background-color: #252526;
-    color: #cccccc;
+    color: white;
     border: 1px solid #454545;
 }
 
 QMenu#terminal_context_menu::item {
+    color: white;
     padding: 4px 20px 4px 20px;
 }
 
 QMenu#terminal_context_menu::item:selected {
     background-color: #007acc;
     color: white;
+}
+
+QMenu#terminal_context_menu::item:disabled {
+    color: #666666;
+    background-color: transparent;
+}
+
+QMenu#terminal_context_menu::separator {
+    height: 1px;
+    background-color: #454545;
+    margin: 4px 8px;
 }
 
 QLabel#status_state_label {

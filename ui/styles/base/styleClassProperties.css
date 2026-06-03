@@ -21,8 +21,10 @@ QLabel[styleClass="muted_text"] {
 }
 
 QLabel[styleClass="help_box"] {
-    background-color: #f0f0f0;
+    background-color: #f8f9fa;
+    color: #333333;
     padding: 8px;
+    border: 1px solid #e9ecef;
     border-radius: 4px;
     margin-top: 10px;
 }

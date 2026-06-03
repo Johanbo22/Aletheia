@@ -3,23 +3,31 @@
     border: 1px solid rgba(128, 128, 128, 0.3);
     border-radius: 6px;
     gridline-color: rgba(128, 128, 128, 0.2);
+    selection-background-color: rgba(58, 134, 255, 0.15);
+    selection-color: #1f2937;
+}
+
+#layoutGridTable:focus {
+    outline: none;
+    border: 1px solid #3A86FF;
 }
 
 #layoutGridTable::item {
     background-color: rgba(128, 128, 128, 0.05);
     color: rgba(128, 128, 128, 0.9);
     font-weight: normal;
+    border: 2px solid transparent;
 }
 
 #layoutGridTable::item:selected {
     background-color: rgba(128, 128, 128, 0.2);
-    color: palette(text);
+    color: #1f2937;
     border: 2px solid #3A86FF;
 }
 
 #layoutGridTable::item:hover {
     background-color: rgba(128, 128, 128, 0.15);
-    color: palette(text);
+    color: #1f2937;
 }
 
 #layoutGridTable::item:selected:hover {
@@ -29,7 +37,9 @@
 QLabel[styleClass="plot_cell_label"] {
     background: transparent;
     font-weight: bold;
-    color: palette(text);
+    color: #1f2937;
+    border-bottom: 3px solid transparent;
+    border-left: 3px solid transparent;
 }
 
 QLabel[styleClass="plot_cell_label"][has_x_axis="true"] {

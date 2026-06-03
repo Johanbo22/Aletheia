@@ -3,11 +3,12 @@ This CSS file governs the styling of QSpinBox and QDoubleSpinBox
 */
 QSpinBox,
 QDoubleSpinBox {
-    border: 1.5px solid #bdc3c7;
+    border: 1px solid #bdc3c7;
     border-radius: 3px;
     padding: 1px 4px 1px 3px;
     min-width: 2em;
     background-color: #ffffff;
+    color: #333333;
 }
 
 QSpinBox:hover,
@@ -20,6 +21,13 @@ QDoubleSpinBox:focus {
     border: 1px solid #2563eb;
     background-color: rgba(82, 139, 255, 0.05);
     outline: none;
+}
+
+QSpinBox:disabled,
+QDoubleSpinBox:disabled {
+    background-color: #f2f4f6;
+    color: #95a5a6;
+    border-color: #dcdcdc;
 }
 
 QSpinBox::up-button,

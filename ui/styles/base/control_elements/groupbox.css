@@ -2,16 +2,15 @@
 This CSS file governs the styling of QGroupBox
 */
 QGroupBox {
-    font-size: 14pt;
+    font-size: 13pt;
     font-weight: bold;
-    border: 1.5px solid #c2c2c2;
+    border: 1px solid #dcdcdc;
     border-radius: 4px;
     margin-top: 10px;
     padding-top: 10px;
 }
 
-QGroupBox:focus,
-QGroupBox:hover {
+QGroupBox:focus {
     border: 1.5px solid #2563eb;
 }
 
@@ -22,4 +21,28 @@ QGroupBox::title {
     left: 10px;
     background-color: #ffffff;
     top: 0px;
+}
+
+QGroupBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #dbc3c7;
+    border-radius: 3px;
+    background-color: #ffffff;
+    margin-right: 4px;
+}
+
+QGroupBox::indicator:hover {
+    border-color: #95a5a6;
+}
+
+QGroupBox::indicator:checked {
+    background-color: rgba(82, 139, 255, 0.05);
+    border-color: #2563eb;
+    image: url(icons/ui_styling/checkmark.svg);
+}
+
+QGroupBox::indicator:disabled {
+    background-color: #f2f4f6;
+    border-color: #dcdcdc;
 }
