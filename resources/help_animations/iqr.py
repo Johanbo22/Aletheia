@@ -14,6 +14,7 @@ class Animation(HelpAnimationEngine):
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent, fps=60, duration_ms=9000)
 
+        self.c_bg = QColor("#2b2b2b")
         self.c_bg_normal = QColor("#333333")
         self.c_bg_quartile = QColor("#2b4a6b")
         self.c_bg_outlier = QColor("#6b2b2b")
@@ -31,6 +32,7 @@ class Animation(HelpAnimationEngine):
         self.spacing = 10.0
 
     def draw_animation(self, painter: QPainter, progress: float) -> None:
+        painter.fillRect(self.rect(), self.c_bg)
         p_intro = self.get_eased_progress(progress, 0.0, 0.10)
         p_quartiles = self.get_eased_progress(progress, 0.15, 0.35)
         p_bounds = self.get_eased_progress(progress, 0.40, 0.60)

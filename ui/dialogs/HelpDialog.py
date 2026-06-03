@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QVBoxLayout, QWidget, QPushButton, QApplication
 )
 
-from core.resource_loader import get_resource_path
+from ui.help_animation_engine import load_help_animation_widget
 
 
 class HelpDialog(QDialog):
@@ -56,18 +56,7 @@ class HelpDialog(QDialog):
         content_layout.setContentsMargins(20, 20, 20, 20)
         content_layout.setSpacing(15)
         
-        current_dir = Path(__file__).resolve().parent
-        ui_dir = current_dir.parent
-        project_root = ui_dir.parent
-
-        if project_root not in sys.path:
-            sys.path.insert(0, str(project_root))
-        
-        clean_filename = f"{str(topic_id).lower()}.py"
-        anim_path_obj = project_root / "resources" / "help_animations" / clean_filename
-        anim_path = get_resource_path(str(anim_path_obj))
-
-        animation_widget = self._load_animation(topic_id, anim_path)
+        animation_widget = load_help_animation_widget(topic_id)
         content_layout.addWidget(animation_widget, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Description area
@@ -151,38 +140,6 @@ class HelpDialog(QDialog):
             if not self.isActiveWindow():
                 self.reject()
         super().changeEvent(event)
-    
-    def _load_animation(self, topic_id, path):
-        if not Path(path).exists():
-            print(f"HelpDialog: Animation file missing at {path}")
-            return self._create_placeholder(f"No animation found for '{topic_id}'")
-
-        module_name = f"anim_{topic_id}"
-        try:
-            spec = importlib.util.spec_from_file_location(module_name, path)
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[module_name] = module
-                spec.loader.exec_module(module)
-
-                if hasattr(module, 'Animation'):
-                    animation_instance = module.Animation()
-                    if isinstance(animation_instance, QWidget):
-                        return animation_instance
-                    
-        except Exception as AnimationLoadingError:
-            print(f"HelpDialog: Error loading {path}: {AnimationLoadingError}")
-            sys.modules.pop(module_name, None)
-        
-        return self._create_placeholder("Preview unavailable")
-
-    def _create_placeholder(self, text) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setFixedSize(450, 300)
-        lbl.setObjectName("help_animation_placeholder")
-        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setWordWrap(True)
-        return lbl
 
     def _open_link(self):
         if self.valid_link:

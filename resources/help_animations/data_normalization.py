@@ -14,6 +14,7 @@ class Animation(HelpAnimationEngine):
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent, fps=60, duration_ms=8000)
 
+        self.c_bg = QColor("#2b2b2b")
         self.c_table_bg = QColor("#1e1e1e")
         self.c_header_bg = QColor("#333333")
         self.c_border = QColor("#444444")
@@ -37,6 +38,7 @@ class Animation(HelpAnimationEngine):
         self.col_widths = [100, 240]
 
     def draw_animation(self, painter: QPainter, progress: float) -> None:
+        painter.fillRect(self.rect(), self.c_bg)
         p_intro = self.get_eased_progress(progress, 0.0, 0.15)
         p_transform = self.get_eased_progress(progress, 0.35, 0.65)
         p_outro = self.get_eased_progress(progress, 0.85, 1.0)

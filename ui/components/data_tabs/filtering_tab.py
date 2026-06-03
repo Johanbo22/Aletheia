@@ -68,7 +68,7 @@ class FilteringTab(BaseDataTab):
             title="Advanced Filter",
             tooltip="Open the advanced multi-conditional filter to build more complex filters",
             callback=self.controller.open_advanced_filter,
-            help_id="advanced_filter",
+            help_id="apply_filter",
             icon_type=IconType.AdvancedFilter
         ))
         layout.addWidget(advanced_filter_group)

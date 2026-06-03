@@ -285,7 +285,10 @@ class AnnotationManager:
                         self.on_annotation_selected(self.view.annotations_list.item(idx))
                         self.status_bar.log(f"Selected annotation: {artist.get_text()}", "INFO")
 
-                        if hasattr(event, "guiEvent") and event.guiEvent is not None:
+                        mouse_event = getattr(event, "mouseevent", None)
+                        is_dbclick = getattr(mouse_event, "dblclick", False)
+
+                        if is_dbclick and hasattr(event, "guiEvent") and event.guiEvent is not None:
                             global_pos = event.guiEvent.globalPosition().toPoint()
                             global_pos.setY(global_pos.y() - 50)
                             self.show_annotation_toolbar(idx, global_pos)

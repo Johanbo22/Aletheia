@@ -211,14 +211,23 @@ class CanvasInteractionManager:
         if self.plot_tab.custom_tabs.currentIndex() == annotation_tab_index:
             ax = self.plot_tab.plot_engine.current_ax
             if ax:
-                inv = ax.transAxes.inverted()
-                x, y = inv.transform((event.x, event.y))
+                is_clicking_annotation = False
+                for text_artist in ax.texts:
+                    if text_artist.get_gid() and str(text_artist.get_gid()).startswith("annotation_"):
+                        contains, _ = text_artist.contains(event)
+                        if contains:
+                            is_clicking_annotation = True
+                            break
 
-                x = max(0.0, min(1.0, x))
-                y = max(0.0, min(1.0, y))
+                if not is_clicking_annotation:
+                    inv = ax.transAxes.inverted()
+                    x, y = inv.transform((event.x, event.y))
 
-                self.plot_tab.view.annotation_x_spin.setValue(x)
-                self.plot_tab.view.annotation_y_spin.setValue(y)
+                    x = max(0.0, min(1.0, x))
+                    y = max(0.0, min(1.0, y))
+
+                    self.plot_tab.view.annotation_x_spin.setValue(x)
+                    self.plot_tab.view.annotation_y_spin.setValue(y)
 
     def on_mouse_move(self, event) -> None:
         """Handles middle-click mouse panning and tooltips"""
@@ -292,5 +301,5 @@ class CanvasInteractionManager:
         if self.span_selector is not None:
             if hasattr(self.span_selector, "clear"):
                 self.span_selector.clear()
-            elif hasttr(self.span_selector, "set_visible"):
+            elif hasattr(self.span_selector, "set_visible"):
                 self.span_selector.set_visible(False)
