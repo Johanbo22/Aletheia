@@ -13,14 +13,14 @@ from pathlib import Path
 
 from ui.data_table_model import DataTableModel
 from ui.theme import ThemeColors
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.components.data_operations_panel import DataOperationsPanel
 from ui.components.statistics_generator import StatisticsGenerator
 from ui.components.data_table_delegate import DataTableDelegate
 from ui.components.data_search_bar import DataSearchBar
 from ui.components.data_view_toolbar import DataViewToolbar
 from ui.LandingPage import LandingPage
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 from ui.animations import (
     EditModeToggleAnimation

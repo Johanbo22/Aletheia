@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 
 from ui.theme import ThemeColors
 from ui.workers import FilterWorker
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 
 class FilterAdvancedDialog(QDialog):

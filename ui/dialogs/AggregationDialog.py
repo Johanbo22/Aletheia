@@ -10,7 +10,7 @@ from xlrd import colname
 
 from ui.theme import ThemeColors
 from ui.workers import AggregationWorker
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 DIALOG_WIDTH: int = 1200
 DIALOG_HEIGHT: int = 700

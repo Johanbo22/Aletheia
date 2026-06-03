@@ -8,7 +8,7 @@ from pathlib import Path
 
 from core.data_handler import DataHandler
 from ui.theme import ThemeColors
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 @dataclass
 class ExportConfig:

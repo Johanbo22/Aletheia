@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 from core.resource_loader import get_resource_path
-from ui.icons.icon_registry import IconBuilder, IconType
+from icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 from ui.widgets.VennDiagramWidget import VennDiagramWidget
 from core.data_handler import DataHandler

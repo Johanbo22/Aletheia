@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize, QSettings
 from PyQt6.QtGui import QIcon, QAction, QColor, QPixmap
 from pathlib import Path
 import re
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors

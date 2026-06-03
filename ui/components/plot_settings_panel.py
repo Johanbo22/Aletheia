@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
 
 from core.help_manager import HelpManager
 from ui.dialogs import HelpDialog
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class PlotSettingsPanel(QWidget):
     """

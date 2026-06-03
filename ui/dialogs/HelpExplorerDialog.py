@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QLineE
 from core.help_manager import HelpManager, HelpTopicDetail
 from core.resource_loader import get_resource_path
 from resources.version import APPLICATION_NAME
-from ui.icons.icon_registry import IconBuilder, IconType
+from icons.icon_registry import IconBuilder, IconType
 
 logger = logging.getLogger(__name__)
 

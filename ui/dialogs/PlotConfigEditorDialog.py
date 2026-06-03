@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QTextEdit, QLabel
 from PyQt6.QtGui import QFont, QCloseEvent, QSyntaxHighlighter, QTextCharFormat, QColor, QTextCursor, QTextFormat, QTextDocument, QShortcut, QKeySequence
 from PyQt6.QtCore import Qt, QTimer, QRegularExpression
 
-from ui.icons.icon_registry import IconBuilder, IconType
+from icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 from ui.dialogs import CodeEditor
 

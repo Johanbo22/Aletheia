@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QStackedWidget, QGridLayout, QSpinBox, QDoubleSpinBox, QListWidget, QLineEdit, QGroupBox, QComboBox, QPushButton
 
-from ui.icons import IconBuilder
+from icons import IconBuilder
 from ui.theme import ThemeColors
 from ui.widgets import ToggleSwitch
 

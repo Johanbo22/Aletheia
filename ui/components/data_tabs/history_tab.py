@@ -3,7 +3,7 @@ from PyQt6.QtCore import Qt
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.widgets.PipelineGraphView import PipelineGraphView
 
 if TYPE_CHECKING:

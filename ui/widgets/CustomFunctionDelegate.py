@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QStyle, Q
 from PyQt6.QtCore import Qt, QEvent, pyqtSignal, QModelIndex, QRect, QAbstractItemModel
 from PyQt6.QtGui import QPainter, QMouseEvent
 
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class CustomFunctionDelegate(QStyledItemDelegate):
     """

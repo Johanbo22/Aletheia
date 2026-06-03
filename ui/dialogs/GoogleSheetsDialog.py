@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageB
 
 from resources.version import APPLICATION_NAME
 from ui.theme import ThemeColors
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from core.resource_loader import get_resource_path
 
 class GoogleSheetsImportConfig(NamedTuple):

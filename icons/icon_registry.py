@@ -99,7 +99,7 @@ def _load_icon_database() -> dict[str, str | list[str]]:
     
     :return: A dictionary mapping IconType to their SVG path data
     """
-    json_path = Path(__file__).resolve().parent.parent.parent / "resources" / "icon_data.json"
+    json_path = Path(__file__).resolve().parent.parent / "resources" / "icon_data.json"
     
     if not json_path.exists():
         return {}

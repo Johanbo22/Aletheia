@@ -11,7 +11,7 @@ from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToo
 from core.resource_loader import get_resource_path
 from ui.theme import ThemeColors
 from ui.components.plot_settings_panel import PlotSettingsPanel
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class PlotTabUI(QWidget):
     """"""

@@ -5,7 +5,7 @@ from PyQt6.QtGui import QPixmap
 from pathlib import Path
 
 from resources.version import APPLICATION_NAME
-from ui.icons.icon_registry import IconBuilder, IconType
+from icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 
 class PlotExportDialog(QDialog):

@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QFra
 from typing import Optional, Callable, TYPE_CHECKING
 
 from ui.widgets import HelpIcon
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController

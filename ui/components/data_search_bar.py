@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPropertyAnimation, QEasingCurve, QPoint
 
 from core.data_handler import DataHandler
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.workers import SearchWorker
 
 class DataSearchBar(QWidget):

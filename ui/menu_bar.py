@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import QMenuBar, QWidget, QMenu
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtCore import Qt
 from core.resource_loader import get_resource_path
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class MenuBar(QMenuBar):
     """Custom menu bar for the application"""

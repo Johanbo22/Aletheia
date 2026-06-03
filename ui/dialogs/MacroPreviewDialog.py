@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QDialogBu
 from PyQt6.QtCore import Qt, QSize
 
 from ui.widgets import ToggleSwitch
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class MacroPreviewDialog(QDialog):
     """

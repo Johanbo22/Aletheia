@@ -19,7 +19,7 @@ from core.logger import Logger
 from ui.status_bar import LogLevel, StatusBar
 from ui.dialogs import (ProgressDialog, GoogleSheetsDialog, DatabaseConnectionDialog, ExportDialog, GoogleSheetsExportDialog, ConsoleDialog)
 from ui.animations import (FileImportAnimation, FailedAnimation, SavedProjectAnimation, GoogleSheetsImportAnimation, DatabaseImportAnimation, ProjectOpenAnimation, ScriptLogExportAnimation, ExportFileAnimation)
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class MainWindow(QWidget):
     """Main widget"""

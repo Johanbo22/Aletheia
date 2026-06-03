@@ -5,7 +5,7 @@ import pandas as pd
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFormLayout, QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QLineEdit, QGroupBox, QComboBox, QCheckBox, QPushButton
 
 from ui.theme import ThemeColors
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class RollingWindowDialog(QDialog):
     """

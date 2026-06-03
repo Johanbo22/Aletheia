@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import QButtonGroup, QComboBox, QDialog, QDialogButtonBox, 
 
 from core.resource_loader import get_resource_path
 from resources.version import APPLICATION_NAME
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.workers import FetchSchemaWorker, TestConnectionWorker
 
 class SQLSyntaxHighlighter(QSyntaxHighlighter):

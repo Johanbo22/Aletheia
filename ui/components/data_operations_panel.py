@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController
 
 from core.resource_loader import get_resource_path
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.theme import ThemeColors
 
 from ui.components.data_tabs import CleaningTab, FilteringTab, ColumnsTab, TransformTab, DatetimeTab, SubsetsTab, HistoryTab

@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, QRegularExpression, QPoint, QEvent, QObject
 from PyQt6.QtGui import QFont, QColor, QRegularExpressionValidator, QKeyEvent
 
 from ui.theme import ThemeColors
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class CreateDatasetDialog(QDialog):
     """

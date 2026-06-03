@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QLabel, QGraphicsOpacityEffect, QHBoxLayout
 from PyQt6.QtCore import QEasingCurve, QParallelAnimationGroup, QPoint, QTimer, Qt, QPropertyAnimation
 
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 
 class AutosaveIndicator(QWidget):
     def __init__(self, parent: QWidget) -> None:

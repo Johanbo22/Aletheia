@@ -3,7 +3,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import pyqtSignal, Qt
 
 from core.resource_loader import get_resource_path
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.theme import ThemeColors
 
 class DataViewToolbar(QWidget):

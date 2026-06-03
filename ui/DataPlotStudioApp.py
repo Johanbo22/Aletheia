@@ -14,7 +14,7 @@ from core.resource_loader import get_resource_path
 from core.style_reloader import StyleReloader
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 from ui.dialogs import SettingsDialog, AboutDialog, HelpExplorerDialog
-from ui.icons.icon_registry import IconBuilder, IconType
+from icons.icon_registry import IconBuilder, IconType
 from ui.main_window import MainWindow
 from ui.menu_bar import MenuBar
 from ui.status_bar import StatusBar

@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWi
     QPushButton, QHBoxLayout, QGraphicsDropShadowEffect, QSizePolicy, QApplication, QLineEdit
 
 from core.resource_loader import get_resource_path
-from ui.icons.icon_registry import IconBuilder, IconType
+from icons.icon_registry import IconBuilder, IconType
 from ui.theme import ThemeColors
 
 

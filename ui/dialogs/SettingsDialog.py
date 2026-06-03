@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFontComboBox, QFormLayou
     QTabWidget, QVBoxLayout, QWidget
 from PyQt6.QtGui import QFont
 
-from ui.icons import IconBuilder, IconType
+from icons import IconBuilder, IconType
 from ui.widgets import ToggleSwitch
 
 class SettingsDialog(QDialog):
