@@ -7,8 +7,12 @@ from .formatting_manager import PlotFormattingManager
 from .reference_line_manager import ReferenceLineManager
 from .color_manager import ColorManager
 from .reference_span_manager import ReferenceSpanManager
+from .plot_type_manager import PlotTypeManager
+from .plot_export_manager import PlotExportManager
 
 __all__ =  [
+    "PlotExportManager",
+    "PlotTypeManager",
     "ReferenceSpanManager",
     "ColorManager",
     "CanvasInteractionManager",

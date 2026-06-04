@@ -23,7 +23,7 @@ from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotCleared
 from ui.status_bar import StatusBar
 from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
-from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager
+from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager, PlotTypeManager, PlotExportManager
 from ui.widgets import ColorBlindnessEffect
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
@@ -96,17 +96,7 @@ class PlotTab(PlotTabUI):
 
         self.line_customizations = {}
         self.bar_customizations = {}
-        
-        # Categories
-        self.plot_categories = {
-            "Basic and Relational": ["Line", "Scatter", "Bar", "Area", "Pie", "Stem", "Stairs"],
-            "Distribution": ["Histogram", "Box", "Violin", "KDE", "ECDF", "Count Plot", "Eventplot"],
-            "2D, Gridded and 3D": ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Stackplot", "3D Line", "3D Scatter", "3D Surface"],
-            "Vector Fields": ["Barbs", "Quiver", "Streamplot"],
-            "Triangulation": ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"],
-            "Geospatial": ["GeoSpatial"]
-        }
-        
+
         # Create canvas and toolbar
         self.plot_engine.create_figure()
         canvas = FigureCanvas(self.plot_engine.get_figure())
@@ -115,10 +105,11 @@ class PlotTab(PlotTabUI):
         self.init_ui(canvas, toolbar)
         
         self.view = self.settings_panel
+        self.type_manager = PlotTypeManager(self)
+        self.export_manager = PlotExportManager(self)
         
         #populate box in general tab with icons
-        #
-        self._populate_plot_toolbox()
+        self.type_manager.populate_plot_toolbox()
 
         self.selection_overlay = SubplotOverlay(self.canvas)
         self.canvas.mpl_connect("resize_event", self.on_canvas_resize)
@@ -126,7 +117,7 @@ class PlotTab(PlotTabUI):
         # Load initial data
         self.update_column_combo()
         
-        self._select_plot_in_toolbox("Line")
+        self.type_manager.select_plot_in_toolbox("Line")
         
         self.set_empty_state_greeting()
 
@@ -166,7 +157,7 @@ class PlotTab(PlotTabUI):
         self.plot_button.clicked.connect(self.generate_plot)
         self.editor_button.clicked.connect(self.script_manager.open_script_editor)
         self.clear_button.clicked.connect(self.clear_plot)
-        self.save_plot_button.clicked.connect(self.save_plot_image)
+        self.save_plot_button.clicked.connect(self.export_manager.save_plot_image)
 
         #editor sync
         self.view.x_column.currentTextChanged.connect(self.script_manager.sync_script_if_open)
@@ -189,7 +180,7 @@ class PlotTab(PlotTabUI):
 
         self.view.use_subset_check.stateChanged.connect(self.use_subset)
         self.view.secondary_y_check.stateChanged.connect(lambda state: self._toggle_secondary_input(bool(state)))
-        self.view.secondary_plot_type_combo.currentTextChanged.connect(lambda _: self._update_customization_visibility(self.current_plot_type_name))
+        self.view.secondary_plot_type_combo.currentTextChanged.connect(lambda _: self.type_manager.update_customization_visibility(self.current_plot_type_name))
     
     def _connect_appearance_tab_signals(self) -> None:
         """Connect signals for the Appearance tab"""
@@ -435,70 +426,6 @@ class PlotTab(PlotTabUI):
             
             if hasattr(self, "canvas") and self.canvas is not None:
                 self.canvas.draw_idle()
-
-    def _populate_plot_toolbox(self):
-        while self.view.plot_type.count() > 0:
-            self.view.plot_type.removeItem(0)
-        
-        self.category_lists = []
-        for category, plot_names in self.plot_categories.items():
-            list_widget = QListWidget()
-            list_widget.setViewMode(QListWidget.ViewMode.IconMode)
-            list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
-            list_widget.setMovement(QListWidget.Movement.Static)
-            
-            list_widget.setGridSize(QSize(105, 100))
-            list_widget.setSpacing(8)
-            list_widget.setIconSize(QSize(48, 48))
-
-            list_widget.itemClicked.connect(self._on_plot_list_item_clicked)
-
-            for plot_name in plot_names:
-                if plot_name in self.plot_engine.AVAILABLE_PLOTS:
-                    icon_key = self.plot_engine.AVAILABLE_PLOTS[plot_name]
-                    icon_path = get_resource_path(f"icons/plot_tab/plots/{icon_key}.png")
-
-                    item = QListWidgetItem(QIcon(icon_path), plot_name)
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                    item.setToolTip(self.plot_engine.PLOT_DESCRIPTIONS.get(plot_name, ""))
-                    list_widget.addItem(item)
-            
-            self.view.plot_type.addItem(list_widget, category)
-            self.category_lists.append(list_widget)
-    
-    def _on_plot_list_item_clicked(self, item):
-        if not item: return
-
-        plot_type = item.text()
-        self.current_plot_type_name = plot_type
-        self.view.current_plot_label.setText(f"Selected Plot: {plot_type}")
-
-        for list_w in self.category_lists:
-            if list_w != item.listWidget():
-                list_w.clearSelection()
-        
-        self.on_plot_type_changed(plot_type)
-        self.on_data_changed()
-        self.script_manager.sync_script_if_open()
-    
-    def _select_plot_in_toolbox(self, plot_type_name):
-        self.current_plot_type_name = plot_type_name
-        self.current_plot_label.setText(f"Selected Plot: {plot_type_name}")
-
-        for i, (category, names) in enumerate(self.plot_categories.items()):
-            if plot_type_name in names:
-                self.view.plot_type.setCurrentIndex(i)
-                list_widget = self.category_lists[i]
-
-                items = list_widget.findItems(plot_type_name, Qt.MatchFlag.MatchExactly)
-                if items:
-                    list_widget.setCurrentItem(items[0])
-                    for list_w in self.category_lists:
-                        if list_w != list_widget:
-                            list_w.clearSelection()
-                    self.on_plot_type_changed(plot_type_name)
-                break
     
     def toggle_individual_spines(self):
         """Toggles the customization of spines for each"""
@@ -514,64 +441,6 @@ class PlotTab(PlotTabUI):
         self.subplot_manager.update_overlay(is_resize=True)
         self.formatting_manager.setup_plot_figure(clear=False)
         self.canvas.draw_idle()
-
-    def save_plot_image(self) -> None:
-        """Save the plot to a file. This is the quick method for most common choices: png, pdf, and svg files"""
-        if self.plot_engine.current_figure is None:
-            QMessageBox.warning(self, "Warning", "No plot available to save")
-            return
-        
-        try:
-            default_export_dpi = 300
-            
-            overlay_was_visible: bool = False
-            if hasattr(self, "selection_overlay") and self.selection_overlay.isVisible():
-                overlay_was_visible = True
-                self.selection_overlay.hide()
-                
-            preview_pixmap = self.canvas.grab()
-            if overlay_was_visible:
-                self.selection_overlay.show()
-            
-            fig_width, fig_height = self.plot_engine.current_figure.get_size_inches()
-            
-            dialog = PlotExportDialog(current_dpi=default_export_dpi, preview_pixmap=preview_pixmap, fig_width=fig_width, fig_height=fig_height, parent=self)
-            if dialog.exec():
-                config = dialog.get_config()
-                filepath: str | None = config.get("filepath")
-
-                if filepath:
-                    kwargs = {
-                        "dpi": config["dpi"],
-                        "bbox_inches": "tight" if config["tight_layout"] else None,
-                        "transparent": config["transparent"]
-                    }
-                    if not config["transparent"]:
-                        kwargs["facecolor"] = self.bg_color
-                    
-                    original_size = self.plot_engine.current_figure.get_size_inches()
-                    target_size = (config["width"], config["height"])
-                    
-                    try:
-                        self.plot_engine.current_figure.set_size_inches(*target_size)
-                        self.plot_engine.current_figure.savefig(filepath, **kwargs)
-                    finally:
-                        self.plot_engine.current_figure.set_size_inches(*original_size)
-                        self.canvas.draw_idle()
-                SavePlotAnimation(self).start(self)
-                self.status_bar.log_action(f"Plot saved to {filepath}", level="SUCCESS")
-                QMessageBox.information(self, "Success", f"Plot saved successfully to:\n{filepath}")
-        except PermissionError:
-            self.status_bar.log("Permission denied: Target file might be open in another program.", "ERROR")
-            QMessageBox.critical(
-                self, 
-                "Save Error", 
-                "Cannot save the file.\n\nIf you are trying to overwrite an existing file (like a PDF), please ensure it is closed in your viewer/editor before saving."
-            )
-        except Exception as ExportPlotAsImageError:
-            self.status_bar.log(f"Failed to save plot: {str(ExportPlotAsImageError)}", "ERROR")
-            QMessageBox.critical(self, "Save Error", f"Could not save plot:\n{str(ExportPlotAsImageError)}")
-            traceback.print_exc()
 
     def activate_subset(self, subset_name: str):
         """Activates the 'Use Subset' checkbox and selects the selected subset"""
@@ -1183,162 +1052,6 @@ class PlotTab(PlotTabUI):
         
         except Exception as PlotTableError:
             self.status_bar.log(f"Failed to add table to plot: {str(PlotTableError)}", "WARNING")
-    
-    def on_plot_type_changed(self, plot_type: str, log: bool = True):
-        """Handle plot type change"""
-        if log:
-            self.status_bar.log(f"Plot type changed to: {plot_type}")
-        
-        self.view.custom_tabs.setTabVisible(6, plot_type == "GeoSpatial")
-        if plot_type == "GeoSpatial":
-            def _pre_import_geo_deps():
-                try:
-                    import mapclassify
-                except ImportError:
-                    pass
-                try:
-                    import contextily
-                except ImportError:
-                    pass
-            threading.Thread(target=_pre_import_geo_deps, daemon=True).start()
-
-        self._update_customization_visibility(plot_type)
-
-
-        #plots with multiple ycols
-        multi_y_supported = ["Line", "Bar", "Area", "Box", "Stackplot", "Eventplot", "Contour", "Contourf", "Barbs", "Quiver", "Streamplot", "Tricontour", "Tricontourf", "Tripcolor", "Triplot"]
-
-        #enabled based on plottype
-        if plot_type in multi_y_supported:
-            self.view.multi_y_check.setEnabled(True)
-            self.view.multi_y_check.setToolTip("")
-        else:
-            self.view.multi_y_check.setEnabled(False)
-            self.view.multi_y_check.setChecked(False)
-            self.view.multi_y_check.setToolTip(f"{plot_type} plots do not support multiple y columns")
-        
-        #Disbale plots with no dual yaxis support
-        dual_axis_supported = ["Line", "Bar", "Scatter", "Area"]
-        if plot_type in dual_axis_supported:
-            self.view.secondary_y_check.setEnabled(True)
-        else:
-            self.view.secondary_y_check.setChecked(False)
-            self.view.secondary_y_check.setEnabled(False)
-
-        #disable hue for certain plots
-        plots_without_hue: list[str] = [
-            "Pie", "KDE", "Count Plot", "Stackplot", "Eventplot",
-            "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Tricontour",
-            "Tricontourf", "Tripcolor", "Triplot", "2D Histogram", "ECDF", "Stairs", "Stem",
-            "Barbs", "Quiver", "Streamplot", "GeoSpatial"
-        ]
-        self.view.hue_column.setEnabled(plot_type not in plots_without_hue)
-
-        if plot_type in plots_without_hue:
-            self.view.hue_column.setCurrentText("None")
-
-        #disable flipping axes on certain plots
-        incompatible_plots: list[str] = [
-            "Histogram", "Pie", "Heatmap", "KDE", "Stackplot",
-            "Image Show (imshow)", "pcolormesh", "Contour", "Contourf", "Barbs", "Quiver",
-            "Streamplot", "Tricontour", "Tricontourf", "Tripcolor", "Triplot", "2D Histogram", "ECDF", "GeoSpatial", "3D Scatter", "3D Line", "3D Surface"
-        ]
-        self.view.flip_axes_check.setEnabled(plot_type not in incompatible_plots)
-        if plot_type in incompatible_plots:
-            self.view.flip_axes_check.setChecked(False)
-    
-    def _update_customization_visibility(self, primary_plot_type: str) -> None:
-        """
-        Updates visibility of customization options based on active plot types
-        """
-        line_plots = ["Line", "Area", "Step", "Stairs", "3D Line"]
-        bar_plots = ["Bar", "Count Plot", "Stem"]
-        hist_plots = ["Histogram", "Box", "Violin"]
-        scatter_plots = ["Scatter", "3D Scatter"]
-        pie_plots = ["Pie"]
-        
-        active_plot_types = [primary_plot_type]
-        
-        if self.view.secondary_y_check.isChecked() and self.view.secondary_y_check.isEnabled():
-            active_plot_types.append(self.view.secondary_plot_type_combo.currentText())
-            
-        show_line = False
-        show_bar_hist = False
-        show_scatter = False
-        show_pie = False
-        
-        show_markers = False
-        show_error_bars = False
-        
-        for p_type in active_plot_types:
-            if p_type in line_plots:
-                show_line = True
-                show_markers = True
-                if p_type != "3D Line":
-                    show_error_bars = True
-            elif p_type in hist_plots:
-                show_bar_hist = True
-                if p_type in ["Box", "Violin"]:
-                    show_error_bars = True
-            elif p_type in bar_plots:
-                show_bar_hist = True
-                show_error_bars = True
-            elif p_type in scatter_plots:
-                show_scatter = True
-                show_markers = True
-                if p_type != "3D Scatter":
-                    show_error_bars = True
-            elif p_type in pie_plots:
-                show_pie = True
-        
-        self.view.page_line.setVisible(show_line)
-        self.view.page_bar_hist.setVisible(show_bar_hist)
-        self.view.page_scatter.setVisible(show_scatter)
-        self.view.page_pie.setVisible(show_pie)
-        self.view.page_empty.setVisible(not any([show_line, show_bar_hist, show_scatter, show_pie]))
-        
-        self.view.marker_group.setVisible(show_markers)
-        self.view.error_bars_group.setVisible(show_error_bars)
-        
-        # 3d settings
-        is_3d  = primary_plot_type in ["3D Scatter", "3D Line", "3D Surface"]
-        self.view.z_column_widget.setVisible(is_3d)
-        self.view.camera_3d_group.setVisible(is_3d)
-        self.view.zlabel_widget.setVisible(is_3d)
-
-        # Disable tight layout for 3D plots
-        if is_3d:
-            self.view.tight_layout_check.setChecked(False)
-            self.view.tight_layout_check.setEnabled(False)
-            self.view.tight_layout_check.setToolTip("Tight layout is not supported for 3D plots")
-        else:
-            self.view.tight_layout_check.setEnabled(True)
-            self.view.tight_layout_check.setToolTip("")
-        
-        z_tab_idx = self.view.axis_tab_widget.indexOf(self.view.z_tab)
-        if is_3d and z_tab_idx == -1:
-            self.view.axis_tab_widget.addTab(self.view.z_tab, "Z-Axis")
-        else:
-            self.view.axis_tab_widget.removeTab(z_tab_idx)
-        
-        # Tick formatting controls to be disabled at 3D plots
-        unsupported_3d_tick_controls: list[str] = [
-            "x_major_tick_direction_combo", "x_major_tick_width_spin",
-            "y_major_tick_direction_combo", "y_major_tick_width_spin",
-            "z_major_tick_direction_combo", "z_major_tick_width_spin",
-            "x_minor_tick_direction_combo", "x_minor_tick_width_spin",
-            "y_minor_tick_direction_combo", "y_minor_tick_width_spin",
-            "z_minor_tick_direction_combo", "z_minor_tick_width_spin"
-        ]
-        for control_name in unsupported_3d_tick_controls:
-            if hasattr(self.view, control_name):
-                control_widget = getattr(self.view, control_name)
-                control_widget.setEnabled(not is_3d)
-
-                if is_3d:
-                    control_widget.setToolTip("Tick direction and width customization are not supported in 3D rendered plots")
-                else:
-                    control_widget.setToolTip("")
 
     def on_data_changed(self):
         """Handle data column selection change"""
@@ -1899,7 +1612,7 @@ class PlotTab(PlotTabUI):
             self.view.secondary_plot_type_combo.setEnabled(is_enabled)
         if hasattr(self.view, "secondary_zorder_check"):
             self.view.secondary_zorder_check.setEnabled(is_enabled)
-        self._update_customization_visibility(self.current_plot_type_name)
+        self.type_manager.update_customization_visibility(self.current_plot_type_name)
     
     def load_config(self, config: dict) -> None:
         """Load plot configuration"""
