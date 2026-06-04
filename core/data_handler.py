@@ -424,6 +424,18 @@ class DataHandler:
             raise ValueError("No data loaded")
         if self._history.sort_state == (column, ascending):
             return self.df
+
+        is_currently_sorted = False
+        if column == "[Index]":
+            is_currently_sorted = self.df.index.is_monotonic_increasing if ascending else self.df.index.is_monotonic_decreasing
+        elif column in self.df.columns:
+            is_currently_sorted = self.df[column].is_monotonic_increasing if ascending else self.df[
+                column].is_monotonic_decreasing
+
+        if is_currently_sorted:
+            self._history.sort_state = (column, ascending)
+            return self.df
+
         try:
             old_df = self.df.copy(deep=False)
             changed_df, new_sort_state = self._mutator.sort_data(

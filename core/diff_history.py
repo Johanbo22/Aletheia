@@ -143,7 +143,7 @@ class HistoryNode:
     parent_id: Optional[str]
     diff_record: Optional[DiffRecord] = None
     children_ids: List[str] = field(default_factory=list)
-    sort_state: Optional[Tuple[str, bool]] = None
+    sort_state: Optional[Tuple[str, bool]] = ("[Index]", True)
     created_at: float = field(default_factory=lambda: __import__("time").time())
     
 class DiffHistoryManager:
@@ -164,7 +164,7 @@ class DiffHistoryManager:
 
         # Operation log for macro export
         self.operation_log: List[Dict[str, Any]] = []
-        self.sort_state: Optional[Tuple[str, bool]] = None
+        self.sort_state: Optional[Tuple[str, bool]] = ("[Index]", True)
 
         # Callback for memory updates
         self.memory_update_callback: Optional[Callable[[int, int], None]] = None
@@ -517,7 +517,7 @@ class DiffHistoryManager:
         self.current_node_id = self.root_id
 
         self.operation_log.clear()
-        self.sort_state = None
+        self.sort_state = ("[Index]", True)
         self.current_memory_bytes = 0
         self.buffer_manager.cleanup()
         self._notify_memory_usage()
