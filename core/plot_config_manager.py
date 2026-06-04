@@ -42,9 +42,9 @@ class PlotConfigManager:
         try:
             if "plot_type" in config:
                 self.pt.plot_type.blockSignals(True)
-                self.pt._select_plot_in_toolbox(config["plot_type"])
+                self.pt.type_manager.select_plot_in_toolbox(config["plot_type"])
                 self.pt.plot_type.blockSignals(False)
-                self.pt.on_plot_type_changed(config["plot_type"])
+                self.pt.type_manager._on_plot_type_changed(config["plot_type"])
             if "basic" in config: self._load_basic_config(config["basic"])
             if "appearance" in config: self._load_appearance_config(config["appearance"])
             if "axes" in config: self._load_axes_config(config["axes"])
@@ -80,6 +80,15 @@ class PlotConfigManager:
         return theme_data
 
     def _get_basic_config(self) -> Dict[str, Any]:
+        subset_name = self.pt.subset_combo.currentData()
+        subset_def = None
+
+        if self.pt.use_subset_check.isChecked() and subset_name:
+            data_handler = getattr(self.pt, "data_handler", None)
+            if data_handler and hasattr(data_handler, "subset_manager"):
+                subset = data_handler.subset_manager.get_subset(subset_name)
+                if subset:
+                    subset_def = subset.to_dict()
         return {
             "x_column": self.pt.x_column.currentText(),
             "y_columns": self.pt.get_selected_y_columns(),
@@ -87,7 +96,8 @@ class PlotConfigManager:
             "multi_y_checked": self.pt.multi_y_check.isChecked(),
             "hue_column": self.pt.hue_column.currentText(),
             "use_subset": self.pt.use_subset_check.isChecked(),
-            "subset_name": self.pt.subset_combo.currentData(),
+            "subset_name": subset_name,
+            "subset_def": subset_def,
             "secondary_y_enabled": self.pt.secondary_y_check.isChecked(),
             "secondary_y_column": self.pt.secondary_y_column.currentText(),
             "secondary_plot_type": self.pt.secondary_plot_type_combo.currentText(),

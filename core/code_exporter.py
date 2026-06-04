@@ -402,7 +402,7 @@ class CodeExporter:
     def _generate_figure_setup(self, config: Dict[str, Any]) -> List[str]:
         """Generate the code for the figure initialization and global styling params"""
         lines = ["\n    # --- 1. Set up Figure and Style ---"]
-        
+
         style = self._clean_value(self._get_cfg(config, "appearance.figure.style", "default"))
         lines.extend([
             "    try:",
@@ -418,52 +418,124 @@ class CodeExporter:
         width = self._get_cfg(config, 'appearance.figure.width', 10)
         height = self._get_cfg(config, 'appearance.figure.height', 6)
         dpi = self._get_cfg(config, 'appearance.figure.dpi', 100)
-        
+
         plot_type = self._get_cfg(config, "plot_type")
         is_3d_plot = plot_type in ["3D Scatter", "3D Line", "3D Surface"]
         subplot_kwargs = "projection='3d'" if is_3d_plot else ""
-        
-        if subplot_kwargs:
-            lines.append(f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi}, subplot_kw={{{self._clean_value('projection')}: {self._clean_value('3d')}}})")
+
+        subplots_cfg = self._get_cfg(config, "basic.subplots", {})
+        use_subplots = subplots_cfg.get("enabled", False)
+
+        if use_subplots:
+            rows = subplots_cfg.get("rows", 1)
+            cols = subplots_cfg.get("cols", 1)
+            sharex = subplots_cfg.get("sharex", False)
+            sharey = subplots_cfg.get("sharey", False)
+
+            kwargs = []
+            if sharex: kwargs.append("sharex=True")
+            if sharey: kwargs.append("sharey=True")
+            if subplot_kwargs: kwargs.append(
+                f"subplot_kw={{{self._clean_value('projection')}: {self._clean_value('3d')}}}")
+
+            kwargs_str = ", ".join(kwargs)
+            if kwargs_str: kwargs_str = ", " + kwargs_str
+
+            lines.append(
+                f"    fig, axes = plt.subplots({rows}, {cols}, figsize=({width}, {height}), dpi={dpi}{kwargs_str})")
+            lines.append(
+                "    # Note: Exporting to subplots targets the first axis by default. Modify index to place plots on different axes.")
+            lines.append("    ax = axes.flatten()[0] if isinstance(axes, np.ndarray) else axes")
         else:
-            lines.append(f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi})")
-        
+            if subplot_kwargs:
+                lines.append(
+                    f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi}, subplot_kw={{{self._clean_value('projection')}: {self._clean_value('3d')}}})")
+            else:
+                lines.append(f"    fig, ax = plt.subplots(figsize=({width}, {height}), dpi={dpi})")
+
         bg_color = self._clean_value(self._get_cfg(config, 'appearance.figure.bg_color', 'white'))
         face_color = self._clean_value(self._get_cfg(config, 'appearance.figure.face_color', 'white'))
-        
-        if bg_color != "'white'": 
+
+        if bg_color != "'white'":
             lines.append(f"    fig.set_facecolor({bg_color})")
-        if face_color != "'white'": 
+        if face_color != "'white'":
             lines.append(f"    ax.set_facecolor({face_color})")
-        
+
         return lines
     
     def _generate_data_prep(self, df: pd.DataFrame, config: Dict[str, Any], x_col: str, y_cols: List[str]) -> List[str]:
         """Generate the code used to preprare datetime data"""
         lines = ["\n    # --- 2. Data Preparation ---"]
-        
+
         cols_to_convert = []
-        
+
         if x_col and x_col in df.columns:
             if "datetime" in str(df.dtypes.get(x_col, '')):
                 cols_to_convert.append(x_col)
-        
+
         for y_c in y_cols:
             if y_c in df.columns and "datetime" in str(df.dtypes.get(y_c, '')):
                 cols_to_convert.append(y_c)
-        
+
         if cols_to_convert:
             lines.extend([
                 "    # Convert detected datetime columns",
                 "    try:"
             ])
             for col in set(cols_to_convert):
-                lines.append(f"        df[{self._clean_value(col)}] = pd.to_datetime(df[{self._clean_value(col)}], errors='coerce', utc=True)")
+                lines.append(
+                    f"        df[{self._clean_value(col)}] = pd.to_datetime(df[{self._clean_value(col)}], errors='coerce', utc=True)")
             lines.append("    except Exception as e: print(f'Warning: Date conversion failed: {e}')")
-        
+
         if self._get_cfg(config, "basic.use_subset"):
             subset_name = self._clean_value(self._get_cfg(config, "basic.subset_name"))
-            lines.append(f"    print(f'Note: processing full dataset, but UI was viewing subset: {{ {subset_name} }}')")
+            subset_def = self._get_cfg(config, "basic.subset_def")
+
+            lines.append(f"\n    # Apply Subset: {subset_name}")
+            if subset_def and "filters" in subset_def:
+                filters = subset_def.get("filters", [])
+                logic = subset_def.get("logic", "AND")
+
+                if filters:
+                    lines.append(f"    print(f'Applying subset {subset_name}...')")
+                    for i, f in enumerate(filters):
+                        col = self._clean_value(f.get("column"))
+                        cond = f.get("condition")
+
+                        # Prepare right-hand side evaluation value cleanly
+                        val = f.get("value")
+                        if cond == "in":
+                            val = [val] if not isinstance(val, (list, tuple, set)) else val
+                        val_str = self._clean_value(val)
+
+                        if cond == "Is Null":
+                            mask_str = f"df[{col}].isna()"
+                        elif cond == "Is Not Null":
+                            mask_str = f"df[{col}].notna()"
+                        elif cond == "contains":
+                            mask_str = f"df[{col}].astype(str).str.contains(str({val_str}), na=False, regex=False)"
+                        elif cond == "in":
+                            mask_str = f"df[{col}].isin({val_str})"
+                        else:
+                            mask_str = f"(df[{col}] {cond} {val_str})"
+
+                        lines.append(f"    mask_{i} = {mask_str}")
+
+                    if logic == "COMPLEX":
+                        lines.append("    final_mask = mask_0")
+                        for i in range(1, len(filters)):
+                            operator = filters[i].get("operator", "AND")
+                            op_char = "&" if operator == "AND" else "|"
+                            lines.append(f"    final_mask = final_mask {op_char} mask_{i}")
+                    elif logic == "OR":
+                        lines.append(f"    final_mask = " + " | ".join([f"mask_{i}" for i in range(len(filters))]))
+                    else:
+                        lines.append(f"    final_mask = " + " & ".join([f"mask_{i}" for i in range(len(filters))]))
+
+                    lines.append("    df = df[final_mask].copy()")
+            else:
+                lines.append(
+                    f"    print(f'Note: processing full dataset, but UI was viewing subset: {{ {subset_name} }}')")
 
         return lines
     
