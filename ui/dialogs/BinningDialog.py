@@ -84,7 +84,7 @@ class BinningPreviewWidget(QWidget):
                     fontsize=8,
                     color=ThemeColors.TEXT_PRIMARY.name()
                 )
-        self.figure.tight_layout()
+        self.figure.subplots_adjust(bottom=0.50, top=0.90, left=0.05, right=0.95)
         self.canvas.draw()
 
 class BinningMethod(Enum):
