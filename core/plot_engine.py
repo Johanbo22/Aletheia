@@ -16,6 +16,8 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as ticker
 
 from core.regression_analyser import RegressionMetrics
+from core.plot_engine_objects.plot_formatter import PlotFormatter
+from core.plot_engine_objects.plot_analytics_renderer import PlotAnalyticsRenderer
 from ui.status_bar import LogLevel
 from core.logger import Logger
 
@@ -120,6 +122,9 @@ class PlotEngine:
         self.secondary_ax = None
         self._cached_processed_data: Optional[pd.DataFrame] = None
         self._is_data_dirty: bool = False
+
+        self._formatter = PlotFormatter(self)
+        self._analytics = PlotAnalyticsRenderer(self)
     
     def cache_data(self, df: pd.DataFrame) -> None:
         self._cached_processed_data = df.copy() if df is not None else None
@@ -139,26 +144,7 @@ class PlotEngine:
 
     def _set_labels(self, title: Optional[str], xlabel: Optional[str], ylabel: Optional[str], legend: bool, **kwargs) -> None:
         """Function that sets labels and handles latex rendering if requqested"""
-        usetex = kwargs.get("usetex", False)
-
-        plt.rcParams["text.usetex"] = usetex
-
-        default_weight = "normal" if usetex else "bold"
-        title_weight = kwargs.get("title_weight", default_weight)
-
-        if title:
-            self.current_ax.set_title(title, fontsize=14, fontweight=title_weight, picker=True)
-        if xlabel:
-            self.current_ax.set_xlabel(xlabel, fontsize=12, picker=True)
-        if ylabel:
-            self.current_ax.set_ylabel(ylabel, fontsize=12, picker=True)
-        
-        zlabel = kwargs.get("zlabel", None)
-        if zlabel and hasattr(self.current_ax, "set_zlabel"):
-            self.current_ax.set_zlabel(zlabel, fontsize=12, picker=True)
-        
-        if legend:
-            self.current_ax.legend()
+        self._formatter.set_labels(title, xlabel, ylabel, legend, **kwargs)
     
     def finalize_layout(self) -> None:
         if self.current_figure is not None:
@@ -467,420 +453,45 @@ class PlotEngine:
 
     def _helper_format_categorical_axis(self, axis, labels):
         """Format categorical axis with better tick spacing"""
-        if labels is None or len(labels) == 0:
-            return
-        
-        n_labels = len(labels)
-        MAX_TICKS = 20
-
-        if n_labels > MAX_TICKS:
-            step = int(np.ceil(n_labels / MAX_TICKS))
-            indices = np.arange(0, n_labels, step)
-            subset_labels = [labels[i] for i in indices]
-
-            axis.set_major_locator(ticker.FixedLocator(indices))
-            axis.set_major_formatter(ticker.FixedFormatter(subset_labels))
-        else:
-            axis.set_major_locator(ticker.FixedLocator(np.arange(n_labels)))
-            axis.set_major_formatter(ticker.FixedFormatter(labels))
-        
-        if axis == self.current_ax.xaxis:
-            plt.setp(self.current_ax.get_xticklabels(), rotation=45, ha="right")
+        self._formatter.format_categorical_axis(axis, labels)
 
     def _helper_is_datetime_column(self, plot_tab: "PlotTab", data: Any) -> bool:
         """Check if data is datetime"""
-        if data is None:
-            return False
-        
-        try:
-            if isinstance(data, pd.Series):
-                if pd.api.types.is_datetime64_any_dtype(data):
-                    return True
-                if data.dtype == "object":
-                    if data.empty:
-                        return False
-
-                    valid_samples = data.dropna().head(50)
-                    if valid_samples.empty:
-                        return False
-
-                    try:
-                        converted = pd.to_datetime(valid_samples, errors="coerce")
-                        if converted.notna().mean() > 0.5:
-                            return True
-                    except Exception:
-                        pass
-            elif hasattr(data, "dtype"):
-                return pd.api.types.is_datetime64_any_dtype(data.dtype)
-        except Exception as DateTimeColumnError:
-            plot_tab.status_bar.log(f"Datetime detection warning: {str(DateTimeColumnError)}", LogLevel.WARNING)
-        return False
+        return self._formatter.is_datetime_column(plot_tab, data)
 
     def _helper_apply_auto_datetime_format(self, plot_tab: "PlotTab", axis, data):
         """Apply datetime formatting based on the input datarange"""
-        if data is None or len(data) < 2 or not self._helper_is_datetime_column(plot_tab, data):
-            return
-        
-        try:
-            if isinstance(data, pd.Series):
-                if data.dtype == "object":
-                    data = pd.to_datetime(data, utc=True, errors="coerce")
-            
-            data = data.dropna()
-
-            if len(data) < 2:
-                return
-            
-            date_range = data.max() - data.min()
-            if date_range <= pd.Timedelta(hours=6):
-                axis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
-                axis.set_major_locator(mdates.MinuteLocator(interval=max(1, len(data) // 10)))
-            elif date_range <= pd.Timedelta(days=1):
-                axis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-                axis.set_major_locator(mdates.HourLocator(interval=max(1, len(data) // 12)))
-            elif date_range <= pd.Timedelta(days=7):
-                axis.set_major_formatter(mdates.DateFormatter("%m/%d %H:%M"))
-                axis.set_major_locator(mdates.DayLocator(interval=1))
-            elif date_range <= pd.Timedelta(days=30):
-                axis.set_major_formatter(mdates.DateFormatter("%m/%d"))
-                axis.set_major_locator(mdates.DayLocator(interval=max(1, date_range.days // 10)))
-            elif date_range <= pd.Timedelta(days=365):
-                axis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-                axis.set_major_locator(mdates.MonthLocator(interval=max(1, date_range.days // 90)))
-            else:
-                axis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-                axis.set_major_locator(mdates.YearLocator())
-        except Exception as ApplyDateTimeError:
-            plot_tab.status_bar.log(f"Failed to auto-format datetime: {str(ApplyDateTimeError)}", LogLevel.WARNING)
+        self._formatter.apply_auto_datetime_format(plot_tab, axis, data)
 
     def _helper_set_intelligent_locator(self, plot_tab: "PlotTab", axis, data):
         """Set tick locators based on tghe datarange"""
-        if data is None or len(data) < 2 or not self._helper_is_datetime_column(plot_tab, data):
-            return
-        
-        try:
-            if isinstance(data, pd.Series):
-                if data.dtype == "object":
-                    data = pd.to_datetime(data, utc=True, errors="coerce")
-            data = data.dropna()
-
-            if len(data) < 2:
-                return
-            
-            date_range = data.max() - data.min()
-            if date_range <= pd.Timedelta(hours=6):
-                axis.set_major_locator(mdates.MinuteLocator(interval=max(1, len(data) // 10)))
-            elif date_range <= pd.Timedelta(days=1):
-                axis.set_major_locator(mdates.HourLocator(interval=max(1, len(data) // 12)))
-            elif date_range <= pd.Timedelta(days=7):
-                axis.set_major_locator(mdates.DayLocator(interval=1))
-            elif date_range <= pd.Timedelta(days=30):
-                axis.set_major_locator(mdates.MonthLocator(interval=max(1, date_range.days // 10)))
-            elif date_range <= pd.Timedelta(days=365):
-                axis.set_major_locator(mdates.MonthLocator(interval=max(1, date_range.days // 90)))
-            else:
-                axis.set_major_locator(mdates.YearLocator())
-        except Exception as DateTimeLocatorError:
-            plot_tab.status_bar.log(f"Failed to set datetime locator: {str(DateTimeLocatorError)}", LogLevel.WARNING)
+        self._formatter.set_intelligent_locator(plot_tab, axis, data)
     
     def _helper_format_datetime_axis(self, plot_tab: "PlotTab", ax, x_data, y_data=None) -> None:
         """Format datetime axes with tick spacing"""
-
-        #first check if datetime in cols
-        is_x_datetime = self._helper_is_datetime_column(plot_tab, x_data)
-        is_y_datetime = self._helper_is_datetime_column(plot_tab, y_data) if y_data is not None else False
-
-        use_custom_format: bool = plot_tab.custom_datetime_check.isChecked()
-
-        #format the x-axis
-        if is_x_datetime:
-            try:
-                if isinstance(x_data, pd.Series):
-                    if x_data.dtype == "object":
-                        x_data = pd.to_datetime(x_data, utc=True, errors="coerce")
-                    elif not hasattr(x_data.dtype, "tz") or x_data.dtype.tz is None:
-                        x_data = x_data.dt.tz_localize("UTC", nonexistent="shift_forward", ambiguous="infer")
-            except Exception as FormatDateTimeAxisError:
-                plot_tab.status_bar.log(f"X-axis timezone handling: {str(FormatDateTimeAxisError)}", LogLevel.WARNING)
-            
-            if use_custom_format:
-                format_text = plot_tab.x_datetime_format_combo.currentText()
-
-                if format_text == "Custom":
-                    custom_format = plot_tab.x_custom_datetime_input.text().strip()
-                    if custom_format:
-                        try:
-                            ax.xaxis.set_major_formatter(mdates.DateFormatter(custom_format))
-                            self._helper_set_intelligent_locator(plot_tab, ax.xaxis, x_data)
-                        except Exception as FormatDateTimeAxisError:
-                            plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatDateTimeAxisError)}", LogLevel.WARNING)
-                            self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-                    else:
-                        self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-                elif format_text == "Auto":
-                    self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-                else:
-                    format_code = format_text.split(" ")[0]
-                    try:
-                        ax.xaxis.set_major_formatter(mdates.DateFormatter(format_code))
-                        self._helper_set_intelligent_locator(plot_tab, ax.xaxis, x_data)
-                    except Exception as FormatDateTimeAxisError:
-                        plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatDateTimeAxisError)}", LogLevel.WARNING)
-                        self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-            else:
-                self._helper_apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-
-        #fmt yaxis
-        if is_y_datetime:
-            try:
-                if isinstance(y_data, pd.Series):
-                    if y_data.dtype == 'object':
-                        y_data = pd.to_datetime(y_data, utc=True, errors='coerce')
-                    elif not hasattr(y_data.dtype, 'tz') or y_data.dtype.tz is None:
-                        y_data = y_data.dt.tz_localize('UTC', nonexistent='shift_forward', ambiguous='infer')
-            except Exception as FormatYAxisDateTimeError:
-                plot_tab.status_bar.log(f"Y-axis timezone handling: {str(FormatYAxisDateTimeError)}", LogLevel.WARNING)
-            
-            if use_custom_format:
-                format_text = plot_tab.y_datetime_format_combo.currentText()
-
-                if format_text == "Custom":
-                    custom_format = plot_tab.y_custom_datetime_format_input.text().strip()
-                    if custom_format:
-                        try:
-                            ax.yaxis.set_major_formatter(mdates.DateFormatter(custom_format))
-                            self._helper_set_intelligent_locator(plot_tab, ax.yaxis, y_data)
-                        except Exception as FormatYAxisDateTimeError:
-                            plot_tab.status_bar.log(f"Invalid datetime format: {str(FormatYAxisDateTimeError)}", LogLevel.WARNING)
-                            self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-                    else:
-                        self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-                elif x_data is not None and hasattr(x_data, "dtype") and (x_data.dtype == "object" or isinstance(x_data.dtype, pd.CategoricalDtype)):
-                    try:
-                        labels = x_data.unique()
-                        labels = [l for l in labels if pd.notna(l)]
-                        self._helper_format_categorical_axis(ax.xaxis, labels)
-                    except Exception:
-                        pass
-                elif format_text == "Auto":
-                    self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-                else:
-                    format_code = format_text.split(" ")[0]
-                    try:
-                        ax.yaxis.set_major_formatter(mdates.DateFormatter(format_code))
-                        self._helper_set_intelligent_locator(plot_tab, ax.yaxis, y_data)
-                    except Exception as InvalidDateTimeError:
-                        plot_tab.status_bar.log(f"Invalid datetime format: {str(InvalidDateTimeError)}", "WARNING")
-                        self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-            else:
-                self._helper_apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
+        self._formatter.format_datetime_axis(plot_tab, ax, x_data, y_data)
     
     def _helper_apply_flipped_labels(self, plot_tab: "PlotTab", x_col, y_cols, font_family):
         """Function to correctly apply axes labels when flipped axes is true"""
-        if plot_tab.xlabel_check.isChecked():
-            ylabel_to_use = plot_tab.xlabel_input.text() or x_col
-            self.current_ax.set_ylabel(
-                ylabel_to_use,
-                fontsize=plot_tab.xlabel_size_spin.value(),
-                fontweight=plot_tab.xlabel_weight_combo.currentText(),
-                fontfamily=font_family
-            )
-        
-        if plot_tab.ylabel_check.isChecked():
-            default_ylabel = y_cols[0] if len(y_cols) == 1 else ", ".join(y_cols)
-            xlabel_to_use = plot_tab.ylabel_input.text() or default_ylabel
-            self.current_ax.set_xlabel(
-                xlabel_to_use,
-                fontsize=plot_tab.ylabel_size_spin.value(),
-                fontweight=plot_tab.ylabel_weight_combo.currentText(),
-                fontfamily=font_family
-            )
-        
-        if plot_tab.title_check.isChecked():
-            title_to_use = plot_tab.title_input.text() if plot_tab.title_input.text() else plot_tab.plot_type.currentText()
-            self.current_ax.set_title(
-                title_to_use,
-                fontsize=plot_tab.title_size_spin.value(),
-                fontweight=plot_tab.title_weight_combo.currentText(),
-                fontfamily=font_family
-            )
-    
-    def _helper_add_regression_analysis(self, plot_tab: "PlotTab", x_col: str, y_col: str, flipped: bool = False) -> None:
+        self._formatter.apply_flipped_labels(plot_tab, x_col, y_cols, font_family)
+
+    def _helper_add_regression_analysis(self, plot_tab: "PlotTab", x_col: str, y_col: str,
+                                        flipped: bool = False) -> None:
         """Orchestrates regression calculation via RegressionAnalyzer and renders output."""
-        try:
-            from core.regression_analyser import RegressionAnalyser, RegressionType, ErrorBarType
-            reg_type_str = plot_tab.view.regression_type_combo.currentText() if hasattr(plot_tab, "regression_type_combo") else "Linear"
-            try:
-                reg_type = RegressionType(reg_type_str)
-            except ValueError:
-                reg_type = RegressionType.LINEAR
-            
-            try:
-                x_data, y_data = RegressionAnalyser.clean_data(plot_tab.data_handler.df, x_col, y_col, reg_type)
-            except TypeError as Type_err:
-                plot_tab.status_bar.log(f"Regression skipped: {str(Type_err)}", "INFO")
-                return
-            
-            if len(x_data) < 2:
-                plot_tab.status_bar.log("Not enough data points to perform regression analysis", "WARNING")
-                return
-            degree = plot_tab.view.poly_degree_spin.value() if hasattr(plot_tab, "poly_degree_spin") else 2
-            try:
-                result = RegressionAnalyser.compute_fit(x_data, y_data, reg_type, degree)
-            except RuntimeError:
-                plot_tab.status_bar.log(f"{reg_type.value} fit failed to converge", "ERROR")
-                return
-            
-            if plot_tab.view.regression_line_check.isChecked():
-                self._render_regression_line(result.x_line, result.y_line, reg_type, flipped)
-            
-            if plot_tab.view.confidence_interval_check.isChecked():
-                confidence = plot_tab.view.confidence_level_spin.value() / 100.0
-                margin = RegressionAnalyser.compute_confidence_interval(x_data, result.residuals, result.x_line, confidence)
-                self._render_confidence_interval(result.x_line, result.y_line, margin, confidence, flipped)
-            
-            self._render_regression_statistics(plot_tab, result.metrics, flipped)
-            
-            plot_tab.status_bar.log(
-            f"Regression ({reg_type.value}): R²={result.metrics.r_squared:.4f}, RMSE={result.metrics.rmse:.4f}",
-            "SUCCESS"
-            )
-        except Exception as error:
-            plot_tab.status_bar.log(f"Regression analysis failed: {str(error)}", "ERROR")
-            import traceback
-            logger = Logger.get_instance()
-            logger.error(f"Regression error: {traceback.print_exc()}")
+        self._analytics.add_regression_analysis(plot_tab, x_col, y_col, flipped)
     
     def _render_regression_line(self, x_line: np.ndarray, y_line: np.ndarray, reg_type: Any, flipped: bool) -> None:
-        plot_args = (x_line, y_line) if not flipped else (y_line, x_line)
-        reg_line = self.current_ax.plot(
-            *plot_args, color="red", linestyle="-", linewidth=2,
-            label=f"{reg_type.value} Fit", alpha=0.5
-        )[0]
-        reg_line.set_gid("regression_line")
+        self._analytics.render_regression_line(x_line, y_line, reg_type, flipped)
     
     def _render_confidence_interval(self, x_line: np.ndarray, y_line: np.ndarray, margin: np.ndarray, confidence: float, flipped: bool) -> None:
-        fill_args = (x_line, y_line - margin, y_line + margin) if not flipped else (y_line - margin, y_line + margin, x_line)
-        if not flipped:
-            ci_poly = self.current_ax.fill_between(
-                fill_args[0], fill_args[1], fill_args[2],
-                color="red", alpha=0.15, label=f"{int(confidence*100)}% CI", zorder=-1
-            )
-        else:
-            ci_poly = self.current_ax.fill_betweenx(
-                fill_args[2], fill_args[0], fill_args[1],
-                color="red", alpha=0.15, label=f"{int(confidence*100)}% CI", zorder=-1
-            )
-        ci_poly.set_gid("confidence_interval")
+        self._analytics.render_confidence_interval(x_line, y_line, margin, confidence, flipped)
     
     def _render_regression_statistics(self, plot_tab: 'PlotTab', metrics: RegressionMetrics, flipped: bool) -> None:
-        stats_text = []
-        eq_x_label = "y" if flipped else "x"
-        eq_y_label = "x" if flipped else "y"
-        
-        if plot_tab.view.show_equation_check.isChecked():
-            formatted_eq = metrics.equation_str.replace('x', eq_x_label)
-            stats_text.append(f'{eq_y_label} = {formatted_eq}')
-        
-        if plot_tab.view.show_r2_check.isChecked():
-            stats_text.append(f"R² = {metrics.r_squared:.4f}")
-        
-        if plot_tab.view.show_rmse_check.isChecked():
-            stats_text.append(f"RMSE = {metrics.rmse:.4f}")
-            
-        if stats_text:
-            textstr = "\n".join(stats_text)
-            props = dict(boxstyle="round", facecolor="wheat", alpha=0.85, edgecolor="black", linewidth=1)
-            font_family = plot_tab.view.font_family_combo.currentFont().family()
-            self.current_ax.text(
-                0.05, 0.95, textstr, transform=self.current_ax.transAxes, 
-                fontsize=11, verticalalignment='top', bbox=props, 
-                fontfamily=font_family, zorder=15
-            )
+        self._analytics.render_regression_statistics(plot_tab, metrics, flipped)
     
     def add_error_bars(self, df: pd.DataFrame, x_col: str, y_cols: List[str], error_bar_type_str: str, flipped: bool = False, plot_tab: "PlotTab" = None) -> None:
         """Computes standard deviation and standard error bars"""
-        from core.regression_analyser import ErrorBarType
-        import numpy as np
-        
-        try:
-            error_bar_type = ErrorBarType(error_bar_type_str)
-        except ValueError:
-            error_bar_type = ErrorBarType.NONE
-            
-        if error_bar_type == ErrorBarType.NONE:
-            return
-        
-        ecolor = "black"
-        elinewidth = 1.5
-        capsize = 4.0
-        alpha = 0.5
-        zorder = 10
-        
-        if plot_tab is not None:
-            if hasattr(plot_tab, "error_bar_color"): 
-                ecolor = plot_tab.error_bar_color
-            if hasattr(plot_tab, "view") and plot_tab.view is not None:
-                if hasattr(plot_tab.view, "error_bar_linewidth_spin"): 
-                    elinewidth = plot_tab.view.error_bar_linewidth_spin.value()
-                if hasattr(plot_tab.view, "error_bar_capsize_spin"): 
-                    capsize = plot_tab.view.error_bar_capsize_spin.value()
-                if hasattr(plot_tab.view, "error_bar_alpha_slider"): 
-                    alpha = plot_tab.view.error_bar_alpha_slider.value() / 100.0
-                if hasattr(plot_tab.view, "error_bar_zorder_spin"): 
-                    zorder = plot_tab.view.error_bar_zorder_spin.value()
-            
-        for y_col in y_cols:
-            clean_df = df[[x_col, y_col]].dropna()
-            if clean_df.empty:
-                continue
-                
-            grouped = clean_df.groupby(x_col)[y_col]
-            x_centers = grouped.mean().index.to_numpy()
-            y_centers = grouped.mean().to_numpy(dtype=float)
-            
-            if error_bar_type == ErrorBarType.STANDARD_DEVIATION:
-                errors = grouped.std().fillna(0).to_numpy(dtype=float)
-            elif error_bar_type == ErrorBarType.STANDARD_ERROR:
-                errors = grouped.sem().fillna(0).to_numpy(dtype=float)
-            else:
-                continue
-            
-            if np.all(errors == 0):
-                x_centers = clean_df[x_col].to_numpy()
-                y_centers = clean_df[y_col].to_numpy(dtype=float)
-                
-                if error_bar_type == ErrorBarType.STANDARD_DEVIATION:
-                    global_err = clean_df[y_col].std()
-                else:
-                    global_err = clean_df[y_col].sem()
-                
-                if pd.isna(global_err) or global_err == 0:
-                    continue
-                    
-                errors = np.full(len(y_centers), global_err)
-                
-            err_args = (x_centers, y_centers) if not flipped else (y_centers, x_centers)
-            err_kwargs = {"yerr": errors} if not flipped else {"xerr": errors}
-            
-            data_line, caplines, barcols = self.current_ax.errorbar(
-                *err_args, **err_kwargs,
-                fmt="none", ecolor=ecolor, alpha=alpha,
-                capsize=capsize, zorder=zorder, elinewidth=elinewidth
-            )
-            if data_line is not None:
-                data_line.set_gid("error_bar")
-            
-            if caplines is not None:
-                for cap in caplines:
-                    if cap is not None:
-                        cap.set_linestyle('none')
-                        cap.set_gid("error_bar")
-                    
-            if barcols is not None:
-                for col in barcols:
-                    if col is not None:
-                        col.set_gid("error_bar")
+        self._analytics.add_error_bars(df, x_col, y_cols, error_bar_type_str, flipped, plot_tab)
     
     def _ensure_projection(self, is_3d: bool) -> None:
         """Replaces the current axis with 3D or 2D"""
