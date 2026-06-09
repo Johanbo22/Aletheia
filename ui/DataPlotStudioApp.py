@@ -314,17 +314,16 @@ class DataPlotStudio(QMainWindow):
         QApplication.setFont(font)
 
         base_css: str = ""
-        styles_dir: Path = Path(get_resource_path("ui/styles"))
+        styles_root: Path = Path(get_resource_path("ui/styles"))
         
-        if settings["dark_mode"]:
-            base_css = self.get_dark_theme()
-        else:
-            light_stylesheet_paths: list[Path] = []
-            if styles_dir.exists() and styles_dir.is_dir():
-                for css_file in styles_dir.rglob("*.css"):
-                    if css_file.name != "dark_theme.css":
-                        light_stylesheet_paths.append(css_file)
-            base_css = self.load_stylesheets(light_stylesheet_paths)
+        theme_folder: str = "dark_theme" if settings["dark_mode"] else "light_theme"
+        active_theme_dir: Path = styles_root / theme_folder
+
+        stylesheet_paths: list[Path] = []
+        if active_theme_dir.exists() and active_theme_dir.is_dir():
+            stylesheet_paths = list(active_theme_dir.rglob("*.css"))
+
+        base_css = self.load_stylesheets(stylesheet_paths)
         
         if QApplication.instance() is not None:
             QApplication.instance().setStyleSheet(base_css)
@@ -343,10 +342,6 @@ class DataPlotStudio(QMainWindow):
         self.apply_settings(self._current_settings)
         self.main_widget.apply_autosave_settings(self._current_settings)
         self.status_bar_widget.log("Styles reloaded", "INFO")
-    
-    def get_dark_theme(self):
-        dark_theme_path: Path = Path(get_resource_path("ui/styles/dark_theme.css"))
-        return self.load_stylesheets([dark_theme_path])
 
     @classmethod
     def load_stylesheets(cls, absolute_paths: list[Path]) -> str:

@@ -2,19 +2,16 @@ import threading
 from enum import Enum
 
 import pandas as pd
-from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, QRunnable, QSortFilterProxyModel, QModelIndex
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, QStandardItem, QStandardItemModel
+from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, QRunnable, QSortFilterProxyModel
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, \
+    QStandardItem, \
+    QStandardItemModel
 from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, \
-    QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListWidgetItem, QListView, QMenu, QLineEdit, QGroupBox, QComboBox, QPushButton
-from xlrd import colname
+    QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListView, QMenu, QLineEdit, QGroupBox, QComboBox, QPushButton
 
-from ui.theme import ThemeColors
 from ui.workers import AggregationWorker
 from icons import IconBuilder, IconType
 
-DIALOG_WIDTH: int = 1200
-DIALOG_HEIGHT: int = 700
-PREVIEW_TABLE_MAX_HEIGHT: int = 200
 DEFAULT_PREVIEW_LIMIT: int = 5
 DEBOUNCE_DELAY_MS: int = 300
 MIN_AGG_TABLE_HEIGHT: int = 150
@@ -122,7 +119,10 @@ class AggregationDialog(QDialog):
         self.result_df = None
         self.setWindowTitle("Aggregate Data")
         self.setModal(True)
-        self.resize(DIALOG_WIDTH, DIALOG_HEIGHT)
+
+        screen_geometry = self.screen().availableGeometry()
+        self.resize(int(screen_geometry.width() * 0.6), int(screen_geometry.height() * 0.7))
+
         self.columns = list(data_handler.df.columns)
 
         self.date_grouping_options = ["None", "Year", "Quarter", "Month", "Week", "Day"]
@@ -153,9 +153,7 @@ class AggregationDialog(QDialog):
         group_layout = QVBoxLayout()
 
         group_info = QLabel("Select columns to group by:")
-        group_font = group_info.font()
-        group_font.setPointSize(9)
-        group_info.setFont(group_font)
+        group_info.setProperty("styleClass", "info_text")
         group_layout.addWidget(group_info)
         
         # Search bar for the group by list
@@ -185,10 +183,6 @@ class AggregationDialog(QDialog):
 
         self.date_hint_label = QLabel("Select a datetime column to enable date grouping")
         self.date_hint_label.setObjectName("DateGroupingHintLabel")
-        hint_font = self.date_hint_label.font()
-        hint_font.setPointSize(8)
-        hint_font.setItalic(True)
-        self.date_hint_label.setFont(hint_font)
         self.date_hint_label.setWordWrap(True)
         group_layout.addWidget(self.date_hint_label)
 
@@ -288,14 +282,10 @@ class AggregationDialog(QDialog):
         self.agg_table.setAlternatingRowColors(True)
         self.agg_table.setColumnCount(3)
         self.agg_table.setHorizontalHeaderLabels(["Column", "Function", "Output Name"])
-        
-        header_font = self.agg_table.horizontalHeader().font()
-        header_font.setBold(True)
-        self.agg_table.horizontalHeader().setFont(header_font)
         self.agg_table.verticalHeader().setDefaultSectionSize(35)
         
         self.agg_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.agg_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.agg_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.agg_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.agg_table.setColumnWidth(1, 140)
         self.agg_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -359,18 +349,15 @@ class AggregationDialog(QDialog):
         self.preview_table.setAlternatingRowColors(True)
         self.preview_table.verticalHeader().setVisible(False)
         self.preview_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.preview_table.setMaximumHeight(PREVIEW_TABLE_MAX_HEIGHT)
-        
-        preview_header_font = self.preview_table.horizontalHeader().font()
-        preview_header_font.setBold(True)
-        self.preview_table.horizontalHeader().setFont(preview_header_font)
+
         self.preview_table.setGridStyle(Qt.PenStyle.DotLine)
         
         bottom_layout.addWidget(self.preview_table)
 
         self.main_splitter.addWidget(bottom_widget)
         
-        self.main_splitter.setSizes([DIALOG_HEIGHT - PREVIEW_TABLE_MAX_HEIGHT, PREVIEW_TABLE_MAX_HEIGHT])
+        self.main_splitter.setStretchFactor(0, 7)
+        self.main_splitter.setStretchFactor(1, 3)
 
         main_layout.addWidget(self.main_splitter)
         main_layout.addSpacing(10)
@@ -418,38 +405,36 @@ class AggregationDialog(QDialog):
         self._re_evaluate_apply_button()
 
     def on_group_selection_change(self):
-        """Changes in group by selection t show date options"""
+        """
+        Handle changes in group-by selection.
+        Adds or removes data grouping comboboxes based on selection
+        without removing widgets to preserve UI focus and avoid flickering
+        """
         selected_indexes = self.group_by_list_view.selectionModel().selectedIndexes()
-        show_date_options = False
 
-        existing_states: dict[str, str] = {
-            col: combo.currentText() for col, combo in self.date_freq_combos.items()
+        selected_dt_cols: set[str] = {
+            item.data() for item in selected_indexes if pd.api.types.is_datetime64_any_dtype(self.data_handler.df[item.data()])
         }
 
-        while self.date_group_layout.count():
-            item = self.date_group_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        current_cols: list[str] = list(self.date_freq_combos.keys())
+        for col_name in current_cols:
+            if col_name not in selected_dt_cols:
+                combo_to_remove = self.date_freq_combos.pop(col_name)
+                self.date_group_layout.removeRow(combo_to_remove)
+                combo_to_remove.deleteLater()
 
-        self.date_freq_combos.clear()
-
-        # check for datetime
-        for item in selected_indexes:
-            col_name = item.data()
-            if pd.api.types.is_datetime64_any_dtype(self.data_handler.df[col_name]):
-                show_date_options = True
-
+        for col_name in selected_dt_cols:
+            if col_name not in self.date_freq_combos:
                 combo = QComboBox()
                 combo.addItems(self.date_grouping_options)
-
-                if col_name in existing_states:
-                    combo.setCurrentText(existing_states[col_name])
                 combo.currentTextChanged.connect(self.update_preview)
                 self.date_group_layout.addRow(f"{col_name}:", combo)
                 self.date_freq_combos[col_name] = combo
 
-        self.date_group_frame.setVisible(show_date_options)
-        self.date_hint_label.setVisible(not show_date_options)
+        has_date_options: bool = len(self.date_freq_combos) > 0
+        self.date_group_frame.setVisible(has_date_options)
+        self.date_hint_label.setVisible(not has_date_options)
+
         self.update_preview()
     
     def filter_available_columns(self, search_text: str) -> None:
@@ -467,7 +452,7 @@ class AggregationDialog(QDialog):
         
     def add_first_visible_column_to_agg(self) -> None:
         """Add the top visible column in the available list wehen hittin ENter/Return key"""
-        if self.available_proxy.rowCOunt() > 0:
+        if self.available_proxy.rowCount() > 0:
             first_index = self.available_proxy.index(0, 0)
             self._add_specific_column_to_agg(first_index.data())
             self.column_search_input.clear()
@@ -679,6 +664,8 @@ class AggregationDialog(QDialog):
     def _populate_list_with_icons(self, model: QStandardItemModel, columns: list[str]) -> None:
         """Populate a standard item model with column names and their data type"""
         model.clear()
+        items: list[QStandardItem] = []
+
         for col_name in columns:
             item = QStandardItem(col_name)
 
@@ -692,7 +679,9 @@ class AggregationDialog(QDialog):
 
             item.setIcon(icon)
             item.setEditable(False)
-            model.appendRow(item)
+            items.append(item)
+        if items:
+            model.invisibleRootItem().appendRows(items)
 
     def _re_evaluate_apply_button(self) -> None:
         group_cols, agg_config, _, _ = self.get_current_config()
