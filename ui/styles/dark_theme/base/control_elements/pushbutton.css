@@ -1,0 +1,164 @@
+/*
+This CSS file governs the styling of QPushButton in Dark Mode
+Contains styling parameters for 3 main button objects:
+
+    DEFAULT BUTTON
+    MainActionButton
+    DestructiveButton
+
+This CSS file will also hold any buttons that require a unique ObjectName 
+not stored in a *_dialog.css file, custom_widget or component_style css file. 
+*/
+/* DEFAULT BUTTON 
+    The default button is not targeted by any ObjectName or setProperty() 
+    Will always work as a secondary action button unless a Destructive objectName is assigned
+*/
+QPushButton {
+    background-color: #3b4048;
+    color: #abb2bf;
+    font-weight: bold;
+    padding: 8px;
+    min-width: 30px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+QPushButton:hover {
+    background-color: #4b5363;
+}
+
+QPushButton:pressed {
+    background-color: #282c34;
+}
+
+QPushButton:checked {
+    background-color: #2c313a;
+    border: 1px inset #181a1f;
+}
+
+QPushButton:focus {
+    border: 1px solid #61afef;
+    outline: none;
+}
+
+QPushButton:disabled {
+    background-color: rgba(59, 64, 72, 128);
+    color: rgba(171, 178, 191, 128);
+}
+
+/*Size Varian StyleClass*/
+QPushButton[size_variant="large"] {
+    padding: 12px;
+}
+
+QPushButton[flat="true"] {
+    background-color: transparent;
+    border: 1px solid transparent;
+}
+
+QPushButton[flat="true"]:hover {
+    background-color: rgba(75, 83, 99, 128);
+}
+
+/*
+The MainActionButton Styling
+*/
+QPushButton#MainActionButton {
+    background-color: #61afef;
+    color: #1e222a;
+    border: 2px solid transparent;
+}
+
+QPushButton#MainActionButton:hover {
+    background-color: #528bff;
+}
+
+QPushButton#MainActionButton:pressed {
+    background-color: #427bc5;
+}
+
+QPushButton#MainActionButton:focus {
+    border: 2px solid #abb2bf;
+}
+
+QPushButton#MainActionButton:disabled {
+    background-color: rgba(97, 175, 239, 128);
+    color: rgba(30, 34, 42, 128);
+}
+
+/*
+The DesctructiveButton styling
+*/
+QPushButton#DestructiveButton {
+    background-color: #e06c75;
+    color: #ffffff;
+    border: 2px solid transparent;
+}
+
+QPushButton#DestructiveButton:hover {
+    background-color: #be5046;
+}
+
+QPushButton#DestructiveButton:pressed {
+    background-color: #9c362a;
+}
+
+QPushButton#DestructiveButton:focus {
+    border: 2px solid #abb2bf;
+}
+
+QPushButton#DestructiveButton:disabled {
+    background-color: rgba(224, 108, 117, 128);
+    color: rgba(255, 255, 255, 128);
+}
+
+/* Unique PushButton for the StatusBar ViewLogHistory Popup*/
+QPushButton#ViewLogHistory {
+    background-color: #2c313a;
+    color: #abb2bf;
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+}
+
+QPushButton#ViewLogHistory:hover {
+    background-color: #3b4048;
+}
+
+/* Unique Google Sheet reimport button*/
+QPushButton#GoogleSheetReImport {
+    background-color: #98c379;
+    color: #1e222a;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+QPushButton#GoogleSheetReImport:hover {
+    background-color: #7cb059;
+}
+
+/* The button controlling EditMode 
+This changes the color based on :checked state
+*/
+QPushButton#EditModeButton {
+    background-color: #3b4048;
+    color: #abb2bf;
+}
+
+QPushButton#EditModeButton:hover {
+    background-color: #4b5363;
+}
+
+QPushButton#EditModeButton:checked {
+    background-color: #98c379;
+    color: #1e222a;
+}
+
+QPushButton#EditModeButton:checked:hover {
+    background-color: #7cb059;
+}
+
+QPushButton#EditModeButton:focus {
+    border: 1px solid #abb2bf;
+    outline: none;
+}

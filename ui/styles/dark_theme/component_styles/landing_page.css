@@ -1,0 +1,179 @@
+#LandingPage,
+#landing_sidebar,
+#landing_scroll_area {
+    background-color: #0f172a;
+}
+
+QFrame#sidebar_separator {
+    border: none;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 transparent, stop:0.5 #334155, stop:1 transparent);
+    min-width: 200px;
+    margin-bottom: 5px;
+}
+
+QFrame#landing_vertical_separator {
+    border: none;
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 transparent, stop:0.5 #334155, stop:1 transparent);
+    margin: 10px 20px;
+}
+
+QLabel#landing_title {
+    font-size: 36px;
+    font-weight: bold;
+    color: #f1f5f9;
+}
+
+QLabel#landing_subtitle {
+    font-size: 12px;
+    font-weight: bold;
+    color: #94a3b8;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+}
+
+QFrame#sidebar_separator {
+    border: none;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 transparent, stop:0.5 #334155, stop:1 transparent);
+    min-width: 200px;
+    margin-bottom: 5px;
+}
+
+QLabel[styleClass="landing_section_label"] {
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #334155;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+QLabel#no_recent_label {
+    color: #94a3b8;
+    font-style: italic;
+    font-size: 12px;
+    padding: 10px 0;
+}
+
+QScrollArea#landing_scroll_area {
+    background-color: transparent;
+    border: none;
+
+}
+
+QScrollArea#landing_scroll_area QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollArea#landing_scroll_area QScrollBar::handle:vertical {
+    background: #475569;
+    min-height: 30px;
+    border-radius: 4px;
+}
+
+QScrollArea#landing_scroll_area QScrollBar::handle:vertical:hover {
+    background: #64748b;
+}
+
+QScrollArea#landing_scroll_area QScrollBar::add-line:vertical,
+QScrollArea#landing_scroll_area QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: none;
+}
+
+QScrollArea#landing_scroll_area QScrollBar::add-page:vertical,
+QScrollArea#landing_scroll_area QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QFrame#InfoPanel {
+    background-color: #1e293b;
+    border-radius: 15px;
+    border: 1px solid #334155;
+}
+
+QLabel#whats_new_title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #f8fafc;
+}
+
+QLabel#app_version_label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #38bdf8;
+    background-color: #0c4a6e;
+    padding: 4px 10px;
+    border-radius: 10px;
+}
+
+QLabel#whats_new_content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    color: #cbd5e1;
+}
+
+QFrame#landing_header_separator {
+    background-color: #334155;
+    border: none;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+
+ChangelogViewer {
+    background-color: #0f172a;
+}
+
+ChanglogViewer#ChanglogTextBrowser {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 15px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    color: #e2e8f0;
+}
+
+ChangelogViewer QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 8px;
+    margin: 0px;
+}
+
+ChangelogViewer QScrollBar::handle:vertical {
+    background: #475569;
+    min-height: 30px;
+    border-radius: 4px;
+}
+
+ChangelogViewer QScrollBar::handle:vertical:hover {
+    background: #64748b;
+}
+
+ChangelogViewer QScrollBar::add-line:vertical,
+ChangelogViewer QScrollBar::sub-line:vertical,
+ChangelogViewer QScrollBar::add-page:vertical,
+ChangelogViewer QScrollBar::sub-page:vertical {
+    height: 0px;
+    background: none;
+}
+
+ChangelogViewer QPushButton {
+    background-color: #0ea5e9;
+    color: #f8fafc;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 24px;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+ChangelogViewer QPushButton:hover {
+    background-color: #0284c7;
+}

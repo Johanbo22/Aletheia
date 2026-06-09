@@ -1,0 +1,206 @@
+QStatusBar {
+    background: #21252b;
+    border-top: 1px solid #181a1f;
+    color: #abb2bf;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+}
+
+QStatusBar#main_status_bar {
+    background-color: #1e222a;
+    color: #abb2bf;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+    border-top: 1px solid #181a1f;
+    padding: 4px;
+}
+
+QStatusBar#main_status_bar::item {
+    border: none;
+}
+
+QLabel#stats_label {
+    color: #5c6370;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+    padding-right: 15px;
+}
+
+QLabel#source_label {
+    color: #61afaf;
+    font-size: 11px;
+    padding-right: 10px;
+}
+
+QLabel#issue_counter_label {
+    color: #abb2bf;
+    font-weight: bold;
+    font-size: 11px;
+    padding: 0 5px;
+}
+
+QFrame[styleClass="status_separator"] {
+    color: #3b4048;
+}
+
+QProgressBar#status_progress_bar {
+    border: none;
+    background-color: #282c34;
+    border-radius: 2px;
+    min-height: 4px;
+    max-height: 4px;
+}
+
+QProgressBar#status_progress_bar::chunk {
+    background-color: #61afaf;
+    border-radius: 2px;
+}
+
+QLineEdit#status_terminal {
+    background-color: #1e222a;
+    font-family: Consolas, monospace;
+    font-size: 10px;
+    border: 1px solid #3b4048;
+    padding: 4px;
+}
+
+QLineEdit#status_terminal:focus {
+    outline: none;
+    border: 1px solid #5c6370;
+}
+
+QLineEdit#status_terminal[logLevel="IDLE"] {
+    background-color: transparent;
+    color: #5c6370;
+    border: 1px solid #3b4048;
+}
+
+QLineEdit#status_terminal[logLevel="SUCCESS"],
+QLineEdit#status_terminal[logLevel="INFO"] {
+    background-color: transparent;
+    color: #98c379;
+    border: 1px solid #98c379;
+}
+
+QLineEdit#status_terminal[logLevel="WARNING"] {
+    background-color: #e5c07b;
+    color: #1e222a;
+    border: 1px solid #e5c07b;
+}
+
+QLineEdit#status_terminal[logLevel="ERROR"] {
+    background-color: #e06c75;
+    color: #ffffff;
+    border: 1px solid #e06c75;
+}
+
+QLineEdit#status_terminal[errorFlash="true"] {
+    background-color: rgba(224, 108, 117, 0.15);
+}
+
+QMenu#terminal_context_menu {
+    background-color: #282c34;
+    color: #abb2bf;
+    border: 1px solid #3b4048;
+}
+
+QMenu#terminal_context_menu::item {
+    color: #abb2bf;
+    padding: 4px 20px 4px 20px;
+}
+
+QMenu#terminal_context_menu::item:selected {
+    background-color: #61afaf;
+    color: #ffffff;
+}
+
+QMenu#terminal_context_menu::item:disabled {
+    color: #5c6370;
+    background-color: transparent;
+}
+
+QMenu#terminal_context_menu::separator {
+    height: 1px;
+    background-color: #3b4048;
+    margin: 4px 8px;
+}
+
+QLabel#status_state_label {
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-weight: bold;
+    font-size: 10px;
+}
+
+QLabel#status_state_label[logLevel="IDLE"] {
+    background-color: transparent;
+    color: #5c6370;
+    border: 1px solid #3b4048;
+}
+
+QLabel#status_state_label[logLevel="SUCCESS"],
+QLabel#status_state_label[logLevel="INFO"] {
+    background-color: transparent;
+    color: #98c379;
+    border: 1px solid #98c379;
+}
+
+QLabel#status_state_label[logLevel="WARNING"] {
+    background-color: #e5c07b;
+    color: #1e222a;
+    border: none;
+}
+
+QLabel#status_state_label[logLevel="ERROR"] {
+    background-color: #e06c75;
+    color: #ffffff;
+    border: none;
+}
+
+QLabel#view_context_label {
+    font-weight: bold;
+    font-size: 11px;
+    padding-right: 10px;
+}
+
+QLabel#view_context_label[contextType="aggregation"] {
+    color: #c678dd;
+}
+
+QLabel#view_context_label[contextType="subset"] {
+    color: #d19a66;
+}
+
+QStatusBar QProgressBar {
+    border: 1px solid #3b4048;
+    border-radius: 4px;
+    background-color: #1e222a;
+    text-align: center;
+    color: #abb2bf;
+    font-size: 10px;
+    font-weight: 600;
+    min-height: 14px;
+    max-height: 14px;
+}
+
+QStatusBar QProgressBar::chunk {
+    border-radius: 2px;
+    background-color: #61afef;
+}
+
+#status_memory_bar[usageLevel="normal"]::chunk {
+    background-color: #98c379;
+}
+
+#status_memory_bar[usageLevel="warning"]::chunk {
+    background-color: #e5c07b;
+}
+
+#status_memory_bar[usageLevel="critical"] {
+    border: 1px solid #e06c75;
+    color: #ffffff;
+}
+
+#status_memory_bar[usageLevel="critical"]::chunk {
+    background-color: #e06c75;
+}

@@ -1,0 +1,75 @@
+#MainDataHeader::section {
+    background-color: #21252b;
+    color: #aab2bf;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    border-right: 1px solid #181a1f;
+    border-bottom: 2pxsolid #181a1f;
+    padding: 6px 8px;
+}
+
+#MainDataHeader::section:hover {
+    background-color: #2c313a;
+    color: #ffffff;
+}
+
+QTableCornerButton::section {
+    background-color: #21252b;
+    border: none;
+    border-right: 1px solid #181a1f;
+    border-bottom: 1px solid #181a1f;
+}
+
+#MainDataTable QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 14px;
+    margin: 0px;
+}
+
+#MainDataTable QScrollBar::handle:vertical {
+    background: rgba(171, 178, 191, 0.2);
+    min-height: 40px;
+    border-radius: 6px;
+    margin: 3px;
+}
+
+#MainDataTable QScrollBar::handle:vertical:hover {
+    background: rgba(171, 178, 191, 0.4);
+}
+
+#MainDataTable QScrollBar:horizontal {
+    border: none;
+    background: transparent;
+    height: 14px;
+    margin: 0px;
+}
+
+#MainDataTable QScrollBar::handle:horizontal {
+    background: rgba(171, 178, 191, 0.2);
+    min-width: 40px;
+    border-radius: 6px;
+    margin: 3px;
+}
+
+#MainDataTable QScrollBar::handle:horizontal:hover {
+    background: rgba(171, 178, 191, 0.4);
+}
+
+#MainDataTable QScrollBar::add-line:vertical,
+#MainDataTable QScrollBar::sub-line:vertical,
+#MainDataTable QScrollBar::add-line:horizontal,
+#MainDataTable QScrollBar::sub-line:horizontal {
+    height: 0px;
+    width: 0px;
+    border: none;
+    background: none;
+}
+
+#MainDataTable QScrollBar::add-page:vertical,
+#MainDataTable QScrollBar::sub-page:vertical,
+#MainDataTable QScrollBar::add-page:horizontal,
+#MainDataTable QScrollBar::sub-page:horizontal {
+    background: none;
+}

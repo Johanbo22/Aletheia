@@ -25,6 +25,7 @@ class ChangelogViewer(QDialog):
         layout.setSpacing(15)
         
         self.browser = QTextBrowser()
+        self.browser.setObjectName("ChanglogTextBrowser")
         self.browser.setHtml(content_html)
         self.browser.setOpenExternalLinks(True)
         layout.addWidget(self.browser)
@@ -266,6 +267,7 @@ class LandingPage(QWidget):
         whats_new_scroll_area.setWidget(info_panel)
         
         right_panel = QWidget()
+        right_panel.setObjectName("LandingPage")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(50, 60, 50, 60)
         right_layout.addWidget(whats_new_scroll_area)

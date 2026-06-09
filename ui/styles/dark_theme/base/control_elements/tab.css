@@ -1,0 +1,99 @@
+/*
+This CSS file governs the styling associated with the 
+QTabWidget system, and the QTabBar for the Dark Mode theme 
+
+This file also handles the styling for any QToolButtons on an associated QTabBar
+*/
+QTabWidget:focus {
+    outline: none;
+}
+
+QTabWidget::pane {
+    border: 1px solid #181a1f;
+    background: #21252b;
+    border-radius: 6px;
+    border-top-left-radius: 0px;
+    top: -1px;
+}
+
+QTabBar {
+    qproperty-drawBase: 0;
+    background: transparent;
+}
+
+QTabBar::tab {
+    background: transparent;
+    color: #5c6370;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    padding: 8px 16px;
+    margin-right: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    min-width: 75px;
+}
+
+QTabBar::tab:hover {
+    background: rgba(97, 175, 239, 0.05);
+    color: #abb2bf;
+    border-bottom: 2px solid rgba(97, 175, 239, 0.3);
+}
+
+QTabBar::tab:selected {
+    background: #21252b;
+    color: #61afef;
+    font-weight: bold;
+    border: 1px solid #181a1f;
+    border-bottom: 2px solid #61afef;
+}
+
+QTabBar::tab:disabled {
+    color: #3b4048;
+    background: transparent;
+}
+
+QTabBar::tab:focus {
+    outline: none;
+    border: 1px dashed #61afef;
+}
+
+QTabBar::close-button {
+    background: transparent;
+    border-radius: 3px;
+    padding: 2px;
+    margin: 2px;
+}
+
+QTabBar::close-button:hover {
+    background-color: rgba(224, 108, 117, 0.15);
+}
+
+QTabBar::close-button:pressed {
+    background-color: rgba(224, 108, 117, 0.30);
+}
+
+QTabBar QToolButton {
+    background-color: #282c34;
+    border: 1px solid #3b4048;
+    border-radius: 4px;
+    margin: 1px;
+}
+
+QTabBar QToolButton:hover {
+    background-color: #3b4048;
+}
+
+QTabBar QToolButton:pressed {
+    background-color: #4b5363;
+}
+
+QTabBar QToolButton:focus {
+    border: 1px solid #61afef;
+    outline: none;
+}
+
+QTabBar QToolButton:disabled {
+    background-color: rgba(40, 44, 52, 128);
+    color: rgba(171, 178, 191, 128);
+    border-color: rgba(59, 64, 72, 128);
+}

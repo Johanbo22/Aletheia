@@ -1,0 +1,37 @@
+/* This css file governs the general styleClass property styling rules set for entire application. 
+Individual dialog styleClasses are set in their own [name].css file 
+This is the stylesheet for styleClasses in the Dark mode theme.
+*/
+QLabel[styleClass="info_text"] {
+    color: #5c6370;
+    font-style: italic;
+    font-size: 9pt;
+}
+
+QLabel[styleClass="warning_info_text"] {
+    color: #d19a66;
+    font-style: italic;
+    font-size: 9pt;
+}
+
+QLabel[styleClass="muted_text"] {
+    color: #5c6370;
+    font-size: 9pt;
+    font-style: italic;
+}
+
+QLabel[styleClass="help_box"] {
+    background-color: #1e222a;
+    color: #abb2bf;
+    padding: 8px;
+    border: 1px solid #3b4048;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+QLabel[styleClass="section_header"] {
+    font-weight: bold;
+    color: #61afef;
+    font-size: 11pt;
+    margin-bottom: 5px;
+}

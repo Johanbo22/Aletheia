@@ -1,0 +1,49 @@
+/*
+This CSS file governs the styling of QGroupBox in Dark mode
+*/
+QGroupBox {
+    font-size: 13pt;
+    font-weight: bold;
+    border: 1px solid #3b4048;
+    border-radius: 4px;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+QGroupBox:focus {
+    border: 1.5px solid #61afef;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    color: #aab2bf;
+    padding: 0 5px;
+    left: 10px;
+    background-color: #21252b;
+    top: 0px;
+}
+
+QGroupBox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #3b4048;
+    border-radius: 3px;
+    background-color: #1e222a;
+    margin-right: 4px;
+}
+
+QGroupBox::indicator:hover {
+    border-color: #5c6370;
+}
+
+QGroupBox::indicator:checked {
+    background-color: rgba(97, 175, 239, 0.05);
+    border-color: #61afef;
+    image: url(icons/ui_styling/checkmark.svg);
+}
+
+QGroupBox::indicator:disabled {
+    background-color: rgba(40, 44, 52, 128);
+    border-color: rgba(59, 64, 72, 128);
+}
