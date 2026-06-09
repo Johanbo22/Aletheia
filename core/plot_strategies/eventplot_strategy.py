@@ -36,18 +36,36 @@ class EventplotPlotStrategy(BasePlotStrategy):
 
         # Eventplot default orientation is 'horizontal' (events along x-axis)
         orientation = "vertical" if axes_flipped else "horizontal"
-        kwargs["orientation"] = orientation
 
         data_to_plot = [df[col].dropna().values for col in y_cols]
+        num_series = len(data_to_plot)
 
-        engine.current_ax.eventplot(data_to_plot, **kwargs)
+        colors = kwargs.pop("colors", kwargs.pop("color", None))
+        linestyles = kwargs.pop("linestyles", kwargs.pop("linestyle", "solid"))
+        linewidths = kwargs.pop("linewidths", kwargs.pop("linewidth", None))
+        alpha = kwargs.pop("alpha", 1.0)
 
-        if len(y_cols) > 1:
+        lineoffsets = kwargs.pop("lineoffsets", list(range(num_series)))
+        linelengths = kwargs.pop("linelengths", 0.8 if num_series > 1 else 1.0)
+
+        engine.current_ax.eventplot(
+            data_to_plot,
+            orientation=orientation,
+            lineoffsets=lineoffsets,
+            linelengths=linelengths,
+            linewidths=linewidths,
+            colors=colors,
+            linestyles=linestyles,
+            alpha=alpha,
+            **kwargs
+        )
+
+        if num_series > 0:
             if axes_flipped:
-                engine.current_ax.set_xticks(range(len(y_cols)))
+                engine.current_ax.set_xticks(lineoffsets)
                 engine.current_ax.set_xticklabels(y_cols)
             else:
-                engine.current_ax.set_yticks(range(len(y_cols)))
+                engine.current_ax.set_yticks(lineoffsets)
                 engine.current_ax.set_yticklabels(y_cols)
 
         if axes_flipped:

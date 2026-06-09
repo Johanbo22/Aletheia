@@ -273,13 +273,16 @@ class MainWindow(QWidget):
     def open_project(self) -> None:
         """Open an existing project"""
         if self._confirm_discard_changes():
+            settings = QSettings(f"{APPLICATION_NAME}", "Preferences")
+            last_dir = settings.value("last_project_dir", "")
             filepath, _ = QFileDialog.getOpenFileName(
                 self,
                 "Open Project",
-                "",
+                last_dir,
                 f"{APPLICATION_NAME} Portable Files (*{self.project_manager.PROJECT_EXTENSION})"
             )
             if filepath:
+                settings.setValue("last_project_dir", str(Path(filepath).parent))
                 self._load_project_from_path(filepath)
     
     def open_recent_project(self, filepath: str) -> None:
@@ -546,9 +549,13 @@ class MainWindow(QWidget):
         data_filter = "Data Files (*.csv *.xlsx *.xls *.txt *.json)"
         all_files_filter = "All Files (*)"
         file_filter = f"{data_filter};;{geospatial_filter};;{all_files_filter}"
+
+        settings = QSettings(f"{APPLICATION_NAME}", "Preferences")
+        last_dir = settings.value("last_import_dir", "")
         
-        filepath, _ = QFileDialog.getOpenFileName(self, "Import Data File", "", file_filter)
+        filepath, _ = QFileDialog.getOpenFileName(self, "Import Data File", last_dir, file_filter)
         if filepath:
+            settings.setValue("last_import_dir", str(Path(filepath).parent))
             self.load_file_from_path(filepath)
     
     @pyqtSlot(int, str)
