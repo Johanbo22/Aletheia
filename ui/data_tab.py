@@ -1,5 +1,5 @@
 # ui/data_tab.py
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QListWidgetItem, QTableView, QHeaderView, QGraphicsOpacityEffect, QMenu, QStackedWidget, QApplication, QTabWidget, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QListWidgetItem, QTableView, QHeaderView, QGraphicsOpacityEffect, QMenu, QStackedWidget, QApplication, QTabWidget, QLabel, QAbstractItemView
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QSize, QTimer, QModelIndex
 from PyQt6.QtGui import QIcon, QFont, QAction, QPalette, QColor, QShortcut, QKeySequence
@@ -150,9 +150,12 @@ class DataTab(QWidget):
             QHeaderView.ResizeMode.Interactive
         )
         self.data_table.verticalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Interactive
+            QHeaderView.ResizeMode.Fixed
         )
+        self.data_table.setWordWrap(False)
         self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        self.data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
+        self.data_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
         
         palette = self.data_table.palette()
         active_highlight = palette.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Highlight)
@@ -884,9 +887,12 @@ class DataTab(QWidget):
         self.data_table.setWordWrap(settings["word_wrap"])
         self.data_table.setSelectionBehavior(settings["selection_behavior"])
 
-        self.data_table.resizeRowsToContents()
         if settings["word_wrap"]:
+            self.data_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
             self.data_table.resizeColumnsToContents()
+        else:
+            self.data_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+            self.data_table.verticalHeader().setDefaultSectionSize(32)
         
         if self.data_table.model() and isinstance(self.data_table.model(), DataTableModel):
             self.data_table.model().set_float_precision(self.current_precision)

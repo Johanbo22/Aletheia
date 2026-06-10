@@ -4,6 +4,9 @@ import operator
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, QVariant
 from PyQt6.QtGui import QColor, QFont
 from typing import Any
+
+from sqlalchemy.sql.dml import isinsert
+
 from ui.status_bar import StatusBar
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -11,6 +14,17 @@ if TYPE_CHECKING:
 
 class DataTableModel(QAbstractTableModel):
     """ table for the data Table"""
+
+    _SUPPORTED_ROLES = {
+        Qt.ItemDataRole.DisplayRole,
+        Qt.ItemDataRole.BackgroundRole,
+        Qt.ItemDataRole.TextAlignmentRole,
+        Qt.ItemDataRole.ToolTipRole,
+        Qt.ItemDataRole.EditRole,
+        Qt.ItemDataRole.ForegroundRole,
+        Qt.ItemDataRole.FontRole,
+        Qt.ItemDataRole.CheckStateRole
+    }
 
     def __init__(self, data_handler: "DataHandler", editable: bool=False, parent: Any=None, highlighted_rows: list[int] | None=None, float_precision: int = 2, conditional_rules: list[dict[str, Any]] | None = None):
         super().__init__(parent)
@@ -212,64 +226,61 @@ class DataTableModel(QAbstractTableModel):
         """Returns le data"""
         if not index.isValid() or self._data is None:
             return None
-    
-        _supported_roles = (
-            Qt.ItemDataRole.DisplayRole,
-            Qt.ItemDataRole.BackgroundRole,
-            Qt.ItemDataRole.TextAlignmentRole,
-            Qt.ItemDataRole.ToolTipRole,
-            Qt.ItemDataRole.EditRole,
-            Qt.ItemDataRole.ForegroundRole,
-            Qt.ItemDataRole.FontRole,
-            Qt.ItemDataRole.CheckStateRole
-        )
-        if role not in _supported_roles:
+
+        if role not in self._SUPPORTED_ROLES:
             return None
         
         row: int = index.row()
         col: int = index.column()
         
-        is_insert_row: bool = self.editable and row == self._data.shape[0]
-        is_insert_col: bool = self.editable and col == self._data.shape[1]
-        
-        if is_insert_row and is_insert_col:
-            if role == Qt.ItemDataRole.BackgroundRole:
-                return QColor("#f8f9fa")
-            return None
-        
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            if self._col_alignments and col < len(self._col_alignments):
+                return self._col_alignments[col]
+            return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+
         if role == Qt.ItemDataRole.BackgroundRole:
             if row in self.highlighted_rows:
                 return self._highlight_color
+
+        shape = self._data.shape
+        is_insert_row: bool = self.editable and row >= shape[0]
+        is_insert_col: bool = self.editable and col >= shape[1]
+
+        if is_insert_row or is_insert_col:
+            if is_insert_row and is_insert_col and role == Qt.ItemDataRole.BackgroundRole:
+                return QColor("#f8f9fa")
             return None
-        
-        if role == Qt.ItemDataRole.TextAlignmentRole:
-            if self._col_alignments and 0 <= col < len(self._col_alignments):
-                return self._col_alignments[col]
-            return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        
+
         try:
             val: Any = self._data.iat[row, col]
-        except Exception as error:
+        except Exception:
             return None
-            
-        is_missing = pd.api.types.is_scalar(val) and pd.isna(val)
-        # Skip retrieval if there are no conditional formatting set
-        if role == Qt.ItemDataRole.ForegroundRole and not self._compiled_rules:
-            return None
-        
+
+        is_missing = (
+            val is None or
+            val is pd.NA or
+            val is pd.NaT or
+            (isinstance(val, float) and val != val) or
+            (isinstance(val, np.floating) and np.isnan(val))
+        )
         if role == Qt.ItemDataRole.DisplayRole:
             return self._get_display_data(val, col, is_missing)
-        if role == Qt.ItemDataRole.ToolTipRole:
-            return self._get_tooltip_data(val)
-        if role == Qt.ItemDataRole.EditRole:
-            return self._get_edit_data(val)
+
         if role == Qt.ItemDataRole.ForegroundRole:
-            return self._get_foreground_data(val, is_missing)
+            return self._get_foreground_data(val, is_missing) if self._compiled_rules or is_missing else None
+
         if role == Qt.ItemDataRole.FontRole:
-            return self._get_font_data(is_missing)
+            return self._nan_font if is_missing else None
+
         if role == Qt.ItemDataRole.CheckStateRole:
             return self._get_check_state_data(val, col, is_missing)
-        
+
+        if role == Qt.ItemDataRole.ToolTipRole:
+            return self._get_tooltip_data(val)
+
+        if role == Qt.ItemDataRole.EditRole:
+            return self._get_edit_data(val, is_missing)
+
         return None
     
     def _get_display_data(self, val: Any, col: int, is_missing: bool = False) -> Any:
@@ -279,14 +290,11 @@ class DataTableModel(QAbstractTableModel):
                 return "" if self.nan_display == "<Empty>" else self.nan_display
 
             # Suppress text rendering entirely for inferred Checkbox columns if setting is enabled
-            if self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool) and \
-                    self._col_is_bool[col]:
-                return ""
+            if self._col_is_bool and col < len(self._col_is_bool) and self._col_is_bool[col]:
+                return "" if self.render_bools_as_checkboxes else str(self._parse_bool(val))
 
-            if isinstance(val, float) or isinstance(val, np.floating):
-                if np.isnan(val):
-                    return "" if self.nan_display == "<Empty>" else self.nan_display
-
+            val_type = type(val)
+            if val_type is float or isinstance(val, np.floating):
                 if self.scientific_notation:
                     return f"{val:.{self.float_precision}e}"
                 elif self.thousands_separator:
@@ -294,12 +302,10 @@ class DataTableModel(QAbstractTableModel):
                 else:
                     return f"{val:.{self.float_precision}f}"
 
-            if not self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool) and \
-                    self._col_is_bool[col]:
-                return str(self._parse_bool(val))
             if isinstance(val, pd.Timestamp):
                 return val.strftime("%Y-%m-%d %H:%M:%S")
-            if isinstance(val, (int, np.integer)):
+
+            if val_type is int or isinstance(val, np.integer):
                 if self.scientific_notation:
                     return f"{val:.{self.float_precision}e}"
                 elif self.thousands_separator:
