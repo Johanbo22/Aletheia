@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 from typing import Dict
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QPushButton, QComboBox, QColorDialog, QDialogButtonBox, QPlainTextEdit, QGroupBox, QSplitter, QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QPushButton, QComboBox, QColorDialog, QDialogButtonBox, QPlainTextEdit, QGroupBox, QSplitter, QFileDialog, QMessageBox, QWidget, QScrollArea
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFontDatabase, QFont
+from PyQt6.QtGui import QColor, QFontDatabase, QFont, QPaintEvent, QPainter, QBrush, QPen
 
 from ui.PythonHighlighter import SyntaxCategory, DefaultColorScheme, PythonHighlighter
 
@@ -48,8 +48,9 @@ class ColorPickerButton(QPushButton):
         super().__init__(parent)
         self._color: str = initial_color
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(40, 24)
+        self.setProperty("isColorPicker", True)
         self.clicked.connect(self._choose_color)
-        self._update_style()
     
     def get_color(self) -> str:
         return self._color
@@ -57,20 +58,22 @@ class ColorPickerButton(QPushButton):
     def set_color(self, color: str, emit_signal: bool = True) -> None:
         if self._color != color:
             self._color = color
-            self._update_style()
+            self.update()
             if emit_signal:
                 self.color_changed.emit(self._color)
     
-    def _update_style(self) -> None:
-        self.setStyleSheet(
-            f"QPushButton {{"
-            f"    background-color: {self._color}; "
-            f"    border: 1px solid #555; "
-            f"    border-radius: 4px; "
-            f"    min-width: 40px; "
-            f"    min-height: 20px;"
-            f"}}"
-        )
+    def paintEvent(self, event: QPaintEvent) -> None:
+        """PaintEvent for drawing color button"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect().adjusted(1, 1, -1, -1)
+
+        painter.setBrush(QBrush(QColor(self._color)))
+        painter.setPen(QPen(QColor("#555555"), 1))
+        painter.drawRoundedRect(rect, 4, 4)
+
+        painter.end()
     
     def _choose_color(self) -> None:
         color = QColorDialog.getColor(QColor(self._color), self.window(), "Select Syntax Color")
@@ -125,19 +128,28 @@ class SyntaxHighlightSettingsDialog(QDialog):
         management_layout.addWidget(self.export_btn)
         management_layout.addWidget(self.reset_btn)
         controls_layout.addLayout(management_layout)
-        
-        form_layout = QFormLayout()
+
+        scroll_area = QScrollArea()
+        scroll_area.setProperty("styleClass", "transparent_scroll_area")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        form_container = QWidget()
+        form_layout = QFormLayout(form_container)
+        form_layout.setVerticalSpacing(8)
+
         for category in SyntaxCategory:
             btn = ColorPickerButton(current_scheme.get(category, "#ffffff"))
             
-            btn.clicked.connect(lambda: self.theme_combo.setCurrentText("Custom"))
-            btn.color_changed.connect(self._update_live_preview)
+            btn.color_changed.connect(self._on_custom_color_picked)
             
             self.color_buttons[category] = btn
             form_layout.addRow(category.value + ":", btn)
 
-        controls_layout.addLayout(form_layout)
-        controls_layout.addStretch()
+        scroll_area.setWidget(form_container)
+        controls_layout.addWidget(scroll_area)
+
         splitter.addWidget(controls_widget)
         
         preview_widget = QGroupBox("Preview")
@@ -145,6 +157,8 @@ class SyntaxHighlightSettingsDialog(QDialog):
         
         self.preview_editor = QPlainTextEdit()
         self.preview_editor.setReadOnly(True)
+        self.preview_editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.preview_editor.setObjectName("syntax_preview_editor")
         
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         font.setPointSize(11)
@@ -160,6 +174,9 @@ class SyntaxHighlightSettingsDialog(QDialog):
         
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
+
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
         
         main_layout.addWidget(splitter)
         
@@ -204,17 +221,18 @@ class SyntaxHighlightSettingsDialog(QDialog):
     def _update_preview_background(self) -> None:
         """Adjusts the background of the preview to help visibility"""
         is_light_theme = self.theme_combo.currentText() == "Light Theme"
-        bg_color = "#ffffff" if is_light_theme else "#2b2b2b"
-        text_color = "#000000" if is_light_theme else "#f8f8f2"
-        
-        self.preview_editor.setStyleSheet(
-            f"QPlainTextEdit {{"
-            f"    background-color: {bg_color};"
-            f"    color: {text_color};"
-            f"    border: none;"
-            f"}}"
-        )
-    
+        theme_mode = "light" if is_light_theme else "dark"
+
+        self.preview_editor.setProperty("themeMode", theme_mode)
+        self.preview_editor.style().unpolish(self.preview_editor)
+        self.preview_editor.style().polish(self.preview_editor)
+
+    def _on_custom_color_picked(self, new_color: str = "") -> None:
+        """Handles state transitions when a user manually picks a new color"""
+        if self.theme_combo.currentText() != "Custom":
+            self.theme_combo.setCurrentText("Custom")
+        self._update_live_preview()
+
     def _match_current_scheme_to_theme(self, current_scheme: Dict[SyntaxCategory, str]) -> None:
         """
         Restarts the combobox index based on signature
@@ -236,8 +254,12 @@ class SyntaxHighlightSettingsDialog(QDialog):
         self.theme_combo.setCurrentText("Default (Dracula)")
     
     def _export_theme(self) -> None:
+        """Exports the current color scheme to a JSON file."""
+        safe_theme_name = self.theme_combo.currentText().replace(" ", "_").lower()
+        default_file_name = f"{safe_theme_name}_syntax.json"
+
         file_path_str, _ = QFileDialog.getSaveFileName(
-            self, "Export Syntax Theme", "", "JSON Files (*.json)"
+            self, "Export Syntax Theme", default_file_name, "JSON Files (*.json)"
         )
         if not file_path_str:
             return
@@ -255,6 +277,7 @@ class SyntaxHighlightSettingsDialog(QDialog):
             QMessageBox.critical(self, "Export Error", f"Failed to export theme:\n{err}")
     
     def _import_theme(self) -> None:
+        """Imports a JSON theme file and applies it"""
         file_path_str, _ = QFileDialog.getOpenFileName(
             self, "Import Syntax Theme", "", "JSON Files (*.json)"
         )
@@ -266,17 +289,24 @@ class SyntaxHighlightSettingsDialog(QDialog):
             import_path: Path = Path(file_path_str)
             with import_path.open('r', encoding='utf-8') as file:
                 import_data: dict = json.load(file)
-                
+
+            imported_count = 0
             for cat_str, color in import_data.items():
                 try:
                     category = SyntaxCategory(cat_str)
                     if category in self.color_buttons:
                         self.color_buttons[category].set_color(color, emit_signal=False)
+                        imported_count += 1
                 except ValueError:
-                    continue 
+                    continue
+
+            if imported_count == 0:
+                QMessageBox.warning(self, "Import Warning", "No valid syntax categories found in the file.")
+                return
             
             self.theme_combo.setCurrentText("Custom")
             self._update_live_preview()
+            QMessageBox.information(self, "Import Successful", f"Successfully imported {imported_count} color settings.")
             
         except json.JSONDecodeError:
             QMessageBox.critical(self, "Import Error", "The selected file is not a valid JSON document.")
