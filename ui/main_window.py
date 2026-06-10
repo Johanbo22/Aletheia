@@ -20,6 +20,8 @@ from ui.status_bar import LogLevel, StatusBar
 from ui.dialogs import (ProgressDialog, GoogleSheetsDialog, DatabaseConnectionDialog, ExportDialog, GoogleSheetsExportDialog, ConsoleDialog)
 from ui.animations import (FileImportAnimation, FailedAnimation, SavedProjectAnimation, GoogleSheetsImportAnimation, DatabaseImportAnimation, ProjectOpenAnimation, ScriptLogExportAnimation, ExportFileAnimation)
 from icons import IconBuilder, IconType
+from controller.toast_manager import ToastManager
+from ui.widgets.ToastNotification import ToastLevel
 
 class MainWindow(QWidget):
     """Main widget"""
@@ -60,6 +62,16 @@ class MainWindow(QWidget):
         self.autosave_indicator = AutosaveIndicator(self)
         
         QTimer.singleShot(0, self._check_recovery)
+        self.toast_manager = ToastManager(self)
+
+    def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
+                   duration_ms: int = 4000) -> None:
+        """
+        Public method to dispatch toast notifications safely.
+        Components should use signals connected to this slot rather than
+        instantiating toasts themselves.
+        """
+        self.toast_manager.show_toast(title, message, level, duration_ms)
 
     def apply_autosave_settings(self, settings: dict) -> None:
         """
@@ -300,8 +312,9 @@ class MainWindow(QWidget):
             self.status_bar.log(f"Project loaded: {filepath}")
             self._update_recent_projects(filepath)
 
-            self.open_project_animation = ProjectOpenAnimation(message="Project Opened")
-            self.open_project_animation.start(target_widget=self)
+            self.show_toast("Project Opened", "Project loaded", ToastLevel.SUCCESS)
+            #self.open_project_animation = ProjectOpenAnimation(message="Project Opened")
+            #self.open_project_animation.start(target_widget=self)
         
         except Exception as LoadProjectError:
             QMessageBox.critical(self, "Error", f"Failed to load project: {str(LoadProjectError)}")
@@ -367,8 +380,7 @@ class MainWindow(QWidget):
             saved_path = self.project_manager.save_project(project_data, filepath)
             QApplication.processEvents()
 
-            self.saved_animation = SavedProjectAnimation("Project Saved", parent=None)
-            self.saved_animation.start(target_widget=self)
+            self.show_toast("Project saved", f"Project saved to {filepath}", ToastLevel.SUCCESS)
 
             if saved_path:
                 self._unsaved_changes = False
@@ -594,6 +606,7 @@ class MainWindow(QWidget):
             self.progress_dialog.accept()
             self.progress_dialog.deleteLater()
             self.progress_dialog = None
+        self.show_toast("Error", "Failed to import file", ToastLevel.ERROR)
         QMessageBox.critical(self, "Error", f"Failed to import file: {str(error)}")
         self.status_bar.log(f"Import failed: {str(error)}", "ERROR")
         self._temp_import_filepath = None
@@ -664,6 +677,7 @@ class MainWindow(QWidget):
                 "sheet_name": sheet_name, "rows": loaded_dataframe.shape[0], "columns": loaded_dataframe.shape[1]
             }
         )
+        self.show_toast("Google Sheet Import", "Data imported from Google Sheets", ToastLevel.SUCCESS)
         self.google_sheets_import_animation = GoogleSheetsImportAnimation(parent=None, message="Google Sheet Import")
         self.google_sheets_import_animation.start(target_widget=self)
     

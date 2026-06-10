@@ -1,0 +1,78 @@
+/* 
+General styling for the Toast Notification widget
+Styling also governs the toastLevel properties
+*/
+
+#toastNotification {
+    background-color: #2d2d30;
+    border-radius: 8px;
+    border: 1px solid #3e3e42;
+}
+
+#toastNotification[toastLevel="info"] #toastContent {
+    background-color: rgba(0, 122, 204, 0.1);
+    border-radius: 8px 8px 0px 0px;
+}
+
+#toastNotification[toastLevel="success"] #toastContent {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-radius: 8px 8px 0px 0px;
+}
+
+#toastNotification[toastLevel="warning"] #toastContent {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-radius: 8px 8px 0px 0px;
+}
+
+#toastNotification[toastLevel="error"] #toastContent {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: 8px 8px 0px 0px;
+}
+
+#toastTitle {
+    font-weight: bold;
+    font-size: 14px;
+    color: #E0E0E0;
+}
+
+#toastMessage {
+    font-size: 12px;
+    color: #B0B0B0;
+}
+
+#toastCloseButton {
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+#toastCloseButton:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Progress Bar */
+#toastProgressBar {
+    background-color: transparent;
+    border: none;
+    border-radius: 0px 0px 8px 8px;
+}
+
+#toastProgressBar::chunk {
+    border-radius: 0px 0px 8px 8px;
+}
+
+#toastNotification[toastLevel="info"] #toastProgressBar::chunk {
+    background-color: #007ACC;
+}
+
+#toastNotification[toastLevel="success"] #toastProgressBar::chunk {
+    background-color: #28A745;
+}
+
+#toastNotification[toastLevel="warning"] #toastProgressBar::chunk {
+    background-color: #FFC107;
+}
+
+#toastNotification[toastLevel="error"] #toastProgressBar::chunk {
+    background-color: #DC3545;
+}
