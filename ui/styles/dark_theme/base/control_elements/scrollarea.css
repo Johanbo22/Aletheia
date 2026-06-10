@@ -1,0 +1,100 @@
+/*
+This CSS file governs the styling for general QScrollAreas the Object ScrollContent
+for any QWidget with a ScrollArea. 
+
+This file also has the styling prperties of both the vertical and horizontal
+QScollBars
+*/
+QWidget#ScrollContent {
+    background-color: #0f172a;
+    border: none;
+}
+
+QWidget#TransparentScrollContent {
+    background-color: transparent;
+    border: none;
+}
+
+QScrollArea[styleClass="transparent_scroll_area"] {
+    background-color: transparent;
+    border: none;
+}
+
+QScrollArea {
+    border: none;
+}
+
+QScrollArea:focus {
+    outline: none;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 12px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: rgba(148, 163, 184, 0.3);
+    /* Slate 400 */
+    min-height: 30px;
+    border-radius: 5px;
+    margin: 1px 2px 1px 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: rgba(148, 163, 184, 0.5);
+}
+
+QScrollBar::handle:vertical:pressed {
+    background: rgba(148, 163, 184, 0.7);
+}
+
+QScrollBar::handle:vertical:disabled {
+    background: rgba(100, 116, 139, 0.2);
+    /* Slate 500 */
+}
+
+QScrollBar:horizontal {
+    border: none;
+    background: transparent;
+    height: 12px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: rgba(148, 163, 184, 0.3);
+    min-width: 30px;
+    border-radius: 5px;
+    margin: 2px 1px 2px 1px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: rgba(148, 163, 184, 0.5);
+}
+
+QScrollBar::handle:horizontal:pressed {
+    background: rgba(148, 163, 184, 0.7);
+}
+
+QScrollBar::handle:horizontal:disabled {
+    background: rgba(100, 116, 139, 0.2);
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical,
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    height: 0px;
+    width: 0px;
+    border: none;
+    background: none;
+}
+
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical,
+QScrollBar::add-page:horizontal,
+QScrollBar::sub-page:horizontal {
+    background: none;
+}

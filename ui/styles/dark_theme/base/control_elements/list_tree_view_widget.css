@@ -1,0 +1,92 @@
+/*
+This CSS file governs the shared styling of:
+QListView
+QListWidget
+QTreeWidget
+QTableView
+
+in dark theme
+*/
+QListWidget,
+QListView,
+QTreeWidget,
+QTableView {
+    border: 1px solid #475569;
+    border-radius: 4px;
+    padding: 4px;
+    background-color: #0f172a;
+    color: #f1f5f9;
+}
+
+QListWidget:focus,
+QListView:focus,
+QTreeWidget:focus,
+QTableView:focus {
+    border: 1px solid #3b82f6;
+    outline: none;
+}
+
+QListWidget::item,
+QListView::item,
+QTreeWidget::item {
+    padding: 6px 8px;
+    border-radius: 3px;
+    margin: 2px 0;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+}
+
+QListWidget::item:hover,
+QListView::item:hover,
+QTreeWidget::item:hover {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #ffffff;
+    border: 1px solid transparent;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.4);
+}
+
+QListWidget::item:selected,
+QListView::item:selected,
+QTreeWidget::item:selected {
+    background: #1e3a8a;
+    color: #ffffff;
+    font-weight: bold;
+    border: 1px solid #475569;
+    border-bottom: 2px solid #60a5fa;
+}
+
+QListWidget::indicator,
+QListView::indicator,
+QTreeWidget::indicator,
+QTableView::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #475569;
+    border-radius: 3px;
+    background-color: #0f172a;
+    margin-right: 4px;
+}
+
+QListWidget::indicator:hover,
+QListView::indicator:hover,
+QTreeWidget::indicator:hover,
+QTableView::indicator:hover {
+    border-color: #64748b;
+}
+
+QListWidget::indicator:checked,
+QListView::indicator:checked,
+QTreeWidget::indicator:checked,
+QTableView::indicator:checked {
+    background-color: rgba(59, 130, 246, 0.15);
+    border-color: #3b82f6;
+    image: url(icons/ui_styling/checkmark.svg);
+}
+
+QListWidget::indicator:disabled,
+QListView::indicator:disabled,
+QTreeWidget::indicator:disabled,
+QTableView::indicator:disabled {
+    background-color: #1e293b;
+    border-color: #334155;
+}

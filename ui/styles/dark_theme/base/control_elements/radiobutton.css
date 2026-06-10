@@ -1,0 +1,42 @@
+/*
+This CSS file governs the styling of QRadioButtons in dark mode
+*/
+QRadioButton {
+    spacing: 5px;
+    font-size: 11pt;
+    color: #f1f5f9;
+}
+
+QRadioButton:focus {
+    outline: none;
+}
+
+QRadioButton::indicator {
+    width: 13px;
+    height: 13px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background-color: #0f172a;
+}
+
+QRadioButton::indicator:hover {
+    border: 1px solid #64748b;
+}
+
+QRadioButton::indicator:focus {
+    border-color: #3b82f6;
+}
+
+QRadioButton::indicator:checked {
+    border-color: #3b82f6;
+    background-color: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0 #3b82f6, stop:0.6 #3b82f6, stop:0.7 #0f172a, stop:1 #0f172a);
+}
+
+QRadioButton::indicator:disabled {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+}
+
+QRadioButton:disabled {
+    color: #64748b;
+}

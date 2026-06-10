@@ -1,0 +1,60 @@
+/* This CSS file governs the styling of the QMenuBar and the QMenu in dark mode
+*/
+QMenu {
+    background-color: #1e293b;
+    border: 1px solid #475569;
+    padding: 6px 12px 6px 12px;
+}
+
+QMenu::item {
+    padding: 6px 24px 6px 24px;
+    background-color: transparent;
+    color: #f1f5f9;
+}
+
+QMenu::item:hover {
+    background: rgba(59, 130, 246, 0.15);
+    color: #ffffff;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.4);
+}
+
+QMenu::item:selected {
+    background: rgba(59, 130, 246, 0.15);
+    color: #ffffff;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.4);
+}
+
+QMenu::item:disabled {
+    color: #64748b;
+    background-color: transparent;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #334155;
+    margin: 4px 0px;
+}
+
+QMenuBar {
+    background-color: #0f172a;
+    color: #f1f5f9;
+    spacing: 3px;
+}
+
+QMenuBar::item {
+    padding: 6px 12px;
+    background: transparent;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+QMenuBar::item:selected,
+QMenuBar::item:hover {
+    background: rgba(59, 130, 246, 0.15);
+    color: #ffffff;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.4);
+}
+
+QMenuBar::item:pressed {
+    background-color: #1e293b;
+}

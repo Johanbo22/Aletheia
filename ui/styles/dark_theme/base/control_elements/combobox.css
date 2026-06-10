@@ -1,0 +1,53 @@
+/*
+This CSS file governs the styling of QComboBox in dark theme
+*/
+QComboBox {
+    border: 1px solid #475569;
+    border-radius: 3px;
+    padding: 1px 35px 1px 3px;
+    min-width: 6em;
+    background-color: #0f172a;
+    color: #f1f5f9;
+}
+
+QComboBox:hover {
+    border-color: #64748b;
+}
+
+QComboBox:focus,
+QComboBox:on {
+    border: 1px solid #3b82f6;
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+QComboBox:disabled {
+    background-color: #1e293b;
+    color: #64748b;
+    border-color: #334155;
+}
+
+QComboBox QLineEdit {
+    background: transparent;
+    border: none;
+    color: #f1f5f9;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #475569;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    background-color: #1e293b;
+}
+
+QComboBox::drop-down:hover {
+    background-color: #334155;
+}
+
+QComboBox::down-arrow {
+    image: url(icons/ui_styling/arrow-down-to-line.svg);
+    width: 9px;
+    height: 9px;
+}

@@ -1,0 +1,39 @@
+/*
+This CSS file governs the styling of QCheckBox for dark theme
+*/
+QCheckBox {
+    spacing: 8px;
+    font-size: 11pt;
+    color: #f1f5f9;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #475569;
+    border-radius: 4px;
+    background-color: #0f172a;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #64748b;
+}
+
+QCheckBox::indicator:focus {
+    border-color: #3b82f6;
+}
+
+QCheckBox::indicator:checked {
+    border-color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.15);
+    image: url(icons/ui_styling/checkmark.svg);
+}
+
+QCheckBox::indicator:disabled {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+}
+
+QCheckBox:disabled {
+    color: #64748b;
+}

@@ -1,17 +1,20 @@
+/*
+Dark theme styling for the main window status bar
+*/
 QStatusBar {
-    background: #21252b;
-    border-top: 1px solid #181a1f;
-    color: #abb2bf;
+    background: #0f172a;
+    border-top: 1px solid #334155;
+    color: #f1f5f9;
     font-family: 'Segoe UI', sans-serif;
     font-size: 11px;
 }
 
 QStatusBar#main_status_bar {
-    background-color: #1e222a;
-    color: #abb2bf;
+    background-color: #0f172a;
+    color: #94a3b8;
     font-family: 'Segoe UI', sans-serif;
     font-size: 11px;
-    border-top: 1px solid #181a1f;
+    border-top: 1px solid #1e293b;
     padding: 4px;
 }
 
@@ -20,108 +23,108 @@ QStatusBar#main_status_bar::item {
 }
 
 QLabel#stats_label {
-    color: #5c6370;
+    color: #94a3b8;
     font-family: 'Segoe UI', sans-serif;
     font-size: 11px;
     padding-right: 15px;
 }
 
 QLabel#source_label {
-    color: #61afaf;
+    color: #3b82f6;
     font-size: 11px;
     padding-right: 10px;
 }
 
 QLabel#issue_counter_label {
-    color: #abb2bf;
+    color: #cbd5e1;
     font-weight: bold;
     font-size: 11px;
     padding: 0 5px;
 }
 
 QFrame[styleClass="status_separator"] {
-    color: #3b4048;
+    color: #475569;
 }
 
 QProgressBar#status_progress_bar {
     border: none;
-    background-color: #282c34;
+    background-color: #1e293b;
     border-radius: 2px;
     min-height: 4px;
     max-height: 4px;
 }
 
 QProgressBar#status_progress_bar::chunk {
-    background-color: #61afaf;
+    background-color: #3b82f6;
     border-radius: 2px;
 }
 
 QLineEdit#status_terminal {
-    background-color: #1e222a;
+    background-color: #0f172a;
     font-family: Consolas, monospace;
     font-size: 10px;
-    border: 1px solid #3b4048;
+    border: 1px solid #334155;
     padding: 4px;
 }
 
 QLineEdit#status_terminal:focus {
     outline: none;
-    border: 1px solid #5c6370;
+    border: 1px solid #475569;
 }
 
 QLineEdit#status_terminal[logLevel="IDLE"] {
     background-color: transparent;
-    color: #5c6370;
-    border: 1px solid #3b4048;
+    color: #64748b;
+    border: 1px solid #475569;
 }
 
 QLineEdit#status_terminal[logLevel="SUCCESS"],
 QLineEdit#status_terminal[logLevel="INFO"] {
     background-color: transparent;
-    color: #98c379;
-    border: 1px solid #98c379;
+    color: #4ade80;
+    border: 1px solid #22c55e;
 }
 
 QLineEdit#status_terminal[logLevel="WARNING"] {
-    background-color: #e5c07b;
-    color: #1e222a;
-    border: 1px solid #e5c07b;
+    background-color: rgba(234, 179, 8, 0.15);
+    color: #facc15;
+    border: 1px solid #eab308;
 }
 
 QLineEdit#status_terminal[logLevel="ERROR"] {
-    background-color: #e06c75;
-    color: #ffffff;
-    border: 1px solid #e06c75;
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid #ef4444;
 }
 
 QLineEdit#status_terminal[errorFlash="true"] {
-    background-color: rgba(224, 108, 117, 0.15);
+    background-color: rgba(239, 68, 68, 0.4);
 }
 
 QMenu#terminal_context_menu {
-    background-color: #282c34;
-    color: #abb2bf;
-    border: 1px solid #3b4048;
+    background-color: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid #475569;
 }
 
 QMenu#terminal_context_menu::item {
-    color: #abb2bf;
+    color: #f1f5f9;
     padding: 4px 20px 4px 20px;
 }
 
 QMenu#terminal_context_menu::item:selected {
-    background-color: #61afaf;
+    background-color: #3b82f6;
     color: #ffffff;
 }
 
 QMenu#terminal_context_menu::item:disabled {
-    color: #5c6370;
+    color: #64748b;
     background-color: transparent;
 }
 
 QMenu#terminal_context_menu::separator {
     height: 1px;
-    background-color: #3b4048;
+    background-color: #334155;
     margin: 4px 8px;
 }
 
@@ -134,25 +137,25 @@ QLabel#status_state_label {
 
 QLabel#status_state_label[logLevel="IDLE"] {
     background-color: transparent;
-    color: #5c6370;
-    border: 1px solid #3b4048;
+    color: #64748b;
+    border: 1px solid #475569;
 }
 
 QLabel#status_state_label[logLevel="SUCCESS"],
 QLabel#status_state_label[logLevel="INFO"] {
     background-color: transparent;
-    color: #98c379;
-    border: 1px solid #98c379;
+    color: #4ade80;
+    border: 1px solid #22c55e;
 }
 
 QLabel#status_state_label[logLevel="WARNING"] {
-    background-color: #e5c07b;
-    color: #1e222a;
+    background-color: #ca8a04;
+    color: #ffffff;
     border: none;
 }
 
 QLabel#status_state_label[logLevel="ERROR"] {
-    background-color: #e06c75;
+    background-color: #dc2626;
     color: #ffffff;
     border: none;
 }
@@ -164,19 +167,21 @@ QLabel#view_context_label {
 }
 
 QLabel#view_context_label[contextType="aggregation"] {
-    color: #c678dd;
+    color: #c084fc;
+    /* Purple 400 */
 }
 
 QLabel#view_context_label[contextType="subset"] {
-    color: #d19a66;
+    color: #fb923c;
+    /* Orange 400 */
 }
 
 QStatusBar QProgressBar {
-    border: 1px solid #3b4048;
+    border: 1px solid #334155;
     border-radius: 4px;
-    background-color: #1e222a;
+    background-color: #0f172a;
     text-align: center;
-    color: #abb2bf;
+    color: #e2e8f0;
     font-size: 10px;
     font-weight: 600;
     min-height: 14px;
@@ -185,22 +190,22 @@ QStatusBar QProgressBar {
 
 QStatusBar QProgressBar::chunk {
     border-radius: 2px;
-    background-color: #61afef;
+    background-color: #3b82f6;
 }
 
 #status_memory_bar[usageLevel="normal"]::chunk {
-    background-color: #98c379;
+    background-color: #22c55e;
 }
 
 #status_memory_bar[usageLevel="warning"]::chunk {
-    background-color: #e5c07b;
+    background-color: #eab308;
 }
 
 #status_memory_bar[usageLevel="critical"] {
-    border: 1px solid #e06c75;
+    border: 1px solid #ef4444;
     color: #ffffff;
 }
 
 #status_memory_bar[usageLevel="critical"]::chunk {
-    background-color: #e06c75;
+    background-color: #ef4444;
 }

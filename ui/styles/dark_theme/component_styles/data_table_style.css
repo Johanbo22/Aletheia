@@ -1,24 +1,27 @@
+/*
+Dark theme styling for the main data table
+*/
 #MainDataHeader::section {
-    background-color: #21252b;
-    color: #aab2bf;
+    background-color: #1e293b;
+    color: #f1f5f9;
     font-weight: bold;
     border: none;
     border-radius: 4px;
-    border-right: 1px solid #181a1f;
-    border-bottom: 2pxsolid #181a1f;
+    border-right: 1px solid #334155;
+    border-bottom: 2px solid #0f172a;
     padding: 6px 8px;
 }
 
 #MainDataHeader::section:hover {
-    background-color: #2c313a;
+    background-color: #334155;
     color: #ffffff;
 }
 
 QTableCornerButton::section {
-    background-color: #21252b;
+    background-color: #0f172a;
     border: none;
-    border-right: 1px solid #181a1f;
-    border-bottom: 1px solid #181a1f;
+    border-right: 1px solid #334155;
+    border-bottom: 1px solid #1e293b;
 }
 
 #MainDataTable QScrollBar:vertical {
@@ -29,14 +32,14 @@ QTableCornerButton::section {
 }
 
 #MainDataTable QScrollBar::handle:vertical {
-    background: rgba(171, 178, 191, 0.2);
+    background: rgba(148, 163, 184, 0.3);
     min-height: 40px;
     border-radius: 6px;
     margin: 3px;
 }
 
 #MainDataTable QScrollBar::handle:vertical:hover {
-    background: rgba(171, 178, 191, 0.4);
+    background: rgba(148, 163, 184, 0.5);
 }
 
 #MainDataTable QScrollBar:horizontal {
@@ -47,14 +50,14 @@ QTableCornerButton::section {
 }
 
 #MainDataTable QScrollBar::handle:horizontal {
-    background: rgba(171, 178, 191, 0.2);
+    background: rgba(148, 163, 184, 0.3);
     min-width: 40px;
     border-radius: 6px;
     margin: 3px;
 }
 
 #MainDataTable QScrollBar::handle:horizontal:hover {
-    background: rgba(171, 178, 191, 0.4);
+    background: rgba(148, 163, 184, 0.5);
 }
 
 #MainDataTable QScrollBar::add-line:vertical,

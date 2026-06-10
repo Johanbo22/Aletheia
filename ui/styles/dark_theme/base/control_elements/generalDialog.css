@@ -1,0 +1,10 @@
+/*
+This CSS file houses the general style sets for QDialogs and the QDialogButtonBoxes
+*/
+QDialog {
+    background-color: #1e293b;
+}
+
+QDialogButtonBox {
+    alignment: 'AlignRight';
+}

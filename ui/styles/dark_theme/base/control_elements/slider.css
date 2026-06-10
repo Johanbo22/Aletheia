@@ -1,0 +1,64 @@
+/* This CSS file governs styling of QSliders in dark mode
+*/
+QSlider::groove:horizontal {
+    border: 1px solid #475569;
+    height: 4px;
+    background: #1e293b;
+    margin: 0px 0;
+    border-radius: 2px;
+}
+
+QSlider::handle:horizontal {
+    background: #e2e8f0;
+    border: 1px solid #64748b;
+    width: 16px;
+    height: 16px;
+    margin: -7px 0;
+    border-radius: 9px;
+}
+
+QSlider::handle:horizontal:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+QSlider::handle:horizontal:focus {
+    border-color: #3b82f6;
+}
+
+QSlider::groove:vertical {
+    border: 1px solid #475569;
+    width: 4px;
+    background: #1e293b;
+    margin: 0 0px;
+    border-radius: 2px;
+}
+
+QSlider::handle:vertical {
+    background: #e2e8f0;
+    border: 1px solid #64748b;
+    height: 16px;
+    width: 16px;
+    margin: 0 -7px;
+    border-radius: 9px;
+}
+
+QSlider::handle:vertical:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+QSlider::handle:vertical:focus {
+    border-color: #3b82f6;
+}
+
+QSlider::handle:horizontal:disabled,
+QSlider::handle:vertical:disabled {
+    background: #334155;
+    border-color: #475569;
+}
+
+QSlider::groove:horizontal:disabled,
+QSlider::groove:vertical:disabled {
+    background: #0f172a;
+}

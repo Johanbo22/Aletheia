@@ -1,0 +1,40 @@
+/*
+Dark theme styling for the Plot tab structural elements
+*/
+QToolBox#plot_type_toolbox {
+    background: transparent;
+}
+
+QToolBox#plot_type_toolbox::tab {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #1e293b, stop: 1 #0f172a);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: bold;
+    padding-left: 15px;
+}
+
+QToolBox#plot_type_toolbox::tab:hover {
+    background: #334155;
+    color: #60a5fa;
+}
+
+QToolBox#plot_type_toolbox::tab:focus {
+    border: 1px solid #3b82f6;
+    outline: none;
+}
+
+QToolBox#plot_type_toolbox::tab:selected {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #1e3a8a, stop: 1 #172554);
+    color: #bfdbfe;
+    border: 1px solid #2563eb;
+    border-left: 4px solid #60a5fa;
+    padding-left: 12px;
+}
+
+#CanvasContainer {
+    background-color: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 8px;
+}
