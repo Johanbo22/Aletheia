@@ -270,6 +270,9 @@ class ConsoleDialog(QDialog):
             if command in ("clear", "clear()") and not self.multiline_buffer:
                 self._clear_console()
                 return
+            elif command in ("quit", "quit()", "exit", "exit()") and not self.multiline_buffer:
+                self.close()
+                return
             
             self.console_output.blockSignals(True)
             print("")
@@ -351,6 +354,8 @@ class ConsoleDialog(QDialog):
                 self.sync_callback()
                 self._update_completer_model()
 
+        except SystemExit:
+            self.close()
         except Exception as execution_error:
             error_details = "".join(traceback.format_exception_only(type(execution_error), execution_error)).strip()
             self._print_error(error_details)
