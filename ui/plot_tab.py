@@ -1,5 +1,4 @@
 # ui/plot_tab.py
-import threading
 import traceback
 from pathlib import Path
 from typing import Dict, Any, Optional, TYPE_CHECKING
@@ -9,20 +8,19 @@ import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.colors import to_hex
-from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidgetItem, QListWidget
-from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
-from PyQt6.QtGui import QColor, QIcon
+from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtCore import QTimer, pyqtSignal, QThreadPool
+from PyQt6.QtGui import QColor
 
 from core.global_signals import global_signals
 from core.plot_engine import PlotEngine
 from core.data_handler import DataHandler
-from core.resource_loader import get_resource_path
 from core.code_exporter import CodeExporter
 from core.plot_config_manager import PlotConfigManager
-from ui.SubplotOverlay import SubplotOverlay
-from ui.animations import SavePlotAnimation, PlotGeneratedAnimation, PlotClearedAnimation
+from ui.widgets.SubplotOverlay import SubplotOverlay
+from ui.animations import PlotClearedAnimation
 from ui.status_bar import StatusBar
-from ui.dialogs import ProgressDialog, PlotExportDialog
+from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI
 from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager, PlotTypeManager, PlotExportManager
 from ui.widgets import ColorBlindnessEffect

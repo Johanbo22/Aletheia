@@ -280,6 +280,13 @@ class DataPlotStudio(QMainWindow):
         dialog = SettingsDialog(self.settings, self)
         if dialog.exec():
             new_settings = dialog.get_settings()
+
+            theme_changed = self.settings.get("dark_mode") != new_settings.get("dark_mode")
+            if theme_changed:
+                theme_name = "Dark" if new_settings.get("dark_mode") else "Light"
+                self.main_widget.show_toast("Theme Changed", f"Applying {theme_name} theme...", duration_ms=2000)
+                QApplication.processEvents()
+
             self.settings.update(new_settings)
             
             app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")

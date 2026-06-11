@@ -1,9 +1,16 @@
 from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, pyqtProperty, QSequentialAnimationGroup, QPauseAnimation, QRectF, QPoint
 from PyQt6.QtGui import QColor, QPainter, QPen, QPaintEvent
-from PyQt6.QtWidgets import QGraphicsOpacityEffect, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class SubplotOverlay(QWidget):
+    """
+    A custom widget that paints a square around the currently active subplot
+
+    When a single plot is configured a single box around that plot is painted.
+    When multiple subplots are configured a label is painted in the middle of the
+    bounding rect to tell which index the current subplot has (eg Plot 1,2,3 etc)
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -40,11 +47,17 @@ class SubplotOverlay(QWidget):
         self.animation_sequence.addAnimation(self.fade_animation)
         
         self.fade_animation.finished.connect(self._on_animation_finished)
-    
+
     def _get_label_style(self, opacity: float) -> str:
+        """
+        Dynamically generates the style string to handle alpha fading.
+        """
         alpha = int(opacity * 255)
-        bg_alpha = int(opacity * 180)
-        return f"color: rgba(33, 150, 243, {alpha}); font-weight: bold; font-size: 14px; background-color: rgba(255, 255, 255, {bg_alpha}); padding: 6px; border-radius: 4px;"
+        bg_alpha = int(opacity * 230)
+        return (f"background-color: rgba(33, 150, 243, {bg_alpha}); "
+                f"color: rgba(255, 255, 255, {alpha}); "
+                "font-weight: 600; padding: 6px 12px; border-radius: 4px; "
+                "font-size: 11pt; border: 1px solid rgba(255, 255, 255, 0.3);")
 
     @pyqtProperty(float)
     def overlay_opacity(self) -> float:
@@ -66,25 +79,33 @@ class SubplotOverlay(QWidget):
         self.update()
     
     def show_update_required(self, visible: bool = True) -> None:
+        """
+        Shows or hides the update required notice overlay
+
+        :param visible: Whether the notice should be visible.
+        """
         self.update_notice_label.setVisible(visible)
         if visible:
             self.animation_sequence.stop()
             self.overlay_opacity = 1.0
             self.show()
-        elif not self.label_widget.text() and self.overlay_opacity == 1.0:
+        elif not self.label_widget.isVisible() and self.overlay_opacity == 1.0:
             self.hide()
 
-    def _on_animation_finished(self):
-        """CAlled when the animation is finished to remove text but retain border values"""
+    def _on_animation_finished(self) -> None:
+        """
+        Called when the fade animation completes.
+        Hides the text label but retains the faint border values.
+        """
         self.label_widget.hide()
 
-    def update_info(self, text: str, geometry: tuple[int, int, int, int], is_resize: bool = False):
+    def update_info(self, text: str, geometry: tuple[int, int, int, int], is_resize: bool = False) -> None:
         """
-        Updater for text and geometry when information is changed
-        Args:
-            text (str): The text to display in the overlay
-            geometry (tuple[int, int, int, int]): The geometry (x, y, w, h) for the overlay
-            is_resize (bool): Flag indicating if the update is triggered by a resize event
+        Updates the overlay text and geometry when subplot information changes.
+
+        :param text: The text to display in the overlay.
+        :param geometry: The geometry bounding box (x, y, width, height) for the overlay.
+        :param is_resize: Flag indicating if the update is triggered by a resize event.
         """
         gx, gy, w, h = geometry
         if self.parentWidget():
@@ -92,16 +113,16 @@ class SubplotOverlay(QWidget):
             self.setGeometry(local_pos.x(), local_pos.y(), w, h)
         else:
             self.setGeometry(gx, gy, w, h)
-        
+
         self.raise_()
-        
+
         if not is_resize:
             self.label_widget.setText(text)
             self.label_widget.show()
             self.show()
-            
-            self.overlay_opacity = 1.0
+
             self.animation_sequence.stop()
+            self.overlay_opacity = 1.0
             self.animation_sequence.start()
 
     def paintEvent(self, event: QPaintEvent):
