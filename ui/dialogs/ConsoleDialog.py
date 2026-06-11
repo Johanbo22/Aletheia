@@ -153,7 +153,7 @@ class ConsoleDialog(QDialog):
                 self.console_output.zoomIn(1)
                 event.accept()
                 return
-            elif event.key() in (Qt.Key.Key_Minus):
+            elif event.key() == Qt.Key.Key_Minus:
                 self.console_output.zoomOut(1)
                 event.accept()
                 return
