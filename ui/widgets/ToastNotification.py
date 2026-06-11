@@ -53,6 +53,7 @@ class ToastNotification(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         self.setProperty("toastLevel", self._level.value)
         self.setObjectName("toastNotification")
@@ -63,16 +64,21 @@ class ToastNotification(QWidget):
 
         content_widget = QWidget(self)
         content_widget.setObjectName("toastContent")
-        content_layout = QHBoxLayout(content_widget)
-        content_layout.setContentsMargins(12, 12, 12, 12)
-        content_layout.setSpacing(10)
+
+        content_vlayout = QVBoxLayout(content_widget)
+        content_vlayout.setContentsMargins(0, 0, 0, 0)
+        content_vlayout.setSpacing(0)
+
+        inner_content_layout = QHBoxLayout()
+        inner_content_layout.setContentsMargins(12, 12, 12, 12)
+        inner_content_layout.setSpacing(10)
 
         # Icon
         self._icon_label = QLabel(content_widget)
         self._icon_label.setObjectName("toastIcon")
         self._icon_label.setPixmap(self._get_standard_icon().pixmap(24, 24))
         self._icon_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        content_layout.addWidget(self._icon_label, alignment=Qt.AlignmentFlag.AlignTop)
+        inner_content_layout.addWidget(self._icon_label, alignment=Qt.AlignmentFlag.AlignTop)
 
         # Text portion
         text_layout = QVBoxLayout()
@@ -89,7 +95,7 @@ class ToastNotification(QWidget):
         text_layout.addWidget(self._title_label)
         text_layout.addWidget(self._message_label)
         text_layout.addStretch()
-        content_layout.addLayout(text_layout)
+        inner_content_layout.addLayout(text_layout)
 
         # Close button
         self._close_button = QPushButton(content_widget)
@@ -97,9 +103,9 @@ class ToastNotification(QWidget):
         self._close_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarCloseButton))
         self._close_button.setFixedSize(24, 24)
         self._close_button.setToolTip("Dismiss")
-        content_layout.addWidget(self._close_button, alignment=Qt.AlignmentFlag.AlignTop)
+        inner_content_layout.addWidget(self._close_button, alignment=Qt.AlignmentFlag.AlignTop)
 
-        main_layout.addWidget(content_widget)
+        content_vlayout.addLayout(inner_content_layout)
 
         # Progress bar
         self._progress_bar = QProgressBar(self)
@@ -108,7 +114,9 @@ class ToastNotification(QWidget):
         self._progress_bar.setRange(0, self._duration_ms)
         self._progress_bar.setValue(self._duration_ms)
         self._progress_bar.setFixedHeight(4)
-        main_layout.addWidget(self._progress_bar)
+        content_vlayout.addWidget(self._progress_bar)
+
+        main_layout.addWidget(content_widget)
 
         self.style().unpolish(self)
         self.style().polish(self)

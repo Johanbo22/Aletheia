@@ -16,7 +16,7 @@ class ToastManager(QObject):
     """
 
     MARGIN_X: int = 15
-    MARGIN_Y: int = 15
+    MARGIN_Y: int = 6
     SPACING_Y: int = 10
     TOAST_WIDTH: int = 420
 
@@ -30,9 +30,13 @@ class ToastManager(QObject):
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Intercepts parent widget resize events to reposition the toasts"""
-        if obj is self._parent_widget and event.type() == QEvent.Type.Resize:
-            self._reposition_toasts(animate=False)
-        return super().eventFilter(obj, event)
+        try:
+            top_level_window = self._parent_widget.window()
+            if event.type() == QEvent.Type.Resize and (obj is self._parent_widget or obj is top_level_window):
+                self._reposition_toasts(animate=False)
+            return super().eventFilter(obj, event)
+        except RuntimeError:
+            return False
 
     def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO, duration_ms: int = 4000) -> None:
         """
@@ -46,7 +50,7 @@ class ToastManager(QObject):
         top_level_window: QWidget = self._parent_widget.window()
         top_level_window.installEventFilter(self)
         toast = ToastNotification(
-            parent=self._parent_widget,
+            parent=top_level_window,
             title=title,
             message=message,
             level=level,
@@ -82,8 +86,11 @@ class ToastManager(QObject):
         """
         Calculates the QPoint for a specific toast to properly stack
         """
-        top_level_window: QWidget = self._parent_widget.window()
-        window_rect = top_level_window.rect()
+        try:
+            top_level_window: QWidget = self._parent_widget.window()
+            window_rect = top_level_window.rect()
+        except RuntimeError:
+            return QPoint(0, 0)
 
         target_x = window_rect.width() - self.TOAST_WIDTH - self.MARGIN_X
         target_y = self.MARGIN_Y

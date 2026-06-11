@@ -11,22 +11,22 @@ Styling also governs the toastLevel properties
 
 #toastNotification[toastLevel="info"] #toastContent {
     background-color: rgba(0, 152, 255, 0.15);
-    border-radius: 8px 8px 0px 0px;
+    border-radius: 8px;
 }
 
 #toastNotification[toastLevel="success"] #toastContent {
     background-color: rgba(33, 195, 84, 0.15);
-    border-radius: 8px 8px 0px 0px;
+    border-radius: 8px;
 }
 
 #toastNotification[toastLevel="warning"] #toastContent {
     background-color: rgba(255, 193, 7, 0.15);
-    border-radius: 8px 8px 0px 0px;
+    border-radius: 8px;
 }
 
 #toastNotification[toastLevel="error"] #toastContent {
     background-color: rgba(255, 75, 75, 0.15);
-    border-radius: 8px 8px 0px 0px;
+    border-radius: 8px;
 }
 
 #toastTitle {
@@ -75,13 +75,4 @@ Styling also governs the toastLevel properties
 
 #toastNotification[toastLevel="error"] #toastProgressBar::chunk {
     background-color: #FF4B4B;
-}
-
-
-#toastNotification[toastLevel="warning"] #toastProgressBar::chunk {
-    background-color: #FFC107;
-}
-
-#toastNotification[toastLevel="error"] #toastProgressBar::chunk {
-    background-color: #DC3545;
 }

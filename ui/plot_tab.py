@@ -19,7 +19,7 @@ from core.code_exporter import CodeExporter
 from core.plot_config_manager import PlotConfigManager
 from ui.widgets.SubplotOverlay import SubplotOverlay
 from ui.animations import PlotClearedAnimation
-from ui.status_bar import StatusBar
+from ui.status_bar import LogLevel, StatusBar
 from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI
 from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager, PlotTypeManager, PlotExportManager
@@ -1405,9 +1405,13 @@ class PlotTab(PlotTabUI):
         except Exception as CreateMainPlotError:
             if progress_dialog:
                 progress_dialog.accept()
-            QMessageBox.critical(self, "Error", f"Failed to create plot: {str(CreateMainPlotError)}")
-            self.status_bar.log(f"Plot generation failed: {str(CreateMainPlotError)}", "ERROR")
-            traceback.print_exc()
+            error_msg = str(CreateMainPlotError)
+            if "ParseSyntaxException" in error_msg or "math text" in error_msg.lower():
+                self.status_bar.log("Incomplete LaTeX math expression detected. Please finish typing", LogLevel.WARNING)
+            else:
+                global_signals.toast_requested.emit("Error", f"Failed to generate plot", ToastLevel.ERROR, 4000)
+                self.status_bar.log(f"Plot generation failed: {error_msg}", LogLevel.ERROR)
+                traceback.print_exc()
         finally:
             if progress_dialog and progress_dialog.isVisible():
                 progress_dialog.accept()
@@ -1503,8 +1507,10 @@ class PlotTab(PlotTabUI):
             if self.view.tight_layout_check.isChecked():
                 self.plot_engine.finalize_layout()
         except Exception as TightLayoutError:
-            self.status_bar.log(f"Tight layout not applied due to error: {str(TightLayoutError)}", "ERROR")
-        
+            error_msg = str(TightLayoutError)
+            if "ParseSyntaxException" not in error_msg and "math text" not in error_msg.lower():
+                self.status_bar.log(f"Tight layout not applied due to error: {error_msg}", "ERROR")
+
         self.canvas.draw()
         
         if hasattr(self, "canvas_stack") and hasattr(self, "canvas"):
