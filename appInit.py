@@ -1,6 +1,6 @@
 import sys
 import threading
-from PyQt6.QtWidgets import QApplication, QSplashScreen, QPushButton
+from PyQt6.QtWidgets import QApplication, QSplashScreen, QPushButton, QComboBox
 from PyQt6.QtCore import QTranslator, QLocale, Qt, QSharedMemory, QCoreApplication, QObject, QEvent
 from PyQt6.QtGui import QGuiApplication, QPixmap
 
@@ -18,8 +18,13 @@ class GlobalCursorFilter(QObject):
     This applies the QCursor.PointingHandCursor for cursor
     """
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.Polish:
+        if event.type() in (QEvent.Type.Polish, QEvent.Type.EnabledChange):
             if isinstance(obj, QPushButton):
+                if obj.isEnabled():
+                    obj.setCursor(Qt.CursorShape.PointingHandCursor)
+                else:
+                    obj.setCursor(Qt.CursorShape.ForbiddenCursor)
+            if isinstance(obj, QComboBox):
                 obj.setCursor(Qt.CursorShape.PointingHandCursor)
         return False
 

@@ -8,3 +8,17 @@ QDialog {
 QDialogButtonBox {
     alignment: 'AlignRight';
 }
+
+QMessageBox QLabel {
+    color: #1e293b;
+    font-size: 13px;
+}
+
+QMessageBox QTextEdit {
+    background-color: #f8fafc;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: Consolas, "Courier New", monospace;
+}

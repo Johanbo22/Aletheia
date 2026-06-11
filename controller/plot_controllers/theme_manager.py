@@ -27,8 +27,21 @@ class ThemeManager:
         self.view.save_theme_button.clicked.connect(self.save_custom_theme)
         self.view.edit_theme_button.clicked.connect(self.edit_custom_theme)
         self.view.delete_theme_button.clicked.connect(self.delete_custom_theme)
+        self.view.theme_combo.currentTextChanged.connect(self._on_theme_selection_changed)
         self.refresh_theme_list()
-    
+        self._on_theme_selection_changed(self.view.theme_combo.currentText())
+
+    def _on_theme_selection_changed(self, text: str) -> None:
+        """
+        Enable or disable the theme action buttons based on the selection
+
+        :param text: The currently selected text in the combo box
+        """
+        is_valid_theme = text != "Select a theme..." and bool(text)
+        self.view.edit_theme_button.setEnabled(is_valid_theme)
+        self.view.load_theme_button.setEnabled(is_valid_theme)
+        self.view.delete_theme_button.setEnabled(is_valid_theme)
+
     def refresh_theme_list(self) -> None:
         """Scans the theme directory to update the theme selection box"""
         self.view.theme_combo.blockSignals(True)

@@ -57,20 +57,24 @@ class AppearanceSettingsTab(QWidget):
 
         self.load_theme_button = QPushButton("Apply theme", parent=self)
         self.load_theme_button.setToolTip("Apply the selected theme to the current plot")
+        self.load_theme_button.setEnabled(False)
         load_layout.addWidget(self.load_theme_button)
         layout.addLayout(load_layout)
 
         controls_layout = QHBoxLayout()
         self.save_theme_button = QPushButton("Save Current Theme", parent=self)
         self.save_theme_button.setToolTip("Save the current visual settings to a JSON file")
+        self.save_theme_button.setEnabled(False)
         controls_layout.addWidget(self.save_theme_button)
 
         self.edit_theme_button = QPushButton("Edit JSON", parent=self)
         self.edit_theme_button.setToolTip("Edit the JSON file of the selected theme")
+        self.edit_theme_button.setEnabled(False)
         controls_layout.addWidget(self.edit_theme_button)
 
         self.delete_theme_button = QPushButton("Delete theme")
         self.delete_theme_button.setObjectName("DestructiveButton")
+        self.delete_theme_button.setEnabled(False)
         controls_layout.addWidget(self.delete_theme_button)
         layout.addLayout(controls_layout)
 
