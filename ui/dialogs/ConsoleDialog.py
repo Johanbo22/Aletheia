@@ -10,7 +10,7 @@ import numpy as np
 from typing import Any, Callable, Dict, List
 
 from PyQt6.QtCore import Qt, QEvent, QSettings, QStringListModel
-from PyQt6.QtGui import QTextCursor, QColor, QFontDatabase, QFont, QKeyEvent, QKeySequence, QGuiApplication
+from PyQt6.QtGui import QCloseEvent, QTextCursor, QColor, QFontDatabase, QFont, QKeyEvent, QKeySequence, QGuiApplication
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QPlainTextEdit, QCompleter
 
 from core.data_handler import DataHandler
@@ -109,7 +109,7 @@ class ConsoleDialog(QDialog):
         settings: QSettings = QSettings(f"{APPLICATION_NAME}", "InteractiveConsole")
         settings.setValue("geometry", self.saveGeometry())
     
-    def closeEvent(self, event: QEvent) -> None:
+    def closeEvent(self, event: QCloseEvent) -> None:
         self._write_settings()
         if hasattr(self, 'completer') and self.completer.popup():
             self.completer.popup().hide()
@@ -163,9 +163,19 @@ class ConsoleDialog(QDialog):
             return
 
         if event.key() == Qt.Key.Key_Backspace:
-            if cursor.position() <= self._input_start_position:
-              event.accept()
-              return
+            if cursor.hasSelection() and cursor.selectionStart() < self._input_start_position:
+                event.accept()
+                return
+            elif cursor.position() <= self._input_start_position:
+                event.accept()
+                return
+        elif event.key() == Qt.Key.Key_Delete:
+            if cursor.hasSelection() and cursor.selectionStart() < self._input_start_position:
+                event.accept()
+                return
+            elif cursor.position() < self._input_start_position:
+                event.accept()
+                return
         elif event.key() == Qt.Key.Key_Left:
             if cursor.position() <= self._input_start_position:
                 event.accept()
@@ -189,10 +199,15 @@ class ConsoleDialog(QDialog):
             event.accept()
             return
 
-        if event.text() and cursor.position() < self._input_start_position:
-            if not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)):
+        if event.text():
+            if cursor.hasSelection() and cursor.selectionStart() < self._input_start_position:
+                cursor.clearSelection()
                 cursor.movePosition(QTextCursor.MoveOperation.End)
                 self.console_output.setTextCursor(cursor)
+            elif cursor.position() < self._input_start_position:
+                if not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.AltModifier)):
+                    cursor.movePosition(QTextCursor.MoveOperation.End)
+                    self.console_output.setTextCursor(cursor)
 
         self._original_key_press(event)
 
@@ -349,6 +364,11 @@ class ConsoleDialog(QDialog):
                 
                 self.data_handler.operation_log.append({
                     "type": "console_command",
+                    "command": command
+                })
+            elif "inplace" in command and "True" in command:
+                self.data_handler.operation_log.append({
+                    "type": "console_command_inplace",
                     "command": command
                 })
                 self.sync_callback()
