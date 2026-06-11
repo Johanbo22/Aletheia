@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import QColorDialog, QApplication, QMessageBox, QListWidget
 from PyQt6.QtCore import QTimer, QSize, Qt, pyqtSignal, QThreadPool
 from PyQt6.QtGui import QColor, QIcon
 
+from core.global_signals import global_signals
 from core.plot_engine import PlotEngine
 from core.data_handler import DataHandler
 from core.resource_loader import get_resource_path
@@ -25,6 +26,8 @@ from ui.dialogs import ProgressDialog, PlotExportDialog
 from ui.plot_tab_ui import PlotTabUI
 from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager, PlotTypeManager, PlotExportManager
 from ui.widgets import ColorBlindnessEffect
+from ui.widgets.ToastNotification import ToastLevel
+
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
 
@@ -1386,7 +1389,7 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = False
 
             if animate:
-                PlotGeneratedAnimation(parent=self, message="Plot Generated").start(target_widget=self)
+                global_signals.toast_requested.emit("Plot Generated", f"A {plot_type} plot has been generated", ToastLevel.SUCCESS, 4000)
         except InterruptedError:
             self.status_bar.log(f"Plot generation cancelled", "INFO")
             if progress_dialog:

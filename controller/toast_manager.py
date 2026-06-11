@@ -18,7 +18,7 @@ class ToastManager(QObject):
     MARGIN_X: int = 15
     MARGIN_Y: int = 15
     SPACING_Y: int = 10
-    TOAST_WIDTH: int = 300
+    TOAST_WIDTH: int = 420
 
     def __init__(self, parent_widget: QWidget) -> None:
         super().__init__(parent_widget)

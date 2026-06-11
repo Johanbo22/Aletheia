@@ -13,6 +13,8 @@ from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QTimer, Qt, p
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy, QStyle, QVBoxLayout, QWidget
 
+from icons import IconBuilder, IconType
+
 class ToastLevel(StrEnum):
     """Enumeration of available severity levels for the Toast Notification"""
     INFO = "info"
@@ -124,9 +126,12 @@ class ToastNotification(QWidget):
 
     def _get_standard_icon(self) -> QIcon:
         """Maps the ToastLevel to a native standard Icon"""
+        if self._level == ToastLevel.SUCCESS:
+            return IconBuilder.build(IconType.Checkmark)
+        elif self._level == ToastLevel.INFO:
+            return IconBuilder.build(IconType.Information)
+
         pixmap_map = {
-            ToastLevel.INFO: QStyle.StandardPixmap.SP_MessageBoxInformation,
-            ToastLevel.SUCCESS: QStyle.StandardPixmap.SP_DialogApplyButton,
             ToastLevel.WARNING: QStyle.StandardPixmap.SP_MessageBoxWarning,
             ToastLevel.ERROR: QStyle.StandardPixmap.SP_MessageBoxCritical,
         }

@@ -13,6 +13,7 @@ from ui.data_tab import DataTab
 from ui.plot_tab import PlotTab
 from ui.widgets.AutosaveIndicator import AutosaveIndicator
 from core.data_handler import DataHandler
+from core.global_signals import global_signals
 from core.project_manager import ProjectManager
 from core.code_exporter import CodeExporter
 from core.logger import Logger
@@ -63,6 +64,7 @@ class MainWindow(QWidget):
         
         QTimer.singleShot(0, self._check_recovery)
         self.toast_manager = ToastManager(self)
+        global_signals.toast_requested.connect(self.show_toast)
 
     def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
                    duration_ms: int = 4000) -> None:
@@ -313,8 +315,6 @@ class MainWindow(QWidget):
             self._update_recent_projects(filepath)
 
             self.show_toast("Project Opened", "Project loaded", ToastLevel.SUCCESS)
-            #self.open_project_animation = ProjectOpenAnimation(message="Project Opened")
-            #self.open_project_animation.start(target_widget=self)
         
         except Exception as LoadProjectError:
             QMessageBox.critical(self, "Error", f"Failed to load project: {str(LoadProjectError)}")
