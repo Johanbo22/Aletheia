@@ -118,6 +118,11 @@ class PlotTypeManager:
 
         self.update_customization_visibility(plot_type)
 
+        stacked_supported = ["Bar", "Area"]
+        self.view.basic_tab.stacked_bars_check.setVisible(plot_type in stacked_supported)
+        if plot_type not in stacked_supported:
+            self.view.basic_tab.stacked_bars_check.setChecked(False)
+
         multi_y_supported = [
             "Line", "Bar", "Area", "Box", "Stackplot", "Eventplot", "Contour",
             "Contourf", "Barbs", "Quiver", "Streamplot", "Tricontour",

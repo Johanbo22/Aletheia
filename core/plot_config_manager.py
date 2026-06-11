@@ -94,6 +94,7 @@ class PlotConfigManager:
             "y_columns": self.pt.get_selected_y_columns(),
             "z_column": getattr(self.pt, "z_column", None) and self.pt.z_column.currentText(),
             "multi_y_checked": self.pt.multi_y_check.isChecked(),
+            "stacked_bars": getattr(self.pt.view.basic_tab, "stacked_bars_check", None) and self.pt.view.basic_tab.stacked_bars_check.isChecked(),
             "hue_column": self.pt.hue_column.currentText(),
             "use_subset": self.pt.use_subset_check.isChecked(),
             "subset_name": subset_name,
@@ -432,6 +433,9 @@ class PlotConfigManager:
         multi_y = config.get("multi_y_checked", False)
         self.pt.multi_y_check.setChecked(multi_y)
         self.pt.toggle_multi_y()
+
+        if hasattr(self.pt.view.basic_tab, "stacked_bars_check"):
+            self.pt.view.basic_tab.stacked_bars_check.setChecked(config.get("stacked_bars", False))
 
         y_cols = config.get("y_columns") or []
         if multi_y:

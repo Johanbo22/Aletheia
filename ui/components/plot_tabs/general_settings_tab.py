@@ -120,23 +120,36 @@ class GeneralSettingsTab(QWidget):
         x_layout.addWidget(self.x_column, 1)
         var_layout.addLayout(x_layout)
 
-        y_lbl_layout = QHBoxLayout()
-        y_lbl_layout.addWidget(QLabel("Y Column(s):"))
-        y_lbl_layout.addStretch()
+        var_layout.addWidget(QLabel("Y Column(s):"))
+
+        y_toggles_layout = QHBoxLayout()
+        y_toggles_layout.setContentsMargins(0, 0, 0, 0)
         self.multi_y_check = ToggleSwitch("Multiple Y Columns")
-        y_lbl_layout.addWidget(self.multi_y_check)
-        var_layout.addLayout(y_lbl_layout)
+        self.stacked_bars_check = ToggleSwitch("Stack (Bar/Area)")
+        y_toggles_layout.addWidget(self.multi_y_check)
+        y_toggles_layout.addWidget(self.stacked_bars_check)
+        y_toggles_layout.addStretch()
+        var_layout.addLayout(y_toggles_layout)
 
         self.y_column = QComboBox()
         var_layout.addWidget(self.y_column)
 
         self.y_columns_list = QListWidget()
         self.y_columns_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        self.y_columns_list.setMaximumHeight(100)
+        self.y_columns_list.setMinimumHeight(100)
         self.y_columns_list.setVisible(False)
         var_layout.addWidget(self.y_columns_list)
 
         multi_btns = QHBoxLayout()
+        multi_btns.setContentsMargins(0, 0, 0, 0)
+
+        self.multi_y_info = QLabel("Tip: Hold Ctrl/Cmd")
+        self.multi_y_info.setProperty("styleClass", "muted_text")
+        self.multi_y_info.setVisible(False)
+        multi_btns.addWidget(self.multi_y_info)
+
+        multi_btns.addStretch()
+
         self.select_all_y_btn = QPushButton("Select All", parent=self)
         self.select_all_y_btn.setVisible(False)
         self.clear_all_y_btn = QPushButton("Clear All", parent=self)
@@ -146,11 +159,6 @@ class GeneralSettingsTab(QWidget):
         multi_btns.addWidget(self.clear_all_y_btn)
         var_layout.addLayout(multi_btns)
 
-        self.multi_y_info = QLabel("Tip: Hold Ctrl/Cmd to select multiple columns")
-        self.multi_y_info.setProperty("styleClass", "muted_text")
-        self.multi_y_info.setVisible(False)
-        var_layout.addWidget(self.multi_y_info)
-        
         self.z_column_widget = QWidget()
         z_layout = QHBoxLayout(self.z_column_widget)
         z_layout.setContentsMargins(0, 0, 0, 0)

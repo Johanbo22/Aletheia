@@ -166,6 +166,7 @@ class PlotTab(PlotTabUI):
     def _connect_basic_tab_signals(self) -> None:
         """Connect signals for the General tab """
         self.view.multi_y_check.stateChanged.connect(self.toggle_multi_y)
+        self.view.basic_tab.stacked_bars_check.stateChanged.connect(self.toggle_stacked_bars)
         self.view.select_all_y_btn.clicked.connect(self.select_all_y_columns)
         self.view.clear_all_y_btn.clicked.connect(self.clear_all_y_columns)
         
@@ -687,6 +688,9 @@ class PlotTab(PlotTabUI):
         self.view.clear_all_y_btn.setVisible(is_multi)
         self.view.multi_y_info.setVisible(is_multi)
 
+        if not is_multi:
+            self.view.basic_tab.stacked_bars_check.setChecked(False)
+
         #wen swhichtng to multi ycols, select the current ycol
         if is_multi and self.view.y_column.currentText():
             current_y = self.view.y_column.currentText()
@@ -694,6 +698,12 @@ class PlotTab(PlotTabUI):
                 if self.view.y_columns_list.item(i).text() == current_y:
                     self.view.y_columns_list.item(i).setSelected(True)
                     break
+        self.on_data_changed()
+
+    def toggle_stacked_bars(self) -> None:
+        """Handle toggle of stacked bars check"""
+        if self.view.basic_tab.stacked_bars_check.isChecked():
+            self.view.multi_y_check.setChecked(True)
         self.on_data_changed()
     
     def select_all_y_columns(self):

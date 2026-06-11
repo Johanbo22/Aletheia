@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, List, Dict, Any, Optional
+import numpy as np
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab
@@ -25,6 +26,8 @@ class BarPlotStrategy(BasePlotStrategy):
         width = plot_kwargs.pop("width", general_kwargs.pop("width", 0.8))
         if hasattr(plot_tab, "bar_width_spin"):
             width = plot_tab.bar_width_spin.value()
+        stacked = plot_kwargs.pop("stacked", general_kwargs.pop("stacked_bars", False))
+        stacked = stacked or plot_tab.view.basic_tab.stacked_bars_check.isChecked()
 
         kwargs = plot_kwargs.copy()
 
@@ -37,29 +40,51 @@ class BarPlotStrategy(BasePlotStrategy):
                 engine.current_ax.bar(df[x_col], df[y_col_name], width=width, picker=True, **kwargs)
 
         elif len(y_cols) > 1:
-            # Grouped bar chart natively in matplotlib
+            # Grouped or stacked bar chart natively in matplotlib
             x_labels = df[x_col].unique()
             x_pos = np.arange(len(x_labels))
-            bar_width = width / len(y_cols)
 
             colors = engine._get_colors_from_cmap(cmap_name, len(y_cols))
 
-            for i, col in enumerate(y_cols):
-                offset = (i - len(y_cols) / 2) * bar_width + bar_width / 2
-                values = []
-                for label in x_labels:
-                    mask = df[x_col] == label
-                    if mask.any():
-                        values.append(df.loc[mask, col].values[0])
+            if stacked:
+                bar_width = width
+                bottoms = np.zeros(len(x_labels))
+
+                for i, col in enumerate(y_cols):
+                    values = []
+                    for label in x_labels:
+                        mask = df[x_col] == label
+                        if mask.any():
+                            values.append(df.loc[mask, col].values[0])
+                        else:
+                            values.append(0)
+
+                    if colors: kwargs["color"] = colors[i]
+
+                    if axes_flipped:
+                        engine.current_ax.barh(x_pos, values, height=bar_width, left=bottoms, label=col, picker=True, **kwargs)
                     else:
-                        values.append(0)
+                        engine.current_ax.bar(x_pos, values, width=bar_width, bottom=bottoms, label=col, picker=True, **kwargs)
 
-                if colors: kwargs["color"] = colors[i]
+                    bottoms += np.nan_to_num(np.array(values, dtype=float))
+            else:
+                bar_width = width / len(y_cols)
+                for i, col in enumerate(y_cols):
+                    offset = (i - len(y_cols) / 2) * bar_width + bar_width / 2
+                    values = []
+                    for label in x_labels:
+                        mask = df[x_col] == label
+                        if mask.any():
+                            values.append(df.loc[mask, col].values[0])
+                        else:
+                            values.apend(0)
 
-                if axes_flipped:
-                    engine.current_ax.barh(x_pos + offset, values, height=bar_width, label=col, picker=True, **kwargs)
-                else:
-                    engine.current_ax.bar(x_pos + offset, values, width=bar_width, label=col, picker=True, **kwargs)
+                    if colors: kwargs["color"] = colors[i]
+
+                    if axes_flipped:
+                        engine.current_ax.barh(x_pos + offset, values, height=bar_width, label=col, picker=True, **kwargs)
+                    else:
+                        engine.current_ax.bar(x_pos + offset, values, width=bar_width, label=col, picker=True, **kwargs)
 
             if axes_flipped:
                 engine._helper_format_categorical_axis(engine.current_ax.yaxis, x_labels)
