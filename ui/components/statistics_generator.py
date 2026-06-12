@@ -20,7 +20,7 @@ class StatisticsGenerator:
             str: The formatted HTML string
         """
         try:
-            css_content, html_template = self._load_templates()
+            css_content, js_content = self._load_assets()
         except Exception as LoadHTMLError:
             error_msg = f"Failed t load CSS/HTML templates: {str(LoadHTMLError)}"
             traceback.print_exc()
@@ -42,26 +42,38 @@ class StatisticsGenerator:
         
         # Categorical statistics
         body_html += self._generate_categorical_statistics(df)
-        
-        return html_template.format(
-            css_content=css_content, body_content=body_html
-        )
+
+        html_template = f"""<!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        {css_content}
+                    </style>
+                    <script>{js_content}</script>
+                </head>
+                <body>
+                    {body_html}
+                </body>
+                </html>
+                """
+        return html_template
     
-    def _load_templates(self) -> tuple[str, str]:
-        """Loads CSS and HTML templates from resources"""
+    def _load_assets(self) -> tuple[str, str]:
+        """Loads CSS and JavaScript template from the resource module"""
         css_file_path = Path(get_resource_path("resources/statistics_style.css"))
-        html_path = Path(get_resource_path("resources/template.html"))
-        
+        js_file_path = Path(get_resource_path("resources/statistics_script.js"))
+
         if not css_file_path.exists():
             raise FileNotFoundError(f"Missing CSS resource file: {css_file_path.resolve()}")
-        
-        if not html_path.exists():
-            raise FileNotFoundError(f"Missing HTML resource file: {html_path.resolve()}")
-        
+
+        if not js_file_path.exists():
+            raise FileNotFoundError(f"Missing JavaScript resource file: {js_file_path.resolve()}")
+
         css_content = css_file_path.read_text(encoding="UTF-8")
-        html_template = html_path.read_text(encoding="UTF-8")
-        
-        return css_content, html_template
+        js_content = js_file_path.read_text(encoding="UTF-8")
+
+        return css_content, js_content
     
     def _generate_overview_section(self, df: pd.DataFrame, info: dict) -> str:
         """Generates the general overview section of the statistics"""
@@ -113,10 +125,14 @@ class StatisticsGenerator:
     def _generate_column_info_section(self, info: dict) -> str:
         """Generates the information table of the columns"""
         html = "<h2>Column Information</h2>"
+        html += "<div style='display: flex; gap: 15px; margin-bottom: 15px; align-items: center;'>"
+        html += "<input type='text' id='columnSearch' class='search-box' placeholder='Search columns by name...' style='margin-bottom: 0; flex-grow: 1;'>"
+        html += "<label style='font-size: 14px; cursor: pointer; user-select: none;'><input type='checkbox' id='missingDataToggle'> Show only missing data</label>"
+        html += "</div>"
         html += "<div class='table-container'>"
-        html += "<table>"
+        html += "<table id='columnInfoTable'>"
         html += "<tr><th>Column Name</th><th>Data Type</th><th class='numeric-col'>Non-Null Count</th><th class='numeric-col'>Missing Values</th><th class='numeric-col'>Missing %</th></tr>"
-        
+
         total_rows = info.get("shape", [0])[0]
         total_missing_check = 0
         
@@ -209,11 +225,16 @@ class StatisticsGenerator:
             numeric_df = df.select_dtypes(include=["int64", "int32", "float64", "float32"])
 
             if len(numeric_df.columns) > 1:
-                html += "<h2>Correlation Matrix</h2>"
+                html += "<div style='margin-bottom: 15px; display: flex; align-items: center; gap: 10px; font-size: 14px;'>"
+                html += "<label for='corrThreshold'><strong>Highlight Threshold (Absolute ≥):</strong></label>"
+                html += "<input type='range' id='corrThreshold' min='0' max='1' step='0.05' value='0' style='width: 200px; cursor: pointer;'>"
+                html += "<span id='corrThresholdLabel' style='min-width: 40px; font-weight: bold;'>0.00</span>"
+                html += "</div>"
+
                 html += "<div class='table-container'>"
                 corr = numeric_df.corr()
 
-                html += "<table>"
+                html += "<table id='correlationTable'>"
                 html += "<tr><th></th>"
                 for col in corr.columns:
                     html += f"<th class='numeric-col'>{col}</th>"

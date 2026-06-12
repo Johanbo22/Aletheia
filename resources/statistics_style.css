@@ -273,3 +273,92 @@ td[style*="background-color"] {
 ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
 }
+
+th {
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+}
+
+th:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+th::after {
+    content: '\21D5';
+    opacity: 0.3;
+    font-size: 0.8em;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.search-box {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-main);
+    background-color: var(--card-bg);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    box-sizing: border-box;
+}
+
+.search-box:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 256, 0.15);
+}
+
+.search-box::placeholder {
+    color: var(--text-muted);
+}
+
+input[type="checkbox"] {
+    accent-color: var(--accent-blue);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    margin: 0;
+    vertical-align: middle;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: transparent;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    background: var(--border-color);
+    height: 6px;
+    border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--accent-blue);
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    margin-top: -5px;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+    transition: transform 0.1s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="range"]:focus {
+    outline: none;
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    background: var(--accent-indigo);
+}

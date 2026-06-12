@@ -6,11 +6,16 @@ from PyQt6.QtWidgets import QMessageBox, QInputDialog, QApplication, QFileDialog
 from PyQt6.QtCore import Qt, QThreadPool
 import pandas as pd
 from pathlib import Path
+import html
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
 
 from core.data_handler import DataHandler
 from core.aggregation_manager import AggregationManager
 from core.help_manager import HelpManager
 from core.subset_manager import SubsetManager
+from core.resource_loader import get_resource_path
 
 from ui.animations import AggregationAnimation, CalculationAnimation, DataFilterAnimation, DataTypeChangeAnimation, DropColumnAnimation, MeltDataAnimation, OutlierDetectionAnimation, RenameColumnAnimation, DropMissingValueAnimation, FillMissingValuesAnimation, RemoveRowAnimation, ResetToOriginalStateAnimation, FailedAnimation, NewDataFrameAnimation, FileImportAnimation, SubsetDataAnimation, ExportFileAnimation
 
@@ -1998,63 +2003,136 @@ class DataTabController:
             0,
             False
         )
-        
+
         if ok and test_type:
             try:
-                results =self.data_handler.run_statistical_test(test_type, col1, col2)
-                
+                results = self.data_handler.run_statistical_test(test_type, col1, col2)
+
                 stat_val = results['statistic']
                 p_val = results['p_value']
                 test_name = results['test']
                 interpretation = results['interpretation']
+
+                fig, ax = plt.subplots(figsize=(6,4))
+                if test_type == "pearson":
+                    ax.scatter(self.data_handler.df[col1], self.data_handler.df[col2], alpha=0.6, color="#3b82f6")
+                    ax.set_xlabel(col1)
+                    ax.set_ylabel(col2)
+                    ax.set_title(f"Scatter Plot: {col1} vs {col2}", fontsize=10)
+                else:
+                    data_to_plot = [self.data_handler.df[col1].dropna(), self.data_handler.df[col2].dropna()]
+                    bplot = ax.boxplot(data_to_plot, patch_artist=True, labels=[col1, col2])
+                    for patch in bplot['boxes']:
+                        patch.set_facecolor('#eff6ff')
+                        patch.set_edgecolor('#3b82f6')
+                    for median in bplot['medians']:
+                        median.set_color('#1e3a8a')
+                    ax.set_ylabel("Values")
+                    ax.set_title(f"Distribution Comparison: {col1} vs {col2}", fontsize=10)
+
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                plt.tight_layout()
+
+                buffer = BytesIO()
+                fig.savefig(buffer, format="png", dpi=100, transparent=True)
+                plt.close(fig)
+                img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                img_html = f'<img src="data:image/png;base64,{img_str}" alt="Statistical Graph" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"/>'
+
                 if not hasattr(self, "test_results_history"):
                     self.test_results_history = []
-                
+
+                is_significant = p_val < 0.05
+                badge_class = "badge-significant" if is_significant else "badge-insignificant"
+                badge_text = "Significant (p < 0.05)" if is_significant else "Not Significant"
+
+                raw_clipboard = (
+                    f"Test: {test_name}\n"
+                    f"Columns: {col1} vs {col2}\n"
+                    f"Test Statistic: {stat_val:.4f}\n"
+                    f"P-Value: {p_val:.4e}\n"
+                    f"Interpretation: {interpretation}"
+                )
+                clipboard_text = html.escape(raw_clipboard).replace('\n', '&#10;')
+
                 html_result = f"""
-                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); border-left: 4px solid #3b82f6;">
-                    <h3 style="margin-top: 0; color: #0f172a; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; font-size: 16px; font-weight: 700;">{test_name}</h3>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;"><b>Compared Columns:</b> <span style="color: #3b82f6; font-weight: 600;">{col1}</span> vs <span style="color: #3b82f6; font-weight: 600;">{col2}</span></p>
-                    <div style="display: flex; gap: 20px; margin-bottom: 24px;">
-                        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; flex: 1;">
-                            <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.05em;">Test Statistic</div>
-                            <div style="font-size: 24px; font-weight: 800; color: #0f172a; font-family: 'JetBrains Mono', 'Consolas', monospace;">{stat_val:.4f}</div>
-                        </div>
-                        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; flex: 1;">
-                            <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.05em;">P-Value</div>
-                            <div style="font-size: 24px; font-weight: 800; color: #0f172a; font-family: 'JetBrains Mono', 'Consolas', monospace;">{p_val:.4e}</div>
+                <div class="test-card">
+                    <div class="card-header-row">
+                        <h3>{test_name}</h3>
+                        <div class="header-actions">
+                            <span class="sig-badge {badge_class}">{badge_text}</span>
+                            <button class="copy-btn" title="Copy to clipboard" data-clipboard="{clipboard_text}">
+                                &#x2398; Copy
+                            </button>
                         </div>
                     </div>
-                    <div style="background-color: #eff6ff; padding: 16px 20px; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 14px; line-height: 1.5; color: #1e3a8a;">
-                        <b style="color: #1e40af; text-transform: uppercase; font-size: 12px; letter-spacing: 0.05em;">Interpretation</b><br>
-                        <div style="margin-top: 6px;">{interpretation}</div>
+                    <div class="test-content">
+                        <p class="compare-text"><b>Compared Columns:</b> <span>{col1}</span> vs <span>{col2}</span></p>
+                        <div class="metrics-container">
+                            <div class="metric-box">
+                                <div class="metric-label">Test Statistic</div>
+                                <div class="metric-value">{stat_val:.4f}</div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-label">P-Value</div>
+                                <div class="metric-value">{p_val:.4e}</div>
+                            </div>
+                        </div>
+                        <div class="interpretation-box">
+                            <b class="interpretation-label">Interpretation</b><br>
+                            <div style="margin-top: 6px;">{interpretation}</div>
+                        </div>
+
+                        <div class="visual-sub-card">
+                            <h4 class="sub-card-header"><span class="sub-toggle-icon">&#9658;</span> Visual Distribution</h4>
+                            <div class="sub-card-content" style="display: none;">
+                                {img_html}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 """
                 self.test_results_history.insert(0, html_result)
-                full_page = f"""
+
+                css_path = Path(get_resource_path("resources/test_resultPanel/stats_test_style.css"))
+                js_path = Path(get_resource_path("resources/test_resultPanel/stats_test_script.js"))
+
+                css_content = css_path.read_text(encoding="UTF-8") if css_path.exists() else ""
+                js_content = js_path.read_text(encoding="UTF-8") if js_path.exists() else ""
+
+                full_page = f"""<!DOCTYPE html>
                 <html>
                 <head>
+                    <meta charset="UTF-8">
                     <style>
-                        body {{ font-family: 'Inter', system-ui, sans-serif; padding: 40px; background-color: #f1f5f9; margin: 0; color: #1e293b; -webkit-font-smoothing: antialiased; }}
-                        h2 {{ color: #0f172a; font-size: 18px; font-weight: 800; margin-bottom: 32px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 16px; }}
-                        h2::after {{ content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, #e2e8f0, transparent); }}
+                        {css_content}
                     </style>
+                    <script>
+                        {js_content}
+                    </script>
                 </head>
                 <body>
-                    <h2>Statistical Analysis Results</h2>
-                    {"".join(self.test_results_history)}
+                    <div class="page-header">
+                        <h2>Statistical Analysis Results</h2>
+                        <input type="text" id="testSearch" class="search-box" placeholder="Search tests, columns, or results...">
+                    </div>
+                    <div id="test-list">
+                        {"".join(self.test_results_history)}
+                    </div>
                 </body>
                 </html>
                 """
-                
+
                 self.view.test_results_text.setHtml(full_page)
                 self.view.data_tabs.setCurrentWidget(self.view.test_results_text)
                 self.status_bar.log(
-                    f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val:.4e})", 
+                    f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val:.4e})",
                     "SUCCESS"
                 )
             except Exception as StatisticalTestError:
-                QMessageBox.critical(self.view, "Error", f"Failed to run statistical test:\n{str(StatisticalTestError)}")
+                QMessageBox.critical(self.view, "Error",
+                                     f"Failed to run statistical test:\n{str(StatisticalTestError)}")
                 self.status_bar.log(f"Statistical test failed: {str(StatisticalTestError)}", "ERROR")
 
     def export_data(self) -> None:
