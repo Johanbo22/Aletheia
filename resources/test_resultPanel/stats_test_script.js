@@ -102,4 +102,97 @@ document.addEventListener('DOMContentLoaded', function() {
             document.body.removeChild(textArea);
         });
     });
-});
+
+    const dismissButtons = document.querySelectorAll('.dismiss-btn');
+    dismissButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card = btn.closest('.test-card');
+
+            card.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.98)';
+
+            setTimeout(() => {
+                card.remove();
+            }, 200);
+        });
+    });
+
+    function toggleAll(collapse) {
+        document.querySelectorAll('.test-card').forEach(card => {
+            const content = card.querySelector('.test-content');
+            const icon = card.querySelector('.toggle-icon');
+
+            if (content && icon) {
+                content.style.display = collapse ? 'none' : 'block';
+                icon.style.transform = collapse ? 'rotate(-90deg)' : 'rotate(0deg)';
+            }
+        });
+    }
+
+    document.getElementById('expandAllBtn')?.addEventListener('click', () => toggleAll(false));
+    document.getElementById('collapseAllBtn')?.addEventListener('click', () => toggleAll(true));
+
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', function (e) {
+            const sortBy = e.target.value;
+            const container = document.getElementById('test-list');
+            const cardElements = Array.from(container.querySelectorAll('.test-card'));
+
+            cardElements.sort((a, b) => {
+                if (sortBy === 'pvalue') {
+                    return parseFloat(a.dataset.pvalue) - parseFloat(b.dataset.pvalue);
+                } else if (sortBy === 'newest') {
+                    return parseInt(b.dataset.timestamp) - parseInt(b.dataset.timestamp);
+                } else if (sortBy === 'type') {
+                    const typeA = a.querySelector('h3').innerText.trim();
+                    const typeB = b.querySelector('h3').innerText.trim();
+                    return typeA.localeCompare(typeB);
+                }
+            });
+
+            cardElements.forEach(card => container.appendChild(card));
+        });
+    }
+
+    const newTestBtn = document.getElementById('newTestBtn');
+    const newTestForm = document.getElementById('newTestForm');
+    const cancelTestBtn = document.getElementById('cancelTestBtn');
+    const runTestBtn = document.getElementById('runTestBtn');
+
+    if (newTestBtn && newTestForm) {
+        newTestBtn.addEventListener('click', () => {
+            newTestBtn.style.display = 'none';
+            newTestForm.style.display = 'flex';
+        });
+
+        cancelTestBtn.addEventListener('click', () => {
+            newTestForm.style.display = 'none';
+            newTestBtn.style.display = 'block';
+        });
+
+        runTestBtn.addEventListener('click', () => {
+            const col1 = document.getElementById('col1Select').value;
+            const col2 = document.getElementById('col2Select').value;
+
+            if (!col1 || !col2) {
+                alert("Please select numeric columns first. If none are available, ensure data with numeric types is loaded");
+                return;
+            }
+
+            if (col1 === col2) {
+                alert("Please select two different columns for the statistical test");
+                return;
+            }
+
+            runTestBtn.innerText = "Running...";
+            runTestBtn.disabled = true;
+            runTestBtn.style.opacity = "0.7";
+            runTestBtn.style.cursor = "wait";
+
+            window.location.hash = `STATSTEST|${encodeURIComponent(col1)}|${encodeURIComponent(col2)}|${encodeURIComponent(type)}|${Date.now()}`;
+        });
+    }
+}); 

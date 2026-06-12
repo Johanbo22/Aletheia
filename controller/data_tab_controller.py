@@ -3,7 +3,9 @@ from typing import TYPE_CHECKING, Optional
 import weakref
 
 from PyQt6.QtWidgets import QMessageBox, QInputDialog, QApplication, QFileDialog, QDialog
-from PyQt6.QtCore import Qt, QThreadPool
+from PyQt6.QtCore import QTimer, Qt, QThreadPool, QUrl, QTimer, QObject, pyqtSlot
+from PyQt6.QtWebChannel import QWebChannel
+from PyQt6.QtWebEngineCore import QWebEnginePage
 import pandas as pd
 from pathlib import Path
 import html
@@ -13,6 +15,7 @@ from io import BytesIO
 
 from core.data_handler import DataHandler
 from core.aggregation_manager import AggregationManager
+from core.global_signals import global_signals
 from core.help_manager import HelpManager
 from core.subset_manager import SubsetManager
 from core.resource_loader import get_resource_path
@@ -21,6 +24,7 @@ from ui.animations import AggregationAnimation, CalculationAnimation, DataFilter
 
 from ui.dialogs import RenameColumnDialog,FilterAdvancedDialog,AggregationDialog,FillMissingDialog,HelpDialog,MeltDialog,OutlierDetectionDialog,PivotDialog,MergeDialog,BinningDialog,ComputedColumnDialog,SubsetDataViewer,SubsetManagerDialog,ProgressDialog,SplitColumnDialog,RegexReplaceDialog,AppendDialog, MacroPreviewDialog, ColumnReorderDialog, RollingWindowDialog, ShiftDataDialog, PercentageChangeDialog, CreateDatasetDialog
 from ui.dialogs.ExportDialog import ExportConfig, ExportDialog
+from ui.widgets.ToastNotification import ToastLevel
 
 from ui.workers import GoogleSheetsImportWorker, AutoCreateSubsetsWorker
 
@@ -1970,94 +1974,101 @@ class DataTabController:
                     QMessageBox.critical(self.view, "Macro Execution Failed", str(err))
     
     def run_statistical_test_from_selection(self) -> None:
-        """Handles the selection of columns and triggers a statistical test"""
+        """Handles the selection of columns and trigger a statistical test or opens the workspace"""
         if self.data_handler.df is None:
-            QMessageBox.warning(self.view, "No Data", "Please load data first.")
+            global_signals.toast_requested.emit("Warning", "No data loaded. Please load data first", ToastLevel.WARNING, 2000)
             return
-        
+
         _, selected_columns = self.view.get_selection_state()
-        
-        if len(selected_columns) != 2:
-            QMessageBox.warning(
-                self.view, 
-                "Selection Error", 
-                "Please select exactly two columns in the table to run a statistical comparison."
-            )
-            return
-        
-        col1, col2 = selected_columns
-        # verify that both columns are numeric
-        if not pd.api.types.is_numeric_dtype(self.data_handler.df[col1]) or not pd.api.types.is_numeric_dtype(self.data_handler.df[col2]):
-            QMessageBox.warning(
-                self.view,
-                "Type Error",
-                "Both selected columns must be strictly numeric to perform these statistical tests."
-            )
-            return
-        
-        test_type, ok = QInputDialog.getItem(
-            self.view,
-            "Select Statistical Test",
-            f"Select test to run between '{col1}' and '{col2}':",
-            ["pearson", "t-test", "anova"],
-            0,
-            False
-        )
 
-        if ok and test_type:
-            try:
-                results = self.data_handler.run_statistical_test(test_type, col1, col2)
-
-                stat_val = results['statistic']
-                p_val = results['p_value']
-                test_name = results['test']
-                interpretation = results['interpretation']
-
-                fig, ax = plt.subplots(figsize=(6,4))
-                if test_type == "pearson":
-                    ax.scatter(self.data_handler.df[col1], self.data_handler.df[col2], alpha=0.6, color="#3b82f6")
-                    ax.set_xlabel(col1)
-                    ax.set_ylabel(col2)
-                    ax.set_title(f"Scatter Plot: {col1} vs {col2}", fontsize=10)
-                else:
-                    data_to_plot = [self.data_handler.df[col1].dropna(), self.data_handler.df[col2].dropna()]
-                    bplot = ax.boxplot(data_to_plot, patch_artist=True, labels=[col1, col2])
-                    for patch in bplot['boxes']:
-                        patch.set_facecolor('#eff6ff')
-                        patch.set_edgecolor('#3b82f6')
-                    for median in bplot['medians']:
-                        median.set_color('#1e3a8a')
-                    ax.set_ylabel("Values")
-                    ax.set_title(f"Distribution Comparison: {col1} vs {col2}", fontsize=10)
-
-                ax.spines['top'].set_visible(False)
-                ax.spines['right'].set_visible(False)
-                plt.tight_layout()
-
-                buffer = BytesIO()
-                fig.savefig(buffer, format="png", dpi=100, transparent=True)
-                plt.close(fig)
-                img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
-                img_html = f'<img src="data:image/png;base64,{img_str}" alt="Statistical Graph" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"/>'
-
-                if not hasattr(self, "test_results_history"):
-                    self.test_results_history = []
-
-                is_significant = p_val < 0.05
-                badge_class = "badge-significant" if is_significant else "badge-insignificant"
-                badge_text = "Significant (p < 0.05)" if is_significant else "Not Significant"
-
-                raw_clipboard = (
-                    f"Test: {test_name}\n"
-                    f"Columns: {col1} vs {col2}\n"
-                    f"Test Statistic: {stat_val:.4f}\n"
-                    f"P-Value: {p_val:.4e}\n"
-                    f"Interpretation: {interpretation}"
+        if len(selected_columns) == 2:
+            col1, col2 = selected_columns
+            if not pd.api.types.is_numeric_dtype(self.data_handler.df[col1]) or not pd.api.types.is_numeric_dtype(self.data_handler.df[col2]):
+                global_signals.toast_requested.emit(
+                    "Warning", "Both selected columns must be numeric to perform statistical tests",
+                    ToastLevel.WARNING, 2000
                 )
-                clipboard_text = html.escape(raw_clipboard).replace('\n', '&#10;')
+                self._render_test_results_page()
+                return
 
-                html_result = f"""
-                <div class="test-card">
+            test_type, ok = QInputDialog.getItem(
+                self.view, "Select Statistical Test", f"Select test to run between '{col1}' and '{col2}':",
+                ["pearson", "t-test", "anova"], 0, False
+            )
+            if ok and test_type:
+                self._execute_statistical_test(col1, col2, test_type)
+        else:
+            self._render_test_results_page()
+
+    def _execute_statistical_test(self, col1: str, col2: str, test_type: str) -> None:
+        """
+        Core execution logic for statistical tests
+        Generates results and renders the workspace
+        """
+        if self.data_handler.df is None:
+            return
+
+        if not pd.api.types.is_numeric_dtype(self.data_handler.df[col1]) or not pd.api.types.is_numeric_dtype(
+                self.data_handler.df[col2]):
+            global_signals.toast_requested.emit(
+                "Warning", "Both selected columns must be numeric to perform statistical tests",
+                ToastLevel.WARNING, 4000
+            )
+            return
+
+        try:
+            results = self.data_handler.run_statistical_test(test_type, col1, col2)
+
+            stat_val = results['statistic']
+            p_val = results['p_value']
+            test_name = results['test']
+            interpretation = results['interpretation']
+
+            fig, ax = plt.subplots(figsize=(6, 4))
+            if test_type == "pearson":
+                ax.scatter(self.data_handler.df[col1], self.data_handler.df[col2], alpha=0.6, color='#3b82f6')
+                ax.set_xlabel(col1)
+                ax.set_ylabel(col2)
+                ax.set_title(f"Scatter Plot: {col1} vs {col2}", fontsize=10)
+            else:
+                data_to_plot = [self.data_handler.df[col1].dropna(), self.data_handler.df[col2].dropna()]
+                bplot = ax.boxplot(data_to_plot, patch_artist=True, labels=[col1, col2])
+                for patch in bplot['boxes']:
+                    patch.set_facecolor('#eff6ff')
+                    patch.set_edgecolor('#3b82f6')
+                for median in bplot['medians']:
+                    median.set_color('#1e3a8a')
+                ax.set_ylabel("Values")
+                ax.set_title(f"Distribution Comparison: {col1} vs {col2}", fontsize=10)
+
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            plt.tight_layout()
+
+            buffer = BytesIO()
+            fig.savefig(buffer, format="png", dpi=100, transparent=True)
+            plt.close(fig)
+            img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            img_html = f'<img src="data:image/png;base64,{img_str}" alt="Statistical Graph" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"/>'
+
+            if not hasattr(self, "test_results_history"):
+                self.test_results_history = []
+
+            is_significant = p_val < 0.05
+            badge_class = "badge-significant" if is_significant else "badge-insignificant"
+            badge_text = "Significant (p < 0.05)" if is_significant else "Not Significant"
+
+            raw_clipboard = (
+                f"Test: {test_name}\n"
+                f"Columns: {col1} vs {col2}\n"
+                f"Test Statistic: {stat_val:.4f}\n"
+                f"P-Value: {p_val:.4e}\n"
+                f"Interpretation: {interpretation}"
+            )
+            clipboard_text = html.escape(raw_clipboard).replace('\n', '&#10;')
+
+            html_result = f"""
+                <div class="test-card" data-pvalue="{p_val}" data-timestamp="{len(self.test_results_history)}">
                     <div class="card-header-row">
                         <h3>{test_name}</h3>
                         <div class="header-actions">
@@ -2065,6 +2076,7 @@ class DataTabController:
                             <button class="copy-btn" title="Copy to clipboard" data-clipboard="{clipboard_text}">
                                 &#x2398; Copy
                             </button>
+                            <button class="dismiss-btn" title="Remove this result">&times;</button>
                         </div>
                     </div>
                     <div class="test-content">
@@ -2083,7 +2095,6 @@ class DataTabController:
                             <b class="interpretation-label">Interpretation</b><br>
                             <div style="margin-top: 6px;">{interpretation}</div>
                         </div>
-
                         <div class="visual-sub-card">
                             <h4 class="sub-card-header"><span class="sub-toggle-icon">&#9658;</span> Visual Distribution</h4>
                             <div class="sub-card-content" style="display: none;">
@@ -2093,47 +2104,126 @@ class DataTabController:
                     </div>
                 </div>
                 """
-                self.test_results_history.insert(0, html_result)
+            self.test_results_history.insert(0, html_result)
+            self.status_bar.log(f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val:.4e})", "SUCCESS")
 
-                css_path = Path(get_resource_path("resources/test_resultPanel/stats_test_style.css"))
-                js_path = Path(get_resource_path("resources/test_resultPanel/stats_test_script.js"))
+            self._render_test_results_page()
+        except Exception as StatisticalTestError:
+            global_signals.toast_requested.emit(
+                "Error", f"Failed to run statistical test", ToastLevel.ERROR, 4000
+            )
+            self.status_bar.log(f"Statistical test failed: {str(StatisticalTestError)}", "ERROR")
+            self._render_test_results_page()
 
-                css_content = css_path.read_text(encoding="UTF-8") if css_path.exists() else ""
-                js_content = js_path.read_text(encoding="UTF-8") if js_path.exists() else ""
+    def _on_stats_url_changed(self, url: QUrl) -> None:
+        """Intercepts URL hash changes from JavaScript to trigger backend tests"""
+        fragment = url.fragment()
+        if fragment and fragment.startswith("STATSTEST|"):
+            from urllib.parse import unquote
+            from PyQt6.QtCore import QTimer
+            import traceback
 
-                full_page = f"""<!DOCTYPE html>
+            try:
+                parts = fragment.split("|")
+                if len(parts) >= 4:
+                    col1 = unquote(parts[1])
+                    col2 = unquote(parts[2])
+                    test_type = unquote(parts[3])
+
+                    QTimer.singleShot(50, lambda c1=col1, c2=col2, t=test_type: self._execute_statistical_test(c1, c2, t)
+                    )
+            except Exception as e:
+                print(f"Failed to parse test parameters from workspace: {e}")
+                traceback.print_exc()
+
+    def _render_test_results_page(self) -> None:
+        """Builds and renders the full test results page including the New Test UI workspace"""
+
+        if not hasattr(self, "stats_page_attached"):
+            self.view.test_results_text.urlChanged.connect(self._on_stats_url_changed)
+            self.stats_page_attached = True
+
+        css_path = Path(get_resource_path("resources/test_resultPanel/stats_test_style.css"))
+        js_path = Path(get_resource_path("resources/test_resultPanel/stats_test_script.js"))
+
+        css_content = css_path.read_text(encoding="UTF-8") if css_path.exists() else ""
+        js_content = js_path.read_text(encoding="UTF-8") if js_path.exists() else ""
+
+        numeric_cols = []
+        if self.data_handler.df is not None:
+            numeric_cols = self.data_handler.df.select_dtypes(include=["number"]).columns.tolist()
+
+        import html
+        col_options = "".join([f'<option value="{html.escape(c)}">{html.escape(c)}</option>' for c in numeric_cols])
+
+        history_html = "".join(getattr(self, "test_results_history", []))
+        if not history_html:
+            history_html = """
+            <div style="text-align: center; padding: 60px 20px; color: #64748b;">
+                <h3 style="color: #475569; margin-bottom: 8px;">No Tests Run Yet</h3>
+                <p style="font-size: 14px;">Click the <b>+ New Statistical Test</b> button above to explore relationships in your numeric data.</p>
+            </div>
+            """
+
+        full_page = f"""<!DOCTYPE html>
                 <html>
                 <head>
                     <meta charset="UTF-8">
-                    <style>
-                        {css_content}
-                    </style>
-                    <script>
-                        {js_content}
-                    </script>
+                    <style>{css_content}</style>
+                    <script>{js_content}</script>
                 </head>
                 <body>
                     <div class="page-header">
                         <h2>Statistical Analysis Results</h2>
-                        <input type="text" id="testSearch" class="search-box" placeholder="Search tests, columns, or results...">
+        
+                        <div class="new-test-container">
+                            <button id="newTestBtn" class="global-control-btn primary-btn">+ New Statistical Test</button>
+                            <div id="newTestForm" class="new-test-form" style="display: none;">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Column 1 (Numeric)</label>
+                                        <select id="col1Select" class="sort-dropdown">{col_options}</select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Column 2 (Numeric)</label>
+                                        <select id="col2Select" class="sort-dropdown">{col_options}</select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Test Type</label>
+                                        <select id="testTypeSelect" class="sort-dropdown">
+                                            <option value="pearson">Pearson Correlation</option>
+                                            <option value="t-test">Independent T-Test</option>
+                                            <option value="anova">ANOVA</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <button id="runTestBtn" class="global-control-btn run-btn">Run Test</button>
+                                    <button id="cancelTestBtn" class="global-control-btn">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+        
+                        <div class="controls-row">
+                            <input type="text" id="testSearch" class="search-box" placeholder="Search tests, columns, or results...">
+                            <select id="sortSelect" class="sort-dropdown">
+                                <option value="newest">Sort: Newest First</option>
+                                <option value="pvalue">Sort: Most Significant (P-Value)</option>
+                                <option value="type">Sort: Test Type</option>
+                            </select>
+                            <button id="expandAllBtn" class="global-control-btn">Expand All</button>
+                            <button id="collapseAllBtn" class="global-control-btn">Collapse All</button>
+                        </div>
                     </div>
                     <div id="test-list">
-                        {"".join(self.test_results_history)}
+                        {history_html}
                     </div>
                 </body>
                 </html>
                 """
 
-                self.view.test_results_text.setHtml(full_page)
-                self.view.data_tabs.setCurrentWidget(self.view.test_results_text)
-                self.status_bar.log(
-                    f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val:.4e})",
-                    "SUCCESS"
-                )
-            except Exception as StatisticalTestError:
-                QMessageBox.critical(self.view, "Error",
-                                     f"Failed to run statistical test:\n{str(StatisticalTestError)}")
-                self.status_bar.log(f"Statistical test failed: {str(StatisticalTestError)}", "ERROR")
+        self.view.test_results_text.setHtml(full_page, QUrl("http://aletheia.local/workspace"))
+        self.view.data_tabs.setCurrentWidget(self.view.test_results_text)
 
     def export_data(self) -> None:
         """Handles exporting the dataframe to a file or clipboard"""

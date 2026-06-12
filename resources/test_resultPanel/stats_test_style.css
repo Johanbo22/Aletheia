@@ -261,6 +261,151 @@ h2::after {
     color: #0f172a;
 }
 
+.controls-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.search-box {
+    flex-grow: 1;
+}
+
+.sort-dropdown{
+    padding: 12px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #1e293b;
+    background-color: #ffffff;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.sort-dropdown:hover, .sort-dropdown:focus{
+    border-color: #3b82f6;
+}
+
+.sort-dropdown option {
+    background-color: #ffffff;
+    color: #1e293b;
+    padding: 8px 12px;
+}
+
+.sort-dropdown option:checked {
+    background-color: #eff6ff;
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.new-test-container {
+    margin-bottom: 24px;
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.primary-btn {
+    background-color: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+    display: block;
+    width: 100%;
+}
+
+.primary-btn:hover {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.new-test-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.form-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 16px;
+}
+
+.run-btn {
+    background-color: #10b981;
+    color: #ffffff;
+    border-color: #059669;
+}
+
+.run-btn:hover {
+    background-color: #059669;
+    color: #ffffff;
+}
+
+.global-control-btn {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    white-space: nowrap;
+}
+
+.global-control-btn:hover{
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+.dismiss-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    transition: color 0.2s;
+    font-weight: bold;
+}
+
+.dismiss-btn:hover {
+    color: #ef4444; 
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
