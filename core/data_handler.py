@@ -196,6 +196,7 @@ class DataHandler:
             "type": "export_google_sheets",
             "sheet_id": sheet_id,
             "sheet_name": sheet_name,
+            "parent_id": self._history.current_node_id
         })
         return result
     
@@ -278,17 +279,29 @@ class DataHandler:
 
         df_backup = self.df.copy(deep=False)
         log_backup = self._history.operation_log.copy()
-        redo_backup = self._history.redo_stack.copy()
+        node_backup = self._history.current_node_id
         sort_state_backup = self.sort_state
         current_op_type = "Unknown"
 
+        id_mapping = {}
+
         try:
-            for op in operations:
+            for i, op in enumerate(operations):
+                old_parent_id = op.get("parent_id")
+
+                if i == 0 and old_parent_id:
+                    id_mapping[old_parent_id] = self._history.current_node_id
+
+                if old_parent_id and old_parent_id in id_mapping:
+                    target_parent = id_mapping[old_parent_id]
+                    if self._history.current_node_id != target_parent:
+                        self.jump_to_history_index(target_parent)
+
                 current_op_type = op.get("type", "unknown")
                 if current_op_type == "unknown":
                     continue
 
-                kwargs = {k: v for k, v in op.items() if k != "type"}
+                kwargs = {k: v for k, v in op.items() if k not in ["type", "node_id", "parent_id"]}
 
                 if current_op_type == "filter":
                     self.filter_data(
@@ -348,10 +361,14 @@ class DataHandler:
                 else:
                     self.clean_data(action=current_op_type, **kwargs)
 
+                old_node_id = op.get("node_id")
+                if old_node_id:
+                    id_mapping[old_node_id] = self._history.current_node_id
+
         except Exception as e:
             self.df = df_backup
             self._history.operation_log = log_backup
-            self._history.redo_stack = redo_backup
+            self._history.current_node_id = node_backup
             self.sort_state = sort_state_backup
             logger.error(
                 f"Macro execution aborted. Data rolled back to original state "

@@ -353,12 +353,16 @@ class DiffHistoryManager:
             sort_state=self.sort_state
         )
 
-        self.nodes[self.current_node_id].children_ids.append(new_node_id)
+        if self.current_node_id and self.current_node_id in self.nodes:
+            self.nodes[self.current_node_id].children_ids.append(new_node_id)
+
         self.nodes[new_node_id] = new_node
         self.current_node_id = new_node_id
         self.current_memory_bytes += state_memory
 
-        if operation_log_entry:
+        if operation_log_entry is not None:
+            operation_log_entry['node_id'] = new_node_id
+            operation_log_entry['parent_id'] = new_node.parent_id
             self.operation_log.append(operation_log_entry)
 
         self._enforce_memory_limits()
@@ -542,13 +546,12 @@ class DiffHistoryManager:
 
     def export_pipeline_macro(self, filepath: Union[str, Path]) -> None:
         """Export operation log to JSON file."""
-        active_log = self.operation_log[:len(self.undo_stack)]
-        if not active_log:
+        if not self.operation_log:
             raise ValueError("No operations to export")
 
         target_path = Path(filepath)
         with target_path.open("w", encoding="utf-8") as f:
-            json.dump(active_log, f, indent=4)
+            json.dump(self.operation_log, f, indent=4)
 
     def load_pipeline_macro(
         self,
