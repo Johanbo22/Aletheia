@@ -302,14 +302,6 @@ h2::after {
     font-weight: 600;
 }
 
-.new-test-container {
-    margin-bottom: 24px;
-    background: #ffffff;
-    border: 1px dashed #cbd5e1;
-    border-radius: 8px;
-    padding: 16px;
-}
-
 .primary-btn {
     background-color: #3b82f6;
     color: #ffffff;
@@ -321,12 +313,6 @@ h2::after {
 .primary-btn:hover {
     background-color: #2563eb;
     color: #ffffff;
-}
-
-.new-test-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
 }
 
 .form-row {
@@ -357,17 +343,6 @@ h2::after {
     justify-content: flex-end;
     border-top: 1px solid #f1f5f9;
     padding-top: 16px;
-}
-
-.run-btn {
-    background-color: #10b981;
-    color: #ffffff;
-    border-color: #059669;
-}
-
-.run-btn:hover {
-    background-color: #059669;
-    color: #ffffff;
 }
 
 .global-control-btn {

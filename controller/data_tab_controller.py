@@ -2115,32 +2115,10 @@ class DataTabController:
             self.status_bar.log(f"Statistical test failed: {str(StatisticalTestError)}", "ERROR")
             self._render_test_results_page()
 
-    def _on_stats_url_changed(self, url: QUrl) -> None:
-        """Intercepts URL hash changes from JavaScript to trigger backend tests"""
-        fragment = url.fragment()
-        if fragment and fragment.startswith("STATSTEST|"):
-            from urllib.parse import unquote
-            from PyQt6.QtCore import QTimer
-            import traceback
-
-            try:
-                parts = fragment.split("|")
-                if len(parts) >= 4:
-                    col1 = unquote(parts[1])
-                    col2 = unquote(parts[2])
-                    test_type = unquote(parts[3])
-
-                    QTimer.singleShot(50, lambda c1=col1, c2=col2, t=test_type: self._execute_statistical_test(c1, c2, t)
-                    )
-            except Exception as e:
-                print(f"Failed to parse test parameters from workspace: {e}")
-                traceback.print_exc()
-
     def _render_test_results_page(self) -> None:
-        """Builds and renders the full test results page including the New Test UI workspace"""
+        """Builds and renders the full test results page"""
 
         if not hasattr(self, "stats_page_attached"):
-            self.view.test_results_text.urlChanged.connect(self._on_stats_url_changed)
             self.stats_page_attached = True
 
         css_path = Path(get_resource_path("resources/test_resultPanel/stats_test_style.css"))
@@ -2149,80 +2127,39 @@ class DataTabController:
         css_content = css_path.read_text(encoding="UTF-8") if css_path.exists() else ""
         js_content = js_path.read_text(encoding="UTF-8") if js_path.exists() else ""
 
-        numeric_cols = []
-        if self.data_handler.df is not None:
-            numeric_cols = self.data_handler.df.select_dtypes(include=["number"]).columns.tolist()
-
-        import html
-        col_options = "".join([f'<option value="{html.escape(c)}">{html.escape(c)}</option>' for c in numeric_cols])
-
-        history_html = "".join(getattr(self, "test_results_history", []))
-        if not history_html:
-            history_html = """
-            <div style="text-align: center; padding: 60px 20px; color: #64748b;">
-                <h3 style="color: #475569; margin-bottom: 8px;">No Tests Run Yet</h3>
-                <p style="font-size: 14px;">Click the <b>+ New Statistical Test</b> button above to explore relationships in your numeric data.</p>
-            </div>
-            """
-
         full_page = f"""<!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <style>{css_content}</style>
-                    <script>{js_content}</script>
-                </head>
-                <body>
-                    <div class="page-header">
-                        <h2>Statistical Analysis Results</h2>
-        
-                        <div class="new-test-container">
-                            <button id="newTestBtn" class="global-control-btn primary-btn">+ New Statistical Test</button>
-                            <div id="newTestForm" class="new-test-form" style="display: none;">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>Column 1 (Numeric)</label>
-                                        <select id="col1Select" class="sort-dropdown">{col_options}</select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Column 2 (Numeric)</label>
-                                        <select id="col2Select" class="sort-dropdown">{col_options}</select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Test Type</label>
-                                        <select id="testTypeSelect" class="sort-dropdown">
-                                            <option value="pearson">Pearson Correlation</option>
-                                            <option value="t-test">Independent T-Test</option>
-                                            <option value="anova">ANOVA</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-actions">
-                                    <button id="runTestBtn" class="global-control-btn run-btn">Run Test</button>
-                                    <button id="cancelTestBtn" class="global-control-btn">Cancel</button>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <style>
+                                {css_content}
+                            </style>
+                            <script>
+                                {js_content}
+                            </script>
+                        </head>
+                        <body>
+                            <div class="page-header">
+                                <h2>Statistical Analysis Results</h2>
+                                <div class="controls-row">
+                                    <input type="text" id="testSearch" class="search-box" placeholder="Search tests, columns, or results...">
+                                    <select id="sortSelect" class="sort-dropdown">
+                                        <option value="newest">Sort: Newest First</option>
+                                        <option value="pvalue">Sort: Most Significant (P-Value)</option>
+                                        <option value="type">Sort: Test Type</option>
+                                    </select>
+                                    <button id="expandAllBtn" class="global-control-btn">Expand All</button>
+                                    <button id="collapseAllBtn" class="global-control-btn">Collapse All</button>
                                 </div>
                             </div>
-                        </div>
-        
-                        <div class="controls-row">
-                            <input type="text" id="testSearch" class="search-box" placeholder="Search tests, columns, or results...">
-                            <select id="sortSelect" class="sort-dropdown">
-                                <option value="newest">Sort: Newest First</option>
-                                <option value="pvalue">Sort: Most Significant (P-Value)</option>
-                                <option value="type">Sort: Test Type</option>
-                            </select>
-                            <button id="expandAllBtn" class="global-control-btn">Expand All</button>
-                            <button id="collapseAllBtn" class="global-control-btn">Collapse All</button>
-                        </div>
-                    </div>
-                    <div id="test-list">
-                        {history_html}
-                    </div>
-                </body>
-                </html>
-                """
+                            <div id="test-list">
+                                {"".join(self.test_results_history)}
+                            </div>
+                        </body>
+                        </html>
+                        """
 
-        self.view.test_results_text.setHtml(full_page, QUrl("http://aletheia.local/workspace"))
+        self.view.test_results_text.setHtml(full_page)
         self.view.data_tabs.setCurrentWidget(self.view.test_results_text)
 
     def export_data(self) -> None:
