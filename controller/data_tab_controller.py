@@ -2051,24 +2051,26 @@ class DataTabController:
             img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
             img_html = f'<img src="data:image/png;base64,{img_str}" alt="Statistical Graph" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"/>'
 
-            if not hasattr(self, "test_results_history"):
-                self.test_results_history = []
+            if not hasattr(self.data_handler, "test_results_history"):
+                self.data_handler.test_results_history = []
 
             is_significant = p_val < 0.05
             badge_class = "badge-significant" if is_significant else "badge-insignificant"
             badge_text = "Significant (p < 0.05)" if is_significant else "Not Significant"
 
+            p_val_str = f"{p_val:.4e}" if p_val < 0.0001 else f"{p_val:.4f}"
+
             raw_clipboard = (
                 f"Test: {test_name}\n"
                 f"Columns: {col1} vs {col2}\n"
                 f"Test Statistic: {stat_val:.4f}\n"
-                f"P-Value: {p_val:.4e}\n"
+                f"P-Value: {p_val_str}\n"
                 f"Interpretation: {interpretation}"
             )
             clipboard_text = html.escape(raw_clipboard).replace('\n', '&#10;')
 
             html_result = f"""
-                <div class="test-card" data-pvalue="{p_val}" data-timestamp="{len(self.test_results_history)}">
+                <div class="test-card" data-pvalue="{p_val}" data-timestamp="{len(self.data_handler.test_results_history)}">
                     <div class="card-header-row">
                         <h3>{test_name}</h3>
                         <div class="header-actions">
@@ -2088,7 +2090,7 @@ class DataTabController:
                             </div>
                             <div class="metric-box">
                                 <div class="metric-label">P-Value</div>
-                                <div class="metric-value">{p_val:.4e}</div>
+                                <div class="metric-value">{p_val_str}</div>
                             </div>
                         </div>
                         <div class="interpretation-box">
@@ -2104,8 +2106,8 @@ class DataTabController:
                     </div>
                 </div>
                 """
-            self.test_results_history.insert(0, html_result)
-            self.status_bar.log(f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val:.4e})", "SUCCESS")
+            self.data_handler.test_results_history.insert(0, html_result)
+            self.status_bar.log(f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val_str})", "SUCCESS")
 
             self._render_test_results_page()
         except Exception as StatisticalTestError:
@@ -2126,6 +2128,8 @@ class DataTabController:
 
         css_content = css_path.read_text(encoding="UTF-8") if css_path.exists() else ""
         js_content = js_path.read_text(encoding="UTF-8") if js_path.exists() else ""
+
+        history = getattr(self.data_handler, "test_results_history", [])
 
         full_page = f"""<!DOCTYPE html>
                         <html>
@@ -2153,7 +2157,7 @@ class DataTabController:
                                 </div>
                             </div>
                             <div id="test-list">
-                                {"".join(self.test_results_history)}
+                                {"".join(history)}
                             </div>
                         </body>
                         </html>

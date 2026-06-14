@@ -33,6 +33,7 @@ class DataHandler:
         
         self.df: Optional[pd.DataFrame] = None
         self.original_df: Optional[pd.DataFrame] = None
+        self.test_results_history: List[str] = []
         
         atexit.register(self.cleanup_temp_files)
     
@@ -118,6 +119,7 @@ class DataHandler:
     
     def _reset_history(self) -> None:
         self._history.clear()
+        self.test_results_history = []
     
     def cleanup_temp_files(self) -> None:
         self._io.cleanup_temp_files()

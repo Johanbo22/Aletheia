@@ -285,6 +285,24 @@ class DataTab(QWidget):
             self._handle_empty_data_view()
             return
         
+        # Detect if a completely new dataset or project has been loaded
+        history_info = self.data_handler.get_history_info()
+        nodes_dict = history_info.get("nodes", {})
+        root_id = history_info.get("root_id")
+        root_node = nodes_dict.get(root_id)
+
+        dataset_signature = f"{id(root_node)}_{getattr(self.data_handler, 'file_path', '')}_{getattr(self.data_handler, 'last_gsheet_gid', '')}"
+        if getattr(self, "_last_dataset_signature", None) != dataset_signature:
+            if hasattr(self.data_handler, "test_results_history") and self.data_handler.test_results_history:
+                controller = getattr(self, "controller", None)
+                if controller and hasattr(controller, "_render_test_results_page"):
+                    controller._render_test_results_page()
+            else:
+                self.set_test_results_greeting()
+                if hasattr(self, "data_tabs") and self.data_tabs is not None:
+                    self.data_tabs.setCurrentIndex(0)
+            self._last_dataset_signature = dataset_signature
+        
         if hasattr(self, "left_stack"):
             self.left_stack.setCurrentIndex(1)
         if hasattr(self, "right_widget"):
@@ -313,12 +331,19 @@ class DataTab(QWidget):
 
         if hasattr(self, "stats_text") and self.stats_text is not None:
             self.stats_text.setHtml("")
+        
+        if hasattr(self, "test_results_text") and self.test_results_text is not None:
+            self.set_test_results_greeting()
 
         if hasattr(self, "toolbar"):
             self.toolbar.set_refresh_visible(False)
 
         self.status_bar.set_data_source("")
         self.status_bar.set_view_context("", "normal")
+    
+        self._last_dataset_signature = None
+        if hasattr(self, "data_tabs") and self.data_tabs is not None:
+            self.data_tabs.setCurrentIndex(0)
     
     def _update_data_model(self, reload_model: bool) -> None:
         """Updates the table model and restores sorting states"""
@@ -643,6 +668,10 @@ class DataTab(QWidget):
             self.toolbar.set_refresh_visible(False)
         self.status_bar.set_data_source("")
         self.status_bar.set_view_context("", "normal")
+
+        self._last_dataset_signature = None
+        if hasattr(self, "data_tabs") and self.data_tabs is not None:
+            self.data_tabs.setCurrentIndex(0)
 
     def _format_operation_text(self, operation: dict) -> str:
         """Formatter for operation dict back to better text handling"""
