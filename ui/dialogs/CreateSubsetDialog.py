@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QLineEdit
 
 from ui.dialogs.FilterAdvancedDialog import FilterAdvancedDialog
@@ -31,7 +31,7 @@ class CreateSubsetDialog(FilterAdvancedDialog):
         top_layout.setContentsMargins(0, 0, 0, 0)
 
         if not self.existing_subset:
-            name_layout = QHBoxLayout()
+            name_layout = QVBoxLayout()
             name_layout.addWidget(QLabel("Subset Name:"))
             self.name_input = QLineEdit()
             self.name_input.setPlaceholderText("e.g., high_values, location_A, etc")
@@ -39,11 +39,19 @@ class CreateSubsetDialog(FilterAdvancedDialog):
             top_layout.addLayout(name_layout)
 
         desc_layout = QHBoxLayout()
-        desc_layout.addWidget(QLabel("Description:"))
+        desc_layout.setSpacing(6)
+        description_label = QLabel("Description")
+        optional_badge = QLabel("Optional")
+        optional_badge.setProperty("styleClass", "optional_badge")
+
+        desc_layout.addWidget(description_label)
+        desc_layout.addWidget(optional_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
+        desc_layout.addStretch()
+        top_layout.addLayout(desc_layout)
+
         self.desc_input = QLineEdit()
         self.desc_input.setPlaceholderText("Optional description")
-        desc_layout.addWidget(self.desc_input)
-        top_layout.addLayout(desc_layout)
+        top_layout.addWidget(self.desc_input)
 
         main_layout.insertWidget(0, top_widget)
 
