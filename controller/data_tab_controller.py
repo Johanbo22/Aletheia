@@ -691,11 +691,15 @@ class DataTabController:
         dialog = ComputedColumnDialog(columns, self.view)
 
         if dialog.exec():
-            new_column, expression = dialog.get_data()
+            new_column, expression, data_type = dialog.get_data()
             try:
                 self.data_handler.create_computed_column(new_column, expression)
+
+                if data_type != "Auto-infer":
+                    self.data_handler.clean_data("change_data_type", column=new_column, new_type=data_type)
+
                 self.view.refresh_data_view()
-                CalculationAnimation(self.view, "Calculate Column").start(self.view)
+                global_signals.toast_requested.emit(f"Success", f"Computed a new column '{new_column}' of type '{data_type}'", ToastLevel.SUCCESS, 4000)
 
                 self.status_bar.log_action(
                     f"Created column '{new_column}' = {expression}",
@@ -711,11 +715,7 @@ class DataTabController:
                     f"Failed to create and calculate new column: {str(ComputedColumnError)}",
                     "ERROR",
                 )
-                QMessageBox.critical(
-                    self.view,
-                    "Computation Error",
-                    f"Failed to create and calculate new column:\n{str(ComputedColumnError)}",
-                )
+                global_signals.toast_requested.emit(f"Error", f"Failed to create and calculate new column", ToastLevel.ERROR, 4000)
 
     def change_column_type(self):
         """Change the data type of the selected column"""

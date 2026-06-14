@@ -6,7 +6,7 @@ import json
 from enum import Enum
 from typing import NamedTuple
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy, QMenu, QListWidget, QLineEdit, QGroupBox, QPushButton
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy, QMenu, QListWidget, QLineEdit, QGroupBox, QPushButton, QComboBox
 from PyQt6.QtCore import QModelIndex, QPoint, Qt, QTimer, QSettings, QEvent, QObject
 from PyQt6.QtGui import QAction, QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
@@ -77,6 +77,24 @@ class ComputedColumnDialog(QDialog):
         self.name_input.setToolTip("Enter a valid, unique Python identifier (no spaces or special characters) as name")
         self.name_input.setClearButtonEnabled(True)
         input_layout.addWidget(self.name_input)
+
+        datatype_label_layout = QHBoxLayout()
+        datatype_label_layout.setContentsMargins(0, 0, 0, 0)
+        datatype_label_layout.setSpacing(6)
+
+        data_type_label = QLabel("Data Type")
+        optional_badge = QLabel("Optional")
+        optional_badge.setProperty("styleClass", "optional_badge")
+
+        datatype_label_layout.addWidget(data_type_label)
+        datatype_label_layout.addWidget(optional_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
+        datatype_label_layout.addStretch()
+        input_layout.addLayout(datatype_label_layout)
+
+        self.datatype_combo = QComboBox()
+        self.datatype_combo.addItems(["Auto-infer", "string", "int", "float", "category", "datetime"])
+        self.datatype_combo.setToolTip("Select the desired data type for the new column.\nIf auto-infer is selected, the system will infer the type based on the computed values")
+        input_layout.addWidget(self.datatype_combo)
 
         input_layout.addWidget(QLabel("Expression"))
         expression_layout = QHBoxLayout()
@@ -287,7 +305,8 @@ class ComputedColumnDialog(QDialog):
         self.focus_col_search_shortcut.activated.connect(self.column_filter_input.setFocus)
         self.focus_col_search_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         
-        QWidget.setTabOrder(self.name_input, self.expression_input)
+        QWidget.setTabOrder(self.name_input, self.datatype_combo)
+        QWidget.setTabOrder(self.datatype_combo, self.expression_input)
         QWidget.setTabOrder(self.expression_input, self.column_filter_input)
         QWidget.setTabOrder(self.column_filter_input, self.column_list)
         QWidget.setTabOrder(self.column_list, self.function_filter_input)
@@ -748,8 +767,9 @@ class ComputedColumnDialog(QDialog):
         else:
             QMessageBox.warning(self, "Validation Error", "Please resolve the highlighted errors before creating the column")
 
-    def get_data(self) -> tuple[str, str]:
+    def get_data(self) -> tuple[str, str, str]:
         return (
             self.name_input.text().strip(),
             self.expression_input.toPlainText().strip(),
+            self.datatype_combo.currentText(),
         )

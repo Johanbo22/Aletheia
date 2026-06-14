@@ -471,8 +471,22 @@ class DataMutator:
                 )
             if "`" in clean_name:
                 raise ValueError("Column names cannot contain backticks (`)")
+            try:
+                df[new_column_name] = df.eval(expression)
+            except Exception as eval_e:
+                error_str = str(eval_e).lower()
+                if "pyarrow" in error_str or "unsupported operand" in error_str or "notimplementederror" in error_str:
+                    temp_df = df.convert_dtypes(dtype_backend="numpy_nullable")
+                    df[new_column_name] = temp_df.eval(expression)
+                else:
+                    raise eval_e
 
-            df[new_column_name] = df.eval(expression)
+            has_pyarrow = hasattr(pd, "ArrowDtype") and any(isinstance(dt, pd.ArrowDtype) for dt in df.dtypes)
+            backend = "pyarrow" if has_pyarrow else "numpy_nullable"
+
+            # Auto infer optimal datatype
+            df[new_column_name] = df[new_column_name].convert_dtypes(dtype_backend=backend)
+
             return df
         except (ValueError, KeyError, TypeError, SyntaxError) as e:
             logger.error(f"Error computing and creating new column: {e}", exc_info=True)
@@ -766,12 +780,17 @@ class DataMutator:
         if not column or not new_type:
             raise ValueError("Column and new data type are needed to change data type")
 
+        has_pyarrow = hasattr(pd, "ArrowDtype") and any(isinstance(dt, pd.ArrowDtype) for dt in df.dtypes)
+
         if new_type == "string":
-            df[column] = df[column].astype(pd.StringDtype())
+            dtype = "string[pyarrow]" if has_pyarrow else pd.StringDtype()
+            df[column] = df[column].astype(dtype)
         elif new_type == "int":
-            df[column] = pd.to_numeric(df[column], errors="coerce").astype(pd.Int64Dtype())
+            dtype = "int64[pyarrow]" if has_pyarrow else pd.Int64Dtype()
+            df[column] = pd.to_numeric(df[column], errors="coerce").astype(dtype)
         elif new_type == "float":
-            df[column] = pd.to_numeric(df[column], errors="coerce").astype(pd.Float64Dtype())
+            dtype = "float64[pyarrow]" if has_pyarrow else pd.Float64Dtype()
+            df[column] = pd.to_numeric(df[column], errors="coerce").astype(dtype)
         elif new_type == "category":
             df[column] = df[column].astype("category")
         elif new_type == "datetime":

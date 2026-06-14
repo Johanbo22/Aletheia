@@ -35,3 +35,12 @@ QLabel[styleClass="section_header"] {
     font-size: 11pt;
     margin-bottom: 5px;
 }
+
+QLabel[styleClass="optional_badge"]{   
+    background-color: #e0e0e0;
+    color: #666666;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: bold;
+}

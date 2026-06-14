@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QLineEdit, QComboBox, QPushButton
+from PyQt6.QtCore import Qt
 
 from ui.widgets.CodeEditor import CodeEditor
 
@@ -34,7 +35,19 @@ class AddCustomFunctionDialog(QDialog):
         layout.addWidget(self.category_input)
 
         # Description / Tooltip role for the custom function
-        layout.addWidget(QLabel("Description (Optional):"))
+        description_layout = QHBoxLayout()
+        description_layout.setContentsMargins(0, 0, 0, 0)
+        description_layout.setSpacing(6)
+        
+        description_label = QLabel("Description")
+        optional_badge = QLabel("Optional")
+        optional_badge.setProperty("styleClass", "optional_badge")
+        
+        description_layout.addWidget(description_label)
+        description_layout.addWidget(optional_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
+        description_layout.addStretch()
+        layout.addLayout(description_layout)
+        
         self.desc_input = QLineEdit()
         self.desc_input.setPlaceholderText("e.g., Calculates (A - B) / A")
         self.desc_input.setToolTip("Will be displayed when hovering over the function in the function tree")
