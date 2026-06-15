@@ -9,10 +9,10 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
-from controller.plot_controllers import AnnotationManager, CanvasInteractionManager, ColorManager, PlotExportManager, \
-    PlotFormattingManager, PlotTableManager, PlotTypeManager, ReferenceLineManager, ReferenceSpanManager, ScriptManager, \
-    SeriesCustomizationManager, SubplotManager, \
-    ThemeManager
+from controller.plot_controllers import (AnnotationManager, AppearanceSettingsManager, CanvasInteractionManager,
+                                         ColorManager, DataSelectionManager, PlotExportManager, PlotFormattingManager,
+                                         PlotTableManager, PlotTypeManager, ReferenceLineManager, ReferenceSpanManager,
+                                         ScriptManager, SeriesCustomizationManager, SubplotManager, ThemeManager)
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
 from core.global_signals import global_signals
@@ -22,7 +22,6 @@ from ui.animations import PlotClearedAnimation
 from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI
 from ui.status_bar import LogLevel, StatusBar
-from ui.widgets import ColorBlindnessEffect
 from ui.widgets.SubplotOverlay import SubplotOverlay
 from ui.widgets.ToastNotification import ToastLevel
 
@@ -120,13 +119,6 @@ class PlotTab(PlotTabUI):
         self.selection_overlay = SubplotOverlay(self.canvas)
         self.canvas.mpl_connect("resize_event", self.on_canvas_resize)
 
-        # Load initial data
-        self.update_column_combo()
-
-        self.type_manager.select_plot_in_toolbox("Line")
-
-        self.set_empty_state_greeting()
-
         # Initialize the plot tab managers
         self.theme_manager = ThemeManager(self)
         self.subplot_manager = SubplotManager(self)
@@ -138,6 +130,13 @@ class PlotTab(PlotTabUI):
         self.color_manager = ColorManager(self)
         self.series_customization_manager = SeriesCustomizationManager(self)
         self.table_manager = PlotTableManager(self)
+        self.data_selection_manager = DataSelectionManager(self)
+        self.appearance_settings_manager = AppearanceSettingsManager(self)
+
+        # Load initial data
+        self.update_column_combo()
+        self.type_manager.select_plot_in_toolbox("Line")
+        self.set_empty_state_greeting()
 
         # Caching
         self._last_data_signature = None
@@ -172,10 +171,7 @@ class PlotTab(PlotTabUI):
 
     def _connect_basic_tab_signals(self) -> None:
         """Connect signals for the General tab """
-        self.view.multi_y_check.stateChanged.connect(self.toggle_multi_y)
-        self.view.basic_tab.stacked_bars_check.stateChanged.connect(self.toggle_stacked_bars)
-        self.view.select_all_y_btn.clicked.connect(self.select_all_y_columns)
-        self.view.clear_all_y_btn.clicked.connect(self.clear_all_y_columns)
+        self.data_selection_manager.connect_signals()
 
         self.view.x_column.currentTextChanged.connect(self.on_data_changed)
         self.view.y_column.currentTextChanged.connect(self.on_data_changed)
@@ -188,16 +184,13 @@ class PlotTab(PlotTabUI):
         self.subplot_manager.connect_signals()
 
         self.view.use_subset_check.stateChanged.connect(self.use_subset)
-        self.view.secondary_y_check.stateChanged.connect(lambda state: self._toggle_secondary_input(bool(state)))
         self.view.secondary_plot_type_combo.currentTextChanged.connect(
             lambda _: self.type_manager.update_customization_visibility(self.current_plot_type_name))
 
     def _connect_appearance_tab_signals(self) -> None:
         """Connect signals for the Appearance tab"""
-        self.view.individual_spines_check.stateChanged.connect(self.toggle_individual_spines)
-        self.view.all_spines_btn.clicked.connect(self.preset_all_spines)
-        self.view.box_only_btn.clicked.connect(self.preset_box_only)
-        self.view.no_spines_btn.clicked.connect(self.preset_no_spines)
+        self.appearance_settings_manager.connect_signals()
+
         self.view.width_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
         self.view.height_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
         self.view.colorblind_check.stateChanged.connect(self.update_colorblind_simulation)
@@ -302,12 +295,9 @@ class PlotTab(PlotTabUI):
 
     def _connect_legend_grid_tab_signals(self) -> None:
         """Connect signals for the Legend and Grid tab"""
-        self.view.legend_check.stateChanged.connect(self.on_legend_toggle)
         self.view.legend_alpha_slider.valueChanged.connect(lambda v: self.view.legend_alpha_label.setText(f"{v}%"))
-        self.view.grid_check.stateChanged.connect(self.on_grid_toggle)
         self.view.global_grid_alpha_slider.valueChanged.connect(
             lambda v: self.view.global_grid_alpha_label.setText(f"{v}%"))
-        self.view.independent_grid_check.stateChanged.connect(self.on_independent_grid_toggle)
         self.view.x_major_grid_alpha_slider.valueChanged.connect(
             lambda v: self.view.x_major_grid_alpha_label.setText(f"{v}%"))
         self.view.x_minor_grid_alpha_slider.valueChanged.connect(
@@ -442,9 +432,7 @@ class PlotTab(PlotTabUI):
 
     def toggle_individual_spines(self):
         """Toggles the customization of spines for each"""
-        checked = self.view.individual_spines_check.isChecked()
-        self.view.individual_spines_container.setVisible(checked)
-        self.on_style_changed()
+        self.appearance_settings_manager.toggle_individual_spines()
 
     def use_subset(self):
         """Active subset on change"""
@@ -547,16 +535,7 @@ class PlotTab(PlotTabUI):
 
     def on_grid_toggle(self) -> None:
         """Handle grid checkbox toggle"""
-        is_enabled = self.view.grid_check.isChecked()
-        self.view.global_grid_group.setVisible(is_enabled)
-        self.view.grid_which_type_combo.setEnabled(is_enabled)
-        self.view.grid_axis_combo.setEnabled(is_enabled)
-        self.view.independent_grid_check.setEnabled(is_enabled)
-
-        if not is_enabled:
-            self.view.grid_axis_tab.setVisible(False)
-            self.view.independent_grid_check.setChecked(False)
-        self.on_style_changed()
+        self.appearance_settings_manager.on_grid_toggle()
 
     def on_legend_toggle(self) -> None:
         """Handle legend UI visibility"""
@@ -564,190 +543,47 @@ class PlotTab(PlotTabUI):
 
     def on_independent_grid_toggle(self):
         """Handle indepeendent customization of axis grids toggle"""
-        is_independent = self.view.independent_grid_check.isChecked()
-
-        # disable global control when independent axis controls are enabeld
-        self.view.grid_which_type_combo.setEnabled(not is_independent)
-        self.view.grid_axis_combo.setEnabled(not is_independent)
-        self.on_style_changed()
+        self.appearance_settings_manager.on_independent_grid_toggle()
 
     def toggle_multi_y(self):
         """Toggle between multi and single y slections"""
-        is_multi = self.view.multi_y_check.isChecked()
-
-        # show appropiate widgets
-        self.view.y_column.setVisible(not is_multi)
-        self.view.y_columns_list.setVisible(is_multi)
-        self.view.select_all_y_btn.setVisible(is_multi)
-        self.view.clear_all_y_btn.setVisible(is_multi)
-        self.view.multi_y_info.setVisible(is_multi)
-
-        if not is_multi:
-            self.view.basic_tab.stacked_bars_check.setChecked(False)
-
-        # wen swhichtng to multi ycols, select the current ycol
-        if is_multi and self.view.y_column.currentText():
-            current_y = self.view.y_column.currentText()
-            for i in range(self.view.y_columns_list.count()):
-                if self.view.y_columns_list.item(i).text() == current_y:
-                    self.view.y_columns_list.item(i).setSelected(True)
-                    break
-        self.on_data_changed()
+        self.data_selection_manager.toggle_multi_y()
 
     def toggle_stacked_bars(self) -> None:
         """Handle toggle of stacked bars check"""
-        if self.view.basic_tab.stacked_bars_check.isChecked():
-            self.view.multi_y_check.setChecked(True)
-        self.on_data_changed()
+        self.data_selection_manager.toggle_stacked_bars()
 
     def select_all_y_columns(self):
         """Select all availalbe ycols"""
-        self.view.y_columns_list.selectAll()
-        self.on_data_changed()
+        self.data_selection_manager.select_all_y_columns()
 
     def clear_all_y_columns(self):
         """Clear all selected ycols"""
-        self.view.y_columns_list.clearSelection()
-        self.on_data_changed()
+        self.data_selection_manager.clear_all_y_columns()
 
     def get_selected_y_columns(self):
         """Get list of selected ycols"""
-        if self.view.multi_y_check.isChecked():
-            selected_items = self.view.y_columns_list.selectedItems()
-            return [item.text() for item in selected_items]
-        else:
-            y_col_text = self.view.y_column.currentText()
-            return [y_col_text] if y_col_text else []
+        return self.data_selection_manager.get_selected_y_columns()
 
     def update_colorblind_simulation(self) -> None:
         """Applies or removes the SVG filter effect from canvas"""
-        if self.view.colorblind_check.isChecked():
-            sim_type = self.view.colorblind_type_combo.currentText()
-            effect = ColorBlindnessEffect(sim_type)
-            self.canvas.setGraphicsEffect(effect)
-            self.status_bar.log(f"Color blindness mode enabled: {sim_type}", "INFO")
-        else:
-            self.canvas.setGraphicsEffect(None)
-            self.status_bar.log("Color blindess mode disabled", "INFO")
-        self.on_style_changed()
+        self.appearance_settings_manager.update_colorblind_simulation()
 
     def preset_all_spines(self):
         """Preset: Show all spines"""
-        self.view.top_spine_visible_check.setChecked(True)
-        self.view.bottom_spine_visible_check.setChecked(True)
-        self.view.left_spine_visible_check.setChecked(True)
-        self.view.right_spine_visible_check.setChecked(True)
-        self.status_bar.log("Applied preset: All Spines", "INFO")
-        self.on_style_changed()
+        self.appearance_settings_manager.preset_all_spines()
 
     def preset_box_only(self):
         """Preset: Show only left and buttom spines"""
-        self.view.top_spine_visible_check.setChecked(False)
-        self.view.bottom_spine_visible_check.setChecked(True)
-        self.view.left_spine_visible_check.setChecked(True)
-        self.view.right_spine_visible_check.setChecked(False)
-        self.status_bar.log("Applied preset: Box Only", "INFO")
-        self.on_style_changed()
+        self.appearance_settings_manager.preset_box_only()
 
     def preset_no_spines(self):
         """Preset: Hide all spines"""
-        self.view.top_spine_visible_check.setChecked(False)
-        self.view.bottom_spine_visible_check.setChecked(False)
-        self.view.left_spine_visible_check.setChecked(False)
-        self.view.right_spine_visible_check.setChecked(False)
-        self.status_bar.log("Applied preset: No Spines", "INFO")
-        self.on_style_changed()
+        self.appearance_settings_manager.preset_no_spines()
 
     def update_column_combo(self):
         """Update column ComboBoxes with available columns"""
-        if self.data_handler.df is None or len(self.data_handler.df.columns) == 0:
-            return
-
-        columns = list(self.data_handler.df.columns)
-        self.view.quick_filter_input.set_columns(columns)
-
-        # Preserve the current selection
-        current_x = self.view.x_column.currentText()
-        current_y = self.view.y_column.currentText()
-        current_z = self.view.z_column.currentText()
-        current_hue = self.view.hue_column.currentText()
-        current_secondary_y = self.view.secondary_y_column.currentText()
-        current_auto_annoate = self.view.auto_annotate_col_combo.currentText()
-        current_multi_y = []
-        if self.view.multi_y_check.isChecked():
-            current_multi_y = [item.text() for item in self.view.y_columns_list.selectedItems()]
-
-        # Block signals to prevent triggering callbacks
-        self.view.x_column.blockSignals(True)
-        self.view.y_column.blockSignals(True)
-        self.view.z_column.blockSignals(True)
-        self.view.hue_column.blockSignals(True)
-        self.view.secondary_y_column.blockSignals(True)
-        self.view.y_columns_list.blockSignals(True)
-        self.view.auto_annotate_col_combo.blockSignals(True)
-
-        # update xcol
-        self.view.x_column.clear()
-        self.view.x_column.addItems(columns)
-        if current_x in columns:
-            self.view.x_column.setCurrentText(current_x)
-
-        # update singleular ycol
-        self.view.y_column.clear()
-        self.view.y_column.addItems(columns)
-        if current_y in columns:
-            self.view.y_column.setCurrentText(current_y)
-
-        # update zcol
-        self.view.z_column.clear()
-        self.view.z_column.addItems(columns)
-        if current_z in columns:
-            self.view.z_column.setCurrentText(current_z)
-
-        # update secondary y col
-        self.view.secondary_y_column.clear()
-        self.view.secondary_y_column.addItems(columns)
-        if current_secondary_y in columns:
-            self.view.secondary_y_column.setCurrentText(current_secondary_y)
-
-        # update more ycols
-        self.view.y_columns_list.clear()
-        for col in columns:
-            self.view.y_columns_list.addItem(col)
-            if col in current_multi_y:
-                item = self.view.y_columns_list.item(self.view.y_columns_list.count() - 1)
-                item.setSelected(True)
-
-        # update hue
-        self.view.hue_column.clear()
-        self.view.hue_column.addItem("None")
-        self.view.hue_column.addItems(columns)
-        if current_hue in columns:
-            self.view.hue_column.setCurrentText(current_hue)
-        else:
-            self.view.hue_column.setCurrentIndex(0)
-
-        # update auto annotations
-        self.view.auto_annotate_col_combo.clear()
-        self.view.auto_annotate_col_combo.addItem("Default (Y-value)")
-        self.view.auto_annotate_col_combo.addItems(columns)
-
-        if current_auto_annoate in columns:
-            self.view.auto_annotate_col_combo.setCurrentText(current_auto_annoate)
-        elif current_auto_annoate == "Default (Y-value)":
-            self.view.auto_annotate_col_combo.setCurrentIndex(0)
-
-        # Unblock signals
-        self.view.x_column.blockSignals(False)
-        self.view.y_column.blockSignals(False)
-        self.view.z_column.blockSignals(False)
-        self.view.hue_column.blockSignals(False)
-        self.view.secondary_y_column.blockSignals(False)
-        self.view.y_columns_list.blockSignals(False)
-        self.view.auto_annotate_col_combo.blockSignals(False)
-
-        if current_x != self.view.x_column.currentText() or current_y != self.view.y_column.currentText():
-            self.on_data_changed()
+        self.data_selection_manager.update_column_combo()
 
     def toggle_table_controls(self):
         """Enable and disable table controls for the user"""
@@ -1332,14 +1168,7 @@ class PlotTab(PlotTabUI):
         QTimer.singleShot(100, lambda: setattr(self, "_is_clearing", False))
 
     def _toggle_secondary_input(self, enabled: bool):
-        is_enabled = bool(enabled)
-
-        self.view.secondary_y_column.setEnabled(is_enabled)
-        if hasattr(self.view, "secondary_plot_type_combo"):
-            self.view.secondary_plot_type_combo.setEnabled(is_enabled)
-        if hasattr(self.view, "secondary_zorder_check"):
-            self.view.secondary_zorder_check.setEnabled(is_enabled)
-        self.type_manager.update_customization_visibility(self.current_plot_type_name)
+        self.data_selection_manager.toggle_secondary_input(enabled)
 
     def load_config(self, config: dict) -> None:
         """Load plot configuration"""

@@ -1,6 +1,8 @@
 from .annotation_manager import AnnotationManager
+from .appearance_settings_manager import AppearanceSettingsManager
 from .canvas_interaction_manager import CanvasInteractionManager
 from .color_manager import ColorManager
+from .data_selection_manager import DataSelectionManager
 from .formatting_manager import PlotFormattingManager
 from .plot_export_manager import PlotExportManager
 from .plot_table_manager import PlotTableManager
@@ -13,6 +15,8 @@ from .subplot_manager import SubplotManager
 from .theme_manager import ThemeManager
 
 __all__ = [
+    "DataSelectionManager",
+    "AppearanceSettingsManager",
     "SeriesCustomizationManager",
     "PlotTableManager",
     "PlotExportManager",
