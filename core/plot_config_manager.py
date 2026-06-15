@@ -323,7 +323,7 @@ class PlotConfigManager:
         linestyle_map = {'Solid': '-', 'Dashed': '--', 'Dash-dot': '-.', 'Dotted': ':', 'None': 'None'}
         return {
             "multi_line_custom"  : self.pt.multiline_custom_check.isChecked(),
-            "line_customizations": self.pt.line_customizations,
+            "line_customizations": self.pt.series_customization_manager.line_customizations,
             "global_line"        : {
                 "width": self.pt.linewidth_spin.value(),
                 "style": linestyle_map.get(self.pt.linestyle_combo.currentText(), "-"),
@@ -337,7 +337,7 @@ class PlotConfigManager:
                 "edge_width": self.pt.marker_edge_width_spin.value(),
             },
             "multi_bar_custom"   : self.pt.multibar_custom_check.isChecked(),
-            "bar_customizations" : self.pt.bar_customizations,
+            "bar_customizations" : self.pt.series_customization_manager.bar_customizations,
             "global_bar"         : {
                 "width"     : self.pt.bar_width_spin.value(),
                 "color"     : self.pt.bar_color,
