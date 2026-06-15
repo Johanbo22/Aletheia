@@ -1,9 +1,10 @@
 import traceback
-from typing import TYPE_CHECKING, Dict, Any, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.ticker import MaxNLocator, FuncFormatter, AutoMinorLocator, NullLocator
+import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator, FuncFormatter, MaxNLocator, NullLocator
+
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
     import pandas as pd
@@ -16,11 +17,12 @@ class PlotFormattingManager:
 
     def build_general_kwargs(self, plot_type: str, x_col: str, y_cols: list[str], hue: Optional[str]) -> Dict[str, Any]:
         """Build the general plotting kwargs."""
-        plots_supporting_hue = ["Scatter", "Line", "Bar", "Violin", "2D Density", "Box", "Count Plot", "Histogram", "3D Scatter", "3D Line"]
+        plots_supporting_hue = ["Scatter", "Line", "Bar", "Violin", "2D Density", "Box", "Count Plot", "Histogram",
+                                "3D Scatter", "3D Line"]
         y_label_text = self.determine_y_label(plot_type, y_cols)
 
         general_kwargs = {
-            "title": self.plot_tab.view.title_input.text() or plot_type,
+            "title" : self.plot_tab.view.title_input.text() or plot_type,
             "xlabel": self.plot_tab.view.xlabel_input.text() or x_col,
             "ylabel": self.plot_tab.view.ylabel_input.text() or y_label_text,
             "legend": self.plot_tab.view.legend_check.isChecked()
@@ -85,26 +87,26 @@ class PlotFormattingManager:
         basemap_source = basemap_combo.currentText() if basemap_combo else "OpenStreetMap"
 
         kwargs = {
-            "scheme": scheme_text if scheme_text != "None" else None,
-            "k": self.plot_tab.view.geo_k_spin.value(),
-            "cmap": self.plot_tab.view.palette_combo.currentText(),
-            "legend": self.plot_tab.view.geo_legend_check.isChecked(),
-            "legend_kwds": {
-                "loc": "best",
+            "scheme"        : scheme_text if scheme_text != "None" else None,
+            "k"             : self.plot_tab.view.geo_k_spin.value(),
+            "cmap"          : self.plot_tab.view.palette_combo.currentText(),
+            "legend"        : self.plot_tab.view.geo_legend_check.isChecked(),
+            "legend_kwds"   : {
+                "loc"        : "best",
                 "orientation": self.plot_tab.view.geo_legend_loc_combo.currentText()
             },
-            "use_divider": self.plot_tab.view.geo_use_divider_check.isChecked(),
-            "cax_enabled": self.plot_tab.view.geo_cax_check.isChecked(),
-            "axis_off": self.plot_tab.view.geo_axis_off_check.isChecked(),
-            "missing_kwds": {
+            "use_divider"   : self.plot_tab.view.geo_use_divider_check.isChecked(),
+            "cax_enabled"   : self.plot_tab.view.geo_cax_check.isChecked(),
+            "axis_off"      : self.plot_tab.view.geo_axis_off_check.isChecked(),
+            "missing_kwds"  : {
                 "color": self.plot_tab.geo_missing_color,
                 "label": self.plot_tab.view.geo_missing_label_input.text(),
                 "hatch": hatch_text if hatch_text != "None" else None
             },
-            "edgecolor": self.plot_tab.geo_edge_color,
-            "linewidth": self.plot_tab.view.geo_linewidth_spin.value(),
-            "target_crs": target_crs,
-            "add_basemap": add_basemap,
+            "edgecolor"     : self.plot_tab.geo_edge_color,
+            "linewidth"     : self.plot_tab.view.geo_linewidth_spin.value(),
+            "target_crs"    : target_crs,
+            "add_basemap"   : add_basemap,
             "basemap_source": basemap_source
         }
         if self.plot_tab.view.geo_boundary_check.isChecked():
@@ -177,7 +179,8 @@ class PlotFormattingManager:
             except Exception as error:
                 self.plot_tab.status_bar.log(f"Z-Scale update ignore: {error}", "WARNING")
 
-    def apply_plot_formatting(self, progress_dialog: Any, x_col: str, y_cols: list[str], axes_flipped: bool, font_family: str, general_kwargs: dict, active_df: 'pd.DataFrame') -> None:
+    def apply_plot_formatting(self, progress_dialog: Any, x_col: str, y_cols: list[str], axes_flipped: bool,
+                              font_family: str, general_kwargs: dict, active_df: 'pd.DataFrame') -> None:
         """Master method to apply all formatting steps."""
         try:
             allowed_locators = ["AutoLocator", "MaxNLocator", "LinearLocator", "MultipleLocator"]
@@ -223,7 +226,7 @@ class PlotFormattingManager:
 
         if progress_dialog:
             self.plot_tab._update_progress(progress_dialog, 95, "Adding data table")
-        self.plot_tab._apply_table()
+        self.plot_tab.table_manager.apply_table()
 
     def apply_plot_appearance(self, x_col: str, y_cols: list[str], font_family: str, general_kwargs: dict) -> None:
         """Apply title, fonts and label settings"""
@@ -309,7 +312,8 @@ class PlotFormattingManager:
         marker_val = "None" if marker == "None" else marker
 
         if self.plot_tab.view.multiline_custom_check.isChecked():
-            lines = [l for l in self.plot_tab.plot_engine.current_ax.get_lines() if l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
+            lines = [l for l in self.plot_tab.plot_engine.current_ax.get_lines() if
+                     l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
             for i, line in enumerate(lines):
                 line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i + 1}"
                 if line_name in self.plot_tab.line_customizations:
@@ -449,17 +453,17 @@ class PlotFormattingManager:
                     labels[i] = custom_labels[i]
 
         legend_kwargs = {
-            "loc": self.plot_tab.view.legend_loc_combo.currentText(),
-            "fontsize": self.plot_tab.view.legend_size_spin.value(),
+            "loc"           : self.plot_tab.view.legend_loc_combo.currentText(),
+            "fontsize"      : self.plot_tab.view.legend_size_spin.value(),
             "title_fontsize": self.plot_tab.view.legend_title_size_spin.value(),
-            "ncol": self.plot_tab.view.legend_columns_spin.value(),
-            "columnspacing": self.plot_tab.view.legend_colspace_spin.value(),
-            "frameon": self.plot_tab.view.legend_frame_check.isChecked(),
-            "fancybox": self.plot_tab.view.legend_fancybox_check.isChecked(),
-            "shadow": self.plot_tab.view.legend_shadow_check.isChecked(),
-            "framealpha": self.plot_tab.view.legend_alpha_slider.value() / 100.0,
-            "facecolor": self.plot_tab.legend_bg_color,
-            "edgecolor": self.plot_tab.legend_edge_color
+            "ncol"          : self.plot_tab.view.legend_columns_spin.value(),
+            "columnspacing" : self.plot_tab.view.legend_colspace_spin.value(),
+            "frameon"       : self.plot_tab.view.legend_frame_check.isChecked(),
+            "fancybox"      : self.plot_tab.view.legend_fancybox_check.isChecked(),
+            "shadow"        : self.plot_tab.view.legend_shadow_check.isChecked(),
+            "framealpha"    : self.plot_tab.view.legend_alpha_slider.value() / 100.0,
+            "facecolor"     : self.plot_tab.legend_bg_color,
+            "edgecolor"     : self.plot_tab.legend_edge_color
         }
 
         try:
@@ -577,20 +581,23 @@ class PlotFormattingManager:
 
         try:
             if needs_x_minor:
-                if type(self.plot_tab.plot_engine.current_ax.xaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
+                if type(self.plot_tab.plot_engine.current_ax.xaxis.get_major_locator()).__name__ in ["AutoLocator",
+                                                                                                     "MaxNLocator"]:
                     self.plot_tab.plot_engine.current_ax.xaxis.set_minor_locator(AutoMinorLocator())
             else:
                 self.plot_tab.plot_engine.current_ax.xaxis.set_minor_locator(NullLocator())
 
             if needs_y_minor:
-                if type(self.plot_tab.plot_engine.current_ax.yaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
+                if type(self.plot_tab.plot_engine.current_ax.yaxis.get_major_locator()).__name__ in ["AutoLocator",
+                                                                                                     "MaxNLocator"]:
                     self.plot_tab.plot_engine.current_ax.yaxis.set_minor_locator(AutoMinorLocator())
             else:
                 self.plot_tab.plot_engine.current_ax.yaxis.set_minor_locator(NullLocator())
 
             if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
                 if needs_z_minor:
-                    if type(self.plot_tab.plot_engine.current_ax.zaxis.get_major_locator()).__name__ in ["AutoLocator", "MaxNLocator"]:
+                    if type(self.plot_tab.plot_engine.current_ax.zaxis.get_major_locator()).__name__ in ["AutoLocator",
+                                                                                                         "MaxNLocator"]:
                         self.plot_tab.plot_engine.current_ax.zaxis.set_minor_locator(AutoMinorLocator())
                 else:
                     self.plot_tab.plot_engine.current_ax.zaxis.set_minor_locator(NullLocator())
@@ -615,7 +622,8 @@ class PlotFormattingManager:
         else:
             self.plot_tab.plot_engine.current_ax.tick_params(axis="y", which="minor", left=False, right=False)
 
-        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and hasattr(self.plot_tab.view,  "z_show_minor_ticks_check"):
+        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and hasattr(self.plot_tab.view,
+                                                                              "z_show_minor_ticks_check"):
             if self.plot_tab.view.z_show_minor_ticks_check.isChecked():
                 self.plot_tab.plot_engine.current_ax.tick_params(
                     axis="z", which="minor", direction=self.plot_tab.view.z_minor_tick_direction_combo.currentText(),
@@ -635,7 +643,8 @@ class PlotFormattingManager:
                 y_formatter = self.create_axis_formatter(y_unit_str)
                 if y_formatter: self.plot_tab.plot_engine.current_ax.yaxis.set_major_formatter(y_formatter)
 
-            if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and hasattr(self.plot_tab.view, "z_display_units_combo"):
+            if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and hasattr(self.plot_tab.view,
+                                                                                  "z_display_units_combo"):
                 z_unit_str = self.plot_tab.view.z_display_units_combo.currentText()
                 if z_unit_str != "None":
                     z_formatter = self.create_axis_formatter(z_unit_str)
@@ -645,10 +654,10 @@ class PlotFormattingManager:
 
         if self.plot_tab.view.custom_datetime_check.isChecked():
             format_map = {
-                "YYYY-MM-DD": "%Y-%m-%d", "MM/DD/YYYY": "%m/%d/%Y", "DD/MM/YYYY": "%d/%m/%Y",
-                "YYYY/MM/DD": "%Y/%m/%d", "DD-MM-YYYY": "%d-%m-%Y", "Mon DD, YYYY": "%b %d, %Y",
+                "YYYY-MM-DD" : "%Y-%m-%d", "MM/DD/YYYY": "%m/%d/%Y", "DD/MM/YYYY": "%d/%m/%Y",
+                "YYYY/MM/DD" : "%Y/%m/%d", "DD-MM-YYYY": "%d-%m-%Y", "Mon DD, YYYY": "%b %d, %Y",
                 "DD Mon YYYY": "%d %b %Y", "YYYY-MM": "%Y-%m", "MM-YYYY": "%m-%Y",
-                "HH:MM:SS": "%H:%M:%S", "YYYY-MM-DD HH:MM": "%Y-%m-%d %H:%M"
+                "HH:MM:SS"   : "%H:%M:%S", "YYYY-MM-DD HH:MM": "%Y-%m-%d %H:%M"
             }
 
             x_fmt_name = self.plot_tab.view.x_datetime_format_combo.currentText()
@@ -675,10 +684,13 @@ class PlotFormattingManager:
                     except Exception:
                         pass
 
-        plt.setp(self.plot_tab.plot_engine.current_ax.get_xticklabels(), rotation=self.plot_tab.view.xtick_rotation_spin.value())
-        plt.setp(self.plot_tab.plot_engine.current_ax.get_yticklabels(), rotation=self.plot_tab.view.ytick_rotation_spin.value())
+        plt.setp(self.plot_tab.plot_engine.current_ax.get_xticklabels(),
+                 rotation=self.plot_tab.view.xtick_rotation_spin.value())
+        plt.setp(self.plot_tab.plot_engine.current_ax.get_yticklabels(),
+                 rotation=self.plot_tab.view.ytick_rotation_spin.value())
         if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
-            plt.setp(self.plot_tab.plot_engine.current_ax.get_zticklabels(), rotation=self.plot_tab.view.ztick_rotation_spin.value())
+            plt.setp(self.plot_tab.plot_engine.current_ax.get_zticklabels(),
+                     rotation=self.plot_tab.view.ztick_rotation_spin.value())
 
         if self.plot_tab.view.x_invert_axis_check.isChecked():
             if not self.plot_tab.plot_engine.current_ax.xaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_xaxis()
@@ -711,25 +723,26 @@ class PlotFormattingManager:
             textbox_text = self.plot_tab.view.textbox_content.text().strip()
             if textbox_text:
                 style_map = {
-                    "Rounded": "round", "Square": "square",
+                    "Rounded"    : "round", "Square": "square",
                     "round,pad=1": "round,pad=1", "round4,pad=0.5": "round4,pad=0.5"
                 }
                 style = style_map.get(self.plot_tab.view.textbox_style_combo.currentText(), "round")
 
                 position_coords = {
-                    "upper left": (0.05, 0.95), "upper center": (0.5, 0.95), "upper right": (0.95, 0.95),
+                    "upper left" : (0.05, 0.95), "upper center": (0.5, 0.95), "upper right": (0.95, 0.95),
                     "center left": (0.05, 0.5), "center": (0.5, 0.5), "center right": (0.95, 0.5),
-                    "lower left": (0.05, 0.05), "lower center": (0.5, 0.05), "lower right": (0.95, 0.05)
+                    "lower left" : (0.05, 0.05), "lower center": (0.5, 0.05), "lower right": (0.95, 0.05)
                 }
 
                 position_name = self.plot_tab.view.textbox_position_combo.currentText()
                 x, y = position_coords.get(position_name, (0.5, 0.5))
 
-                ha_map = {"upper left": "left", "center left": "left", "lower left": "left", "upper center": "center",
-                          "center": "center", "lower center": "center", "upper right": "right", "center right": "right",
-                          "lower right": "right"}
-                va_map = {"upper left": "top", "upper center": "top", "upper right": "top", "center left": "center",
-                          "center": "center", "center right": "center", "lower left": "bottom",
+                ha_map = {"upper left"  : "left", "center left": "left", "lower left": "left", "upper center": "center",
+                          "center"      : "center", "lower center": "center", "upper right": "right",
+                          "center right": "right",
+                          "lower right" : "right"}
+                va_map = {"upper left"  : "top", "upper center": "top", "upper right": "top", "center left": "center",
+                          "center"      : "center", "center right": "center", "lower left": "bottom",
                           "lower center": "bottom", "lower right": "bottom"}
 
                 self.plot_tab.plot_engine.current_ax.text(

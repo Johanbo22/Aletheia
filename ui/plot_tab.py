@@ -1,29 +1,29 @@
 # ui/plot_tab.py
 import traceback
 from pathlib import Path
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import pandas as pd
-import numpy as np
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.colors import to_hex
+from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtCore import QTimer, pyqtSignal, QThreadPool
-from PyQt6.QtGui import QColor
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
-from core.global_signals import global_signals
-from core.plot_engine import PlotEngine
-from core.data_handler import DataHandler
+from controller.plot_controllers import AnnotationManager, CanvasInteractionManager, ColorManager, PlotExportManager, \
+    PlotFormattingManager, PlotTableManager, PlotTypeManager, ReferenceLineManager, ReferenceSpanManager, ScriptManager, \
+    SeriesCustomizationManager, SubplotManager, \
+    ThemeManager
 from core.code_exporter import CodeExporter
+from core.data_handler import DataHandler
+from core.global_signals import global_signals
 from core.plot_config_manager import PlotConfigManager
-from ui.widgets.SubplotOverlay import SubplotOverlay
+from core.plot_engine import PlotEngine
 from ui.animations import PlotClearedAnimation
-from ui.status_bar import LogLevel, StatusBar
 from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI
-from controller.plot_controllers import ThemeManager, ScriptManager, SubplotManager, AnnotationManager, CanvasInteractionManager, PlotFormattingManager, ReferenceLineManager, ColorManager, ReferenceSpanManager, PlotTypeManager, PlotExportManager
+from ui.status_bar import LogLevel, StatusBar
 from ui.widgets import ColorBlindnessEffect
+from ui.widgets.SubplotOverlay import SubplotOverlay
 from ui.widgets.ToastNotification import ToastLevel
 
 if TYPE_CHECKING:
@@ -31,12 +31,20 @@ if TYPE_CHECKING:
 
 class PlotTab(PlotTabUI):
     """Tab for creating and customizing plots"""
-    
+
     brush_selection_made = pyqtSignal(set)
-    
+
+    @property
+    def line_customizations(self) -> Dict[str, Any]:
+        return self.series_customization_manager.line_customizations
+
+    @property
+    def bar_customizations(self) -> Dict[str, Any]:
+        return self.series_customization_manager.bar_customizations
+
     def __init__(self, data_handler: DataHandler, status_bar: StatusBar, subset_manager=None) -> None:
         super().__init__()
-        
+
         self.view: PlotSettingsPanel | None = None
         self.data_handler: DataHandler = data_handler
         self.status_bar: StatusBar = status_bar
@@ -57,7 +65,7 @@ class PlotTab(PlotTabUI):
         self._pan_start_ylim = None
         self.config_manager = PlotConfigManager(self)
         self.thread_pool = QThreadPool.globalInstance()
-        
+
         self._is_data_dirty = False
         self._is_clearing = False
         self.AUTO_UPDATE_THRESHOLD = 2000
@@ -65,7 +73,7 @@ class PlotTab(PlotTabUI):
         self.style_update_timer.setSingleShot(True)
         self.style_update_timer.setInterval(300)
         self.style_update_timer.timeout.connect(self._fast_render)
-        
+
         self.bg_color = "white"
         self.face_color = "white"
 
@@ -95,31 +103,28 @@ class PlotTab(PlotTabUI):
         self.geo_edge_color = "black"
         self.error_bar_color = "black"
 
-        self.line_customizations = {}
-        self.bar_customizations = {}
-
         # Create canvas and toolbar
         self.plot_engine.create_figure()
         canvas = FigureCanvas(self.plot_engine.get_figure())
         toolbar = NavigationToolbar(canvas, self)
-        
+
         self.init_ui(canvas, toolbar)
-        
+
         self.view = self.settings_panel
         self.type_manager = PlotTypeManager(self)
         self.export_manager = PlotExportManager(self)
-        
-        #populate box in general tab with icons
+
+        # populate box in general tab with icons
         self.type_manager.populate_plot_toolbox()
 
         self.selection_overlay = SubplotOverlay(self.canvas)
         self.canvas.mpl_connect("resize_event", self.on_canvas_resize)
-        
+
         # Load initial data
         self.update_column_combo()
-        
+
         self.type_manager.select_plot_in_toolbox("Line")
-        
+
         self.set_empty_state_greeting()
 
         # Initialize the plot tab managers
@@ -131,12 +136,14 @@ class PlotTab(PlotTabUI):
         self.canvas_interaction_manager = CanvasInteractionManager(self)
         self.formatting_manager = PlotFormattingManager(self)
         self.color_manager = ColorManager(self)
-        
+        self.series_customization_manager = SeriesCustomizationManager(self)
+        self.table_manager = PlotTableManager(self)
+
         # Caching
         self._last_data_signature = None
         self._last_viz_signature = None
         self._cached_active_df = None
-        
+
         # Connect all signals to their logic methods
         self._connect_signals()
 
@@ -151,7 +158,7 @@ class PlotTab(PlotTabUI):
         self._connect_annotation_tab_signals()
         self._connect_geospatial_tab_signals()
         self._connect_theme_controls()
-    
+
     def _connect_main_controls(self) -> None:
         """Connect the main action buttons and canvas events"""
         #  Main Buttons 
@@ -160,16 +167,16 @@ class PlotTab(PlotTabUI):
         self.clear_button.clicked.connect(self.clear_plot)
         self.save_plot_button.clicked.connect(self.export_manager.save_plot_image)
 
-        #editor sync
+        # editor sync
         self.view.x_column.currentTextChanged.connect(self.script_manager.sync_script_if_open)
-    
+
     def _connect_basic_tab_signals(self) -> None:
         """Connect signals for the General tab """
         self.view.multi_y_check.stateChanged.connect(self.toggle_multi_y)
         self.view.basic_tab.stacked_bars_check.stateChanged.connect(self.toggle_stacked_bars)
         self.view.select_all_y_btn.clicked.connect(self.select_all_y_columns)
         self.view.clear_all_y_btn.clicked.connect(self.clear_all_y_columns)
-        
+
         self.view.x_column.currentTextChanged.connect(self.on_data_changed)
         self.view.y_column.currentTextChanged.connect(self.on_data_changed)
         self.view.y_columns_list.itemSelectionChanged.connect(self.on_data_changed)
@@ -182,8 +189,9 @@ class PlotTab(PlotTabUI):
 
         self.view.use_subset_check.stateChanged.connect(self.use_subset)
         self.view.secondary_y_check.stateChanged.connect(lambda state: self._toggle_secondary_input(bool(state)))
-        self.view.secondary_plot_type_combo.currentTextChanged.connect(lambda _: self.type_manager.update_customization_visibility(self.current_plot_type_name))
-    
+        self.view.secondary_plot_type_combo.currentTextChanged.connect(
+            lambda _: self.type_manager.update_customization_visibility(self.current_plot_type_name))
+
     def _connect_appearance_tab_signals(self) -> None:
         """Connect signals for the Appearance tab"""
         self.view.individual_spines_check.stateChanged.connect(self.toggle_individual_spines)
@@ -194,28 +202,28 @@ class PlotTab(PlotTabUI):
         self.view.height_spin.valueChanged.connect(lambda: self.formatting_manager.setup_plot_figure(clear=False))
         self.view.colorblind_check.stateChanged.connect(self.update_colorblind_simulation)
         self.view.colorblind_type_combo.currentTextChanged.connect(self.update_colorblind_simulation)
-        
+
         self.view.title_input.textChanged.connect(self.on_style_changed)
         self.view.title_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.title_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.title_position_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.title_check.stateChanged.connect(self.on_style_changed)
-        
+
         self.view.xlabel_input.textChanged.connect(self.on_style_changed)
         self.view.xlabel_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.xlabel_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.xlabel_check.stateChanged.connect(self.on_style_changed)
-        
+
         self.view.ylabel_input.textChanged.connect(self.on_style_changed)
         self.view.ylabel_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.ylabel_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.ylabel_check.stateChanged.connect(self.on_style_changed)
-        
+
         self.view.zlabel_check.stateChanged.connect(self.on_style_changed)
         self.view.zlabel_input.textChanged.connect(self.on_style_changed)
         self.view.zlabel_size.valueChanged.connect(self.on_style_changed)
         self.view.zlabel_weight.currentTextChanged.connect(self.on_style_changed)
-        
+
         self.view.font_family_combo.currentFontChanged.connect(self.on_style_changed)
         self.view.style_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.global_spine_width_spin.valueChanged.connect(self.on_style_changed)
@@ -224,26 +232,32 @@ class PlotTab(PlotTabUI):
         self.view.left_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.right_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.palette_combo.currentTextChanged.connect(self._on_palette_changed)
-        
+
         self.view.camera_elevation_spin.valueChanged.connect(self.on_style_changed)
         self.view.camera_azimuth_spin.valueChanged.connect(self.on_style_changed)
-    
+
     def _connect_axes_tab_signals(self) -> None:
         """Connect signals for the Axes tab"""
-        self.view.x_auto_check.stateChanged.connect(lambda: self.view.x_min_spin.setEnabled(not self.view.x_auto_check.isChecked()))
-        self.view.x_auto_check.stateChanged.connect(lambda: self.view.x_max_spin.setEnabled(not self.view.x_auto_check.isChecked()))
-        self.view.y_auto_check.stateChanged.connect(lambda: self.view.y_min_spin.setEnabled(not self.view.y_auto_check.isChecked()))
-        self.view.y_auto_check.stateChanged.connect(lambda: self.view.y_max_spin.setEnabled(not self.view.y_auto_check.isChecked()))
-        self.view.z_auto_check.stateChanged.connect(lambda: self.view.z_min_spin.setEnabled(not self.view.z_auto_check.isChecked()))
-        self.view.z_auto_check.stateChanged.connect(lambda: self.view.z_max_spin.setEnabled(not self.view.z_auto_check.isChecked()))
-        
+        self.view.x_auto_check.stateChanged.connect(
+            lambda: self.view.x_min_spin.setEnabled(not self.view.x_auto_check.isChecked()))
+        self.view.x_auto_check.stateChanged.connect(
+            lambda: self.view.x_max_spin.setEnabled(not self.view.x_auto_check.isChecked()))
+        self.view.y_auto_check.stateChanged.connect(
+            lambda: self.view.y_min_spin.setEnabled(not self.view.y_auto_check.isChecked()))
+        self.view.y_auto_check.stateChanged.connect(
+            lambda: self.view.y_max_spin.setEnabled(not self.view.y_auto_check.isChecked()))
+        self.view.z_auto_check.stateChanged.connect(
+            lambda: self.view.z_min_spin.setEnabled(not self.view.z_auto_check.isChecked()))
+        self.view.z_auto_check.stateChanged.connect(
+            lambda: self.view.z_max_spin.setEnabled(not self.view.z_auto_check.isChecked()))
+
         self.view.custom_datetime_check.stateChanged.connect(self.toggle_datetime_format)
         self.view.custom_datetime_check.stateChanged.connect(self.on_data_changed)
         self.view.x_datetime_format_combo.currentTextChanged.connect(self.on_x_datetime_format_changed)
         self.view.y_datetime_format_combo.currentTextChanged.connect(self.on_y_datetime_format_changed)
         self.view.x_custom_datetime_input.textChanged.connect(self.on_data_changed)
         self.view.y_custom_datetime_format_input.textChanged.connect(self.on_data_changed)
-        
+
         self.view.flip_axes_check.stateChanged.connect(self.on_data_changed)
         self.view.x_auto_check.stateChanged.connect(self.on_style_changed)
         self.view.y_auto_check.stateChanged.connect(self.on_style_changed)
@@ -273,7 +287,7 @@ class PlotTab(PlotTabUI):
         self.view.x_invert_axis_check.stateChanged.connect(self.on_style_changed)
         self.view.y_invert_axis_check.stateChanged.connect(self.on_style_changed)
         self.view.z_invert_axis_check.stateChanged.connect(self.on_style_changed)
-        
+
         self.view.z_auto_check.stateChanged.connect(self.on_style_changed)
         self.view.z_min_spin.valueChanged.connect(self.on_style_changed)
         self.view.z_max_spin.valueChanged.connect(self.on_style_changed)
@@ -285,19 +299,24 @@ class PlotTab(PlotTabUI):
         self.view.z_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.z_minor_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.z_minor_tick_width_spin.valueChanged.connect(self.on_style_changed)
-        
+
     def _connect_legend_grid_tab_signals(self) -> None:
         """Connect signals for the Legend and Grid tab"""
         self.view.legend_check.stateChanged.connect(self.on_legend_toggle)
         self.view.legend_alpha_slider.valueChanged.connect(lambda v: self.view.legend_alpha_label.setText(f"{v}%"))
         self.view.grid_check.stateChanged.connect(self.on_grid_toggle)
-        self.view.global_grid_alpha_slider.valueChanged.connect(lambda v: self.view.global_grid_alpha_label.setText(f"{v}%"))
+        self.view.global_grid_alpha_slider.valueChanged.connect(
+            lambda v: self.view.global_grid_alpha_label.setText(f"{v}%"))
         self.view.independent_grid_check.stateChanged.connect(self.on_independent_grid_toggle)
-        self.view.x_major_grid_alpha_slider.valueChanged.connect(lambda v: self.view.x_major_grid_alpha_label.setText(f"{v}%"))
-        self.view.x_minor_grid_alpha_slider.valueChanged.connect(lambda v: self.view.x_minor_grid_alpha_label.setText(f"{v}%"))
-        self.view.y_major_grid_alpha_slider.valueChanged.connect(lambda v: self.view.y_major_grid_alpha_label.setText(f"{v}%"))
-        self.view.y_minor_grid_alpha_slider.valueChanged.connect(lambda v: self.view.y_minor_grid_alpha_label.setText(f"{v}%"))
-        
+        self.view.x_major_grid_alpha_slider.valueChanged.connect(
+            lambda v: self.view.x_major_grid_alpha_label.setText(f"{v}%"))
+        self.view.x_minor_grid_alpha_slider.valueChanged.connect(
+            lambda v: self.view.x_minor_grid_alpha_label.setText(f"{v}%"))
+        self.view.y_major_grid_alpha_slider.valueChanged.connect(
+            lambda v: self.view.y_major_grid_alpha_label.setText(f"{v}%"))
+        self.view.y_minor_grid_alpha_slider.valueChanged.connect(
+            lambda v: self.view.y_minor_grid_alpha_label.setText(f"{v}%"))
+
         self.view.legend_loc_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.legend_title_input.textChanged.connect(self.on_style_changed)
         self.view.legend_title_size_spin.valueChanged.connect(self.on_style_changed)
@@ -329,16 +348,12 @@ class PlotTab(PlotTabUI):
         self.view.y_minor_grid_style_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.y_minor_grid_linewidth_spin.valueChanged.connect(self.on_style_changed)
         self.view.y_minor_grid_alpha_slider.valueChanged.connect(self.on_style_changed)
-        
+
     def _connect_advanced_tab_signals(self) -> None:
         """Connect signals for the customization tab"""
-        self.view.multiline_custom_check.stateChanged.connect(self.toggle_line_selector)
-        self.view.line_selector_combo.currentTextChanged.connect(self.on_line_selected)
-        self.view.multibar_custom_check.stateChanged.connect(self.toggle_bar_selector)
-        self.view.bar_selector_combo.currentTextChanged.connect(self.on_bar_selected)
-        self.view.bar_edge_width_spin.valueChanged.connect(self._update_bar_customization_live)
+        self.series_customization_manager.connect_signals()
         self.view.alpha_slider.valueChanged.connect(lambda v: self.view.alpha_label.setText(f"{v}%"))
-        
+
         # Style connections
         self.view.linewidth_spin.valueChanged.connect(self.on_style_changed)
         self.view.linestyle_combo.currentTextChanged.connect(self.on_style_changed)
@@ -346,7 +361,7 @@ class PlotTab(PlotTabUI):
         self.view.marker_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.marker_edge_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.alpha_slider.valueChanged.connect(self.on_style_changed)
-        
+
         # Data connections
         self.view.histogram_bins_spin.valueChanged.connect(self.on_data_changed)
         self.view.histogram_show_normal_check.stateChanged.connect(self.on_data_changed)
@@ -371,21 +386,17 @@ class PlotTab(PlotTabUI):
 
         self.view.error_bar_linewidth_spin.valueChanged.connect(self.on_data_changed)
         self.view.error_bar_capsize_spin.valueChanged.connect(self.on_data_changed)
-        self.view.error_bar_alpha_slider.valueChanged.connect(lambda v: self.view.error_bar_alpha_label.setText(f"{v}%"))
+        self.view.error_bar_alpha_slider.valueChanged.connect(
+            lambda v: self.view.error_bar_alpha_label.setText(f"{v}%"))
         self.view.error_bar_alpha_slider.valueChanged.connect(self.on_data_changed)
         self.view.error_bar_zorder_spin.valueChanged.connect(self.on_data_changed)
-        
+
     def _connect_annotation_tab_signals(self) -> None:
         """Connect signals for the Annotations tab"""
         self.annotation_manager.connect_signals()
         self.reference_line_manager.connect_signals()
         self.reference_span_manager.connect_signals()
-        self.view.table_enable_check.stateChanged.connect(self.on_style_changed)
-        self.view.table_type_combo.currentTextChanged.connect(self.on_style_changed)
-        self.view.table_location_combo.currentTextChanged.connect(self.on_style_changed)
-        self.view.table_auto_font_size_check.stateChanged.connect(self.on_style_changed)
-        self.view.table_font_size_spin.valueChanged.connect(self.on_style_changed)
-        self.view.table_scale_spin.valueChanged.connect(self.on_style_changed)
+        self.table_manager.connect_signals()
 
     def _connect_geospatial_tab_signals(self) -> None:
         """Connect signals for the Geospatial tab"""
@@ -408,11 +419,11 @@ class PlotTab(PlotTabUI):
         """Connect signals for Theme management"""
         self.theme_manager.connect_signals()
         self.color_manager.connect_signals()
-    
+
     def showEvent(self, event) -> None:
         """Triggered on tab visibility. Clears selectons from plot"""
         super().showEvent(event)
-        
+
         if getattr(self, "is_data_dirty", False):
             df = self.get_active_dataframe()
             if df is not None and len(df) <= self.AUTO_UPDATE_THRESHOLD:
@@ -425,20 +436,20 @@ class PlotTab(PlotTabUI):
                 self.canvas_interaction_manager.span_selector.clear()
             elif hasattr(self.canvas_interaction_manager.span_selector, "set_visible"):
                 self.canvas_interaction_manager.span_selector.set_visible(False)
-            
+
             if hasattr(self, "canvas") and self.canvas is not None:
                 self.canvas.draw_idle()
-    
+
     def toggle_individual_spines(self):
         """Toggles the customization of spines for each"""
-        checked  = self.view.individual_spines_check.isChecked()
+        checked = self.view.individual_spines_check.isChecked()
         self.view.individual_spines_container.setVisible(checked)
         self.on_style_changed()
-    
+
     def use_subset(self):
         """Active subset on change"""
         subset_enabled = self.view.use_subset_check.isChecked()
-    
+
     def on_canvas_resize(self, event):
         self.subplot_manager.update_overlay(is_resize=True)
         self.formatting_manager.setup_plot_figure(clear=False)
@@ -449,7 +460,7 @@ class PlotTab(PlotTabUI):
         if not self.subset_manager:
             self.status_bar.log("Cannot activate subset: SubsetManager not available", "ERROR")
             return
-        
+
         self.refresh_subset_list()
 
         target_index = -1
@@ -458,7 +469,7 @@ class PlotTab(PlotTabUI):
             if item_data == subset_name:
                 target_index = i
                 break
-        
+
         if target_index == -1:
             self.status_bar.log(f"Cannot activate subset: Subset '{subset_name}' not found", "WARNING")
             return
@@ -482,173 +493,57 @@ class PlotTab(PlotTabUI):
         if not self.subset_manager:
             self.status_bar.log("Warning: Subset manager not available", "WARNING")
             return
-        
+
         if not hasattr(self, 'subset_combo'):
             self.status_bar.log("Warning: Subset combobox not initialized", "WARNING")
             return
-        
+
         try:
             self.view.subset_combo.blockSignals(True)
             self.view.subset_combo.clear()
             self.view.subset_combo.addItem("(Full Dataset)")
-            
+
             for name in self.subset_manager.list_subsets():
                 subset = self.subset_manager.get_subset(name)
                 self.view.subset_combo.addItem(f"{name} ({subset.row_count} rows)", userData=name)
-            
+
             self.view.subset_combo.blockSignals(False)
-            
+
             subset_count = len(self.subset_manager.list_subsets())
             if subset_count > 0:
                 self.status_bar.log(f"Refreshed subset list: {subset_count} subsets available", "INFO")
         except Exception as RefreshSubsetListError:
             print(f"Warning: Could not refresh subset list: {RefreshSubsetListError}")
-    
+
     def get_active_dataframe(self):
         """Get the active dataframe (full dataset or selected subset)"""
         # Check if subset UI exists
         if not hasattr(self.view, 'use_subset_check') or not hasattr(self.view, 'subset_combo'):
             return self.data_handler.df
-        
+
         # Check if user wants to use subset
         if not self.view.use_subset_check.isChecked():
             return self.data_handler.df
-        
+
         # Check if subset manager is available
         if not self.subset_manager:
             self.status_bar.log("Subset manager not available, using full dataset", "WARNING")
             return self.data_handler.df
-        
+
         # Get selected subset name
         subset_name = self.view.subset_combo.currentData()
         if not subset_name:
             return self.data_handler.df
-        
+
         # Try to apply subset
         try:
             subset_df = self.subset_manager.apply_subset(self.data_handler.df, subset_name)
             self.status_bar.log(f"Using subset: {subset_name} ({len(subset_df)} rows)", "INFO")
             return subset_df
         except Exception as ApplySubsetToActiveDataFrameError:
-            self.status_bar.log(f"Failed to apply subset, using full dataset: {str(ApplySubsetToActiveDataFrameError)}", "WARNING")
+            self.status_bar.log(f"Failed to apply subset, using full dataset: {str(ApplySubsetToActiveDataFrameError)}",
+                                "WARNING")
             return self.data_handler.df
-        
-    
-    def toggle_bar_selector(self) -> None:
-        """Show/hide bar selection to customize more than one bar"""
-        is_enabled = self.view.multibar_custom_check.isChecked()
-        self.view.bar_selector_label.setVisible(is_enabled)
-        self.view.bar_selector_combo.setVisible(is_enabled)
-
-        if is_enabled:
-            self._initialize_all_bar_customizations()
-            self.update_bar_selector()
-        self.on_style_changed()
-    
-    def _initialize_all_bar_customizations(self) -> None:
-        """Initialize customizations dictionary for all bars with their current visual state."""
-        if not self.plot_engine.current_ax or not self.plot_engine.current_ax.containers:
-            return
-        
-        for i, container in enumerate(self.plot_engine.current_ax.containers):
-            if not hasattr(container, "patches") or not container.patches:
-                continue
-            label = container.get_label()
-            if not label or label.startswith("_"):
-                handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                label = labels[i] if i < len(labels) else f"Bar Series {i+1}"
-            
-            if label not in self.bar_customizations:
-                patch = container.patches[0]
-                self.bar_customizations[label] = {
-                    "facecolor": to_hex(patch.get_facecolor()) if patch.get_facecolor() else None,
-                    "edgecolor": to_hex(patch.get_edgecolor()) if patch.get_edgecolor() else None,
-                    "linewidth": patch.get_linewidth(),
-                    "alpha": patch.get_alpha() if patch.get_alpha() is not None else 1.0
-                }
-    def update_bar_selector(self, preserve_selection: bool = False) -> None:
-        """Update the bar selection tool with the current patches in the plot"""
-        current_text = self.view.bar_selector_combo.currentText()
-        self.view.bar_selector_combo.blockSignals(True)
-        self.view.bar_selector_combo.clear()
-
-        if self.plot_engine.current_ax and self.plot_engine.current_ax.containers:
-            for i, container in enumerate(self.plot_engine.current_ax.containers):
-                label = container.get_label()
-
-                if not label or label.startswith("_"):
-                    handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                    if i < len(labels):
-                        label = labels[i]
-                    else:
-                        label = f"Bar Series {i+1}"
-                self.view.bar_selector_combo.addItem(label, userData=container)
-        
-        self.view.bar_selector_combo.blockSignals(False)
-
-        if preserve_selection and current_text:
-            idx = self.view.bar_selector_combo.findText(current_text)
-            if idx >= 0:
-                self.view.bar_selector_combo.setCurrentIndex(idx)
-                return
-
-        if self.view.bar_selector_combo.count() > 0:
-            self.on_bar_selected(self.view.bar_selector_combo.currentText())
-    
-    def on_bar_selected(self, bar_name: str) -> None:
-        """Load settings for a selected bar series"""
-        if not self.view.multibar_custom_check.isChecked():
-            return
-        
-        container = self.view.bar_selector_combo.currentData()
-
-        if not container or not hasattr(container, "patches") or not container.patches:
-            return
-        
-        patch = container.patches[0]
-
-        #load color
-        facecolor = to_hex(patch.get_facecolor())
-        if facecolor:
-            self.bar_color = facecolor
-            self.view.bar_color_label.setText(facecolor)
-            ColorManager.update_button_color_swatch(self.view.bar_color_button, QColor(self.bar_color))
-        
-        #edge color
-        edgecolor = to_hex(patch.get_edgecolor())
-        if edgecolor:
-            self.bar_edge_color = edgecolor
-            self.view.bar_edge_label.setText(edgecolor)
-            ColorManager.update_button_color_swatch(self.view.bar_edge_button, QColor(self.bar_edge_color))
-
-        #load the bar edge width
-        self.view.bar_edge_width_spin.blockSignals(True)
-        self.view.bar_edge_width_spin.setValue(patch.get_linewidth())
-        self.view.bar_edge_width_spin.blockSignals(False)
-        
-        alpha = patch.get_alpha()
-        if alpha is not None:
-            self.view.alpha_slider.blockSignals(True)
-            self.view.alpha_slider.setValue(int(alpha * 100))
-            self.view.alpha_slider.blockSignals(False)
-            self.view.alpha_label.setText(f"{int(alpha * 100)}%")
-    
-    def _update_bar_customization_live(self) -> None:
-        """Saves the current temporary bar settings to self.bar_customizations if a bar series is selected"""
-        if not self.view.multibar_custom_check.isChecked():
-            return
-        
-        bar_name = self.view.bar_selector_combo.currentText()
-        if not bar_name:
-            return
-        
-        custom = self.bar_customizations.get(bar_name, {})
-        custom["facecolor"] = self.bar_color
-        custom["edgecolor"] = self.bar_edge_color
-        custom["linewidth"] = self.view.bar_edge_width_spin.value()
-        custom["alpha"] = self.view.alpha_slider.value() / 100.0
-
-        self.bar_customizations[bar_name] = custom
 
     def on_grid_toggle(self) -> None:
         """Handle grid checkbox toggle"""
@@ -662,26 +557,25 @@ class PlotTab(PlotTabUI):
             self.view.grid_axis_tab.setVisible(False)
             self.view.independent_grid_check.setChecked(False)
         self.on_style_changed()
-    
+
     def on_legend_toggle(self) -> None:
         """Handle legend UI visibility"""
         self.on_style_changed()
 
-    
     def on_independent_grid_toggle(self):
         """Handle indepeendent customization of axis grids toggle"""
         is_independent = self.view.independent_grid_check.isChecked()
 
-        #disable global control when independent axis controls are enabeld
+        # disable global control when independent axis controls are enabeld
         self.view.grid_which_type_combo.setEnabled(not is_independent)
         self.view.grid_axis_combo.setEnabled(not is_independent)
         self.on_style_changed()
-    
+
     def toggle_multi_y(self):
         """Toggle between multi and single y slections"""
         is_multi = self.view.multi_y_check.isChecked()
 
-        #show appropiate widgets
+        # show appropiate widgets
         self.view.y_column.setVisible(not is_multi)
         self.view.y_columns_list.setVisible(is_multi)
         self.view.select_all_y_btn.setVisible(is_multi)
@@ -691,7 +585,7 @@ class PlotTab(PlotTabUI):
         if not is_multi:
             self.view.basic_tab.stacked_bars_check.setChecked(False)
 
-        #wen swhichtng to multi ycols, select the current ycol
+        # wen swhichtng to multi ycols, select the current ycol
         if is_multi and self.view.y_column.currentText():
             current_y = self.view.y_column.currentText()
             for i in range(self.view.y_columns_list.count()):
@@ -705,17 +599,17 @@ class PlotTab(PlotTabUI):
         if self.view.basic_tab.stacked_bars_check.isChecked():
             self.view.multi_y_check.setChecked(True)
         self.on_data_changed()
-    
+
     def select_all_y_columns(self):
         """Select all availalbe ycols"""
         self.view.y_columns_list.selectAll()
         self.on_data_changed()
-    
+
     def clear_all_y_columns(self):
         """Clear all selected ycols"""
         self.view.y_columns_list.clearSelection()
         self.on_data_changed()
-    
+
     def get_selected_y_columns(self):
         """Get list of selected ycols"""
         if self.view.multi_y_check.isChecked():
@@ -724,7 +618,7 @@ class PlotTab(PlotTabUI):
         else:
             y_col_text = self.view.y_column.currentText()
             return [y_col_text] if y_col_text else []
-    
+
     def update_colorblind_simulation(self) -> None:
         """Applies or removes the SVG filter effect from canvas"""
         if self.view.colorblind_check.isChecked():
@@ -737,138 +631,6 @@ class PlotTab(PlotTabUI):
             self.status_bar.log("Color blindess mode disabled", "INFO")
         self.on_style_changed()
 
-    def toggle_line_selector(self) -> None:
-        """Show/enable line selection"""
-        is_enabled = self.view.multiline_custom_check.isChecked()
-        self.view.line_selector_label.setVisible(is_enabled)
-        self.view.line_selector_combo.setVisible(is_enabled)
-
-        if is_enabled:
-            self._initialize_all_line_customizations()
-            self.update_line_selector()
-        self.on_style_changed()
-    
-    def _initialize_all_line_customizations(self) -> None:
-        """Initialize customizations dict for all lines with their current state"""
-        if not self.plot_engine.current_ax:
-            return
-        lines = [l for l in self.plot_engine.current_ax.get_lines() if l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-        for i, line in enumerate(lines):
-            line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i+1}"
-            if line_name not in self.line_customizations:
-                self.line_customizations[line_name] = {
-                    'linewidth': line.get_linewidth(),
-                    'linestyle': line.get_linestyle(),
-                    'color': to_hex(line.get_color()) if line.get_color() else None,
-                    'marker': line.get_marker(),
-                    'markersize': line.get_markersize(),
-                    'markerfacecolor': to_hex(line.get_markerfacecolor()) if line.get_markerfacecolor() else None,
-                    'markeredgecolor': to_hex(line.get_markeredgecolor()) if line.get_markeredgecolor() else None,
-                    'markeredgewidth': line.get_markeredgewidth(),
-                    'alpha': line.get_alpha() if line.get_alpha() is not None else 1.0
-                }
-    def _update_line_customization_live(self) -> None:
-        """Save the current settings for the selected line"""
-        if not self.view.multiline_custom_check.isChecked():
-            return
-        line_name = self.view.line_selector_combo.currentText()
-        if not line_name:
-            return
-        
-        linestyle_map = {'Solid': '-', 'Dashed': '--', 'Dash-dot': '-.', 'Dotted': ':'}
-        linestyle_val = linestyle_map.get(self.view.linestyle_combo.currentText(), '-')
-        custom = self.line_customizations.get(line_name, {})
-        custom.update({
-            'linewidth': self.view.linewidth_spin.value(),
-            'linestyle': linestyle_val,
-            'color': self.line_color,
-            'marker': self.view.marker_combo.currentText(),
-            'markersize': self.view.marker_size_spin.value(),
-            'markerfacecolor': self.marker_color,
-            'markeredgecolor': self.marker_edge_color,
-            'markeredgewidth': self.view.marker_edge_width_spin.value(),
-            'alpha': self.view.alpha_slider.value() / 100.0,
-        })
-        self.line_customizations[line_name] = custom
-    
-    def update_line_selector(self, preserve_selection: bool = False) -> None:
-        """Update the line selection with the ucrrent lines in current_ax"""
-        current_text = self.view.line_selector_combo.currentText()
-        self.view.line_selector_combo.blockSignals(True)
-        self.view.line_selector_combo.clear()
-        
-        if self.plot_engine.current_ax:
-            lines = [l for l in self.plot_engine.current_ax.get_lines() if l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-            for i, line in enumerate(lines):
-                label = line.get_label()
-                if label.startswith("_"):
-                    label = f"Line {i+1}"
-                self.view.line_selector_combo.addItem(label, userData=i)
-        self.view.line_selector_combo.blockSignals(False)
-        
-        if preserve_selection and current_text:
-            idx = self.view.line_selector_combo.findText(current_text)
-            if idx >= 0:
-                self.view.line_selector_combo.setCurrentIndex(idx)
-                return
-            
-        if self.view.line_selector_combo.count() > 0:
-            self.on_line_selected(self.view.line_selector_combo.currentText())
-    
-    def on_line_selected(self, line_name):
-        """Load settings for a selected line"""
-        if not self.view.multiline_custom_check.isChecked():
-            return
-        
-        if not self.plot_engine.current_ax:
-            return
-        
-        #get line idx
-        line_idx = self.view.line_selector_combo.currentData()
-        if line_idx is None:
-            return
-        
-        lines = [l for l in self.plot_engine.current_ax.get_lines() if l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-
-        if line_idx < len(lines):
-            line = lines[line_idx]
-
-            #load current line props
-            self.view.linewidth_spin.blockSignals(True)
-            self.view.linewidth_spin.setValue(line.get_linewidth())
-            self.view.linewidth_spin.blockSignals(False)
-
-            linestyle_map_reverse = {"-": "Solid", "--": "Dashed", "-.": "Dash-dot", ":": "Dotted"}
-            current_style = linestyle_map_reverse.get(line.get_linestyle(), "Solid")
-            self.view.linestyle_combo.blockSignals(True)
-            self.view.linestyle_combo.setCurrentText(current_style)
-            self.view.linestyle_combo.blockSignals(False)
-
-            #load color
-            color = line.get_color()
-            if color:
-                self.line_color = to_hex(color)
-                self.view.line_color_label.setText(self.line_color)
-                ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.line_color))
-
-            #load markers
-            marker = line.get_marker()
-            if marker and marker != "None":
-                self.view.marker_combo.blockSignals(True)
-                self.view.marker_combo.setCurrentText(marker)
-                self.view.marker_combo.blockSignals(False)
-
-                self.view.marker_size_spin.blockSignals(True)
-                self.view.marker_size_spin.setValue(int(line.get_markersize()))
-                self.view.marker_size_spin.blockSignals(False)
-                
-            alpha = line.get_alpha()
-            if alpha is not None:
-                self.view.alpha_slider.blockSignals(True)
-                self.view.alpha_slider.setValue(int(alpha * 100))
-                self.view.alpha_slider.blockSignals(False)
-                self.view.alpha_label.setText(f"{int(alpha * 100)}%")
-    
     def preset_all_spines(self):
         """Preset: Show all spines"""
         self.view.top_spine_visible_check.setChecked(True)
@@ -895,12 +657,12 @@ class PlotTab(PlotTabUI):
         self.view.right_spine_visible_check.setChecked(False)
         self.status_bar.log("Applied preset: No Spines", "INFO")
         self.on_style_changed()
-    
+
     def update_column_combo(self):
         """Update column ComboBoxes with available columns"""
         if self.data_handler.df is None or len(self.data_handler.df.columns) == 0:
             return
-        
+
         columns = list(self.data_handler.df.columns)
         self.view.quick_filter_input.set_columns(columns)
 
@@ -923,40 +685,40 @@ class PlotTab(PlotTabUI):
         self.view.secondary_y_column.blockSignals(True)
         self.view.y_columns_list.blockSignals(True)
         self.view.auto_annotate_col_combo.blockSignals(True)
-        
-        #update xcol
+
+        # update xcol
         self.view.x_column.clear()
         self.view.x_column.addItems(columns)
         if current_x in columns:
             self.view.x_column.setCurrentText(current_x)
 
-        #update singleular ycol
+        # update singleular ycol
         self.view.y_column.clear()
         self.view.y_column.addItems(columns)
         if current_y in columns:
             self.view.y_column.setCurrentText(current_y)
-        
+
         # update zcol
         self.view.z_column.clear()
         self.view.z_column.addItems(columns)
         if current_z in columns:
             self.view.z_column.setCurrentText(current_z)
 
-        #update secondary y col
+        # update secondary y col
         self.view.secondary_y_column.clear()
         self.view.secondary_y_column.addItems(columns)
         if current_secondary_y in columns:
             self.view.secondary_y_column.setCurrentText(current_secondary_y)
 
-        #update more ycols
+        # update more ycols
         self.view.y_columns_list.clear()
         for col in columns:
             self.view.y_columns_list.addItem(col)
             if col in current_multi_y:
                 item = self.view.y_columns_list.item(self.view.y_columns_list.count() - 1)
                 item.setSelected(True)
-        
-        #update hue
+
+        # update hue
         self.view.hue_column.clear()
         self.view.hue_column.addItem("None")
         self.view.hue_column.addItems(columns)
@@ -965,7 +727,7 @@ class PlotTab(PlotTabUI):
         else:
             self.view.hue_column.setCurrentIndex(0)
 
-        #update auto annotations
+        # update auto annotations
         self.view.auto_annotate_col_combo.clear()
         self.view.auto_annotate_col_combo.addItem("Default (Y-value)")
         self.view.auto_annotate_col_combo.addItems(columns)
@@ -974,7 +736,7 @@ class PlotTab(PlotTabUI):
             self.view.auto_annotate_col_combo.setCurrentText(current_auto_annoate)
         elif current_auto_annoate == "Default (Y-value)":
             self.view.auto_annotate_col_combo.setCurrentIndex(0)
-        
+
         # Unblock signals
         self.view.x_column.blockSignals(False)
         self.view.y_column.blockSignals(False)
@@ -986,7 +748,7 @@ class PlotTab(PlotTabUI):
 
         if current_x != self.view.x_column.currentText() or current_y != self.view.y_column.currentText():
             self.on_data_changed()
-    
+
     def toggle_table_controls(self):
         """Enable and disable table controls for the user"""
         enabled = self.view.table_enable_check.isChecked()
@@ -1001,75 +763,17 @@ class PlotTab(PlotTabUI):
 
         self.view.table_font_size_spin.setEnabled(enabled and not self.view.table_auto_font_size_check.isChecked())
         self.view.table_font_size_spin.setVisible(enabled and not self.view.table_auto_font_size_check.isChecked())
-    
+
     def toggle_table_font_controls(self):
         self.view.table_font_size_spin.setEnabled(not self.view.table_auto_font_size_check.isChecked())
         self.view.table_font_size_spin.setVisible(not self.view.table_auto_font_size_check.isChecked())
-
-    def _apply_table(self):
-        """Generate the table and add it to the plot"""
-        if self.plot_engine.current_ax:
-            for table in list(self.plot_engine.current_ax.tables):
-                try:
-                    table.remove()
-                except Exception:
-                    pass
-        if not self.view.table_enable_check.isChecked():
-            return
-        
-        df = self.get_active_dataframe()
-        if df is None:
-            return
-        
-        try:
-            table_type = self.view.table_type_combo.currentText()
-            x_col = self.view.x_column.currentText()
-            y_cols = self.get_selected_y_columns()
-
-            cols_to_use = []
-            if x_col: cols_to_use.append(x_col)
-            cols_to_use.extend(y_cols)
-
-            if cols_to_use and all(column in df.columns for column in cols_to_use):
-                target_df = df[cols_to_use]
-            else:
-                target_df = df.select_dtypes(include=[np.number])
-            
-            match table_type:
-                case "Summary Stats":
-                    data = target_df.describe().round(2)
-                case "First 5 Rows":
-                    data = target_df.head(5)
-                case "Last 5 Rows":
-                    data = target_df.tail(5)
-                case "Correlation Matrix":
-                    data = target_df.corr().round(2)
-                case _:
-                    data = target_df.head()
-            
-            loc = self.view.table_location_combo.currentText()
-            auto_font = self.view.table_auto_font_size_check.isChecked()
-            fontsize = self.view.table_font_size_spin.value()
-            scale = self.view.table_scale_spin.value()
-
-            self.plot_engine.add_table(
-                data,
-                loc=loc,
-                auto_font_size=auto_font,
-                fontsize=fontsize,
-                scale_factor=scale
-            )
-    
-        
-        except Exception as PlotTableError:
-            self.status_bar.log(f"Failed to add table to plot: {str(PlotTableError)}", "WARNING")
 
     def on_data_changed(self):
         """Handle data column selection change"""
         if self._is_clearing:
             return
         self._is_data_dirty = True
-        
+
         df = self.get_active_dataframe()
         if df is not None and len(df) <= self.AUTO_UPDATE_THRESHOLD:
             self.style_update_timer.start()
@@ -1077,7 +781,7 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = True
             self.selection_overlay.show_update_required(True)
             self.status_bar.log("Data change detected. Click 'Generate Plot' to update.", "WARNING")
-    
+
     def on_style_changed(self) -> None:
         if self._is_clearing:
             return
@@ -1089,18 +793,18 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = True
             return
         if self.view.multiline_custom_check.isChecked():
-            self._update_line_customization_live()
+            self.series_customization_manager.update_line_customization_live()
         if self.view.multibar_custom_check.isChecked():
-            self._update_bar_customization_live()
+            self.series_customization_manager.update_bar_customization_live()
         if self.style_update_timer:
             self.style_update_timer.start()
-    
+
     def _on_palette_changed(self, text: str) -> None:
         if self._is_clearing:
             return
         self._last_data_signature = None
         self.on_data_changed()
-    
+
     def _on_geospatial_projection_changed(self, *args) -> None:
         if self._is_clearing:
             return
@@ -1120,7 +824,7 @@ class PlotTab(PlotTabUI):
         cached_df = getattr(self, '_cached_active_df', None)
         if cached_df is None:
             return
-        
+
         current_subplot_index, _ = self._get_subplot_config()
         x_col = self.view.x_column.currentText()
         y_cols = self.get_selected_y_columns()
@@ -1158,21 +862,22 @@ class PlotTab(PlotTabUI):
 
         self.view.format_help.setVisible(is_enabled)
 
-        #enable the custom input if custom is selected from the box
+        # enable the custom input if custom is selected from the box
         if is_enabled:
             self.view.x_custom_datetime_input.setEnabled(self.view.x_datetime_format_combo.currentText() == "Custom")
-            self.view.y_custom_datetime_format_input.setEnabled(self.view.y_datetime_format_combo.currentText() == "Custom")
-    
+            self.view.y_custom_datetime_format_input.setEnabled(
+                self.view.y_datetime_format_combo.currentText() == "Custom")
+
     def on_x_datetime_format_changed(self, text) -> None:
         """Handle x-axis format change"""
         self.view.x_custom_datetime_input.setEnabled(text == "Custom")
         self.on_data_changed()
-    
+
     def on_y_datetime_format_changed(self, text) -> None:
         """Handle y-axis format change"""
         self.view.x_custom_datetime_input.setEnabled(text == "Custom")
         self.on_data_changed()
-    
+
     def generate_plot(self):
         """Generate plot based on current settings"""
         if self._is_clearing:
@@ -1185,11 +890,12 @@ class PlotTab(PlotTabUI):
 
         # Get data configuration
         current_subplot_index, frozen_config = self._get_subplot_config()
-        active_df, x_col, y_cols, hue, subset_name, quick_filter = self._resolve_data_config(current_subplot_index, frozen_config)
+        active_df, x_col, y_cols, hue, subset_name, quick_filter = self._resolve_data_config(current_subplot_index,
+                                                                                             frozen_config)
 
         if not self._validate_active_dataframe(active_df):
             return
-        
+
         plot_type = self.current_plot_type_name
         axes_flipped = self.view.flip_axes_check.isChecked()
         x_scale, y_scale = self.view.x_scale_combo.currentText(), self.view.y_scale_combo.currentText()
@@ -1198,7 +904,7 @@ class PlotTab(PlotTabUI):
         y_dt_fmt = self.view.y_datetime_format_combo.currentText() if self.view.custom_datetime_check.isChecked() else None
         x_dt_custom = self.view.x_custom_datetime_input.text() if x_dt_fmt == "Custom" else None
         y_dt_custom = self.view.y_custom_datetime_format_input.text() if y_dt_fmt == "Custom" else None
-        
+
         data_params = [
             id(active_df),
             active_df.shape,
@@ -1216,19 +922,22 @@ class PlotTab(PlotTabUI):
             y_dt_custom
         ]
         current_data_signature = tuple(data_params)
-        if (hasattr(self, "_last_data_signature") and self._last_data_signature == current_data_signature and hasattr(self, "_cached_active_df") and self._cached_active_df is not None):
+        if (hasattr(self, "_last_data_signature") and self._last_data_signature == current_data_signature and hasattr(
+                self, "_cached_active_df") and self._cached_active_df is not None):
             self.status_bar.log("Using cached data for plotting", "INFO")
             self._generate_main_plot(
-                self._cached_active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter, keep_data=True
+                self._cached_active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter,
+                keep_data=True
             )
             return
 
         self._last_data_signature = current_data_signature
-        
+
         self.status_bar.log("Preparing data in background...", "INFO")
-        self._prep_progress_dialog = ProgressDialog(title="Preparing Data", message="Initializing background task...", parent=self)
+        self._prep_progress_dialog = ProgressDialog(title="Preparing Data", message="Initializing background task...",
+                                                    parent=self)
         self._prep_progress_dialog.show()
-        
+
         from ui.workers import PlotDataPrepWorker
         worker = PlotDataPrepWorker(active_df, plot_type, x_col, y_cols, quick_filter)
         worker.signals.progress.connect(self._prep_progress_dialog.update_progress)
@@ -1240,7 +949,7 @@ class PlotTab(PlotTabUI):
             )
         )
         self.thread_pool.start(worker)
-    
+
     def _on_prep_error(self, error: Exception) -> None:
         """Handle errors from the background data preparation worker."""
         if hasattr(self, "_prep_progress_dialog") and self._prep_progress_dialog:
@@ -1248,16 +957,18 @@ class PlotTab(PlotTabUI):
         self.status_bar.log(f"Data preparation failed: {str(error)}", "ERROR")
         QMessageBox.critical(self, "Data Preparation Error", f"An error occurred during data processing:\n{str(error)}")
 
-    def _on_prep_finished(self, processed_df: pd.DataFrame, plot_type: str, x_col: str, y_cols: list[str], hue: str, subset_name: str, current_subplot_index: int, quick_filter: str) -> None:
+    def _on_prep_finished(self, processed_df: pd.DataFrame, plot_type: str, x_col: str, y_cols: list[str], hue: str,
+                          subset_name: str, current_subplot_index: int, quick_filter: str) -> None:
         """Called when background data preparation completes successfully."""
         if hasattr(self, "_prep_progress_dialog") and self._prep_progress_dialog:
             self._prep_progress_dialog.accept()
-            
+
         self._cached_active_df = processed_df
         self._generate_main_plot(
-            processed_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter, keep_data=False
+            processed_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter,
+            keep_data=False
         )
-    
+
     def _apply_quick_filter(self, df: pd.DataFrame, query: str) -> Optional[pd.DataFrame]:
         """Apply a pandas query to the dataframe"""
         try:
@@ -1272,7 +983,7 @@ class PlotTab(PlotTabUI):
             error_message = f"Invaid Quick Filter expression:\n{str(QuickFilterError)}"
             self.status_bar.log(f"Quick Filter error: {str(QuickFilterError)}", "ERROR")
             QMessageBox.critical(self, "Filter Error", error_message)
-    
+
     def _validate_data_loaded(self) -> bool:
         """Check if data is loaded"""
         if self.data_handler.df is None:
@@ -1280,7 +991,7 @@ class PlotTab(PlotTabUI):
             QMessageBox.warning(self, "Warning", "No data loaded")
             return False
         return True
-    
+
     def _get_subplot_config(self):
         """Get current subplot configuration"""
         current_subplot_index = self.view.active_subplot_combo.currentIndex()
@@ -1329,15 +1040,16 @@ class PlotTab(PlotTabUI):
                 return self.data_handler.df
         else:
             return self.data_handler.df
-        
+
     def _validate_active_dataframe(self, active_df) -> bool:
         """Validates the active dataframe (check if has data or nah)"""
         if active_df is None or len(active_df) == 0:
             QMessageBox.warning(self, "Warning", "Selected data is empty")
             return False
         return True
-    
-    def _generate_main_plot(self, active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter="", keep_data=False, animate=True):
+
+    def _generate_main_plot(self, active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index,
+                            quick_filter="", keep_data=False, animate=True):
         """Generate plot using matplotlib settings"""
         data_size = len(self.data_handler.df)
         show_progress = (data_size > 1000 and not keep_data)
@@ -1352,7 +1064,7 @@ class PlotTab(PlotTabUI):
 
                 self._update_progress(progress_dialog, 10, "Preparing Data")
 
-            #Build config
+            # Build config
             axes_flipped = self.view.flip_axes_check.isChecked()
             font_family = self.view.font_family_combo.currentText()
 
@@ -1376,17 +1088,20 @@ class PlotTab(PlotTabUI):
             if not keep_data:
                 self._update_progress(progress_dialog, 40, f"Creating {plot_type} plot")
 
-                if not self._execute_plot_strategy(plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs, general_kwargs):
+                if not self._execute_plot_strategy(plot_type, active_df, x_col, y_cols, axes_flipped, font_family,
+                                                   plot_kwargs, general_kwargs):
                     if progress_dialog:
                         progress_dialog.accept()
                     return
 
             # Apply formatting and customizations
-            self.formatting_manager.apply_plot_formatting(progress_dialog, x_col, y_cols, axes_flipped, font_family, general_kwargs, active_df)
+            self.formatting_manager.apply_plot_formatting(progress_dialog, x_col, y_cols, axes_flipped, font_family,
+                                                          general_kwargs, active_df)
 
             # Finalize
             self._update_progress(progress_dialog, 98, "Finishing up")
-            self._finalize_plot(current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter, is_fast_render=keep_data)
+            self._finalize_plot(current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter,
+                                is_fast_render=keep_data)
 
             # Log
             if not keep_data:
@@ -1397,7 +1112,8 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = False
 
             if animate:
-                global_signals.toast_requested.emit("Plot Generated", f"A {plot_type} plot has been generated", ToastLevel.SUCCESS, 4000)
+                global_signals.toast_requested.emit("Plot Generated", f"A {plot_type} plot has been generated",
+                                                    ToastLevel.SUCCESS, 4000)
         except InterruptedError:
             self.status_bar.log(f"Plot generation cancelled", "INFO")
             if progress_dialog:
@@ -1416,7 +1132,6 @@ class PlotTab(PlotTabUI):
             if progress_dialog and progress_dialog.isVisible():
                 progress_dialog.accept()
 
-    
     def _init_progress_dialog(self, show_progress, data_size):
         """Initizalixze the progress dialog"""
         if show_progress:
@@ -1430,7 +1145,7 @@ class PlotTab(PlotTabUI):
             QApplication.processEvents()
             return progress_dialog
         return None
-    
+
     def _update_progress(self, progress_dialog, value, message):
         """Update the progress dialog anc check for cancellation"""
         if progress_dialog:
@@ -1438,7 +1153,7 @@ class PlotTab(PlotTabUI):
             if progress_dialog.is_cancelled():
                 self.status_bar.log("Plot generation cancelled", "WARNING")
                 raise InterruptedError("User cancelled")
-    
+
     def _validate_plot_requirements(self, plot_type, x_col, y_cols) -> bool:
         """Validate the required are data is available"""
         plots_no_x = ["Box", "Histogram", "KDE", "Heatmap", "Pie", "ECDF", "Eventplot", "GeoSpatial"]
@@ -1452,7 +1167,7 @@ class PlotTab(PlotTabUI):
         if not x_col and plot_type not in plots_no_x:
             QMessageBox.warning(self, "Warninig", f"Please select an X column for {plot_type}")
             return False
-        
+
         if not y_cols and plot_type not in plots_no_y:
             QMessageBox.warning(self, "Warning", f"Please select at least one Y column for {plot_type}.")
             return False
@@ -1462,9 +1177,10 @@ class PlotTab(PlotTabUI):
             return False
 
         if plot_type in plots_vector and len(y_cols) < 3:
-            QMessageBox.warning(self, "Warning", f"{plot_type} requires 3 Y columns: (Y-position, U-component, V-component)")
+            QMessageBox.warning(self, "Warning",
+                                f"{plot_type} requires 3 Y columns: (Y-position, U-component, V-component)")
             return False
-        
+
         if plot_type in plots_triangulation_z and len(y_cols) < 2:
             QMessageBox.warning(self, "Warning", f"{plot_type} requires 2 Y columns: (Y-position, Z-value)")
             return False
@@ -1472,12 +1188,13 @@ class PlotTab(PlotTabUI):
         if plot_type in plots_triangulation_no_z and len(y_cols) < 1:
             QMessageBox.warning(self, "Warning", f"{plot_type} requires at least one Y columns: (Y-position)")
             return False
-        
+
         return True
 
-    def _execute_plot_strategy(self, plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs, general_kwargs):
+    def _execute_plot_strategy(self, plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs,
+                               general_kwargs):
         """Executes the correct plotting strategy"""
-        
+
         original_df = self.data_handler.df
         self.data_handler.df = active_df
 
@@ -1500,8 +1217,9 @@ class PlotTab(PlotTabUI):
             return True
         finally:
             self.data_handler.df = original_df
-    
-    def _finalize_plot(self, current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter, is_fast_render=False) -> None:
+
+    def _finalize_plot(self, current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter,
+                       is_fast_render=False) -> None:
         """Finalize plot and save configs"""
         try:
             if self.view.tight_layout_check.isChecked():
@@ -1512,7 +1230,7 @@ class PlotTab(PlotTabUI):
                 self.status_bar.log(f"Tight layout not applied due to error: {error_msg}", "ERROR")
 
         self.canvas.draw()
-        
+
         if hasattr(self, "canvas_stack") and hasattr(self, "canvas"):
             self.canvas_stack.setCurrentWidget(self.canvas)
 
@@ -1521,26 +1239,26 @@ class PlotTab(PlotTabUI):
 
         if self.view.add_subplots_check.isChecked():
             self.subplot_manager.save_config(current_subplot_index, {
-            "x_col": x_col,
-            "y_cols": y_cols,
-            "hue": hue,
-            "subset_name": subset_name,
-            "quick_filter": quick_filter
-        })
-        
+                "x_col"       : x_col,
+                "y_cols"      : y_cols,
+                "hue"         : hue,
+                "subset_name" : subset_name,
+                "quick_filter": quick_filter
+            })
+
         if self.view.multiline_custom_check.isChecked():
-            self.update_line_selector(preserve_selection=True)
+            self.series_customization_manager.update_line_selector(preserve_selection=True)
         if self.view.multibar_custom_check.isChecked():
-            self.update_bar_selector(preserve_selection=True)
-            
+            self.series_customization_manager.update_bar_selector(preserve_selection=True)
+
         self.script_manager.sync_script_if_open()
 
     def _log_plot_message(self, plot_type, x_col, y_cols, hue, subset_name, active_df, quick_filter=""):
         """Log plot generation to log"""
         plot_details = {
-            "plot_type": plot_type,
-            "x_column": x_col,
-            "y_column": str(y_cols),
+            "plot_type"  : plot_type,
+            "x_column"   : x_col,
+            "y_column"   : str(y_cols),
             "data_points": len(self.data_handler.df),
             "annotations": len(self.annotation_manager.annotations)
         }
@@ -1555,13 +1273,13 @@ class PlotTab(PlotTabUI):
             plot_details["subset"] = subset_name
             plot_details["subset_rows"] = len(active_df)
             plot_details["total_rows"] = len(self.data_handler.df)
-        
+
         status_message = f"{plot_type} plot created"
         if self.view.use_subset_check.isChecked() and subset_name:
             status_message += f" (Subset: {subset_name})"
         if len(self.annotation_manager.annotations) > 0:
             status_message += f" with {len(self.annotation_manager.annotations)} annotations"
-        
+
         self.status_bar.log_action(status_message, details=plot_details, level="SUCCESS")
 
     def _apply_annotations(self, df=None, x_col=None, y_cols=None):
@@ -1594,18 +1312,10 @@ class PlotTab(PlotTabUI):
         self.canvas.draw()
         if hasattr(self, "canvas_stack") and hasattr(self, "empty_state_view"):
             self.canvas_stack.setCurrentWidget(self.empty_state_view)
-        
+
         self.selection_overlay.hide()
 
-        if self.line_customizations is not None:
-            self.line_customizations.clear()
-        else:
-            self.line_customizations = {}
-
-        if self.bar_customizations is not None:
-            self.bar_customizations.clear()
-        else:
-            self.bar_customizations = {}
+        self.series_customization_manager.clear_customizations()
 
         self.annotation_manager.clear_annotations()
         self.reference_line_manager.clear_all_reference_lines()
@@ -1620,7 +1330,7 @@ class PlotTab(PlotTabUI):
             level="INFO"
         )
         QTimer.singleShot(100, lambda: setattr(self, "_is_clearing", False))
-    
+
     def _toggle_secondary_input(self, enabled: bool):
         is_enabled = bool(enabled)
 
@@ -1630,7 +1340,7 @@ class PlotTab(PlotTabUI):
         if hasattr(self.view, "secondary_zorder_check"):
             self.view.secondary_zorder_check.setEnabled(is_enabled)
         self.type_manager.update_customization_visibility(self.current_plot_type_name)
-    
+
     def load_config(self, config: dict) -> None:
         """Load plot configuration"""
         try:
@@ -1650,11 +1360,11 @@ class PlotTab(PlotTabUI):
         self.view.title_input.blockSignals(True)
         self.view.xlabel_input.blockSignals(True)
         self.view.ylabel_input.blockSignals(True)
-        
+
         self.view.title_input.clear()
         self.view.xlabel_input.clear()
         self.view.ylabel_input.clear()
-        
+
         self.view.title_input.blockSignals(False)
         self.view.xlabel_input.blockSignals(False)
         self.view.ylabel_input.blockSignals(False)
@@ -1671,6 +1381,6 @@ class PlotTab(PlotTabUI):
         except Exception as ReadGreetingError:
             self.status_bar.log(f"Failed to load greeting HTML: {str(ReadGreetingError)}", "ERROR")
             greeting_html = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Plot Studio</h2></div>"
-            
+
         if hasattr(self, "empty_state_view") and self.empty_state_view is not None:
             self.empty_state_view.setHtml(greeting_html)
