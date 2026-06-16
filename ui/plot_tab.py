@@ -37,9 +37,17 @@ class PlotTab(PlotTabUI):
     def line_customizations(self) -> Dict[str, Any]:
         return self.series_customization_manager.line_customizations
 
+    @line_customizations.setter
+    def line_customizations(self, value: Dict[str, Any]) -> None:
+        self.series_customization_manager.line_customizations = value
+
     @property
     def bar_customizations(self) -> Dict[str, Any]:
         return self.series_customization_manager.bar_customizations
+
+    @bar_customizations.setter
+    def bar_customizations(self, value: Dict[str, Any]) -> None:
+        self.series_customization_manager.bar_customizations = value
 
     def __init__(self, data_handler: DataHandler, status_bar: StatusBar, subset_manager=None) -> None:
         super().__init__()
