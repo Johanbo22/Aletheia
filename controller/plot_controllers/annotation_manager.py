@@ -1,14 +1,14 @@
-from typing import Dict, Any, List, TYPE_CHECKING
+from typing import Any, Dict, List, TYPE_CHECKING
 
 import pandas as pd
-import numpy as np
 from PyQt6.QtCore import QPoint
-from PyQt6.QtWidgets import QColorDialog, QMessageBox, QToolTip, QListWidgetItem
-from PyQt6.QtGui import QColor, QCursor
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
 from matplotlib.text import Text
 
-from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
 from controller.plot_controllers.color_manager import ColorManager
+from core.global_signals import ToastLevel, global_signals
+from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -46,7 +46,8 @@ class AnnotationManager:
         self.view.annotations_list.itemClicked.connect(self.on_annotation_selected)
         self.view.clear_annotations_button.clicked.connect(self.clear_annotations)
 
-        for widget in [self.view.auto_annotate_fontsize_spin, self.view.auto_annotate_x_offset_spin, self.view.auto_annotate_y_offset_spin, self.view.auto_annotate_rotation_spin]:
+        for widget in [self.view.auto_annotate_fontsize_spin, self.view.auto_annotate_x_offset_spin,
+                       self.view.auto_annotate_y_offset_spin, self.view.auto_annotate_rotation_spin]:
             widget.valueChanged.connect(self.plot_tab.on_style_changed)
         self.view.auto_annotate_weight_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
 
@@ -73,7 +74,8 @@ class AnnotationManager:
         if color.isValid():
             self.annotation_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button, QColor(self.annotation_bg_color))
+            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button,
+                                                    QColor(self.annotation_bg_color))
             self.plot_tab.on_style_changed()
 
     def choose_auto_annotate_color(self) -> None:
@@ -86,14 +88,18 @@ class AnnotationManager:
         if color.isValid():
             self.auto_annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.auto_annotate_color_label.setText(self.auto_annotation_color)
-            ColorManager.update_button_color_swatch(self.view.auto_annotate_color_button, QColor(self.auto_annotation_color))
-            
+            ColorManager.update_button_color_swatch(self.view.auto_annotate_color_button,
+                                                    QColor(self.auto_annotation_color))
+
             self.plot_tab.on_style_changed()
 
     def toggle_auto_annotate(self) -> None:
         """Toggles the automatic annotation of data points on the canvas"""
         is_enabled = self.view.auto_annotate_check.isChecked()
-        for widget in [self.view.auto_annotate_col_combo, self.view.auto_annotate_fontsize_spin, self.view.auto_annotate_weight_combo, self.view.auto_annotate_color_button, self.view.auto_annotate_x_offset_spin, self.view.auto_annotate_y_offset_spin, self.view.auto_annotate_rotation_spin]:
+        for widget in [self.view.auto_annotate_col_combo, self.view.auto_annotate_fontsize_spin,
+                       self.view.auto_annotate_weight_combo, self.view.auto_annotate_color_button,
+                       self.view.auto_annotate_x_offset_spin, self.view.auto_annotate_y_offset_spin,
+                       self.view.auto_annotate_rotation_spin]:
             widget.setEnabled(is_enabled)
         self.plot_tab.on_style_changed()
 
@@ -101,15 +107,17 @@ class AnnotationManager:
         """Adds a new annotation to the list of active annotations"""
         text = self.view.annotation_text.text().strip()
         if not text:
-            QMessageBox.warning(self.plot_tab, "Warning", "Please enter text for the annotation")
+            global_signals.request_toast(
+                "Missing Text", "Please enter text for the annotation", ToastLevel.WARNING
+            )
             return
 
         annotation = {
-            "text": text,
-            "x": self.view.annotation_x_spin.value(),
-            "y": self.view.annotation_y_spin.value(),
+            "text"    : text,
+            "x"       : self.view.annotation_x_spin.value(),
+            "y"       : self.view.annotation_y_spin.value(),
             "fontsize": self.view.annotation_fontsize_spin.value(),
-            "color": self.annotation_color,
+            "color"   : self.annotation_color,
             "bg_color": self.annotation_bg_color
         }
 
@@ -134,8 +142,9 @@ class AnnotationManager:
 
             self.annotation_bg_color = ann.get("bg_color", "wheat")
             self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button, QColor(self.annotation_bg_color))
-            
+            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button,
+                                                    QColor(self.annotation_bg_color))
+
             self.plot_tab.on_style_changed()
 
     def clear_annotations(self) -> None:
@@ -178,7 +187,8 @@ class AnnotationManager:
             return
 
         # Cleanup existing annotations
-        texts_to_remove = [text for text in self.plot_engine.current_ax.texts if text.get_gid() and (str(text.get_gid()).startswith("annotation_"))]
+        texts_to_remove = [text for text in self.plot_engine.current_ax.texts if
+                           text.get_gid() and (str(text.get_gid()).startswith("annotation_"))]
         for text in texts_to_remove:
             try:
                 text.remove()
@@ -228,8 +238,8 @@ class AnnotationManager:
                         text = f"{y_val:.2f}" if isinstance(y_val, (int, float)) else str(y_val)
                     else:
                         text = str(row[label_choice])
-                    
-                    #apply
+
+                    # apply
                     if is_flipped:
                         self.plot_engine.current_ax.annotate(
                             text,

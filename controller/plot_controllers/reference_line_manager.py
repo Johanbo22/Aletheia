@@ -1,10 +1,10 @@
-from typing import Dict, Any, List, TYPE_CHECKING
+from typing import Any, Dict, List, TYPE_CHECKING
 
-import matplotlib.pyplot as plt
-from PyQt6.QtWidgets import QColorDialog, QMessageBox, QListWidgetItem
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
 
 from controller.plot_controllers.color_manager import ColorManager
+from core.global_signals import ToastLevel, global_signals
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -15,6 +15,7 @@ class ReferenceLineManager:
     Manages the horizontal (hline), vertical (vline) and
     general infinite lines drawn by axline
     """
+
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
         self.view = plot_tab.view
@@ -41,6 +42,12 @@ class ReferenceLineManager:
         self.view.ref_line_color_button.clicked.connect(self.choose_ref_line_color)
         self.view.ref_line_type_combo.currentTextChanged.connect(self.on_ref_line_type_changed)
 
+    @staticmethod
+    def no_line_selected_toast() -> None:
+        global_signals.request_toast(
+            "Warning", "No reference line selected", ToastLevel.WARNING
+        )
+
     def choose_ref_line_color(self) -> None:
         """Open a color dialog for reference line color selection"""
         color = QColorDialog.getColor(
@@ -53,7 +60,7 @@ class ReferenceLineManager:
             self.ref_line_color = color.name()
             self.view.ref_line_color_label.setText(self.ref_line_color)
             ColorManager.update_button_color_swatch(self.view.ref_line_color_button, QColor(self.ref_line_color))
-            
+
     def add_reference_line(self) -> None:
         """Adds a reference line based on the currently selected type in the type selection"""
         ref_line_type_text = self.view.ref_line_type_combo.currentText()
@@ -64,12 +71,12 @@ class ReferenceLineManager:
         label = self.view.ref_line_label_input.text().strip() or None
 
         ref_line_data: Dict[str, Any] = {
-            "color": self.ref_line_color,
+            "color"    : self.ref_line_color,
             "linestyle": line_style,
             "linewidth": line_width,
-            "alpha": alpha,
-            "zorder": zorder,
-            "label": label
+            "alpha"    : alpha,
+            "zorder"   : zorder,
+            "label"    : label
         }
         list_text = ""
         status_text = ""
@@ -157,7 +164,7 @@ class ReferenceLineManager:
     def update_selected_reference_line(self) -> None:
         """Updates the currently selected reference line with new properties"""
         if self.selected_ref_line_index < 0 or self.selected_ref_line_index >= len(self.reference_lines):
-            QMessageBox.warning(self.plot_tab, "Warning", "No reference line selected")
+            self.no_line_selected_toast()
             return
 
         ref_line_type_text = self.view.ref_line_type_combo.currentText()
@@ -168,13 +175,13 @@ class ReferenceLineManager:
         label = self.view.ref_line_label_input.text().strip() or None
 
         updated_data = {
-            "type": new_type,
-            "color": self.ref_line_color,
+            "type"     : new_type,
+            "color"    : self.ref_line_color,
             "linestyle": line_style,
             "linewidth": self.view.ref_line_width_spin.value(),
-            "alpha": self.view.ref_line_alpha_spin.value(),
-            "zorder": self.view.annotations_tab.ref_line_zorder_spin.value(),
-            "label": label
+            "alpha"    : self.view.ref_line_alpha_spin.value(),
+            "zorder"   : self.view.annotations_tab.ref_line_zorder_spin.value(),
+            "label"    : label
         }
 
         if new_type == "hline":
@@ -203,7 +210,7 @@ class ReferenceLineManager:
     def delete_selected_reference_line(self) -> None:
         """Delete the currently selected reference line"""
         if self.selected_ref_line_index < 0 or self.selected_ref_line_index >= len(self.reference_lines):
-            QMessageBox.warning(self.plot_tab, "Warning", "No reference line selected")
+            self.no_line_selected_toast()
             return
 
         del self.reference_lines[self.selected_ref_line_index]
@@ -258,12 +265,12 @@ class ReferenceLineManager:
         for i, ref_line in enumerate(self.reference_lines):
             ref_type = ref_line["type"]
             kwargs = {
-                "color": ref_line.get("color", "black"),
+                "color"    : ref_line.get("color", "black"),
                 "linestyle": ref_line.get("linestyle", "-"),
                 "linewidth": ref_line.get("linewidth", 1.5),
-                "alpha": ref_line.get("alpha", 1.0),
-                "label": ref_line.get("label"),
-                "gid": f"ref_line_{i}"
+                "alpha"    : ref_line.get("alpha", 1.0),
+                "label"    : ref_line.get("label"),
+                "gid"      : f"ref_line_{i}"
             }
             if ref_type == "hline":
                 self.plot_engine.current_ax.axhline(y=ref_line.get("y", 0.0), **kwargs)
@@ -281,10 +288,10 @@ class ReferenceLineManager:
     def _get_matplotlib_linestyle(self, style_name: str) -> str:
         """Converts the UI names to matplotlib linestyle string identifier"""
         style_map = {
-            "solid": "-",
-            "dashed": "--",
+            "solid"  : "-",
+            "dashed" : "--",
             "dashdot": "-.",
-            "dotted": ":"
+            "dotted" : ":"
         }
         return style_map.get(style_name, "-")
 

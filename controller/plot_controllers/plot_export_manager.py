@@ -1,9 +1,8 @@
-import traceback
-from typing import TYPE_CHECKING, Any
-from PyQt6.QtWidgets import QMessageBox
+from typing import Any, TYPE_CHECKING
 
-from ui.dialogs.PlotExportDialog import PlotExportDialog
+from core.global_signals import ToastLevel, global_signals
 from ui.animations import SavePlotAnimation
+from ui.dialogs.PlotExportDialog import PlotExportDialog
 from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
@@ -24,7 +23,9 @@ class PlotExportManager:
     def save_plot_image(self) -> None:
         """Invokes the PlotExportDialog to save the current plot figure to disk"""
         if self.plot_engine.current_figure is None:
-            QMessageBox.warning(self.plot_tab, "Warning", "No plot available to save")
+            global_signals.request_toast(
+                "No Plot", "No plot available to save", ToastLevel.WARNING
+            )
             return
 
         try:
@@ -99,19 +100,20 @@ class PlotExportManager:
         """Handles UI updates on successful export."""
         SavePlotAnimation(self.plot_tab).start(self.plot_tab)
         self.status_bar.log_action(f"Plot saved to {filepath}", level=LogLevel.SUCCESS)
-        QMessageBox.information(self.plot_tab, "Success", f"Plot saved successfully to:\n{filepath}")
+        global_signals.request_toast(
+            "Plot Saved", f"Plot saved to:\n{filepath}", ToastLevel.SUCCESS
+        )
 
     def _handle_permission_error(self) -> None:
         """Displays error when the file is locked by the OS."""
         self.status_bar.log("Permission denied: Target file might be open in another program.", LogLevel.ERROR)
-        QMessageBox.critical(
-            self.plot_tab,
-            "Save Error",
-            "Cannot save the file.\n\nIf you are trying to overwrite an existing file (like a PDF), please ensure it is closed in your viewer/editor before saving."
+        global_signals.request_toast(
+            "Save Error", "Cannot save the file due to permissions", ToastLevel.ERROR
         )
 
     def _handle_general_error(self, e: Exception) -> None:
         """Displays generic export errors."""
         self.status_bar.log(f"Failed to save plot: {str(e)}", LogLevel.ERROR)
-        QMessageBox.critical(self.plot_tab, "Save Error", f"Could not save plot:\n{str(e)}")
-        traceback.print_exc()
+        global_signals.request_toast(
+            "Save Error", f"Could not save plot", ToastLevel.ERROR
+        )

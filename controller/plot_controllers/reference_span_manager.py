@@ -1,9 +1,10 @@
-from typing import Dict, Any, List, TYPE_CHECKING
+from typing import Any, Dict, List, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QColorDialog, QMessageBox, QListWidgetItem
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
 
 from controller.plot_controllers import ColorManager
+from core.global_signals import ToastLevel, global_signals
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -13,6 +14,7 @@ class ReferenceSpanManager:
     Manages reference spans on the plot canvas
     Handles drawing horizontal (axhspan) and vertical (axvspan) shaded areas
     """
+
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
         self.view = plot_tab.view
@@ -26,6 +28,12 @@ class ReferenceSpanManager:
 
         # Default styling
         self.ref_span_color: str = "blue"
+
+    @staticmethod
+    def no_span_selected_toast() -> None:
+        global_signals.request_toast(
+            "Warning", "No reference span selected", ToastLevel.WARNING
+        )
 
     def connect_signals(self) -> None:
         """Connects the UI signals to methods for this Manager"""
@@ -62,10 +70,10 @@ class ReferenceSpanManager:
         label = self.view.annotations_tab.ref_span_label_input.text().strip() or None
 
         ref_span_data: Dict[str, Any] = {
-            "color": self.ref_span_color,
-            "alpha": alpha,
+            "color" : self.ref_span_color,
+            "alpha" : alpha,
             "zorder": zorder,
-            "label": label,
+            "label" : label,
         }
 
         list_text = ""
@@ -76,7 +84,7 @@ class ReferenceSpanManager:
             ymax = self.view.annotations_tab.ref_span_ymax_spin.value()
             ref_span_data.update({"type": "hspan", "ymin": ymin, "ymax": ymax})
             list_text = f"hspan: ymin={ymin:.2f}, ymax={ymax:.2f}"
-            status_text =f"Added horizontal span between y={ymin:.2f} and y={ymax:.2f}"
+            status_text = f"Added horizontal span between y={ymin:.2f} and y={ymax:.2f}"
 
         elif ref_span_type_text == "Vertical (axvspan)":
             xmin = self.view.annotations_tab.ref_span_xmin_spin.value()
@@ -122,7 +130,8 @@ class ReferenceSpanManager:
     def _populate_editor_from_ref_span(self, ref_span: Dict[str, Any]) -> None:
         """Populates the editor UI with the selected reference span's properties"""
         type_map = {"hspan": "Horizontal (axhspan)", "vspan": "Vertical (axvspan)"}
-        self.view.annotations_tab.ref_span_type_combo.setCurrentText(type_map.get(ref_span["type"], "Horizontal (axhspan)"))
+        self.view.annotations_tab.ref_span_type_combo.setCurrentText(
+            type_map.get(ref_span["type"], "Horizontal (axhspan)"))
 
         if ref_span["type"] == "hspan":
             self.view.annotations_tab.ref_span_ymin_spin.setValue(ref_span.get("ymin", 0.0))
@@ -144,7 +153,7 @@ class ReferenceSpanManager:
     def update_selected_reference_span(self) -> None:
         """Updates the selected reference span with new properties"""
         if self.selected_ref_span_index < 0 or self.selected_ref_span_index >= len(self.reference_spans):
-            QMessageBox.warning(self.plot_tab, "Warning", "No reference span selected")
+            self.no_span_selected_toast()
             return
 
         ref_span_type_text = self.view.annotations_tab.ref_span_type_combo.currentText()
@@ -154,11 +163,11 @@ class ReferenceSpanManager:
         label = self.view.annotations_tab.ref_span_label_input.text().strip() or None
 
         updated_data = {
-            "type": new_type,
-            "color": self.ref_span_color,
-            "alpha": self.view.annotations_tab.ref_span_alpha_spin.value(),
+            "type"  : new_type,
+            "color" : self.ref_span_color,
+            "alpha" : self.view.annotations_tab.ref_span_alpha_spin.value(),
             "zorder": self.view.annotations_tab.ref_span_zorder_spin.value(),
-            "label": label
+            "label" : label
         }
 
         if new_type == "hspan":
@@ -179,7 +188,7 @@ class ReferenceSpanManager:
     def delete_selected_reference_span(self) -> None:
         """Deletes the selected reference span"""
         if self.selected_ref_span_index < 0 or self.selected_ref_span_index >= len(self.reference_spans):
-            QMessageBox.warning(self.plot_tab, "Warning", "No reference span selected")
+            self.no_span_selected_toast()
             return
 
         del self.reference_spans[self.selected_ref_span_index]
@@ -235,10 +244,10 @@ class ReferenceSpanManager:
             span_type = ref_span["type"]
             kwargs = {
                 "facecolor": ref_span.get("color", "blue"),
-                "alpha": ref_span.get("alpha", 0.3),
-                "zorder": ref_span.get("zorder", -1),
-                "label": ref_span.get("label"),
-                "gid": f"ref_span_{i}",
+                "alpha"    : ref_span.get("alpha", 0.3),
+                "zorder"   : ref_span.get("zorder", -1),
+                "label"    : ref_span.get("label"),
+                "gid"      : f"ref_span_{i}",
                 "edgecolor": "none"
             }
             if span_type == "hspan":
