@@ -4,18 +4,31 @@ from dataclasses import dataclass
 from ui.LineNumberArea import LineNumberArea
 
 from PyQt6.QtCore import QRect, Qt, QStringListModel, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QTextCursor, QTextFormat, QAction, QKeySequence, QKeyEvent, QWheelEvent, QTextCharFormat, QTextBlock, QPaintEvent, QMouseEvent, QTextOption
-from PyQt6.QtWidgets import QPlainTextEdit, QTextEdit, QCompleter, QMessageBox, QInputDialog, QToolTip
+from PyQt6.QtGui import QColor, QFont, QPainter, QResizeEvent, QTextCursor, QTextFormat, QAction, QKeySequence, \
+    QKeyEvent, QWheelEvent, QTextCharFormat, QTextBlock, QPaintEvent, QMouseEvent, QTextOption
+from PyQt6.QtWidgets import QPlainTextEdit, QTextEdit, QCompleter, QMessageBox, QInputDialog, QToolTip, QWidget
 import traceback
 
 @dataclass
 class LintError:
+    """
+    Data class representing a syntax error detected during linting
+
+    :param line_number (int): The 1-based line number where the error occurred
+    :param offset (int): The character offset within the line where the error occurred
+    :param message (str): The descriptive syntax error message
+    """
     line_number: int
     offset: int
     message: str
     
 class LintWorker(QThread):
-    """Background thread for executing AST parsing"""
+    """
+    Background thread for executing asynchronous AST parsing to detect syntax errors
+
+    Emits a `lint_complete` signal containing a list of `LintError` objects when parsing finishes
+    to avoid blocking the main UI thread during typing.
+    """
     lint_complete = pyqtSignal(list)
     
     def __init__(self, code_text: str) -> None:
@@ -36,10 +49,21 @@ class LintWorker(QThread):
         self.lint_complete.emit(errors)
 
 class CodeEditor(QPlainTextEdit):
-    """Custom texedit widget that serves as a code editor"""
+    """
+    Custom text edit widget providing a code editor
+
+    This editor supports coding capabilities including line numbering, code folding,
+    bracket matching, auto-completion, syntax linting (via AST), and text manipulation
+    shortcuts (indentation, commenting, duplicating lines)
+    """
     
     TAB_SPACES: str = "    "
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: QWidget | None =None) -> None:
+        """
+        Initializes the code editor with UI, actions and background workers
+
+        :param parent: The parent widget. Defaults to None
+        """
         super().__init__(parent)
         self.lineNumberArea: LineNumberArea = LineNumberArea(self)
 
@@ -135,6 +159,11 @@ class CodeEditor(QPlainTextEdit):
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(' '))
 
     def lineNumberAreaWidth(self) -> int:
+        """
+        Calculates the required width for the line number area based on the number of blocks
+
+        :return: The width in pixels required to display line numbers and folding indicators
+        """
         digits = 1
         max_value: int = max(1, self.blockCount())
         while max_value >= 10:
@@ -145,9 +174,22 @@ class CodeEditor(QPlainTextEdit):
         return space + 15
 
     def updateLineNumberAreaWidth(self, _) -> None:
+        """
+        Update the viewport margins to accomodate the line number area
+
+        :param _: Ignored parameter of the new block count emitted by blockCountChanged
+        :return: None
+        """
         self.setViewportMargins(self.lineNumberAreaWidth(), 0, 0, 0)
 
     def updateLineNumberArea(self, rect, dy) -> None:
+        """
+        Update or scroll the line number area when the editor's viewport changes
+
+        :param rect: The rectangle defining the area to update
+        :param dy: The vertical scroll amount in pixels
+        :return: None
+        """
         if dy:
             self.lineNumberArea.scroll(0, dy)
         else:
@@ -156,12 +198,24 @@ class CodeEditor(QPlainTextEdit):
         if rect.contains(self.viewport().rect()):
             self.updateLineNumberAreaWidth(0)
 
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """
+        Handle resize event to ensure line number area matches the editor's height geometry
+
+        :param event: The resize event payload
+        :return: None
+        """
         super().resizeEvent(event)
         cr: QRect = self.contentsRect()
         self.lineNumberArea.setGeometry(QRect(cr.left(), cr.top(), self.lineNumberAreaWidth(), cr.height()))
 
     def lineNumberAreaPaintEvent(self, event: QPaintEvent) -> None:
+        """
+        Paint the line numbers and folding indicators within the line number area
+
+        :param event: The paint event containing the update rectangle
+        :return: None
+        """
         painter = QPainter(self.lineNumberArea)
         painter.fillRect(event.rect(), QColor("#2b2b2b"))
 
@@ -202,7 +256,12 @@ class CodeEditor(QPlainTextEdit):
             block_number += 1
     
     def lineNumberAreaMousePressEvent(self, event: QMouseEvent) -> None:
-        """Handle mouse clicks on the line number area for code folding interactions."""
+        """
+        Handle mouse clicks on the line number area for the code folding interactions
+
+        :param event: The mouse event detailing click coordinates
+        :return: None
+        """
         block: QTextBlock = self.firstVisibleBlock()
         top: int = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
         bottom: int = top + round(self.blockBoundingRect(block).height())
@@ -222,7 +281,12 @@ class CodeEditor(QPlainTextEdit):
             bottom = top + round(self.blockBoundingRect(block).height())
     
     def isFoldable(self, block: QTextBlock) -> bool:
-        """Determines if a text block is a foldable parent based on indentation rules"""
+        """
+        Determine if a block is a foldable parent based on python indentation rules
+
+        :param block: The text block to evaluate
+        :return: True if the block is followed by a more deeply indented block, False otherwise
+        """
         text: str = block.text()
         if not text.strip():
             return False
@@ -249,7 +313,12 @@ class CodeEditor(QPlainTextEdit):
         return False
 
     def toggleFold(self, block: QTextBlock) -> None:
-        """Toggles fold states of block and pushes visibility update"""
+        """
+        Toggle the fold state of a given block and trigger a visibility update
+
+        :param block: The text block to fold or unfold
+        :return: None
+        """
         existing_cursor: QTextCursor | None = None
         
         for cursor in self._folded_cursors:
@@ -267,7 +336,10 @@ class CodeEditor(QPlainTextEdit):
     
     def updateFoldVisibility(self) -> None:
         """
-        Calculates and updates the visibility of all blocks based on nested fold states
+        Calculate and apply the visibility of all blocks based on nested fold states
+
+        Blocks with an indentation level greater than a folded parent are iteratively hidden
+        :return: None
         """
         if not hasattr(self, 'lineNumberArea') or self.lineNumberArea is None:
             return
@@ -324,8 +396,12 @@ class CodeEditor(QPlainTextEdit):
 
         self.setExtraSelections(extraSelections)
     
-    def initCompleter(self):
-        """Sets up the QCompleter for Python keywords and builtins"""
+    def initCompleter(self) -> None:
+        """
+        Configure the QCompleter model for Python keywords, builtins and standard library
+
+        :return: None
+        """
         self.completer = QCompleter()
         self.completer.setWidget(self)
         self.completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
@@ -349,35 +425,52 @@ class CodeEditor(QPlainTextEdit):
         model = QStringListModel(keywords, self.completer)
         self.completer.setModel(model)
     
-    def insertCompletion(self, completion):
-        """Inserts the selected completion into text"""
+    def insertCompletion(self, completion: str) -> None:
+        """
+        Insert he selected completion string from the popup into the editor text
+
+        :param completion: The selected completion text fragment
+        :return: None
+        """
         if self.completer.widget() != self:
             return
         
         text_cursor = self.textCursor()
-        # calculate how manuy characters we must ignore that has already been tuyped
+        # calculate how many characters we must ignore that has already been typed
         extra = len(completion) - len(self.completer.completionPrefix())
         
-        # Dont replace the hwole word if typing in the middle
-        # complete at end
+        # Do not replace the whole word if typing in the middle complete at end
         # and then move cursor to end position and insert suffix
         text_cursor.movePosition(QTextCursor.MoveOperation.EndOfWord)
         text_cursor.insertText(completion[-extra:])
         self.setTextCursor(text_cursor)
         
     def textUnderCursor(self) -> str:
-        """Returns the word under the cursor"""
+        """
+        Extract the word currently residing underneath the text cursor
+
+        :return: The word string
+        """
         tc = self.textCursor()
         tc.select(QTextCursor.SelectionType.WordUnderCursor)
         return tc.selectedText()
 
-    def startCompleter(self):
-        """Trigger the completer popup"""
+    def startCompleter(self) -> None:
+        """
+        Manually trigger the auto-completer popup
+
+        :return: None
+        """
         if self.completer:
             self.handleCompleterUpdate(force=True)
 
-    def handleCompleterUpdate(self, force: bool = False):
-        """updates the completer prefix and shows the completion popup"""
+    def handleCompleterUpdate(self, force: bool = False) -> None:
+        """
+        Update the completer prefix and display the completion popup based on current input
+
+        :param force: If True, forces the popup to show even if fewer than 1 character is typed
+        :return: None
+        """
         if not self.completer:
             return
         
@@ -399,7 +492,11 @@ class CodeEditor(QPlainTextEdit):
         
         self.completer.complete(cursor_rect)
     
-    def showFindReplaceDialog(self):
+    def showFindReplaceDialog(self) -> None:
+        """
+        Instantiate and display the Find/Replace non-modal dialog window
+        :return: None
+        """
         try:
             from ui.dialogs.FindReplaceDialog import FindReplaceDialog
             
@@ -417,7 +514,12 @@ class CodeEditor(QPlainTextEdit):
             QMessageBox.critical(self, "Error", f"Could not open Find/Replace:\n{e}")
     
     def indentSelection(self, cursor: QTextCursor) -> None:
-        """Indents the currently selected text blocks by 4 spaces"""
+        """
+        Indent the currently selected text blocks by 4 spaces
+
+        :param cursor: The text cursor representing the current selection bounds
+        :return: None
+        """
         try:
             has_selection: bool = cursor.hasSelection()
             start_pos: int = cursor.selectionStart()
@@ -449,7 +551,12 @@ class CodeEditor(QPlainTextEdit):
             print(f"CodeEditor Indent Error: {e}")
     
     def unindentSelection(self, cursor: QTextCursor) -> None:
-        """Unindents the currently selected block by up to four space"""
+        """
+        Unindent the currently selected text blocks by up to 4 spaces or 1 tab character
+
+        :param cursor: The text cursor representing the current selection bounds
+        :return: None
+        """
         try:
             has_selection: bool = cursor.hasSelection()
             start_pos: int = cursor.selectionStart()
@@ -502,7 +609,13 @@ class CodeEditor(QPlainTextEdit):
             print(f"CodeEditor Unindent Error: {e}")
     
     def toggleComment(self) -> None:
-        """Toggles Python comments for the selected line"""
+        """
+        Toggles Python line comments ('#') for the selected line(s)
+
+        If all lines in the selection are commented, they will be uncommented
+        Otherwise, all lines within the block will be commented
+        :return: None
+        """
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
         
@@ -551,7 +664,10 @@ class CodeEditor(QPlainTextEdit):
         cursor.endEditBlock()
     
     def showGoToLineDialog(self) -> None:
-        """Prompts for a line number and navigates the cursor to that line"""
+        """
+        Prompt the user for a line number via an input dialog and navigate the cursor to it
+        :return: None
+        """
         current_line: int = self.textCursor().blockNumber() + 1
         max_lines: int = max(1, self.blockCount())
         
@@ -568,14 +684,20 @@ class CodeEditor(QPlainTextEdit):
             self.centerCursor()
     
     def toggleWordWrap(self) -> None:
-        """Toggles between soft-wrapping text and horizontal scrolling"""
+        """
+        Toggle between soft-wrapping text and continuous horizontal scrolling
+        :return: None
+        """
         if self.lineWrapMode() == QPlainTextEdit.LineWrapMode.NoWrap:
             self.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
         else:
             self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
     def toggleWhitespaceVisibility(self) -> None:
-        """Toggles the visual rendering of spaces as dots and tabs as arrows"""
+        """
+        Toggle the visual rendering of invisible characters (spaces as dots, tabs as arrows)
+        :return: None
+        """
         option = self.document().defaultTextOption()
 
         if option.flags() & QTextOption.Flag.ShowTabsAndSpaces:
@@ -586,7 +708,11 @@ class CodeEditor(QPlainTextEdit):
         self.document().setDefaultTextOption(option)
             
     def getBracketSelections(self) -> list[QTextEdit.ExtraSelection]:
-        """Finds and highlights matching bracket pairs if the cursor is adjacent to one"""
+        """
+        Find and highlight matching bracket pairs '()', '[]', '{}' if the cursor is adjacent to one
+
+        :return: A list of ExtraSelection objects containing the formatting for the matched brackets
+        """
         selections: list[QTextEdit.ExtraSelection] = []
         cursor: QTextCursor = self.textCursor()
         
@@ -659,7 +785,10 @@ class CodeEditor(QPlainTextEdit):
         return selections
     
     def duplicateLine(self) -> None:
-        """Duplicates the current line or selected block of lines below"""
+        """
+        Duplicate the current line or the selected block of lines below the selection
+        :return: None
+        """
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
 
@@ -688,7 +817,10 @@ class CodeEditor(QPlainTextEdit):
         cursor.endEditBlock()
 
     def deleteLine(self) -> None:
-        """Deletes the current line or selected block of lines"""
+        """
+        Delete the current line or the selected block of lines from the document
+        :return: None
+        """
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
 
@@ -719,7 +851,10 @@ class CodeEditor(QPlainTextEdit):
         cursor.endEditBlock()
 
     def moveLinesUp(self) -> None:
-        """Moves the current line or selected block of lines up by one"""
+        """
+        Shift the current line or selected block of lines upward by one block position
+        :return: None
+        """
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
 
@@ -754,7 +889,10 @@ class CodeEditor(QPlainTextEdit):
         cursor.endEditBlock()
 
     def moveLinesDown(self) -> None:
-        """Moves the current line or selected block of lines down by one line."""
+        """
+        Shift the current line or selected block of lines downward by one block position
+        :return: None
+        """
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
 
@@ -792,14 +930,22 @@ class CodeEditor(QPlainTextEdit):
         cursor.endEditBlock()
 
     def _startLinting(self) -> None:
-        """Creates the thread background to lint the text state"""
+        """
+        Initialize the background thread to statically lint the current text using AST
+        :return: None
+        """
         text: str = self.toPlainText()
         self._active_lint_worker = LintWorker(text)
         self._active_lint_worker.lint_complete.connect(self._applyLintErrors)
         self._active_lint_worker.start()
     
     def _applyLintErrors(self, errors: list[LintError]) -> None:
-        """Processes the results from the LintWorker and translates into information"""
+        """
+        Process the results from the LintWorker and map syntax errors to underline styles in the text
+
+        :param errors: A list of AST-generated lint errors corresponding to the text state
+        :return: None
+        """
         self._lint_selections.clear()
         self._lint_error_map.clear()
         
