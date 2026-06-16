@@ -27,10 +27,11 @@ from ui.dialogs import AggregationDialog, AppendDialog, BinningDialog, ColumnReo
 from ui.dialogs.ExportDialog import ExportConfig, ExportDialog
 from ui.widgets.ToastNotification import ToastLevel
 from ui.workers import AutoCreateSubsetsWorker, GoogleSheetsImportWorker
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.data_tab import DataTab
-    from ui.status_bar import StatusBar, LogLevel
+    from ui.status_bar import StatusBar
 
 class DataTabController:
     """
