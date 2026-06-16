@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtWidgets import QDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSplitter, QVBoxLayout, QWidget, QTableWidget, QTableWidgetItem, QHeaderView
 from typing import List, Tuple, Optional, Dict, Any
@@ -15,7 +15,8 @@ class MeltDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Melt Data")
         self.setModal(True)
-        self.resize(800, 700)
+        self.resize(1100, 900)
+        self.setMinimumSize(1050, 900)
         self.df = df
         self.columns = list(df.columns)
         self.row_count = df.shape[0]
@@ -43,8 +44,8 @@ class MeltDialog(QDialog):
         
 
         info_description = QLabel(
-            "Using melt you unpivot your data fra a wide format to a long format.\n"
-            "1. Select ID variables (columns to keep as identifers).\n"
+            "Using melt you unpivot your data from a wide format to a long format.\n"
+            "1. Select ID variables (columns to keep as identifiers).\n"
             "2. Select Value Variables (columns to unpivot into rows)."
         )
         info_description.setProperty("styleClass", "info_text")
@@ -58,7 +59,7 @@ class MeltDialog(QDialog):
         layout.addSpacing(5)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(20)
+        splitter.setHandleWidth(5)
         splitter.setChildrenCollapsible(False)
         
         id_panel, self.id_variable_list, self.id_search_input = self._create_column_selection_panel(
@@ -119,11 +120,13 @@ class MeltDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        apply_button = QPushButton("Melt Data")
-        apply_button.setObjectName("MainActionButton")
-        apply_button.setMinimumWidth(120)
-        apply_button.clicked.connect(self.validate_and_accept)
-        button_layout.addWidget(apply_button)
+        self.apply_button = QPushButton("Melt Data")
+        self.apply_button.setObjectName("MainActionButton")
+        self.apply_button.setMinimumWidth(120)
+        self.apply_button.setDefault(True)
+        self.apply_button.setEnabled(False)
+        self.apply_button.clicked.connect(self.validate_and_accept)
+        button_layout.addWidget(self.apply_button)
 
         cancel_button = QPushButton("Cancel")
         cancel_button.setMinimumWidth(120)
@@ -131,13 +134,18 @@ class MeltDialog(QDialog):
         button_layout.addWidget(cancel_button)
 
         layout.addLayout(button_layout)
+
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.setInterval(300)
+        self._preview_timer.timeout.connect(self._do_update_preview)
         
-        self.id_variable_list.itemSelectionChanged.connect(self.update_preview)
-        self.value_list.itemSelectionChanged.connect(self.update_preview)
-        self.variable_name_input.textChanged.connect(self.update_preview)
-        self.value_name_input.textChanged.connect(self.update_preview)
+        self.id_variable_list.itemSelectionChanged.connect(self.schedule_preview_update)
+        self.value_list.itemSelectionChanged.connect(self.schedule_preview_update)
+        self.variable_name_input.textChanged.connect(self.schedule_preview_update)
+        self.value_name_input.textChanged.connect(self.schedule_preview_update)
         
-        self.update_preview()
+        self._do_update_preview()
     
     def _create_column_selection_panel(self, title: str, hint: str = "") -> Tuple[QWidget, QListWidget, QLineEdit]:
         panel_widget = QWidget()
@@ -213,36 +221,62 @@ class MeltDialog(QDialog):
             if item is not None and not item.isHidden():
                 item.setSelected(True)
 
-    def update_preview(self):
-        """Calculate and display the expected shape of the new dataframe"""
+    def schedule_preview_update(self) -> None:
+        """Schedules a preview update to debounce rapid conescutive triggers"""
+        self._preview_timer.start()
+
+    def _set_preview_error(self, message: str) -> None:
+        """
+        Set the preview label to an error state and clear the table
+
+        :param message: The error message
+        :return: None
+        """
+        self.preview_label.setText(message)
+        self.preview_table.setProperty("status", "error")
+        self.preview_label.style().unpolish(self.preview_label)
+        self.preview_label.style().polish(self.preview_label)
+        self.preview_table.clear()
+        self.preview_table.setRowCount(0)
+        self.preview_table.setColumnCount(0)
+        self.apply_button.setEnabled(False)
+
+    def _do_update_preview(self) -> None:
+        """Calculates and display the expected shape of the new dataframe"""
         id_vars = [item.text() for item in self.id_variable_list.selectedItems()]
         value_vars = [item.text() for item in self.value_list.selectedItems()]
 
         overlap = set(id_vars) & set(value_vars)
         if overlap:
-            self.preview_label.setText(f"Error: Overlap in ID and Value variables: {', '.join(overlap)}")
-            self.preview_label.setProperty("status", "error")
-            self.preview_label.style().unpolish(self.preview_label)
-            self.preview_label.style().polish(self.preview_label)
-            self.preview_table.clear()
-            self.preview_table.setRowCount(0)
-            self.preview_table.setColumnCount(0)
+            self._set_preview_error(f"Error: Overlap in ID and Value variables: {', '.join(overlap)}")
             return
-        
+
+        var_name = self.variable_name_input.text().strip()
+        value_name = self.value_name_input.text().strip()
+
+        if not var_name or not value_name:
+            self._set_preview_error("Error: Variable and Value column names cannot be empty")
+            return
+
+        if var_name == value_name:
+            self._set_preview_error("Error: Variable and Value column names cannot be identical")
+            return
+
+        if var_name in id_vars or value_name in id_vars:
+            self._set_preview_error("Error: New column names cannot conflict with existing ID variables")
+            return
+
         v_vars = value_vars if value_vars else None
 
         if not v_vars:
             num_value_vars = len(self.columns) - len(id_vars)
         else:
             num_value_vars = len(v_vars)
-        
+
         new_rows = self.row_count * num_value_vars
         new_cols = len(id_vars) + 2
         try:
             df_slice = self.df.head(15).copy()
-            
-            var_name = self.variable_name_input.text() or "variable"
-            value_name = self.value_name_input.text() or "value"
 
             preview_df = pd.melt(
                 df_slice,
@@ -255,46 +289,44 @@ class MeltDialog(QDialog):
             self.preview_table.setRowCount(preview_df.shape[0])
             self.preview_table.setColumnCount(preview_df.shape[1])
             self.preview_table.setHorizontalHeaderLabels(list(preview_df.columns))
-            
+
             bold_font = QFont()
             bold_font.setBold(True)
 
             for row in range(preview_df.shape[0]):
                 for col in range(preview_df.shape[1]):
                     raw_val = preview_df.iat[row, col]
-                    
+
                     if isinstance(raw_val, float):
                         val_str = f"{raw_val:.4f}"
                     else:
                         val_str = str(raw_val)
+
                     item = QTableWidgetItem(val_str)
-                    
+
                     col_name = preview_df.columns[col]
                     if col_name in (var_name, value_name):
                         item.setFont(bold_font)
                     self.preview_table.setItem(row, col, item)
-            
+
             text = (
-                f"Original Shape: {self.df.shape}  ->  "
+                f"Original Shape: {self.df.shape} -> "
                 f"Result Shape: ({new_rows}, {new_cols})"
             )
             status_state = "success"
-            
+
             if new_rows > 1_000_000 or (self.row_count > 0 and new_rows > self.row_count * 20):
-                text += f"\nWarning: Row count will increase by {num_value_vars}x!"
+                text += f"\nWarning: Row count will increase by {num_value_vars}x"
                 status_state = "warning"
 
             self.preview_label.setText(text)
             self.preview_label.setProperty("status", status_state)
             self.preview_label.style().unpolish(self.preview_label)
             self.preview_label.style().polish(self.preview_label)
-        
+            self.apply_button.setEnabled(True)
+
         except Exception as PreviewMeltError:
-            self.preview_label.setText(f"Preview Error: {str(PreviewMeltError)}")
-            self.preview_label.setProperty("status", "error")
-            self.preview_label.style().unpolish(self.preview_label)
-            self.preview_label.style().polish(self.preview_label)
-            print(PreviewMeltError)
+            self._set_preview_error(f"Preview Error: {str(PreviewMeltError)}")
 
     def validate_and_accept(self):
         """Validate the inputs in melt"""
