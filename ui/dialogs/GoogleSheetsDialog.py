@@ -1,14 +1,14 @@
 import re
 from typing import NamedTuple, Optional
 
-from PyQt6.QtCore import QSettings, Qt, QTimer
+from PyQt6.QtCore import QSettings, QTimer, Qt
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QTabWidget, QFrame, QLineEdit, QGroupBox, QComboBox, QPushButton
+from PyQt6.QtWidgets import QComboBox, QDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+    QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
-from resources.version import APPLICATION_NAME
-from ui.theme import ThemeColors
-from icons import IconBuilder, IconType
 from core.resource_loader import get_resource_path
+from icons import IconBuilder, IconType
+from resources.version import APPLICATION_NAME
 
 class GoogleSheetsImportConfig(NamedTuple):
     """Payload for Google Sheets import config"""
@@ -360,6 +360,13 @@ class GoogleSheetsDialog(QDialog):
                 widget.setProperty("validationState", "error")
                 widget.style().unpolish(widget)
                 widget.style().polish(widget)
+
+        if not self.sheet_id.currentText().strip():
+            self._route_validation_error(
+                widget=self.sheet_id,
+                tab_index=0,
+                error_message="Please enter a valid Google Sheet URL or ID"
+            )
         
         if not self.gid and not self.sheet_name.text():
             self._route_validation_error(
