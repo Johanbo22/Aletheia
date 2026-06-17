@@ -1,28 +1,31 @@
 #ui/main_window.py
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QFileDialog, QMessageBox, QApplication, QTabWidget)
-from PyQt6.QtCore import QThreadPool, pyqtSlot, QTimer, pyqtSignal, QSettings, Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
-from pathlib import Path
-import traceback
 import json
+from pathlib import Path
 
-from resources.version import APPLICATION_NAME, APPLICATION_VERSION, SCRIPT_FILE_NAME, LOG_FILE_NAME
-from core.subset_manager import SubsetManager
-from ui.workers import FileImportWorker, GoogleSheetsImportWorker
-from ui.data_tab import DataTab
-from ui.plot_tab import PlotTab
-from ui.widgets.AutosaveIndicator import AutosaveIndicator
+from PyQt6.QtCore import QSettings, QThreadPool, QTimer, Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtWidgets import (QApplication, QFileDialog, QMessageBox, QTabWidget, QVBoxLayout, QWidget)
+
+from controller.data_tab_controller import DataTabController
+from controller.toast_manager import ToastManager
+from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
 from core.global_signals import global_signals
-from core.project_manager import ProjectManager
-from core.code_exporter import CodeExporter
 from core.logger import Logger
-from ui.status_bar import LogLevel, StatusBar
-from ui.dialogs import (ProgressDialog, GoogleSheetsDialog, DatabaseConnectionDialog, ExportDialog, GoogleSheetsExportDialog, ConsoleDialog)
-from ui.animations import (FileImportAnimation, FailedAnimation, SavedProjectAnimation, GoogleSheetsImportAnimation, DatabaseImportAnimation, ProjectOpenAnimation, ScriptLogExportAnimation, ExportFileAnimation)
+from core.project_manager import ProjectManager
+from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
-from controller.toast_manager import ToastManager
+from resources.version import APPLICATION_NAME, APPLICATION_VERSION, LOG_FILE_NAME, SCRIPT_FILE_NAME
+from ui.animations import (DatabaseImportAnimation, FailedAnimation, FileImportAnimation, GoogleSheetsImportAnimation,
+                           ScriptLogExportAnimation)
+from ui.data_tab import DataTab
+from ui.dialogs import (ConsoleDialog, DatabaseConnectionDialog, GoogleSheetsDialog, GoogleSheetsExportDialog,
+                        ProgressDialog)
+from ui.plot_tab import PlotTab
+from ui.status_bar import LogLevel, StatusBar
+from ui.widgets.AutosaveIndicator import AutosaveIndicator
 from ui.widgets.ToastNotification import ToastLevel
+from ui.workers import FileImportWorker, GoogleSheetsImportWorker
 
 class MainWindow(QWidget):
     """Main widget"""
@@ -194,14 +197,14 @@ class MainWindow(QWidget):
                 try:
                     project_data = self.project_manager.recover_autosave()
                     self.load_project(project_data)
-                    self.status_bar.log("Session recovered", "SUCCESS")
+                    self.status_bar.log("Session recovered", LogLevel.SUCCESS)
+                    self.show_toast("Session Recovered", "Project recovered from latest autosave", ToastLevel.SUCCESS)
                     self.unsaved_changes = True
                 except Exception as err:
-                    QMessageBox.warning(
-                        self,
-                        "Recovery Failed",
-                        f"Unfortunately, the session data could not be recovered:\n\n{str(err)}\n\nThe corrupted autosave will be cleared."
+                    self.show_toast(
+                        "Recovery Failed", "The session data could not be recovered.\nThe corrupted autosave will be deleted", ToastLevel.ERROR
                     )
+                    self.status_bar.log(f"Session data could not be recovered: {str(err)}", LogLevel.ERROR)
                     self.project_manager.cleanup_autosave()
             else:
                 self.project_manager.cleanup_autosave()
@@ -304,6 +307,9 @@ class MainWindow(QWidget):
             if Path(filepath).exists():
                 self._load_project_from_path(filepath)
             else:
+                self.show_toast(
+                    "File Not Found", "The project file could not be found", ToastLevel.WARNING
+                )
                 QMessageBox.warning(self, "File Not Found", f"The project file could not be found:\n{filepath}")
     
     def _load_project_from_path(self, filepath: str) -> None:
@@ -317,8 +323,8 @@ class MainWindow(QWidget):
             self.show_toast("Project Opened", "Project loaded", ToastLevel.SUCCESS)
         
         except Exception as LoadProjectError:
-            QMessageBox.critical(self, "Error", f"Failed to load project: {str(LoadProjectError)}")
-            traceback.print_exc()
+            self.show_toast("Load Project Error", "Failed to load project from file", ToastLevel.ERROR)
+            self.status_bar.log(f"Failed to load project: {str(LoadProjectError)}", LogLevel.ERROR)
     
     def load_project(self, project_data: dict) -> None:
         """Load project data into the UI"""
@@ -396,8 +402,10 @@ class MainWindow(QWidget):
             if "cancelled" in str(SaveProjectError).lower():
                 return False
             FailedAnimation("Save failed", parent=None).start(target_widget=self)
-            QMessageBox.critical(self, "Save Error", f"Failed to save project: {str(SaveProjectError)}")
-            self.status_bar.log(f"Save failed: {str(SaveProjectError)}", "ERROR")
+            self.show_toast(
+                "Save Project Error", "Failed to save project", ToastLevel.ERROR
+            )
+            self.status_bar.log(f"Save failed: {str(SaveProjectError)}", LogLevel.ERROR)
             return False
         finally:
             QApplication.restoreOverrideCursor()
@@ -419,7 +427,9 @@ class MainWindow(QWidget):
         
     def open_python_console(self) -> None:
         if self.data_handler.df is None:
-            QMessageBox.warning(self, "Warning", "Please load data before opening the console.")
+            self.show_toast(
+                "No Data", "Please load data before opening the console window", ToastLevel.WARNING
+            )
             return
 
         if hasattr(self, "console_dialog") and self.console_dialog is not None and self.console_dialog.isVisible():
@@ -606,8 +616,8 @@ class MainWindow(QWidget):
             self.progress_dialog.accept()
             self.progress_dialog.deleteLater()
             self.progress_dialog = None
+
         self.show_toast("Error", "Failed to import file", ToastLevel.ERROR)
-        QMessageBox.critical(self, "Error", f"Failed to import file: {str(error)}")
         self.status_bar.log(f"Import failed: {str(error)}", "ERROR")
         self._temp_import_filepath = None
 
@@ -627,11 +637,11 @@ class MainWindow(QWidget):
                         sheet_id, sheet_name = inputs[0], inputs[1]
                         delimiter, decimal, thousands = ",", ".", None
                     else:
-                        QMessageBox.warning(self, "Error", "Invalid input from dialog")
+                        self.show_toast("Google Sheets Import Warning", "Invalid inputs", ToastLevel.WARNING)
                         return
                 
                 if not sheet_id and not sheet_name:
-                    QMessageBox.warning(self, "Input Error", "Sheet ID is required")
+                    self.show_toast("Input Warning", "Sheet ID is required", ToastLevel.WARNING)
                     return
                 
                 self.status_bar.show_progress(True)
@@ -649,8 +659,7 @@ class MainWindow(QWidget):
                 self.threadpool.start(worker)
         
         except Exception as OpenGoogleSheetDialogError:
-            QMessageBox.critical(self, "Error", f"Failed to open Google Sheets Import Dialog: {str(OpenGoogleSheetDialogError)}")
-            traceback.print_exc()
+            self.show_toast("Error", "Failed to open Google Sheets Import Dialog", ToastLevel.ERROR)
     
     @pyqtSlot(object, str)
     def _on_google_sheet_import_finished(self, loaded_dataframe, sheet_name) -> None:
@@ -678,8 +687,7 @@ class MainWindow(QWidget):
             }
         )
         self.show_toast("Google Sheet Import", "Data imported from Google Sheets", ToastLevel.SUCCESS)
-        self.google_sheets_import_animation = GoogleSheetsImportAnimation(parent=None, message="Google Sheet Import")
-        self.google_sheets_import_animation.start(target_widget=self)
+        GoogleSheetsImportAnimation(parent=None, message="Google Sheet Import").start(target_widget=self)
     
     def import_from_database(self) -> None:
         """Import data from a database connection"""
@@ -688,7 +696,8 @@ class MainWindow(QWidget):
             if dialog.exec():
                 db_type, connection_string, query = dialog.get_details()
                 if not connection_string or not query:
-                    QMessageBox.warning(self, "Input Error", "Invalid connection details or query")
+                    self.show_toast("Database Import Error", "Invalid connection details or query", ToastLevel.WARNING)
+                    self.status_bar.log("Failed to import from database", LogLevel.WARNING)
                     return
                 
                 self.status_bar.show_progress(True)
@@ -718,24 +727,25 @@ class MainWindow(QWidget):
                 self.progress_dialog = None
 
                 self.status_bar.log_action(f"Imported from {db_type} database", level="SUCCESS", details={"db_type": db_type, "rows": self.data_handler.df.shape[0]})
-                self.import_database_animation = DatabaseImportAnimation(parent=None, message="Database Import", db_type=db_type)
-                self.import_database_animation.start(target_widget=self)
+                self.show_toast(
+                    "Import from Database", f"Imported data from {db_type} database", ToastLevel.SUCCESS
+                )
+                DatabaseImportAnimation(parent=None, message="Database Import", db_type=db_type).start(target_widget=self)
         
         except Exception as ImportDatabaseError:
             if self.progress_dialog:
                 self.progress_dialog.accept()
                 self.progress_dialog = None
-            QMessageBox.critical(self, "Import Error", f"Failed to import from database:\n\n{str(ImportDatabaseError)}")
-            traceback.print_exc()
+
+            self.show_toast(
+                "Database Import Error", "Failed to import data from database", ToastLevel.ERROR
+            )
+            self.status_bar.log(f"Failed to import data from database: {str(ImportDatabaseError)}", LogLevel.ERROR)
     
     def export_code(self) -> None:
         """Export data manipulation and plotting code"""
         if self.data_handler.df is None:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "No data loaded. Please load data first"
-            )
+            DataTabController.no_data_loaded_toast()
             return
         
         source_info = self.data_handler.get_data_source()
@@ -794,12 +804,16 @@ class MainWindow(QWidget):
                     script_file.write(script)
                 
                 self.status_bar.log_action(f"Exported script: {Path(filepath).name}", level="SUCCESS", details={"type": export_type})
-                QMessageBox.information(self, "Success", f"Script exported to {filepath}")
-                self.python_export_animation = ScriptLogExportAnimation(parent=self, message="Script Exported", operation_type="python")
-                self.python_export_animation.start(target_widget=self)
+
+                self.show_toast(
+                    "Export success", f"Exported script to {filepath}", ToastLevel.SUCCESS
+                )
+                ScriptLogExportAnimation(parent=self, message="Script Exported", operation_type="python").start(target_widget=self)
             except Exception as ExportPythonScriptError:
-                QMessageBox.critical(self, "Error", f"Failed to export code: {str(ExportPythonScriptError)}")
-                traceback.print_exc()
+                self.show_toast(
+                    "Export Error", "Failed to export code to file", ToastLevel.ERROR
+                )
+                self.status_bar.log(f"Failed to export code: {str(ExportPythonScriptError)}")
     
     def export_logs(self) -> None:
         """Export session log"""
@@ -812,13 +826,18 @@ class MainWindow(QWidget):
                     "Include detailed timestamps?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
                 self.logger.export_logs(filepath, detailed)
-                self.status_bar.log(f"Log exported to {filepath}")
-                self.export_log_animation = ScriptLogExportAnimation(parent=self, message="Logs Exported", operation_type="log")
-                self.export_log_animation.start(target_widget=self)
+
+                self.show_toast(
+                    "Log Export Successful", f"Log exported to {filepath}", ToastLevel.SUCCESS
+                )
+                self.status_bar.log(f"Log exported to {filepath}", LogLevel.SUCCESS)
+                ScriptLogExportAnimation(parent=self, message="Logs Exported", operation_type="log").start(target_widget=self)
 
             except Exception as ExportLogError:
-                QMessageBox.critical(self, "Error", f"Failed to export log: {str(ExportLogError)}")
-                traceback.print_exc()
+                self.show_toast(
+                    "Error", "Failed to export log to file", ToastLevel.ERROR
+                )
+                self.status_bar.log(f"Failed to export log: {str(ExportLogError)}", LogLevel.ERROR)
     
     def export_data_dialog(self) -> None:
         """Export the dataframe to a new file"""
@@ -826,7 +845,7 @@ class MainWindow(QWidget):
     
     def export_google_sheets(self) -> None:
         if self.data_handler.df is None:
-            QMessageBox.warning(self, "Warning", "No data loaded. Please load data before attempting an export.")
+            self.show_toast("No Data", "Please load data before attempting an export to Google Sheets", ToastLevel.WARNING)
             return
         
         dialog = GoogleSheetsExportDialog(self)
@@ -851,15 +870,20 @@ class MainWindow(QWidget):
                 if success:
                     self.status_bar.set_progress(100)
                     self.progress_dialog.update_progress(100, "Upload Complete")
-                    QMessageBox.information(self, "Export Successful", f"Data was successfully pushed to worksheet: '{sheet_name}'.")
+
+                    self.show_toast(
+                        "Export Successful", f"Data was pushed to worksheet '{sheet_name}'", ToastLevel.SUCCESS
+                    )
                     self.status_bar.log_action("Exported data to Google Sheets", level="SUCCESS", details={"sheet_id": sheet_id})
             
             except Exception as ExportSheetsError:
                 if self.progress_dialog:
                     self.progress_dialog.accept()
                     self.progress_dialog = None
-                QMessageBox.critical(self, "Export Error", f"An error occurred during export:\n\n{str(ExportSheetsError)}")
-                traceback.print_exc()
+                self.show_toast(
+                    "Export Error", "An error occurted while exporting data to Google Sheets", ToastLevel.ERROR
+                )
+                self.status_bar.log(f"Failed to export to Google Sheets: {str(ExportSheetsError)}", LogLevel.ERROR)
             finally:
                 self.status_bar.show_progress(False)
                 if self.progress_dialog:
