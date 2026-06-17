@@ -1,6 +1,7 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QLineEdit, QComboBox, QPushButton
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
+from core.global_signals import ToastLevel, global_signals
 from ui.widgets.CodeEditor import CodeEditor
 
 class AddCustomFunctionDialog(QDialog):
@@ -8,6 +9,7 @@ class AddCustomFunctionDialog(QDialog):
     A dialog for defining and saving custom expression snippets
     These expressions snippets can then be used in the ComputeColumnDialog
     """
+
     def __init__(self, existing_categories: list[str] | None = None, parent=None) -> None:
         super().__init__(parent)
         self.existing_categories = existing_categories or []
@@ -24,13 +26,14 @@ class AddCustomFunctionDialog(QDialog):
         self.name_input.setPlaceholderText("e.g., Percentage Difference")
         self.name_input.setToolTip("A recognizable name for your custom function")
         layout.addWidget(self.name_input)
-        
+
         # Category
         layout.addWidget(QLabel("Category:"))
         self.category_input = QComboBox()
         self.category_input.setEditable(True)
         self.category_input.setPlaceholderText("e.g., Custom Math")
-        self.category_input.setToolTip("Group your custom functions. You can type a new group or select an existing one")
+        self.category_input.setToolTip(
+            "Group your custom functions. You can type a new group or select an existing one")
         self.category_input.addItems(self.existing_categories)
         layout.addWidget(self.category_input)
 
@@ -38,16 +41,16 @@ class AddCustomFunctionDialog(QDialog):
         description_layout = QHBoxLayout()
         description_layout.setContentsMargins(0, 0, 0, 0)
         description_layout.setSpacing(6)
-        
+
         description_label = QLabel("Description")
         optional_badge = QLabel("Optional")
         optional_badge.setProperty("styleClass", "optional_badge")
-        
+
         description_layout.addWidget(description_label)
         description_layout.addWidget(optional_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
         description_layout.addStretch()
         layout.addLayout(description_layout)
-        
+
         self.desc_input = QLineEdit()
         self.desc_input.setPlaceholderText("e.g., Calculates (A - B) / A")
         self.desc_input.setToolTip("Will be displayed when hovering over the function in the function tree")
@@ -80,11 +83,11 @@ class AddCustomFunctionDialog(QDialog):
     def validate_and_accept(self) -> None:
         """Validates the inputs before accepting the dialog"""
         if not self.name_input.text().strip():
-            QMessageBox.warning(self, "Validation Error", "Please provide a valid Function Name")
+            global_signals.request_toast("Validation Error", "Please provide a valid Function name", ToastLevel.WARNING)
             self.name_input.setFocus()
             return
         if not self.snippet_input.toPlainText().strip():
-            QMessageBox.warning(self, "Validation Error", "The code snippet cannot be empty")
+            global_signals.request_toast("Validation Error", "The code snippet cannot be empty", ToastLevel.WARNING)
             self.snippet_input.setFocus()
             return
         self.accept()

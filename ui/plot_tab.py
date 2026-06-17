@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import pandas as pd
 from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
@@ -15,7 +15,7 @@ from controller.plot_controllers import (AnnotationManager, AppearanceSettingsMa
                                          ScriptManager, SeriesCustomizationManager, SubplotManager, ThemeManager)
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
-from core.global_signals import global_signals
+from core.global_signals import ToastLevel, global_signals
 from core.plot_config_manager import PlotConfigManager
 from core.plot_engine import PlotEngine
 from ui.animations import PlotClearedAnimation
@@ -23,7 +23,6 @@ from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI
 from ui.status_bar import LogLevel, StatusBar
 from ui.widgets.SubplotOverlay import SubplotOverlay
-from ui.widgets.ToastNotification import ToastLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab_ui import PlotSettingsPanel
@@ -454,7 +453,10 @@ class PlotTab(PlotTabUI):
     def activate_subset(self, subset_name: str):
         """Activates the 'Use Subset' checkbox and selects the selected subset"""
         if not self.subset_manager:
-            self.status_bar.log("Cannot activate subset: SubsetManager not available", "ERROR")
+            global_signals.request_toast(
+                "Cannot Activate Subset", "Subset Manager is not loaded", ToastLevel.ERROR
+            )
+            self.status_bar.log("Cannot activate subset: SubsetManager not available", LogLevel.ERROR)
             return
 
         self.refresh_subset_list()
@@ -467,16 +469,24 @@ class PlotTab(PlotTabUI):
                 break
 
         if target_index == -1:
-            self.status_bar.log(f"Cannot activate subset: Subset '{subset_name}' not found", "WARNING")
+            global_signals.request_toast(
+                "Cannot activate subset", f"Subset '{subset_name}' not found", ToastLevel.WARNING
+            )
+            self.status_bar.log(f"Cannot activate subset: Subset '{subset_name}' not found", LogLevel.WARNING)
             return
 
         self.view.use_subset_check.setChecked(True)
         self.view.subset_combo.setCurrentIndex(target_index)
 
+        global_signals.request_toast(
+            "Activated Subset",
+            f"Activated the '{subset_name}' for plotting",
+            ToastLevel.INFO
+        )
         self.status_bar.log_action(
-            f"Activated subset: '{subset_name}' for ploting",
+            f"Activated subset: '{subset_name}' for plotting",
             details={"subset_name": subset_name, "source": "DataTab"},
-            level="INFO"
+            level=LogLevel.INFO
         )
 
     def set_subset_manager(self, subset_manager) -> None:
@@ -487,11 +497,13 @@ class PlotTab(PlotTabUI):
     def refresh_subset_list(self):
         """Refresh the list of available subsets"""
         if not self.subset_manager:
-            self.status_bar.log("Warning: Subset manager not available", "WARNING")
+            global_signals.request_toast("Warning", "Subset manager not available", ToastLevel.WARNING)
+            self.status_bar.log("Warning: Subset manager not available", LogLevel.WARNING)
             return
 
         if not hasattr(self, 'subset_combo'):
-            self.status_bar.log("Warning: Subset combobox not initialized", "WARNING")
+            global_signals.request_toast("Warning", "Subset UI is not loaded", ToastLevel.WARNING)
+            self.status_bar.log("Warning: Subset combobox not initialized", LogLevel.WARNING)
             return
 
         try:
@@ -507,9 +519,12 @@ class PlotTab(PlotTabUI):
 
             subset_count = len(self.subset_manager.list_subsets())
             if subset_count > 0:
-                self.status_bar.log(f"Refreshed subset list: {subset_count} subsets available", "INFO")
+                global_signals.request_toast("Info", f"Refreshed subset list: {subset_count} subsets available",
+                                             ToastLevel.INFO)
+                self.status_bar.log(f"Refreshed subset list: {subset_count} subsets available", LogLevel.INFO)
         except Exception as RefreshSubsetListError:
-            print(f"Warning: Could not refresh subset list: {RefreshSubsetListError}")
+            self.status_bar.log(f"Error: Could not refresh subset list", LogLevel.ERROR)
+            global_signals.request_toast("Subset Error", "Failed to refresh the list of subsets", ToastLevel.ERROR)
 
     def get_active_dataframe(self):
         """Get the active dataframe (full dataset or selected subset)"""
@@ -523,7 +538,7 @@ class PlotTab(PlotTabUI):
 
         # Check if subset manager is available
         if not self.subset_manager:
-            self.status_bar.log("Subset manager not available, using full dataset", "WARNING")
+            self.status_bar.log("Subset manager not available, using full dataset", LogLevel.WARNING)
             return self.data_handler.df
 
         # Get selected subset name
@@ -534,11 +549,12 @@ class PlotTab(PlotTabUI):
         # Try to apply subset
         try:
             subset_df = self.subset_manager.apply_subset(self.data_handler.df, subset_name)
-            self.status_bar.log(f"Using subset: {subset_name} ({len(subset_df)} rows)", "INFO")
+            self.status_bar.log(f"Using subset: {subset_name} ({len(subset_df)} rows)", LogLevel.INFO)
             return subset_df
         except Exception as ApplySubsetToActiveDataFrameError:
             self.status_bar.log(f"Failed to apply subset, using full dataset: {str(ApplySubsetToActiveDataFrameError)}",
-                                "WARNING")
+                                LogLevel.WARNING)
+            global_signals.request_toast("Warning", "Using full dataset instead of subset", ToastLevel.WARNING)
             return self.data_handler.df
 
     def on_grid_toggle(self) -> None:
@@ -624,7 +640,8 @@ class PlotTab(PlotTabUI):
         else:
             self._is_data_dirty = True
             self.selection_overlay.show_update_required(True)
-            self.status_bar.log("Data change detected. Click 'Generate Plot' to update.", "WARNING")
+            self.status_bar.log("Data change detected. Click 'Generate Plot' to update.", LogLevel.INFO)
+            global_signals.request_toast("Data Changed", "Click 'Generate Plot' to update", ToastLevel.INFO)
 
     def on_style_changed(self) -> None:
         if self._is_clearing:
@@ -798,8 +815,10 @@ class PlotTab(PlotTabUI):
         """Handle errors from the background data preparation worker."""
         if hasattr(self, "_prep_progress_dialog") and self._prep_progress_dialog:
             self._prep_progress_dialog.accept()
-        self.status_bar.log(f"Data preparation failed: {str(error)}", "ERROR")
-        QMessageBox.critical(self, "Data Preparation Error", f"An error occurred during data processing:\n{str(error)}")
+        self.status_bar.log(f"Data preparation failed: {str(error)}", LogLevel.ERROR)
+        global_signals.request_toast(
+            "Data Preparation Error", "An error occurred during data processing", ToastLevel.ERROR
+        )
 
     def _on_prep_finished(self, processed_df: pd.DataFrame, plot_type: str, x_col: str, y_cols: list[str], hue: str,
                           subset_name: str, current_subplot_index: int, quick_filter: str) -> None:
@@ -818,21 +837,26 @@ class PlotTab(PlotTabUI):
         try:
             filtered_df = df.query(query)
             if filtered_df.empty:
-                QMessageBox.warning(self, "Empty Result", f"The filter {query} returned an empty dataset")
-                self.status_bar.log(f"Filter {query} returned 0 rows", "WARNING")
+                global_signals.request_toast(
+                    "Empty Result", f"The filer {query} returned an empty dataset", ToastLevel.WARNING
+                )
+                self.status_bar.log(f"Filter {query} returned 0 rows", LogLevel.WARNING)
                 return None
             self.status_bar.log(f"Quick Filter applied: {query} ({len(df)} -> {len(filtered_df)} rows)", "INFO")
             return filtered_df
         except Exception as QuickFilterError:
-            error_message = f"Invaid Quick Filter expression:\n{str(QuickFilterError)}"
-            self.status_bar.log(f"Quick Filter error: {str(QuickFilterError)}", "ERROR")
-            QMessageBox.critical(self, "Filter Error", error_message)
+            self.status_bar.log(f"Quick Filter error: {str(QuickFilterError)}", LogLevel.ERROR)
+            global_signals.request_toast(
+                "Filter Error", "An error occurred applying quick filter", ToastLevel.ERROR
+            )
 
     def _validate_data_loaded(self) -> bool:
         """Check if data is loaded"""
         if self.data_handler.df is None:
-            self.status_bar.log("No data loaded", "WARNING")
-            QMessageBox.warning(self, "Warning", "No data loaded")
+            self.status_bar.log("No data loaded", LogLevel.WARNING)
+            global_signals.request_toast(
+                "No Data Loaded", "Please load data first", ToastLevel.WARNING
+            )
             return False
         return True
 
@@ -877,10 +901,11 @@ class PlotTab(PlotTabUI):
                         self.data_handler.df, subset_name
                     )
                 else:
-                    self.status_bar.log("Subset Manager not initialized, using full dataset", "WARNING")
+                    self.status_bar.log("Subset Manager not initialized, using full dataset", LogLevel.WARNING)
                     return self.data_handler.df
             except Exception as UseSubsetError:
-                self.status_bar.log(f"Could not restore subset '{subset_name}'. Error: {str(UseSubsetError)}", "ERROR")
+                self.status_bar.log(f"Could not restore subset '{subset_name}'. Error: {str(UseSubsetError)}",
+                                    LogLevel.ERROR)
                 return self.data_handler.df
         else:
             return self.data_handler.df
@@ -888,7 +913,9 @@ class PlotTab(PlotTabUI):
     def _validate_active_dataframe(self, active_df) -> bool:
         """Validates the active dataframe (check if has data or nah)"""
         if active_df is None or len(active_df) == 0:
-            QMessageBox.warning(self, "Warning", "Selected data is empty")
+            global_signals.request_toast(
+                "Data Is Empty", "Selected data is empty", ToastLevel.WARNING
+            )
             return False
         return True
 
@@ -968,7 +995,7 @@ class PlotTab(PlotTabUI):
             if "ParseSyntaxException" in error_msg or "math text" in error_msg.lower():
                 self.status_bar.log("Incomplete LaTeX math expression detected. Please finish typing", LogLevel.WARNING)
             else:
-                global_signals.toast_requested.emit("Error", f"Failed to generate plot", ToastLevel.ERROR, 4000)
+                global_signals.request_toast("Error", f"Failed to generate plot", ToastLevel.ERROR)
                 self.status_bar.log(f"Plot generation failed: {error_msg}", LogLevel.ERROR)
                 traceback.print_exc()
         finally:
@@ -1008,34 +1035,45 @@ class PlotTab(PlotTabUI):
         plots_triangulation_no_z = ["Triplot"]
 
         if not x_col and plot_type not in plots_no_x:
-            QMessageBox.warning(self, "Warninig", f"Please select an X column for {plot_type}")
+            global_signals.request_toast(
+                "Warning", f"Please select an X column for {plot_type}", ToastLevel.INFO
+            )
             return False
 
         if not y_cols and plot_type not in plots_no_y:
-            QMessageBox.warning(self, "Warning", f"Please select at least one Y column for {plot_type}.")
+            global_signals.request_toast(
+                "Warning", f"Please select at least one Y column for {plot_type}", ToastLevel.INFO
+            )
             return False
 
         if plot_type in plots_gridded and len(y_cols) < 2:
-            QMessageBox.warning(self, "Warning", f"{plot_type} requires 2 Y columns: (Y-position, Z-value)")
+            global_signals.request_toast(
+                "Warning", f"{plot_type} requires 2 Y columns (Y-Position, Z-value)", ToastLevel.INFO
+            )
             return False
 
         if plot_type in plots_vector and len(y_cols) < 3:
-            QMessageBox.warning(self, "Warning",
-                                f"{plot_type} requires 3 Y columns: (Y-position, U-component, V-component)")
+            global_signals.request_toast(
+                "Warning", f"{plot_type} requires 3 Y columns (Y-Position, U-component, Y-component)", ToastLevel.INFO
+            )
             return False
 
         if plot_type in plots_triangulation_z and len(y_cols) < 2:
-            QMessageBox.warning(self, "Warning", f"{plot_type} requires 2 Y columns: (Y-position, Z-value)")
+            global_signals.request_toast(
+                "Warning", f"{plot_type} requires 2 Y columns (Y-Position, Z-value)", ToastLevel.INFO
+            )
             return False
 
         if plot_type in plots_triangulation_no_z and len(y_cols) < 1:
-            QMessageBox.warning(self, "Warning", f"{plot_type} requires at least one Y columns: (Y-position)")
+            global_signals.request_toast(
+                "Warning", f"{plot_type} requires one Y columns (Y-Position)", ToastLevel.INFO
+            )
             return False
 
         return True
 
     def _execute_plot_strategy(self, plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs,
-                               general_kwargs):
+                               general_kwargs) -> bool:
         """Executes the correct plotting strategy"""
 
         original_df = self.data_handler.df
@@ -1054,9 +1092,11 @@ class PlotTab(PlotTabUI):
             )
 
             if error_message:
-                QMessageBox.warning(self, "Warning", error_message)
+                global_signals.request_toast(
+                    "Error", error_message, ToastLevel.ERROR
+                )
+                self.status_bar.log(f"Error in executing plot sequence: {str(error_message)}", LogLevel.ERROR)
                 return False
-
             return True
         finally:
             self.data_handler.df = original_df

@@ -69,6 +69,7 @@ class MainWindow(QWidget):
         QTimer.singleShot(0, self._check_recovery)
         self.toast_manager = ToastManager(self)
         global_signals.toast_requested.connect(self.show_toast)
+        global_signals.log_requested.connect(self.status_bar.log)
 
     def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
                    duration_ms: int = 4000) -> None:
