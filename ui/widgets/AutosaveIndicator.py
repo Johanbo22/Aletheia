@@ -4,7 +4,24 @@ from PyQt6.QtCore import QEasingCurve, QParallelAnimationGroup, QPoint, QTimer, 
 from icons import IconBuilder, IconType
 
 class AutosaveIndicator(QWidget):
+    """
+    A non-interactive overlay widget that indicates an autosave operation
+
+    This widget provides a notification by displaying an icon and text.
+    It uses Qt's animation framework to transition into view, pulse while active
+    and fade out. It is transparent to mouse events to not block user interactions in UI
+    """
+
     def __init__(self, parent: QWidget) -> None:
+        """
+        Initialize the autosave widget and animation sequence
+
+        Configures the layout containing the icon and status text
+        It also pre-allocates an configures the QPropertyAnimation and
+        QParallelAnimation instances to prevent overhead during save events
+
+        :param parent: The parent widget over which this indicator is drawn
+        """
         super().__init__(parent)
         self.setObjectName("AutosaveIndicatorWidget")
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -69,7 +86,12 @@ class AutosaveIndicator(QWidget):
         self.hide_timer.timeout.connect(self.fade_out)
 
     def show_indicator(self) -> None:
-        """Defines the position and exposes the indicator"""
+        """
+        Position and expose the indicator with an entrance animation
+
+        Calculates the target position based on parent widget's current
+        dimensions.
+        """
         parent_rect = self.parent().rect()
         self.adjustSize()
 
@@ -96,7 +118,13 @@ class AutosaveIndicator(QWidget):
         self.hide_timer.start(2500)
     
     def fade_out(self) -> None:
-        """Animates the indicator fading out and sliding down slightly."""
+        """
+        Trigger the exit animation for the indicator
+
+        Interrupts the show and pulse animations to prevent property updates.
+        Calculates a slide down based on current position and starts the fade-out
+        parallel animation group.
+        """
         self.show_group.stop()
         self.pulse_anim.stop()
 
