@@ -1,9 +1,10 @@
-import traceback
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator, FuncFormatter, MaxNLocator, NullLocator
+from matplotlib.ticker import MaxNLocator
+
+from controller.plot_controllers.tick_formatting_manager import TickFormattingManager
+from core.global_signals import ToastLevel, global_signals
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -14,6 +15,7 @@ class PlotFormattingManager:
 
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
+        self.tick_manager = TickFormattingManager(plot_tab)
 
     def build_general_kwargs(self, plot_type: str, x_col: str, y_cols: list[str], hue: Optional[str]) -> Dict[str, Any]:
         """Build the general plotting kwargs."""
@@ -179,9 +181,12 @@ class PlotFormattingManager:
             except Exception as error:
                 self.plot_tab.status_bar.log(f"Z-Scale update ignore: {error}", "WARNING")
 
-    def apply_plot_formatting(self, progress_dialog: Any, x_col: str, y_cols: list[str], axes_flipped: bool,
-                              font_family: str, general_kwargs: dict, active_df: 'pd.DataFrame') -> None:
+    def apply_plot_formatting(self, progress_dialog: Any, x_col: str, y_cols: list[str],
+                              general_kwargs: dict, active_df: 'pd.DataFrame') -> None:
         """Master method to apply all formatting steps."""
+        axes_flipped = self.plot_tab.view.flip_axes_check.isChecked()
+        font_family = self.plot_tab.view.font_family_combo.currentText()
+
         try:
             allowed_locators = ["AutoLocator", "MaxNLocator", "LinearLocator", "MultipleLocator"]
             x_locator_name = type(self.plot_tab.plot_engine.current_ax.xaxis.get_major_locator()).__name__
@@ -221,7 +226,7 @@ class PlotFormattingManager:
             self.plot_tab._update_progress(progress_dialog, 85, "Adding annotations")
 
         self.plot_tab._apply_annotations(active_df, x_col, y_cols)
-        self.apply_tick_customization()
+        self.tick_manager.apply_tick_customization()
         self.apply_textbox()
 
         if progress_dialog:
@@ -295,127 +300,139 @@ class PlotFormattingManager:
     def apply_plot_customizations(self) -> None:
         """Apply customizations to lines, markers, bars etc."""
         alpha = self.plot_tab.view.alpha_slider.value() / 100.0
-        linewidth = self.plot_tab.view.linewidth_spin.value()
-        linestyle = self.plot_tab.view.linestyle_combo.currentText()
-        marker = self.plot_tab.view.marker_combo.currentText()
-        marker_size = self.plot_tab.view.marker_size_spin.value()
-        line_color = self.plot_tab.line_color
-        marker_color = self.plot_tab.marker_color
-        marker_edge_color = self.plot_tab.marker_edge_color
-        marker_edge_width = self.plot_tab.view.marker_edge_width_spin.value()
-        bar_color = self.plot_tab.bar_color
-        bar_edge_color = self.plot_tab.bar_edge_color
-        bar_edge_width = self.plot_tab.view.bar_edge_width_spin.value()
 
-        linestyle_map = {'Solid': '-', 'Dashed': '--', 'Dash-dot': '-.', 'Dotted': ':'}
-        linestyle_val = linestyle_map.get(linestyle, linestyle)
+        self._apply_line_customizations(alpha)
+        self._apply_collection_customizations(alpha)
+        self._apply_bar_customizations(alpha)
+
+    def _apply_line_customizations(self, alpha: float) -> None:
+        """Applies style formatting to all line objects in the current axes"""
+        if self.plot_tab.view.multiline_custom_check.isChecked():
+            self._apply_individual_lines(alpha)
+        else:
+            self._apply_global_lines(alpha)
+
+    def _apply_global_lines(self, alpha: float) -> None:
+        """Applies default global line style to all non-special lines"""
+        for line in self.plot_tab.plot_engine.current_ax.get_lines():
+            if line.get_gid() in ["regression_line", "confidence_interval", "error_bar"]:
+                continue
+            self._apply_default_line_style(line, alpha)
+
+    def _apply_individual_lines(self, alpha: float) -> None:
+        """Applies custom line styles per line when multi-line is enabled"""
+        lines = [line for line in self.plot_tab.plot_engine.current_ax.get_lines()
+                 if line.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
+
+        for i, line in enumerate(lines):
+            line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i + 1}"
+            if line_name in self.plot_tab.line_customizations:
+                custom = self.plot_tab.line_customizations[line_name]
+                if "linestyle" in custom and custom["linestyle"] != "None":
+                    line.set_linestyle(custom["linestyle"])
+                if "linewidth" in custom:
+                    line.set_linewidth(custom["linewidth"])
+                if "color" in custom and custom["color"]:
+                    line.set_color(custom["color"])
+                if "marker" in custom and custom["marker"] != "None":
+                    line.set_marker(custom["marker"])
+                    if "markersize" in custom:
+                        line.set_markersize(custom["markersize"])
+                    if "markerfacecolor" in custom and custom["markerfacecolor"]:
+                        line.set_markerfacecolor(custom["markerfacecolor"])
+                    if "markeredgecolor" in custom and custom["markeredgecolor"]:
+                        line.set_markeredgecolor(custom["markeredgecolor"])
+                    if "markeredgewidth" in custom:
+                        line.set_markeredgewidth(custom["markeredgewidth"])
+                if "alpha" in custom:
+                    line.set_alpha(custom["alpha"])
+            else:
+                self._apply_default_line_style(line, alpha)
+
+    def _apply_default_line_style(self, line: Any, alpha: float) -> None:
+        """Helper to apply the globally set line and marker styling to a given line"""
+        linestyle_map = {"Solid": "-", "Dashed": "--", "Dash-dot": "-.", "Dotted": ":"}
+        linestyle_val = linestyle_map.get(self.plot_tab.view.linestyle_combo.currentText(), "-")
+        linewidth = self.plot_tab.view.linewidth_spin.value()
+        marker = self.plot_tab.view.marker_combo.currentText()
         marker_val = "None" if marker == "None" else marker
 
-        if self.plot_tab.view.multiline_custom_check.isChecked():
-            lines = [l for l in self.plot_tab.plot_engine.current_ax.get_lines() if
-                     l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-            for i, line in enumerate(lines):
-                line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i + 1}"
-                if line_name in self.plot_tab.line_customizations:
-                    custom = self.plot_tab.line_customizations[line_name]
-                    if "linestyle" in custom and custom["linestyle"] != "None":
-                        line.set_linestyle(custom["linestyle"])
-                    if "linewidth" in custom:
-                        line.set_linewidth(custom["linewidth"])
-                    if "color" in custom and custom["color"]:
-                        line.set_color(custom["color"])
-                    if "marker" in custom and custom["marker"] != "None":
-                        line.set_marker(custom["marker"])
-                        if "markersize" in custom:
-                            line.set_markersize(custom["markersize"])
-                        if "markerfacecolor" in custom and custom["markerfacecolor"]:
-                            line.set_markerfacecolor(custom["markerfacecolor"])
-                        if "markeredgecolor" in custom and custom["markeredgecolor"]:
-                            line.set_markeredgecolor(custom["markeredgecolor"])
-                        if "markeredgewidth" in custom:
-                            line.set_markeredgewidth(custom["markeredgewidth"])
-                    if "alpha" in custom:
-                        line.set_alpha(custom["alpha"])
-                else:
-                    if linestyle_val != "None":
-                        line.set_linestyle(linestyle_val)
-                    line.set_linewidth(linewidth)
-                    if line_color:
-                        line.set_color(line_color)
-                    if marker_val != "None":
-                        line.set_marker(marker_val)
-                        line.set_markersize(marker_size)
-                        if marker_color:
-                            line.set_markerfacecolor(marker_color)
-                        if marker_edge_color:
-                            line.set_markeredgecolor(marker_edge_color)
-                        line.set_markeredgewidth(marker_edge_width)
-                    line.set_alpha(alpha)
-        else:
-            for line in self.plot_tab.plot_engine.current_ax.get_lines():
-                if line.get_gid() in ["regression_line", "confidence_interval", "error_bar"]:
-                    continue
-                if linestyle_val != "None":
-                    line.set_linestyle(linestyle_val)
-                    line.set_linewidth(linewidth)
-                if line_color:
-                    line.set_color(line_color)
-                if marker_val != "None":
-                    line.set_marker(marker_val)
-                    line.set_markersize(marker_size)
-                    if marker_color:
-                        line.set_markerfacecolor(marker_color)
-                    if marker_edge_color:
-                        line.set_markeredgecolor(marker_edge_color)
-                        line.set_markeredgewidth(marker_edge_width)
-                line.set_alpha(alpha)
+        if linestyle_val != "None":
+            line.set_linestyle(linestyle_val)
+            line.set_linewidth(linewidth)
+        if self.plot_tab.line_color:
+            line.set_color(self.plot_tab.line_color)
 
+        if marker_val != "None":
+            line.set_marker(marker_val)
+            line.set_markersize(self.plot_tab.view.marker_size_spin.value())
+            if self.plot_tab.marker_color:
+                line.set_markerfacecolor(self.plot_tab.marker_color)
+            if self.plot_tab.marker_edge_color:
+                line.set_markeredgecolor(self.plot_tab.marker_edge_color)
+                line.set_markeredgewidth(self.plot_tab.view.marker_edge_width_spin.value())
+        line.set_alpha(alpha)
+
+    def _apply_collection_customizations(self, alpha: float) -> None:
+        """Applies styling to collection objects like scatter plots"""
         for collection in self.plot_tab.plot_engine.current_ax.collections:
             if collection.get_gid() in ["confidence_interval", "error_bar"]:
                 continue
             collection.set_alpha(alpha)
-            if marker_color:
-                collection.set_facecolor(marker_color)
-            if marker_edge_color:
-                collection.set_edgecolor(marker_edge_color)
+            if self.plot_tab.marker_color:
+                collection.set_facecolor(self.plot_tab.marker_color)
+            if self.plot_tab.marker_edge_color:
+                collection.set_edgecolor(self.plot_tab.marker_edge_color)
 
+    def _apply_bar_customizations(self, alpha: float) -> None:
+        """Applies styling to bar plots based on user settings"""
         if self.plot_tab.view.multibar_custom_check.isChecked():
-            if self.plot_tab.plot_engine.current_ax and self.plot_tab.plot_engine.current_ax.containers:
-                for i, container in enumerate(self.plot_tab.plot_engine.current_ax.containers):
-                    if not hasattr(container, "patches") or not container.patches:
-                        continue
-
-                    label = container.get_label()
-                    if not label or label.startswith("_"):
-                        handles, labels = self.plot_tab.plot_engine.current_ax.get_legend_handles_labels()
-                        label = labels[i] if i < len(labels) else f"Bar Series {i + 1}"
-
-                    if label in self.plot_tab.bar_customizations:
-                        custom = self.plot_tab.bar_customizations[label]
-                        for patch in container.patches:
-                            if "facecolor" in custom and custom["facecolor"]:
-                                patch.set_facecolor(custom["facecolor"])
-                            if "edgecolor" in custom and custom["edgecolor"]:
-                                patch.set_edgecolor(custom["edgecolor"])
-                            if "linewidth" in custom:
-                                patch.set_linewidth(custom["linewidth"])
-                            patch.set_alpha(custom.get("alpha", alpha))
-                    else:
-                        for patch in container.patches:
-                            patch.set_alpha(alpha)
-                            if bar_color:
-                                patch.set_facecolor(bar_color)
-                            if bar_edge_color:
-                                patch.set_edgecolor(bar_edge_color)
-                            patch.set_linewidth(bar_edge_width)
+            self._apply_individual_bars(alpha)
         else:
-            for patch in self.plot_tab.plot_engine.current_ax.patches:
-                patch.set_alpha(alpha)
-                if bar_color:
-                    patch.set_facecolor(bar_color)
-                if bar_edge_color:
-                    patch.set_edgecolor(bar_edge_color)
-                patch.set_linewidth(bar_edge_width)
+            self._apply_global_bars(alpha)
+
+    def _apply_global_bars(self, alpha: float) -> None:
+        """Applies default bar styles globally to all patches"""
+        for patch in self.plot_tab.plot_engine.current_ax.patches:
+            self._apply_default_bar_style(patch, alpha)
+
+    def _apply_individual_bars(self, alpha: float) -> None:
+        """Applies custom bar styles per bar series."""
+        ax = self.plot_tab.plot_engine.current_ax
+        if not (ax and ax.containers):
+            return
+
+        for i, container in enumerate(ax.containers):
+            if not hasattr(container, "patches") or not container.patches:
+                continue
+
+            label = container.get_label()
+            if not label or label.startswith("_"):
+                handles, labels = ax.get_legend_handles_labels()
+                label = labels[i] if i < len(labels) else f"Bar Series {i + 1}"
+
+            if label in self.plot_tab.bar_customizations:
+                custom = self.plot_tab.bar_customizations[label]
+                for patch in container.patches:
+                    if "facecolor" in custom and custom["facecolor"]:
+                        patch.set_facecolor(custom["facecolor"])
+                    if "edgecolor" in custom and custom["edgecolor"]:
+                        patch.set_edgecolor(custom["edgecolor"])
+                    if "linewidth" in custom:
+                        patch.set_linewidth(custom["linewidth"])
+                    patch.set_alpha(custom.get("alpha", alpha))
+            else:
+                for patch in container.patches:
+                    self._apply_default_bar_style(patch, alpha)
+
+    def _apply_default_bar_style(self, patch: Any, alpha: float) -> None:
+        """Helper to apply the globally set bar styling to a given patch."""
+        patch.set_alpha(alpha)
+        if self.plot_tab.bar_color:
+            patch.set_facecolor(self.plot_tab.bar_color)
+        if self.plot_tab.bar_edge_color:
+            patch.set_edgecolor(self.plot_tab.bar_edge_color)
+        patch.set_linewidth(self.plot_tab.view.bar_edge_width_spin.value())
 
     def apply_legend_and_grid(self, general_kwargs: dict, font_family: str) -> None:
         """Apply legend and gridlines."""
@@ -447,7 +464,7 @@ class PlotFormattingManager:
 
         custom_labels_str = self.plot_tab.view.legend_labels_input.text().strip()
         if custom_labels_str:
-            custom_labels = [l.strip() for l in custom_labels_str.split(",")]
+            custom_labels = [label.strip() for label in custom_labels_str.split(",")]
             for i in range(min(len(labels), len(custom_labels))):
                 if custom_labels[i]:
                     labels[i] = custom_labels[i]
@@ -535,189 +552,20 @@ class PlotFormattingManager:
                 color=self.plot_tab.global_grid_color, alpha=self.plot_tab.view.global_grid_alpha_slider.value() / 100.0
             )
 
-    def apply_tick_customization(self) -> None:
-        """Apply tick label formatting and rotations."""
-        self.plot_tab.plot_engine.current_ax.tick_params(
-            axis="x", labelsize=self.plot_tab.view.xtick_label_size_spin.value(),
-            direction=self.plot_tab.view.x_major_tick_direction_combo.currentText(),
-            width=self.plot_tab.view.x_major_tick_width_spin.value(), which="major"
-        )
-        self.plot_tab.plot_engine.current_ax.tick_params(
-            axis="y", labelsize=self.plot_tab.view.ytick_label_size_spin.value(),
-            direction=self.plot_tab.view.y_major_tick_direction_combo.currentText(),
-            width=self.plot_tab.view.y_major_tick_width_spin.value(), which="major"
-        )
-
-        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
-            self.plot_tab.plot_engine.current_ax.tick_params(
-                axis="z", labelsize=self.plot_tab.view.ztick_label_size_spin.value(),
-                direction=self.plot_tab.view.z_major_tick_direction_combo.currentText(),
-                width=self.plot_tab.view.z_major_tick_width_spin.value(), which="major"
-            )
-
-        if self.plot_tab.view.x_top_axis_check.isChecked():
-            self.plot_tab.plot_engine.current_ax.xaxis.tick_top()
-            self.plot_tab.plot_engine.current_ax.xaxis.set_label_position("top")
-        else:
-            self.plot_tab.plot_engine.current_ax.xaxis.tick_bottom()
-            self.plot_tab.plot_engine.current_ax.xaxis.set_label_position("bottom")
-
-        needs_x_minor = self.plot_tab.view.x_show_minor_ticks_check.isChecked()
-        needs_y_minor = self.plot_tab.view.y_show_minor_ticks_check.isChecked()
-        needs_z_minor = hasattr(self.plot_tab.view,
-                                "z_show_minor_ticks_check") and self.plot_tab.view.z_show_minor_ticks_check.isChecked()
-
-        if self.plot_tab.view.grid_check.isChecked():
-            if self.plot_tab.view.independent_grid_check.isChecked():
-                if self.plot_tab.view.x_minor_grid_check.isChecked(): needs_x_minor = True
-                if self.plot_tab.view.y_minor_grid_check.isChecked(): needs_y_minor = True
-            else:
-                which = self.plot_tab.view.grid_which_type_combo.currentText()
-                axis = self.plot_tab.view.grid_axis_combo.currentText()
-                if which in ["minor", "both"]:
-                    if axis in ["x", "both"]: needs_x_minor = True
-                    if axis in ["y", "both"]: needs_y_minor = True
-                    if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and axis == "both": needs_z_minor = True
-
-        try:
-            if needs_x_minor:
-                if type(self.plot_tab.plot_engine.current_ax.xaxis.get_major_locator()).__name__ in ["AutoLocator",
-                                                                                                     "MaxNLocator"]:
-                    self.plot_tab.plot_engine.current_ax.xaxis.set_minor_locator(AutoMinorLocator())
-            else:
-                self.plot_tab.plot_engine.current_ax.xaxis.set_minor_locator(NullLocator())
-
-            if needs_y_minor:
-                if type(self.plot_tab.plot_engine.current_ax.yaxis.get_major_locator()).__name__ in ["AutoLocator",
-                                                                                                     "MaxNLocator"]:
-                    self.plot_tab.plot_engine.current_ax.yaxis.set_minor_locator(AutoMinorLocator())
-            else:
-                self.plot_tab.plot_engine.current_ax.yaxis.set_minor_locator(NullLocator())
-
-            if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
-                if needs_z_minor:
-                    if type(self.plot_tab.plot_engine.current_ax.zaxis.get_major_locator()).__name__ in ["AutoLocator",
-                                                                                                         "MaxNLocator"]:
-                        self.plot_tab.plot_engine.current_ax.zaxis.set_minor_locator(AutoMinorLocator())
-                else:
-                    self.plot_tab.plot_engine.current_ax.zaxis.set_minor_locator(NullLocator())
-        except Exception as e:
-            self.plot_tab.status_bar.log(f"Warning mapping minor locators: {str(e)}", "WARNING")
-
-        if self.plot_tab.view.x_show_minor_ticks_check.isChecked():
-            self.plot_tab.plot_engine.current_ax.tick_params(
-                axis="x", which="minor", bottom=True, top=self.plot_tab.view.x_top_axis_check.isChecked(),
-                direction=self.plot_tab.view.x_minor_tick_direction_combo.currentText(),
-                width=self.plot_tab.view.x_minor_tick_width_spin.value()
-            )
-        else:
-            self.plot_tab.plot_engine.current_ax.tick_params(axis="x", which="minor", bottom=False, top=False)
-
-        if self.plot_tab.view.y_show_minor_ticks_check.isChecked():
-            self.plot_tab.plot_engine.current_ax.tick_params(
-                axis="y", which="minor", left=True, right=False,
-                direction=self.plot_tab.view.y_minor_tick_direction_combo.currentText(),
-                width=self.plot_tab.view.y_minor_tick_width_spin.value()
-            )
-        else:
-            self.plot_tab.plot_engine.current_ax.tick_params(axis="y", which="minor", left=False, right=False)
-
-        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and hasattr(self.plot_tab.view,
-                                                                              "z_show_minor_ticks_check"):
-            if self.plot_tab.view.z_show_minor_ticks_check.isChecked():
-                self.plot_tab.plot_engine.current_ax.tick_params(
-                    axis="z", which="minor", direction=self.plot_tab.view.z_minor_tick_direction_combo.currentText(),
-                    width=self.plot_tab.view.z_minor_tick_width_spin.value()
-                )
-            else:
-                self.plot_tab.plot_engine.current_ax.tick_params(axis="z", which="minor")
-
-        try:
-            x_unit_str = self.plot_tab.view.x_display_units_combo.currentText()
-            if x_unit_str != "None":
-                x_formatter = self.create_axis_formatter(x_unit_str)
-                if x_formatter: self.plot_tab.plot_engine.current_ax.xaxis.set_major_formatter(x_formatter)
-
-            y_unit_str = self.plot_tab.view.y_display_units_combo.currentText()
-            if y_unit_str != "None":
-                y_formatter = self.create_axis_formatter(y_unit_str)
-                if y_formatter: self.plot_tab.plot_engine.current_ax.yaxis.set_major_formatter(y_formatter)
-
-            if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis") and hasattr(self.plot_tab.view,
-                                                                                  "z_display_units_combo"):
-                z_unit_str = self.plot_tab.view.z_display_units_combo.currentText()
-                if z_unit_str != "None":
-                    z_formatter = self.create_axis_formatter(z_unit_str)
-                    if z_formatter: self.plot_tab.plot_engine.current_ax.zaxis.set_major_formatter(z_formatter)
-        except Exception as e:
-            self.plot_tab.status_bar.log(f"Failed to apply display units: {str(e)}", "WARNING")
-
-        if self.plot_tab.view.custom_datetime_check.isChecked():
-            format_map = {
-                "YYYY-MM-DD" : "%Y-%m-%d", "MM/DD/YYYY": "%m/%d/%Y", "DD/MM/YYYY": "%d/%m/%Y",
-                "YYYY/MM/DD" : "%Y/%m/%d", "DD-MM-YYYY": "%d-%m-%Y", "Mon DD, YYYY": "%b %d, %Y",
-                "DD Mon YYYY": "%d %b %Y", "YYYY-MM": "%Y-%m", "MM-YYYY": "%m-%Y",
-                "HH:MM:SS"   : "%H:%M:%S", "YYYY-MM-DD HH:MM": "%Y-%m-%d %H:%M"
-            }
-
-            x_fmt_name = self.plot_tab.view.x_datetime_format_combo.currentText()
-            if x_fmt_name and x_fmt_name != "None":
-                fmt_str = self.plot_tab.view.x_custom_datetime_input.text() if x_fmt_name == "Custom" else format_map.get(
-                    x_fmt_name)
-                if fmt_str:
-                    try:
-                        self.plot_tab.plot_engine.current_ax.xaxis.set_major_formatter(mdates.DateFormatter(fmt_str))
-                        self.plot_tab.plot_engine.current_ax.xaxis.set_major_locator(
-                            mdates.AutoDateLocator(minticks=4, maxticks=15))
-                    except Exception:
-                        pass
-
-            y_fmt_name = self.plot_tab.view.y_datetime_format_combo.currentText()
-            if y_fmt_name and y_fmt_name != "None":
-                fmt_str = self.plot_tab.view.y_custom_datetime_format_input.text() if y_fmt_name == "Custom" else format_map.get(
-                    y_fmt_name)
-                if fmt_str:
-                    try:
-                        self.plot_tab.plot_engine.current_ax.yaxis.set_major_formatter(mdates.DateFormatter(fmt_str))
-                        self.plot_tab.plot_engine.current_ax.yaxis.set_major_locator(
-                            mdates.AutoDateLocator(minticks=4, maxticks=15))
-                    except Exception:
-                        pass
-
-        plt.setp(self.plot_tab.plot_engine.current_ax.get_xticklabels(),
-                 rotation=self.plot_tab.view.xtick_rotation_spin.value())
-        plt.setp(self.plot_tab.plot_engine.current_ax.get_yticklabels(),
-                 rotation=self.plot_tab.view.ytick_rotation_spin.value())
-        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
-            plt.setp(self.plot_tab.plot_engine.current_ax.get_zticklabels(),
-                     rotation=self.plot_tab.view.ztick_rotation_spin.value())
-
-        if self.plot_tab.view.x_invert_axis_check.isChecked():
-            if not self.plot_tab.plot_engine.current_ax.xaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_xaxis()
-        else:
-            if self.plot_tab.plot_engine.current_ax.xaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_xaxis()
-
-        if self.plot_tab.view.y_invert_axis_check.isChecked():
-            if not self.plot_tab.plot_engine.current_ax.yaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_yaxis()
-        else:
-            if self.plot_tab.plot_engine.current_ax.yaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_yaxis()
-
-        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
-            if self.plot_tab.view.z_invert_axis_check.isChecked():
-                if not self.plot_tab.plot_engine.current_ax.zaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_zaxis()
-            else:
-                if self.plot_tab.plot_engine.current_ax.zaxis_inverted(): self.plot_tab.plot_engine.current_ax.invert_zaxis()
-
     def apply_textbox(self) -> None:
         """Apply custom floating textbox."""
-        if not self.plot_tab.plot_engine.current_ax: return
+        if not self.plot_tab.plot_engine.current_ax:
+            return
 
         for text_artist in list(self.plot_tab.plot_engine.current_ax.texts):
             if text_artist.get_gid() == "custom_textbox":
                 try:
                     text_artist.remove()
-                except:
-                    pass
+                except Exception as error:
+                    self.plot_tab.status_bar.log(f"Failed to remove previous textbox: {str(error)}", "WARNING")
+                    global_signals.request_toast(
+                        "Textbox Warning", "Failed to remove previous textbox", ToastLevel.WARNING
+                    )
 
         if self.plot_tab.view.textbox_enable_check.isChecked():
             textbox_text = self.plot_tab.view.textbox_content.text().strip()
@@ -753,31 +601,10 @@ class PlotFormattingManager:
                     gid="custom_textbox"
                 )
 
-    def create_axis_formatter(self, unit_str: str) -> Optional[FuncFormatter]:
-        """Create a matplotlib FuncFormatter based on the selected unit."""
-
-        def formatter(x, pos):
-            try:
-                if unit_str == "Hundreds (100s)":
-                    return f"{x / 1e2:.1f}H"
-                elif unit_str == "Thousands":
-                    val = x / 1e3
-                    return f"{val / 1e3:.1f}M" if abs(val) >= 1000 else f"{val:.1f}K"
-                elif unit_str == "Millions":
-                    val = x / 1e6
-                    return f"{val / 1e3:.1f}B" if abs(val) >= 1000 else f"{val:.1f}M"
-                elif unit_str == "Billions":
-                    return f"{x / 1e9:.1f}B"
-                else:
-                    return f"{x:g}"
-            except (ValueError, TypeError):
-                return f"{x:g}"
-
-        return FuncFormatter(formatter) if unit_str != "None" else None
-
     def apply_spines_customization(self) -> None:
         """Apply spines customization."""
-        if not self.plot_tab.plot_engine.current_ax: return
+        if not self.plot_tab.plot_engine.current_ax:
+            return
         try:
             spines = self.plot_tab.plot_engine.current_ax.spines
             is_individual = self.plot_tab.view.individual_spines_check.isChecked()
@@ -797,7 +624,8 @@ class PlotFormattingManager:
             ]
 
             for key, vis_check, width_spin, color_attr in spine_map:
-                if key not in spines: continue
+                if key not in spines:
+                    continue
                 if vis_check.isChecked():
                     spines[key].set_visible(True)
                     spines[key].set_linewidth(width_spin.value() if is_individual else global_width)
@@ -807,4 +635,3 @@ class PlotFormattingManager:
                     spines[key].set_visible(False)
         except Exception as e:
             self.plot_tab.status_bar.log(f"Failed to apply spine customization: {str(e)}", "ERROR")
-            traceback.print_exc()

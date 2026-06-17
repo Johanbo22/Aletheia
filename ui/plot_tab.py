@@ -939,8 +939,7 @@ class PlotTab(PlotTabUI):
                     return
 
             # Apply formatting and customizations
-            self.formatting_manager.apply_plot_formatting(progress_dialog, x_col, y_cols, axes_flipped, font_family,
-                                                          general_kwargs, active_df)
+            self.formatting_manager.apply_plot_formatting(progress_dialog, x_col, y_cols, general_kwargs, active_df)
 
             # Finalize
             self._update_progress(progress_dialog, 98, "Finishing up")
