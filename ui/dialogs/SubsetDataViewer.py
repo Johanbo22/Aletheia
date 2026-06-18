@@ -1,4 +1,49 @@
-from PyQt6.QtWidgets import QDialog, QFileDialog, QLabel, QMessageBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QPushButton
+import pandas as pd
+from pathlib import Path
+
+from PyQt6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QMessageBox, \
+    QTableView, \
+    QTableWidgetItem, \
+    QVBoxLayout, QPushButton
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from typing import Any
+
+from core.global_signals import global_signals, ToastLevel
+
+class SubsetTableModel(QAbstractTableModel):
+    """
+    Read-only self.table_view model for Subset data viewing
+    """
+    def __init__(self, data: pd.DataFrame, parent: Any = None) -> None:
+        super().__init__(parent)
+        self._data = data
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
+            return 0
+        return len(self._data)
+
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        if parent.isValid():
+            return 0
+        return len(self._data.columns)
+
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if not index.isValid():
+            return None
+        if role == Qt.ItemDataRole.DisplayRole:
+            val = self._data.iat[index.row(), index.column()]
+            return str(val) if not pd.isna(val) else ""
+        return None
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                return str(self._data.columns[section])
+            if orientation == Qt.Orientation.Vertical:
+                return str(self._data.index[section])
+        return None
+
 
 class SubsetDataViewer(QDialog):
     """View data in a subset"""
@@ -13,56 +58,75 @@ class SubsetDataViewer(QDialog):
 
         # Info
         info = QLabel(f"Showing {len(df):,} rows x {len(df.columns)} columns")
-        info.setObjectName("susbet_info_label")
+        info.setObjectName("subset_info_label")
         layout.addWidget(info)
 
         # Table
-        table = QTableWidget()
-        table.horizontalHeader().setObjectName("MainDataHeader")
-        table.verticalHeader().setObjectName("MainDataHeader")
-        table.setAlternatingRowColors(True)
-        table.setRowCount(len(df))
-        table.setColumnCount(len(df.columns))
-        table.setHorizontalHeaderLabels(df.columns.tolist())
+        self.table_view = QTableView()
+        self.table_view.horizontalHeader().setObjectName("MainDataHeader")
+        self.table_view.verticalHeader().setObjectName("MainDataHeader")
+        self.table_model = SubsetTableModel(self.df, self)
+        self.table_view.setModel(self.table_model)
+        self.table_view.setAlternatingRowColors(True)
 
-        for row in range(len(df)):
-            for col in range(len(df.columns)):
-                value = df.iloc[row, col]
-                item = QTableWidgetItem(str(value))
-                table.setItem(row, col, item)
+        self.table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
-        table.resizeColumnsToContents()
+        if len(self.df) <= 5000:
+            self.table_view.resizeColumnsToContents()
+        else:
+            self.table_view.horizontalHeader().setDefaultSectionSize(120)
+            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
 
-        layout.addWidget(table)
+        layout.addWidget(self.table_view)
 
-        #export btn
+        # Buttons
+        btn_layout = QHBoxLayout()
         export_btn = QPushButton("Export this subset", parent=self)
         export_btn.clicked.connect(self.export_subset)
-        layout.addWidget(export_btn)
 
-        #close btn
         close_btn = QPushButton("Close", parent=self)
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
+
+        btn_layout.addStretch()
+        btn_layout.addWidget(export_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
 
     def export_subset(self):
         """Export the subset data into a file"""
-        filepath, _ = QFileDialog.getSaveFileName(
+        filepath_str, _ = QFileDialog.getSaveFileName(
             self,
             "Export Subset Data",
             "subset_data.csv",
             "CSV Files (*.csv);;Excel Files (*.xlsx);;JSON Files (*.json)"
         )
+        if not filepath_str:
+            return
 
-        if filepath:
-            try:
-                if filepath.endswith(".csv"):
-                    self.df.to_csv(filepath, index=False)
-                elif filepath.endswith(".xlsx"):
-                    self.df.to_excel(filepath, index=False)
-                elif filepath.endswith(".json"):
-                    self.df.to_json(filepath)
+        filepath = Path(filepath_str)
+        try:
+            if filepath.suffix == ".csv":
+                self.df.to_csv(filepath, index=False)
+            elif filepath.suffix == ".xlsx":
+                self.df.to_excel(filepath, index=False)
+            elif filepath.suffix == ".json":
+                self.df.to_json(filepath)
+            else:
+                global_signals.request_toast("Export Failed", "Unsupported file format", ToastLevel.WARNING)
+                return
 
-                QMessageBox.information(self, "Success", f"Subset exported to:\n{filepath}")
-            except Exception as ExportSubsetError:
-                QMessageBox.critical(self, "Error", f"Failed to export: {str(ExportSubsetError)}")
+            global_signals.request_toast(
+                "Success",
+                f"Subset exported to: {filepath.name}",
+                ToastLevel.SUCCESS
+            )
+
+        except Exception as export_error:
+            global_signals.request_toast(
+                "Export error",
+                f"Failed to export: {str(export_error)}",
+                ToastLevel.ERROR
+            )
