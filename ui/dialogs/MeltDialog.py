@@ -1,12 +1,13 @@
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMessageBox, QPushButton, QSplitter, QVBoxLayout, QWidget, QTableWidget, QTableWidgetItem, QHeaderView
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
-from core.resource_loader import get_resource_path
-from ui.theme import ThemeColors
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtWidgets import QDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, \
+    QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from core.global_signals import ToastLevel, global_signals
+from core.resource_loader import get_resource_path
 
 class MeltDialog(QDialog):
     """Dialog for using the melt function"""
@@ -28,20 +29,19 @@ class MeltDialog(QDialog):
         banner_widget = QWidget()
         banner_layout = QHBoxLayout(banner_widget)
         banner_layout.setContentsMargins(0, 0, 0, 5)
-        
+
         icon_label = QLabel()
         icon_pixmap = QIcon(get_resource_path("icons/data_operations/melt_data.svg")).pixmap(42, 42)
         icon_label.setPixmap(icon_pixmap)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         banner_layout.addWidget(icon_label)
-        
+
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
-        
+
         info_label = QLabel("Melt Data")
         info_label.setFont(QFont("Consolas", 12, QFont.Weight.Bold))
         text_layout.addWidget(info_label)
-        
 
         info_description = QLabel(
             "Using melt you unpivot your data from a wide format to a long format.\n"
@@ -51,33 +51,32 @@ class MeltDialog(QDialog):
         info_description.setProperty("styleClass", "info_text")
         info_description.setWordWrap(True)
         text_layout.addWidget(info_description)
-        
+
         banner_layout.addLayout(text_layout)
         banner_layout.addStretch()
-        
+
         layout.addWidget(banner_widget)
         layout.addSpacing(5)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(5)
         splitter.setChildrenCollapsible(False)
-        
+
         id_panel, self.id_variable_list, self.id_search_input = self._create_column_selection_panel(
             title="ID variables (Keep these columns)"
         )
         splitter.addWidget(id_panel)
-        
-        
+
         value_panel, self.value_list, self.value_search_input = self._create_column_selection_panel(
             title="Value Variables (Unpivot these):",
             hint="(Leave empty to unpivot all non-ID columns)"
         )
         splitter.addWidget(value_panel)
-        
+
         layout.addWidget(splitter)
         layout.addSpacing(15)
 
-        #naming
+        # naming
         naming_group = QGroupBox("New Column Names")
         naming_layout = QFormLayout()
 
@@ -116,7 +115,7 @@ class MeltDialog(QDialog):
 
         layout.addStretch()
 
-        #buttons
+        # buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
@@ -139,82 +138,83 @@ class MeltDialog(QDialog):
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(300)
         self._preview_timer.timeout.connect(self._do_update_preview)
-        
+
         self.id_variable_list.itemSelectionChanged.connect(self.schedule_preview_update)
         self.value_list.itemSelectionChanged.connect(self.schedule_preview_update)
         self.variable_name_input.textChanged.connect(self.schedule_preview_update)
         self.value_name_input.textChanged.connect(self.schedule_preview_update)
-        
+
         self._do_update_preview()
-    
+
     def _create_column_selection_panel(self, title: str, hint: str = "") -> Tuple[QWidget, QListWidget, QLineEdit]:
         panel_widget = QWidget()
         layout = QVBoxLayout(panel_widget)
         layout.setContentsMargins(5, 5, 5, 5)
-        
+
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         header_label = QLabel(title)
         header_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
         header_layout.addWidget(header_label)
-        
+
         header_layout.addStretch()
-        
+
         list_widget = QListWidget()
         list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         list_widget.addItems(self.columns)
-        
+
         select_all_btn = QPushButton("Select All")
         select_all_btn.setFlat(True)
         select_all_btn.setProperty("styleClass", "secondary_button")
         select_all_btn.clicked.connect(lambda: self._select_all_visible(list_widget))
         header_layout.addWidget(select_all_btn)
-        
+
         clear_all_btn = QPushButton("Clear All")
         clear_all_btn.setFlat(True)
         clear_all_btn.setProperty("styleClass", "secondary_button")
         clear_all_btn.clicked.connect(list_widget.clearSelection)
         header_layout.addWidget(clear_all_btn)
-        
+
         layout.addLayout(header_layout)
-        
+
         if hint:
             hint_label = QLabel(hint)
             hint_label.setProperty("styleClass", "muted_text")
             layout.addWidget(hint_label)
-        
+
         search_input = QLineEdit()
         search_input.setPlaceholderText("Filter columns...")
         search_input.setClearButtonEnabled(True)
         search_input.setProperty("styleClass", "seach_input")
         layout.addWidget(search_input)
-        
+
         layout.addWidget(list_widget)
-        
+
         count_label = QLabel()
         count_label.setProperty("styleClass", "muted_text")
         count_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(count_label)
-        
+
         def update_selection_count() -> None:
             count = len(list_widget.selectedItems())
             total = list_widget.count()
             count_label.setText(f"{count} / {total} selected")
+
         list_widget.itemSelectionChanged.connect(update_selection_count)
         update_selection_count()
-        
+
         search_input.textChanged.connect(lambda text, lw=list_widget: self._filter_list_widget(text, lw))
 
         return panel_widget, list_widget, search_input
-    
+
     def _filter_list_widget(self, text: str, list_widget: QListWidget) -> None:
         search_text = text.lower()
         for i in range(list_widget.count()):
             item = list_widget.item(i)
             if item is not None:
                 item.setHidden(search_text not in item.text().lower())
-    
+
     def _select_all_visible(self, list_widget: QListWidget) -> None:
         for i in range(list_widget.count()):
             item = list_widget.item(i)
@@ -335,26 +335,38 @@ class MeltDialog(QDialog):
 
         overlap = set(id_vars) & set(value_vars)
         if overlap:
-            QMessageBox.warning(self, "Validation Error", f"Columns cannot be both ID and value variables:\n{', '.join(overlap)}")
+            global_signals.request_toast(
+                "Validation Error", f"Columns cannot be both ID and value variables:\n{', '.join(overlap)}",
+                ToastLevel.WARNING
+            )
             return
-        
+
         var_name = self.variable_name_input.text().strip()
         value_name = self.value_name_input.text().strip()
 
         if not var_name:
-            QMessageBox.warning(self, "Validation Error", "Please enter a name for the Variable column.")
+            global_signals.request_toast(
+                "Validation Error", "Please enter a name for the Variable column", ToastLevel.ERROR
+            )
             return
 
         if not value_name:
-            QMessageBox.warning(self, "Validation Error", "Please enter a name for the Value column.")
+            global_signals.request_toast(
+                "Validation Error", "Please enter a name for the Value column", ToastLevel.ERROR
+            )
             return
-            
+
         if var_name == value_name:
-            QMessageBox.warning(self, "Validation Error", "The Variable Column Name and Value Column Name cannot be identical.")
+            global_signals.request_toast(
+                "Validation Error", "The Variable Column Name and Value Column Name cannot be identical",
+                ToastLevel.ERROR
+            )
             return
-            
+
         if var_name in id_vars or value_name in id_vars:
-            QMessageBox.warning(self, "Validation Error", "The new column names cannot conflict with existing ID variables.")
+            global_signals.request_toast(
+                "Validation Error", "The new column names cannot conflict with existing ID variables", ToastLevel.ERROR
+            )
             return
 
         self.accept()
@@ -362,8 +374,8 @@ class MeltDialog(QDialog):
     def get_config(self) -> Dict[str, Any]:
         """Return the config for this dialog"""
         return {
-            "id_vars": [item.text() for item in self.id_variable_list.selectedItems()],
+            "id_vars"   : [item.text() for item in self.id_variable_list.selectedItems()],
             "value_vars": [item.text() for item in self.value_list.selectedItems()],
-            "var_name": self.variable_name_input.text().strip(),
+            "var_name"  : self.variable_name_input.text().strip(),
             "value_name": self.value_name_input.text().strip()
         }

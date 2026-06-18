@@ -4,6 +4,101 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.4.0 [Prerelease]
+### Added
+- Added a ReferenceSpanManager to configure axhspan and axvspans to the canvas
+- UI updated to allow for configuring the spans
+- CodeExporter and PlotConfigManager updated to handle new spans
+- Sort by index for Sort Data in Transform tab.
+- Dynamic visibility for the View menu items so they only appear when the Plot Studio is actively on-screen (docked or set as active tab).
+- HelpAnimationPreviewPopup widget utilizing QPropertyAnimation and Qt.WindowType.ToolTip to provide faded window previews of the module's instructional animations.
+- Global Signal event bus for signals emitting Toast Notifications to MainWindow
+- Toast Notification system initial implementation.
+- Added selection boundary checks in ConsoleDialog._custom_key_press_event for Backspace, Delete, and general text input to prevent users from accidentally deleting the console history or command prompt by highlighting overlapping text.
+- Stacked bar chart support. Added a toggle in the General settings when selecting a bar plot type
+- Feature to define the resulting DataType (`string`, `int`, `float`, `datetime`, `category`, `Auto-infer`) when creating a Computed Column.
+- A sticky header label in ColumnsTab to persistently display the currently selected column(s) regardless of scroll position.
+- Full implementation of ToastNotification system
+
+### Changed
+- UI layout for both ReferenceLines and ReferenceSpans
+- Optimized _helper_is_datetime_column in plot_engine.py to use fast, vectorized pandas operations instead of a slow Python for loop over rows. This prevents UI stuttering when loading datasets with complex object columns.
+- Enhanced the Autosave UX in main_window.py by ensuring the application logs a success message to the status bar, reassuring the user that their data is safe without throwing intrusive popups.
+- Improved the "Export Code" dialog in main_window.py with setInformativeText and clearer button labels so the user understands exactly what is being exported (Data Pipeline vs. Data + Plotting Logic).
+- Improved axis label formatting in plot_engine.py to beautifully join multiple Y-columns (e.g., "Revenue, Profit") instead of printing a raw Python list string (e.g., "['Revenue', 'Profit']").
+- Appended .deleteLater() to ProgressDialog cleanup sequences in main_window.py to prevent Qt resource leaking after multiple file imports.
+- Enforced a single-instance pattern for the Python Console via open_python_console(). Clicking the console button repeatedly will now pull the existing window to the foreground rather than spawning detached, overlapping instances that can desync the UI.
+- Enhanced dragEnterEvent to utilize Qt.DropAction.CopyAction. This tells the operating system to show the native "copy" cursor during drag-and-drop, assuring the user that the file is being duplicated into the app, not moved or deleted from their disk.
+- Updated a lot of styling to be standardized across widgets
+- Extracted duplicate dynamic module loading operations out of HelpDialog and HelpAnimationPreviewPopup into a unified load_help_animation_widget utility method located in help_animation_engine.py.
+- Updated CodeExporter and PlotConfigManager to handle subsets and subplots.
+- Improved local file and project import workflows by persisting the last opened directory across sessions using `QSettings`. `QFileDialog` now opens in the user's previously visited path rather than the default project root.
+- Using QApplication.processEvents() to help reduce load time when changing color theme.
+- Disabled the "Edit JSON", "Apply theme", and "Delete theme" buttons in the Appearance Tab by default.
+- Added _on_theme_selection_changed handler in ThemeManager to dynamically toggle theme-dependent buttons, preventing invalid theme file manipulation operations.
+- Enhancements for the statistics tab and the test results tab with embedded JavaScript, visualizations, css etc.
+- Updated p-value formatting in the statistical test result view to only use scientific notation for very small numbers (p < 0.0001). Standard, more readable decimal formatting is now applied for larger values.
+
+### Fixed
+- Python syntax highlighting overwriting string literals if they contained a # (hash) character.
+- MainWindow._update_recent_projects no longer empties the recent files list when a project is saved/opened
+- Replaced typo: list[recent_files] with list(recent_files) to prevent runtime TypeError during tuple casting.
+- Initialized self.autosave_enabled in MainWindow.__init__ to prevent AttributeError crashes in the autosave background timer.
+- Fixed a bug in ScriptManager where custom scripts would incorrectly force gridlines to toggle on during GUI synchronization by checking the visibility state of the grid Line2D objects instead of their sheer existence.
+- Fixed a critical typo (self._history_sort_state) in data_handler.py that would cause an AttributeError or corrupt the sorting state when a data macro pipeline fails and triggers a rollback.
+- Fixed a visual bug in plot_engine.py where the default plot title would render as an integer (e.g., "0" or "1") instead of the actual plot type name (e.g., "Line", "Scatter") when axes were flipped or labels were auto-generated.
+- Fixed a desynchronization bug in main_window.py where triggering Undo or Redo did not update the Plot Studio's dropdown menus or the Status Bar's row/column counts.
+- Fixed a bug where the ContextualAnnotationToolbar could not be loaded properly due to a typo.
+- Removed obtrusive warning message boxes from zoom_in, zoom_out, and zoom_reset functions.
+- Fixed a visual bug in the status bar where the terminal QLineEdit would fail to revert its border and text color to the default idle styling after displaying warning or error messages. The _reset_to_idle_state method now correctly unpolishes and repolishes the widget with the "IDLE" log level property.
+- Fixed a bug where untoggling the "Share X axis" when configuring subplots would not re apply the x axis on the canvas.
+- Resolved a visual glitch in GridSpecDesignerWidget where "Empty Space" labels remained visible behind merged plot cells.
+- Fixed issues where the ContextualAnnotationToolbar would be triggered when trying to move an annotation.
+- Fixed a missing background color for extract_date, duplicate_column, data_normalization, and iqr help_animation
+- - Fixed a bug where opening a file or reverting to the root state would inadvertently spawn infinite `Sort[Index] (Asc)` entries in the `PipelineGraphView` due to implicit QTableView header syncing. A monotonicity guard now checks the `DataFrame` state directly to prevent generating duplicate or initial sort-state history nodes.
+- Prevented the x-axis labels on the BinningPreviewWidget distribution chart from being cut off at the bottom by explicitly reserving bottom margin space via subplots_adjust().
+- Resolved a performance bottleneck in the AggregationDialog where iteratively appending rows inside a loop triggered sequential, redundant UI redraws and signals, significantly slowing down view population for large DataFrames.
+- Resolved a TypeError in ConsoleDialog during Ctrl+Minus key events caused by an invalid tuple check syntax in _custom_key_press_event.
+- Prevented the main application from crashing/closing when quit(), exit(), or sys.exit() are entered in the ConsoleDialog. These commands will now properly close only the dialog itself.
+- Fixed issues where the graph view for operations did not export properly and could not be reapplied to a dataset. UUIDs were not assigned to operations causing them to loose their parent. 
+- Fixed up animations lag issues for the PipelineGraphView.
+- Box plots now properly map the x_col selection to the categorical X-axis, enabling grouped distributions (e.g., viewing 'Sales' distribution grouped by 'Region').
+- Fixed visual bug when editing Table cells where underlying data text was visible when editing
+- Fixed visual bug when editing Table cells where cell layout border did not match cell before editing.
+- Fixed an IndexError in the column reordering animation caused by a missing end-position coordinate for the middle column.
+
+## v 0.3.1 [Patch]
+### Added
+- A GlobalExceptionHandler to log crash and unhandled exceptions to a file.
+- Created a `General` configuration tab in `SettingsDialog` targeting application-level settings like Autosave triggers and intervals.
+ 
+### Changed
+- Rewrote how SVG paths and data is stored. Stored in icon_data.json and is loaded once per runtime sequence.
+- Moved the CodeEditor widget into the correct directory /widgets instead of a /dialogs
+- Improved animations for AutosaveIndicator and StatusBar labels.
+- Explicitly cast rule values to float in DataTableModel._compile_rules to prevent TypeError exceptions during conditional rendering comparisons.
+- Converted the hard block on Python code export for file-less datasets (Database imports, synthethic sets) into a user-bypassable warning in MainWindow.export_code().
+- Appended `DataPlotStudioApp.settings` payload to query `QSettings` for `enable_autosave`, `autosave_interval`,
+### Fixed
+- Resolved a UI bug in the DatabaseConnectionDialog where the text "Testing..." erroneously remained next to the "Connection successful" message.
+- Fixed a missing animation for the settings search inside the plot studio tab
+- Fixed a couple of issues in ConsoleDialog: Bug with pasting text would only evaluate last line, Bug with potential overtyping of command prompt ">>>" would crash the Console and throw a SystemError.
+- Fixed an `UnboundLocalError` in `DataTableModel.data()` triggered when toggling edit mode. The logic now correctly evaluates `is_insert_row OR is_insert_col` (instead of `AND`) to prevent out-of-bounds DataFrame indexing on the appended insertion placeholders.
+- Fixed an issue in PlotTab._generate_main_plot() where canceling a plot generation progress dialog erroneously triggered a critical crash popup. Cancellations are now caught gracefully via InterruptedError.
+- Fixed a critical visualization bug where large, downsampled Line and Area plots rendered as randomized spaghetti lines; PlotDataPrepWorker now appends .sort_index() to preserve sequential data order.
+- Fixed a silent state desynchronization bug in PlotTab.update_column_combo() where missing columns would auto-resolve to default fallback columns without notifying the visualization engine.
+- Fixed a visual artifacting issue in DataTableModel where brush/lasso row highlights were inaccurately preserved across table sorting operations. Highlight states are now cleared on sort.
+- Fixed a critical logic block in DataTableModel.setData() that rendered table checkboxes permanently immutable due to an overly aggressive initial guard clause checking for EditRole.
+- Fixed an oversight in PlotTab.get_active_dataframe() where incorrect object reflection (hasattr(self) instead of hasattr(self.view)) caused the application to completely ignore user-selected data subsets during plot generation.
+- Fixed a bug in the PlotSettingsPanel search filter where hasattr(self, "text") caused the search index to overlook interactive UI elements like Checkboxes and RadioButtons. It now correctly targets hasattr(child, "text").
+- Fixed a vulnerability in PlotTab.activate_subset() where requesting a non-existent subset would place the UI into an invalid state, disrupting future operations. The method now safely exits if the target is invalid.
+- Fixed a highly destructive data-loss bug in PlotDataPrepWorker._is_datetime_column() where plain numeric strings were aggressively evaluated as timestamps and all subsequent text data was forcibly converted to NaT. The validation heuristic is now stricter and checks multiple rows.
+- Fixed an AttributeError application crash in MainWindow._update_recent_projects() caused by PyQt6 silently converting QSettings list data into immutable Python tuples.
+- Fixed a UI threading quirk in MainWindow.export_google_sheets() where modal error dialogs spawned beneath or concurrently with the blocking progress dialog. Progress windows are now gracefully terminated before errors manifest.
+- Fixed an issue in MainWindow.export_data_dialog() where exporting DataFrame contents directly to the clipboard caused silent failures in the logging system due to a missing file path. Logs will now accurately report "Export complete to Clipboard".
+- Fixed an issue where project files could not be opened via drag-and-drop. The drag-and-drop handler now explicitly recognizes the application's native project extension and correctly routes the file to the project loading mechanism rather than the data import pipeline.
+- Resolved a bug where the QTableView model would not display after clicking "New Project" and loading a new file. The model is now cleanly destroyed on project reset and strictly re-attached during data view updates.
+
 ## v 0.3.0 [Prerelease]
 ### Added
 - Support for selecting multiple aggregation functions for a single column simultaneously via MultiIndex unpacking.

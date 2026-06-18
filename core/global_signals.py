@@ -2,6 +2,7 @@ from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 from ui.widgets.ToastNotification import ToastLevel
+from ui.status_bar import LogLevel
 
 class GlobalSignals(QObject):
     """
@@ -25,7 +26,7 @@ class GlobalSignals(QObject):
         """
         self.toast_requested.emit(title, message, level, duration_ms)
 
-    def request_log(self, message: str, level: str = "INFO", action_type: Optional[str] = None) -> None:
+    def request_log(self, message: str, level: LogLevel | str = LogLevel.INFO, action_type: Optional[str] = None) -> None:
         """
         Helper method to emit a status bar log request globally.
         Callers should prefer this over calling log_requested.emit() directly.

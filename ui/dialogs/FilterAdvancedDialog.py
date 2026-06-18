@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QApplication, QComboBox, QCompleter, QDateEdit, QDia
     QGraphicsOpacityEffect, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, \
     QSizePolicy, QStackedWidget, QVBoxLayout, QWidget
 
+from core.global_signals import LogLevel, ToastLevel, global_signals
 from icons import IconBuilder, IconType
 from ui.workers import FilterWorker
 
@@ -872,7 +873,10 @@ class FilterAdvancedDialog(QDialog):
         self.apply_button.setText("Apply Filters")
         self.scroll_area.setEnabled(True)
         self.apply_button.setEnabled(True)
-        QMessageBox.critical(self, "Filter error", f"An error occurred during filtering:\n{str(error)}")
+        global_signals.request_toast(
+            "Filter Error", "An error occurred during filtering", ToastLevel.ERROR
+        )
+        global_signals.request_log(f"An error occurred during filtering: {str(error)}", LogLevel.ERROR)
 
     def get_filters(self):
         """Return active filters with logical operator"""

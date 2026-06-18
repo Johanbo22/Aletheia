@@ -1,14 +1,17 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QFormLayout, QMenu, QToolButton, QLineEdit, QComboBox, QCheckBox, QPushButton
-from PyQt6.QtCore import Qt, QTimer
-from typing import Optional
 import re
+from typing import Optional
 
-from ui.theme import ThemeColors
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtWidgets import QCheckBox, QComboBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QMenu, \
+    QPushButton, QToolButton, QVBoxLayout
+
+from core.global_signals import ToastLevel, global_signals
 
 class RegexReplaceDialog(QDialog):
     """
     Dialog for performing regex-based text replacements on a specific column.
     """
+
     def __init__(self, columns: list[str], parent: Optional[QDialog] = None):
         super().__init__(parent)
         self.setWindowTitle("Regex Replace")
@@ -60,8 +63,10 @@ class RegexReplaceDialog(QDialog):
         preset_menu.addAction(r"Numbers Only (\d+)", lambda: self.pattern_input.setText(r"\d+"))
         preset_menu.addAction(r"Letters Only ([A-Za-z]+)", lambda: self.pattern_input.setText(r"[A-Za-z]+"))
         preset_menu.addAction(r"Whitespace (\s+)", lambda: self.pattern_input.setText(r"\s+"))
-        preset_menu.addAction(r"Email Address", lambda: self.pattern_input.setText(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"))
-        preset_menu.addAction(r"Special Characters ([^A-Za-z0-9\s]+)", lambda: self.pattern_input.setText(r"[^A-Za-z0-9\s]+"))
+        preset_menu.addAction(r"Email Address",
+                              lambda: self.pattern_input.setText(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"))
+        preset_menu.addAction(r"Special Characters ([^A-Za-z0-9\s]+)",
+                              lambda: self.pattern_input.setText(r"[^A-Za-z0-9\s]+"))
 
         self.preset_btn.setMenu(preset_menu)
         self.preset_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -180,12 +185,16 @@ class RegexReplaceDialog(QDialog):
         """Validate inputs before accepting the dialog."""
         pattern: str = self.pattern_input.text().strip()
         if not pattern:
-            QMessageBox.warning(self, "Validation Error", "Regex Pattern cannot be empty")
+            global_signals.request_toast(
+                "Validation Error", "Regex Pattern cannot be empty", ToastLevel.ERROR
+            )
             return
         try:
             re.compile(pattern)
         except re.error:
-            QMessageBox.warning(self, "Validation Error", "The provided Regular Expression is invalid")
+            global_signals.request_toast(
+                "Validation Error", "The provided Regular Expression is invalid", ToastLevel.ERROR
+            )
             return
 
     def get_parameters(self) -> tuple[str, str, str]:
@@ -200,5 +209,5 @@ class RegexReplaceDialog(QDialog):
 
         if self.ignore_case_checkbox.isChecked() and not pattern.startswith("(?i)"):
             pattern = f"(?i){pattern}"
-        
+
         return column, pattern, replacement

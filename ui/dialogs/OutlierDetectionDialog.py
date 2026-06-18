@@ -1,19 +1,18 @@
 # ui/dialogs/OutlierDetectionDialog.py
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableView, QMessageBox, QInputDialog, QWidget, QSplitter, QHeaderView, QApplication, QSpinBox, QGroupBox, QDoubleSpinBox, QComboBox, QPushButton
-from PyQt6.QtCore import Qt, QTimer
-
-from core.data_handler import DataHandler
-from ui.theme import ThemeColors
-from ui.data_table_model import DataTableModel
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtWidgets import QApplication, QComboBox, QDialog, QDoubleSpinBox, QGroupBox, QHBoxLayout, QHeaderView, \
+    QInputDialog, QLabel, QMessageBox, QPushButton, QSpinBox, QSplitter, QTableView, QVBoxLayout, QWidget
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+from core.data_handler import DataHandler
+from core.global_signals import LogLevel, ToastLevel, global_signals
+from ui.data_table_model import DataTableModel
 
 try:
     from scipy import stats
 except ImportError:
     stats = None
-
 
 class OutlierDetectionDialog(QDialog):
     def __init__(self, data_handler: DataHandler, method="z_score", parent=None):
@@ -21,7 +20,7 @@ class OutlierDetectionDialog(QDialog):
         self.data_handler: DataHandler = data_handler
         self.method = method
         self.outlier_indices = []
-        
+
         self.debounce_timer = QTimer()
         self.debounce_timer.setSingleShot(True)
         self.debounce_timer.setInterval(400)
@@ -31,14 +30,16 @@ class OutlierDetectionDialog(QDialog):
             f"Outlier Detection Tool - {method.replace('_', ' ').title()}"
         )
         self.resize(900, 750)
-        
+
         self.numeric_columns = self.data_handler.df.select_dtypes(include=["number"]).columns.tolist()
-        
+
         if not self.numeric_columns:
-            QMessageBox.warning(self, "No numeric data", "The current dataset contains no numeric columns")
+            global_signals.request_toast(
+                "No Numeric Data", "The current dataset contains no numeric columns", ToastLevel.WARNING
+            )
             QTimer.singleShot(0, self.reject)
             return
-        
+
         self.init_ui()
         self.apply_detection()
 
@@ -110,17 +111,17 @@ class OutlierDetectionDialog(QDialog):
         self.info_label.setObjectName("outlier_info_label")
         self.info_label.setProperty("state", "normal")
         layout.addWidget(self.info_label)
-        
+
         main_splitter = QSplitter(Qt.Orientation.Vertical)
 
         # Plot area for visualization
         plot_widget = QWidget()
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         plot_group = QGroupBox("Distribution")
         group_plot_layout = QVBoxLayout()
-        
+
         # Plot Controls
         plot_controls_layout = QHBoxLayout()
         plot_controls_layout.addWidget(QLabel("Bins"))
@@ -132,18 +133,18 @@ class OutlierDetectionDialog(QDialog):
         plot_controls_layout.addWidget(self.bins_spin)
         plot_controls_layout.addStretch()
         group_plot_layout.addLayout(plot_controls_layout)
-        
+
         self.figure = Figure(figsize=(5, 3), dpi=100)
         self.figure.patch.set_facecolor("#2b2b2b")
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setObjectName("outlier_canvas_container")
-        
+
         group_plot_layout.addWidget(self.canvas)
         plot_group.setLayout(group_plot_layout)
         plot_layout.addWidget(plot_group)
-        
+
         main_splitter.addWidget(plot_widget)
-        
+
         # The Preview tabelks
         self.table_view = QTableView()
         self.table_view.setAlternatingRowColors(True)
@@ -153,13 +154,13 @@ class OutlierDetectionDialog(QDialog):
         self.table_view.verticalHeader().setObjectName("MainDataHeader")
         self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         main_splitter.addWidget(self.table_view)
-        
+
         main_splitter.setSizes([400, 350])
         layout.addWidget(main_splitter, stretch=1)
 
         # Action buttons
         button_layout = QHBoxLayout()
-        
+
         self.flag_button = QPushButton("Flag Outliers")
         self.flag_button.clicked.connect(self.flag_outliers)
         self.flag_button.setToolTip("Create a new column marking outliers as True")
@@ -217,11 +218,11 @@ class OutlierDetectionDialog(QDialog):
             self.table_view.setModel(self.model)
             outlier_count = len(self.outlier_indices)
             self.info_label.setText(f"Found {outlier_count} outliers.")
-            
+
             self.info_label.setProperty("state", "warning" if outlier_count > 0 else "success")
             self.info_label.style().unpolish(self.info_label)
             self.info_label.style().polish(self.info_label)
-            
+
             has_outliers = outlier_count > 0
             self.flag_button.setEnabled(has_outliers)
             self.remove_button.setEnabled(has_outliers)
@@ -237,7 +238,7 @@ class OutlierDetectionDialog(QDialog):
             self.info_label.setProperty("state", "error")
             self.info_label.style().unpolish(self.info_label)
             self.info_label.style().polish(self.info_label)
-            
+
             self.outlier_indices = []
             self.flag_button.setEnabled(False)
             self.remove_button.setEnabled(False)
@@ -279,7 +280,7 @@ class OutlierDetectionDialog(QDialog):
         import pandas as pd
         if isinstance(data, pd.DataFrame):
             data = data.iloc[:, 0]
-        
+
         data = data.dropna()
 
         if data.empty:
@@ -330,7 +331,7 @@ class OutlierDetectionDialog(QDialog):
                 zorder=4
             )
             ax.axvspan(xlims[0], lower_bound, color="#e74c3c", alpha=0.15, zorder=1)
-            
+
         if upper_bound is not None:
             ax.axvline(
                 upper_bound,
@@ -341,7 +342,7 @@ class OutlierDetectionDialog(QDialog):
                 zorder=4
             )
             ax.axvspan(upper_bound, xlims[1], color="#e74c3c", alpha=0.15, zorder=1)
-        
+
         ax.set_xlim(xlims)
 
         ax.set_title(title, color="white", pad=10)
@@ -397,16 +398,19 @@ class OutlierDetectionDialog(QDialog):
         if reply == QMessageBox.StandardButton.Yes:
             self.data_handler.clean_data("remove_rows", rows=self.outlier_indices)
             self.accept()
-    
+
     def flag_outliers(self) -> None:
         """Flags detected outliers in a new column as True"""
         if not self.outlier_indices:
             return
-        
+
         name, ok = QInputDialog.getText(self, "Flag Outliers", "Enter name for the new column:", text="is_outlier")
         if ok and name:
             try:
                 self.data_handler.clean_data("flag_outliers", rows=self.outlier_indices, new_column_name=name)
                 self.accept()
             except Exception as error:
-                QMessageBox.critical(self, "Error", f"Failed to flag outliers: {str(error)}")
+                global_signals.request_toast(
+                    "Error Flagging Outliers", "Failed to flag outliers in the dataset", ToastLevel.ERROR
+                )
+                global_signals.request_log(f"Failed to flag outliers: {str(error)}", LogLevel.ERROR)

@@ -1,14 +1,14 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
 from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QLineEdit
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
+from core.global_signals import ToastLevel, global_signals
 from ui.dialogs.FilterAdvancedDialog import FilterAdvancedDialog
-
 
 class CreateSubsetDialog(FilterAdvancedDialog):
     """Dialog for creating and editing subsets"""
-    
+
     def __init__(self, data_handler, parent=None, existing_subset=None) -> None:
         self.existing_subset = existing_subset
 
@@ -63,11 +63,15 @@ class CreateSubsetDialog(FilterAdvancedDialog):
         if not self.existing_subset:
             name = self.name_input.text().strip()
             if not name:
-                QMessageBox.warning(self, "Validation Error", "Please enter a subset name")
+                global_signals.request_toast(
+                    "Validation Warning", "Please enter a subset name", ToastLevel.WARNING
+                )
                 return
 
         if not self.filter_rows:
-            QMessageBox.warning(self, "Validation Error", "Please create at least one filter")
+            global_signals.request_toast(
+                "Validation Warning", "Please create at least one filter", ToastLevel.WARNING
+            )
             return
 
         has_validation_error = False
@@ -82,7 +86,9 @@ class CreateSubsetDialog(FilterAdvancedDialog):
                     has_validation_error = True
 
         if has_validation_error:
-            QMessageBox.warning(self, "Validation Error", "Please enter values for all active filters")
+            global_signals.request_toast(
+                "Validation Error", "Please enter values for all active filters", ToastLevel.WARNING
+            )
             return
         self.accept()
 

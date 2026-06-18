@@ -1,28 +1,28 @@
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from zipfile import BadZipFile
 
 import pandas as pd
-from PyQt6.QtCore import Qt, QThreadPool
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QMessageBox, QDialogButtonBox, \
-    QApplication, QLineEdit, QCheckBox, QPushButton
+from PyQt6.QtCore import QThreadPool, Qt
+from PyQt6.QtWidgets import QApplication, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, \
+    QLineEdit, QMessageBox, QPushButton, QVBoxLayout
 
 from core.data_handler import DataHandler
-from ui.theme import ThemeColors
+from core.global_signals import LogLevel, ToastLevel, global_signals
 from ui.workers import FileReaderWorker
-
 
 class AppendDialog(QDialog):
     """
     Dialog to configure and execute data concatenation/appending operations.
     Allows users to load an external file and append it to the current active DataFrame.
     """
+
     def __init__(self, data_handler: DataHandler, parent=None):
         super().__init__(parent)
         self.data_handler = data_handler
         self.other_df: Optional[pd.DataFrame] = None
         self.thread_pool = QThreadPool.globalInstance()
-        
+
         self.setWindowTitle("Append / Concatenate Data")
 
         font_metrics = self.fontMetrics()
@@ -30,11 +30,11 @@ class AppendDialog(QDialog):
         self.setMinimumWidth(calculated_min_width)
 
         self.init_ui()
-    
+
     def init_ui(self) -> None:
         """Initializes the layout and UI components for the Append Dialog."""
         layout = QVBoxLayout(self)
-        
+
         info_label = QLabel(
             "Select a file to append to the current dataset. Rows from the selected "
             "file will be added to the bottom of your current active dataframe"
@@ -42,32 +42,33 @@ class AppendDialog(QDialog):
         info_label.setWordWrap(True)
         info_label.setProperty("styleClass", "info_text")
         layout.addWidget(info_label)
-        
+
         # File selection layout
         file_layout = QHBoxLayout()
         self.file_path_edit = QLineEdit()
         self.file_path_edit.setReadOnly(True)
         self.file_path_edit.setPlaceholderText("No file selected...")
         self.file_path_edit.setClearButtonEnabled(True)
-        
+
         browse_btn = QPushButton("Browse", parent=self)
         browse_btn.setToolTip("Open a file explorer to find the file you want to append")
         browse_btn.clicked.connect(self.browse_file)
-        
+
         file_layout.addWidget(self.file_path_edit)
         file_layout.addWidget(browse_btn)
         layout.addLayout(file_layout)
 
         layout.addSpacing(10)
-        
+
         # Configuration options
         self.ignore_index_checkbox = QCheckBox("Ignore Index")
         self.ignore_index_checkbox.setChecked(True)
-        self.ignore_index_checkbox.setToolTip("If checked, the resulting DataFrame will be re-indexed from 0 to n-1\nThis is default")
+        self.ignore_index_checkbox.setToolTip(
+            "If checked, the resulting DataFrame will be re-indexed from 0 to n-1\nThis is default")
         layout.addWidget(self.ignore_index_checkbox)
-        
+
         layout.addStretch()
-        
+
         # Accept/reject buttons
         button_box = QDialogButtonBox(Qt.Orientation.Horizontal, self)
 
@@ -139,15 +140,29 @@ class AppendDialog(QDialog):
         self.append_btn.setEnabled(False)
 
         if isinstance(read_error, FileNotFoundError):
-            QMessageBox.critical(self, "Read Error", "The selected file could not be found. Please verify the file path.")
+            global_signals.request_toast(
+                "Read Error", "The selected file could not be found. Please verify the file path", ToastLevel.ERROR
+            )
         elif isinstance(read_error, pd.errors.EmptyDataError):
-            QMessageBox.critical(self, "Read Error", "The selected file contains no data or is entirely empty.")
+            global_signals.request_toast(
+                "Read Error", "The selected file contains no data or is entirely empty", ToastLevel.ERROR
+            )
         elif isinstance(read_error, pd.errors.ParserError):
-            QMessageBox.critical(self, "Read Error", "Failed to parse the file. Please ensure it is a properly formatted tabular data file.")
+            global_signals.request_toast(
+                "Read Error", "Failed to parse the file. Please ensure it is a properly formatted tabular data file",
+                ToastLevel.ERROR
+            )
         elif isinstance(read_error, (ValueError, BadZipFile)):
-            QMessageBox.critical(self, "Read Error", "The file appears to be corrupted, encrypted, or is an invalid Excel/Zip archive.")
+            global_signals.request_toast(
+                "Read Error", "The file appears to be corrupted, encrypted, or is an invalid Excel/Zip Archive",
+                ToastLevel.ERROR
+            )
         else:
-            QMessageBox.critical(self, "Read Error", f"An unexpected error occurred while reading the file:\n{str(read_error)}")
+            global_signals.request_toast(
+                "Read Error", "An unexpected error occurred while reading the file", ToastLevel.ERROR
+            )
+            global_signals.request_log(f"An unexpected error occurred while reading the file: {str(read_error)}",
+                                       LogLevel.ERROR)
 
     def _validate_datasets(self) -> bool:
         """
@@ -201,10 +216,10 @@ class AppendDialog(QDialog):
         """Validates state before accepting the dialog."""
         if self.other_df is not None:
             self.accept()
-    
+
     def get_config(self) -> Dict[str, Any]:
         """Returns the configuration required to execute the append operation."""
         return {
-            "other_df": self.other_df,
+            "other_df"    : self.other_df,
             "ignore_index": self.ignore_index_checkbox.isChecked()
         }

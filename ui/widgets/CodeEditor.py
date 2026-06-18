@@ -1,13 +1,14 @@
 import ast
+import traceback
 from dataclasses import dataclass
 
-from ui.LineNumberArea import LineNumberArea
+from PyQt6.QtCore import QRect, QStringListModel, QThread, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QFont, QKeyEvent, QKeySequence, QMouseEvent, QPaintEvent, QPainter, \
+    QResizeEvent, QTextBlock, QTextCharFormat, QTextCursor, QTextFormat, QTextOption, QWheelEvent
+from PyQt6.QtWidgets import QCompleter, QInputDialog, QPlainTextEdit, QTextEdit, QToolTip, QWidget
 
-from PyQt6.QtCore import QRect, Qt, QStringListModel, QTimer, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QResizeEvent, QTextCursor, QTextFormat, QAction, QKeySequence, \
-    QKeyEvent, QWheelEvent, QTextCharFormat, QTextBlock, QPaintEvent, QMouseEvent, QTextOption
-from PyQt6.QtWidgets import QPlainTextEdit, QTextEdit, QCompleter, QMessageBox, QInputDialog, QToolTip, QWidget
-import traceback
+from core.global_signals import LogLevel, ToastLevel, global_signals
+from ui.LineNumberArea import LineNumberArea
 
 @dataclass
 class LintError:
@@ -21,7 +22,7 @@ class LintError:
     line_number: int
     offset: int
     message: str
-    
+
 class LintWorker(QThread):
     """
     Background thread for executing asynchronous AST parsing to detect syntax errors
@@ -30,11 +31,11 @@ class LintWorker(QThread):
     to avoid blocking the main UI thread during typing.
     """
     lint_complete = pyqtSignal(list)
-    
+
     def __init__(self, code_text: str) -> None:
         super().__init__()
         self.code_text: str = code_text
-    
+
     def run(self) -> None:
         errors: list[LintError] = []
         try:
@@ -45,7 +46,7 @@ class LintWorker(QThread):
                 errors.append(LintError(syntax_err.lineno, offset, str(syntax_err.msg)))
         except Exception:
             pass
-        
+
         self.lint_complete.emit(errors)
 
 class CodeEditor(QPlainTextEdit):
@@ -56,9 +57,10 @@ class CodeEditor(QPlainTextEdit):
     bracket matching, auto-completion, syntax linting (via AST), and text manipulation
     shortcuts (indentation, commenting, duplicating lines)
     """
-    
+
     TAB_SPACES: str = "    "
-    def __init__(self, parent: QWidget | None =None) -> None:
+
+    def __init__(self, parent: QWidget | None = None) -> None:
         """
         Initializes the code editor with UI, actions and background workers
 
@@ -73,24 +75,24 @@ class CodeEditor(QPlainTextEdit):
 
         self.updateLineNumberAreaWidth(0)
         self.highlightCurrentLine()
-        
+
         # Initialize the autocompleter
         self.completer: QCompleter | None = None
         self.initCompleter()
-        
+
         # Initialize find and replace
         self.find_replace_dialog = None
         find_action = QAction("Find/Replace", self)
         find_action.setShortcut(QKeySequence("Ctrl+F"))
         find_action.triggered.connect(self.showFindReplaceDialog)
         self.addAction(find_action)
-        
+
         # Comment toggle
         comment_action = QAction("Toggle Comment", self)
         comment_action.setShortcut(QKeySequence("Ctrl+K"))
         comment_action.triggered.connect(self.toggleComment)
         self.addAction(comment_action)
-        
+
         # Line duplication
         duplicate_lines_action = QAction("Duplicate Lines", self)
         duplicate_lines_action.setShortcut(QKeySequence("Ctrl+D"))
@@ -114,7 +116,7 @@ class CodeEditor(QPlainTextEdit):
         move_down_action.setShortcut(QKeySequence("Alt+Down"))
         move_down_action.triggered.connect(self.moveLinesDown)
         self.addAction(move_down_action)
-        
+
         # Go to line
         goto_action = QAction("Go To Line", self)
         goto_action.setShortcut(QKeySequence("Ctrl+G"))
@@ -132,26 +134,26 @@ class CodeEditor(QPlainTextEdit):
         whitespace_action.setShortcut(QKeySequence("Alt+W"))
         whitespace_action.triggered.connect(self.toggleWhitespaceVisibility)
         self.addAction(whitespace_action)
-        
+
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._folded_cursors: list[QTextCursor] = []
-        
+
         # Linting state
         self._lint_selections: list[QTextEdit.ExtraSelection] = []
         self._lint_error_map: dict[int, str] = {}
         self._active_lint_worker: LintWorker | None = None
-        
+
         self._lint_timer = QTimer(self)
         self._lint_timer.setSingleShot(True)
         self._lint_timer.setInterval(500)
         self._lint_timer.timeout.connect(self._startLinting)
-        
+
         self.setMouseTracking(True)
-        
+
         self.textChanged.connect(self._scheduleFoldUpdate)
         self.textChanged.connect(self._lint_timer.start)
 
-        #font
+        # font
         font = QFont("Consolas", 12)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.setFont(font)
@@ -225,25 +227,25 @@ class CodeEditor(QPlainTextEdit):
         bottom: int = top + round(self.blockBoundingRect(block).height())
 
         font_metrics = self.fontMetrics()
-        
+
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 number: str = str(block_number + 1)
-                
+
                 painter.setPen(QColor("#858585"))
                 painter.drawText(
                     0, top, self.lineNumberArea.width() - 15, font_metrics.height(),
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, number
+                            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, number
                 )
-                
+
                 if self.isFoldable(block):
                     is_folded: bool = self._isBlockFolded(block)
-                    
+
                     margin_right: int = self.lineNumberArea.width()
                     box_size: int = 9
                     box_x: int = margin_right - 12
                     box_y: int = top + (font_metrics.height() - box_size) // 2
-                    
+
                     painter.setPen(QColor("#A0A0A0"))
                     painter.drawRect(box_x, box_y, box_size, box_size)
                     painter.drawLine(box_x + 2, box_y + box_size // 2, box_x + box_size - 2, box_y + box_size // 2)
@@ -254,7 +256,7 @@ class CodeEditor(QPlainTextEdit):
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
             block_number += 1
-    
+
     def lineNumberAreaMousePressEvent(self, event: QMouseEvent) -> None:
         """
         Handle mouse clicks on the line number area for the code folding interactions
@@ -265,12 +267,12 @@ class CodeEditor(QPlainTextEdit):
         block: QTextBlock = self.firstVisibleBlock()
         top: int = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
         bottom: int = top + round(self.blockBoundingRect(block).height())
-        
+
         while block.isValid():
             if block.isVisible():
                 click_y: float = event.position().y()
                 click_x: float = event.position().x()
-                
+
                 if top <= click_y <= bottom:
                     if click_x >= self.lineNumberArea.width() - 15:
                         if self.isFoldable(block):
@@ -279,7 +281,7 @@ class CodeEditor(QPlainTextEdit):
             block = block.next()
             top = bottom
             bottom = top + round(self.blockBoundingRect(block).height())
-    
+
     def isFoldable(self, block: QTextBlock) -> bool:
         """
         Determine if a block is a foldable parent based on python indentation rules
@@ -290,22 +292,22 @@ class CodeEditor(QPlainTextEdit):
         text: str = block.text()
         if not text.strip():
             return False
-        
+
         current_indent: int = len(text) - len(text.lstrip())
         next_block: QTextBlock = block.next()
-        
+
         # Skip empty lines
         while next_block.isValid() and not next_block.text().strip():
             next_block = next_block.next()
-        
+
         if next_block.isValid():
             next_indent: int = len(next_block.text()) - len(next_block.text().lstrip())
             return next_indent > current_indent
         return False
-    
+
     def _scheduleFoldUpdate(self) -> None:
         QTimer.singleShot(0, self.updateFoldVisibility)
-    
+
     def _isBlockFolded(self, block: QTextBlock) -> bool:
         for cursor in self._folded_cursors:
             if cursor.block() == block:
@@ -320,20 +322,20 @@ class CodeEditor(QPlainTextEdit):
         :return: None
         """
         existing_cursor: QTextCursor | None = None
-        
+
         for cursor in self._folded_cursors:
             if cursor.block() == block:
                 existing_cursor = cursor
                 break
-                
+
         if existing_cursor is not None:
             self._folded_cursors.remove(existing_cursor)
         else:
             new_cursor = QTextCursor(block)
             self._folded_cursors.append(new_cursor)
-        
+
         self._scheduleFoldUpdate()
-    
+
     def updateFoldVisibility(self) -> None:
         """
         Calculate and apply the visibility of all blocks based on nested fold states
@@ -347,14 +349,14 @@ class CodeEditor(QPlainTextEdit):
         try:
             block: QTextBlock = self.document().firstBlock()
             hide_until_indent: int = -1
-            
+
             while block.isValid():
                 is_folded: bool = self._isBlockFolded(block)
-                    
+
                 text: str = block.text()
                 is_blank: bool = text.strip() == ""
                 indent: int = len(text) - len(text.lstrip())
-                
+
                 if hide_until_indent != -1:
                     if not is_blank and indent <= hide_until_indent:
                         hide_until_indent = -1
@@ -363,12 +365,12 @@ class CodeEditor(QPlainTextEdit):
                         block.setVisible(False)
                 else:
                     block.setVisible(True)
-                    
+
                 if block.isVisible() and not is_blank and is_folded:
                     hide_until_indent = indent
-                    
+
                 block = block.next()
-                
+
             self.viewport().update()
             self.lineNumberArea.update()
         except Exception as e:
@@ -385,7 +387,7 @@ class CodeEditor(QPlainTextEdit):
             selection.cursor = self.textCursor()
             selection.cursor.clearSelection()
             extraSelections.append(selection)
-            
+
         # Bracket matching highlight
         try:
             extraSelections.extend(self.getBracketSelections())
@@ -395,7 +397,7 @@ class CodeEditor(QPlainTextEdit):
             print(f"CodeEditor Highlighting Error: {e}")
 
         self.setExtraSelections(extraSelections)
-    
+
     def initCompleter(self) -> None:
         """
         Configure the QCompleter model for Python keywords, builtins and standard library
@@ -408,23 +410,23 @@ class CodeEditor(QPlainTextEdit):
         self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.completer.popup().setObjectName("interactive_console_popup")
         self.completer.activated.connect(self.insertCompletion)
-        
+
         try:
             from resources.autocomplete_keywords import AUTOCOMPLETE_KEYWORDS
             keywords = AUTOCOMPLETE_KEYWORDS
         except ImportError:
             print("Warning:_Could not import autocomplete_keywords. Using default")
             keywords = [
-                "def", "class", "if", "else", "elif", "while", "for", "in", "return", 
-                "try", "except", "import", "from", "as", "True", "False", "None", 
-                "and", "or", "not", "break", "continue", "pass", "lambda", "with", 
-                "is", "global", "raise", "yield", "print", "range", "len", "list", 
+                "def", "class", "if", "else", "elif", "while", "for", "in", "return",
+                "try", "except", "import", "from", "as", "True", "False", "None",
+                "and", "or", "not", "break", "continue", "pass", "lambda", "with",
+                "is", "global", "raise", "yield", "print", "range", "len", "list",
                 "dict", "set", "str", "int", "float", "bool", "super", "__init__",
                 "self", "None", "open", "zip", "enumerate", "isinstance"
             ]
         model = QStringListModel(keywords, self.completer)
         self.completer.setModel(model)
-    
+
     def insertCompletion(self, completion: str) -> None:
         """
         Insert he selected completion string from the popup into the editor text
@@ -434,17 +436,17 @@ class CodeEditor(QPlainTextEdit):
         """
         if self.completer.widget() != self:
             return
-        
+
         text_cursor = self.textCursor()
         # calculate how many characters we must ignore that has already been typed
         extra = len(completion) - len(self.completer.completionPrefix())
-        
+
         # Do not replace the whole word if typing in the middle complete at end
         # and then move cursor to end position and insert suffix
         text_cursor.movePosition(QTextCursor.MoveOperation.EndOfWord)
         text_cursor.insertText(completion[-extra:])
         self.setTextCursor(text_cursor)
-        
+
     def textUnderCursor(self) -> str:
         """
         Extract the word currently residing underneath the text cursor
@@ -473,25 +475,26 @@ class CodeEditor(QPlainTextEdit):
         """
         if not self.completer:
             return
-        
+
         completionPrefix = self.textUnderCursor()
-        
+
         # do not force the popup if 0 or 1 characters is typed
         # only force if keysequence is requested
         if not force and len(completionPrefix) < 1:
             self.completer.popup().hide()
             return
-        
+
         if completionPrefix != self.completer.completionPrefix():
             self.completer.setCompletionPrefix(completionPrefix)
             self.completer.popup().setCurrentIndex(self.completer.completionModel().index(0, 0))
-        
+
         cursor_rect = self.cursorRect()
-        cursor_rect.setWidth(self.completer.popup().sizeHintForColumn(0) + self.completer.popup().verticalScrollBar().sizeHint().width())
+        cursor_rect.setWidth(
+            self.completer.popup().sizeHintForColumn(0) + self.completer.popup().verticalScrollBar().sizeHint().width())
         cursor_rect.translate(0, 6)
-        
+
         self.completer.complete(cursor_rect)
-    
+
     def showFindReplaceDialog(self) -> None:
         """
         Instantiate and display the Find/Replace non-modal dialog window
@@ -499,20 +502,22 @@ class CodeEditor(QPlainTextEdit):
         """
         try:
             from ui.dialogs.FindReplaceDialog import FindReplaceDialog
-            
+
             if not self.find_replace_dialog:
                 self.find_replace_dialog = FindReplaceDialog(self)
-            
+
             self.find_replace_dialog.show()
             self.find_replace_dialog.activateWindow()
             self.find_replace_dialog.raise_()
-            
+
         except Exception as e:
-            print(f"Error opening Find/Replace: {e}")
-            import traceback
-            traceback.print_exc()
-            QMessageBox.critical(self, "Error", f"Could not open Find/Replace:\n{e}")
-    
+            global_signals.request_toast(
+                "UI Error", f"Failed to open the Find/Replace Dialog window: {str(e)}", ToastLevel.ERROR
+            )
+            global_signals.request_log(
+                f"Error: Could not open Find/Replace: {str(e)}", LogLevel.ERROR
+            )
+
     def indentSelection(self, cursor: QTextCursor) -> None:
         """
         Indent the currently selected text blocks by 4 spaces
@@ -524,32 +529,33 @@ class CodeEditor(QPlainTextEdit):
             has_selection: bool = cursor.hasSelection()
             start_pos: int = cursor.selectionStart()
             end_pos: int = cursor.selectionEnd()
-            
+
             cursor.setPosition(start_pos)
             start_block: int = cursor.blockNumber()
             cursor.setPosition(end_pos)
             end_block: int = cursor.blockNumber()
-            
+
             if has_selection and cursor.positionInBlock() == 0 and end_block > start_block:
                 end_block -= 1
-            
+
             cursor.beginEditBlock()
             for i in range(start_block, end_block + 1):
                 block = self.document().findBlockByNumber(i)
                 cursor.setPosition(block.position())
                 cursor.insertText(self.TAB_SPACES)
             cursor.endEditBlock()
-            
+
             if has_selection:
                 cursor.setPosition(self.document().findBlockByNumber(start_block).position())
-                cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
+                cursor.setPosition(self.document().findBlockByNumber(end_block).position(),
+                                   QTextCursor.MoveMode.KeepAnchor)
                 cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
             else:
                 cursor.setPosition(start_pos + len(self.TAB_SPACES))
             self.setTextCursor(cursor)
         except Exception as e:
             print(f"CodeEditor Indent Error: {e}")
-    
+
     def unindentSelection(self, cursor: QTextCursor) -> None:
         """
         Unindent the currently selected text blocks by up to 4 spaces or 1 tab character
@@ -561,7 +567,7 @@ class CodeEditor(QPlainTextEdit):
             has_selection: bool = cursor.hasSelection()
             start_pos: int = cursor.selectionStart()
             end_pos: int = cursor.selectionEnd()
-            
+
             cursor.setPosition(start_pos)
             start_block: int = cursor.blockNumber()
             cursor.setPosition(end_pos)
@@ -569,14 +575,14 @@ class CodeEditor(QPlainTextEdit):
 
             if cursor.positionInBlock() == 0 and end_block > start_block:
                 end_block -= 1
-            
+
             cursor.beginEditBlock()
             removed_from_start: int = 0
             for i in range(start_block, end_block + 1):
                 block = self.document().findBlockByNumber(i)
                 cursor.setPosition(block.position())
                 block_text: str = block.text()
-                
+
                 spaces_to_remove: int = 0
                 if block_text.startswith(self.TAB_SPACES):
                     spaces_to_remove = len(self.TAB_SPACES)
@@ -588,26 +594,29 @@ class CodeEditor(QPlainTextEdit):
                             spaces_to_remove += 1
                         else:
                             break
-                            
+
                 if spaces_to_remove > 0:
-                    cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, spaces_to_remove)
+                    cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor,
+                                        spaces_to_remove)
                     cursor.removeSelectedText()
                     if i == start_block:
                         removed_from_start = spaces_to_remove
-                        
+
             cursor.endEditBlock()
             if has_selection:
                 cursor.setPosition(self.document().findBlockByNumber(start_block).position())
-                cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
+                cursor.setPosition(self.document().findBlockByNumber(end_block).position(),
+                                   QTextCursor.MoveMode.KeepAnchor)
                 cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
             else:
-                new_pos: int = max(self.document().findBlockByNumber(start_block).position(), start_pos - removed_from_start)
+                new_pos: int = max(self.document().findBlockByNumber(start_block).position(),
+                                   start_pos - removed_from_start)
                 cursor.setPosition(new_pos)
-                
+
             self.setTextCursor(cursor)
         except Exception as e:
             print(f"CodeEditor Unindent Error: {e}")
-    
+
     def toggleComment(self) -> None:
         """
         Toggles Python line comments ('#') for the selected line(s)
@@ -618,20 +627,20 @@ class CodeEditor(QPlainTextEdit):
         """
         cursor: QTextCursor = self.textCursor()
         cursor.beginEditBlock()
-        
+
         has_selection: bool = cursor.hasSelection()
         start_pos: int = cursor.selectionStart()
         end_pos: int = cursor.selectionEnd()
-        
+
         cursor.setPosition(start_pos)
         start_block: int = cursor.blockNumber()
         cursor.setPosition(end_pos)
         end_block: int = cursor.blockNumber()
-        
+
         # do not include trailing block if only start of that block is included
         if has_selection and cursor.positionInBlock() == 0 and end_block > start_block:
             end_block -= 1
-        
+
         # determine if commenting or uncommenting
         all_commented: bool = True
         for i in range(start_block, end_block + 1):
@@ -640,12 +649,12 @@ class CodeEditor(QPlainTextEdit):
             if text and not text.startswith("#"):
                 all_commented = False
                 break
-        
+
         for i in range(start_block, end_block + 1):
             block = self.document().findBlockByNumber(i)
             cursor.setPosition(block.position())
             text: str = block.text()
-            
+
             if all_commented:
                 indent_len: int = len(text) - len(text.lstrip())
                 if text[indent_len:].startswith("# "):
@@ -662,7 +671,7 @@ class CodeEditor(QPlainTextEdit):
                     cursor.setPosition(block.position() + indent_len)
                     cursor.insertText("#")
         cursor.endEditBlock()
-    
+
     def showGoToLineDialog(self) -> None:
         """
         Prompt the user for a line number via an input dialog and navigate the cursor to it
@@ -670,7 +679,7 @@ class CodeEditor(QPlainTextEdit):
         """
         current_line: int = self.textCursor().blockNumber() + 1
         max_lines: int = max(1, self.blockCount())
-        
+
         line_number, ok = QInputDialog.getInt(
             self, "Go To Line", f"Enter line number (1 - {max_lines}):",
             current_line, 1, max_lines, 1
@@ -680,9 +689,9 @@ class CodeEditor(QPlainTextEdit):
             target_block = self.document().findBlockByNumber(line_number - 1)
             cursor.setPosition(target_block.position())
             self.setTextCursor(cursor)
-            
+
             self.centerCursor()
-    
+
     def toggleWordWrap(self) -> None:
         """
         Toggle between soft-wrapping text and continuous horizontal scrolling
@@ -706,7 +715,7 @@ class CodeEditor(QPlainTextEdit):
             option.setFlags(option.flags() | QTextOption.Flag.ShowTabsAndSpaces)
 
         self.document().setDefaultTextOption(option)
-            
+
     def getBracketSelections(self) -> list[QTextEdit.ExtraSelection]:
         """
         Find and highlight matching bracket pairs '()', '[]', '{}' if the cursor is adjacent to one
@@ -715,13 +724,13 @@ class CodeEditor(QPlainTextEdit):
         """
         selections: list[QTextEdit.ExtraSelection] = []
         cursor: QTextCursor = self.textCursor()
-        
+
         # Match if no text is selected
         if cursor.hasSelection():
             return selections
         doc = self.document()
         pos = cursor.position()
-        
+
         # Function to create a visual selection
         def create_selection(position: int) -> QTextEdit.ExtraSelection:
             sel = QTextEdit.ExtraSelection()
@@ -735,17 +744,17 @@ class CodeEditor(QPlainTextEdit):
             c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
             sel.cursor = c
             return sel
-        
+
         char_right = doc.characterAt(pos)
         char_left = doc.characterAt(pos - 1) if pos > 0 else ''
-        
+
         pairs = {'(': ')', '[': ']', '{': '}'}
         closing_pairs = {')': '(', ']': '[', '}': '{'}
-        
+
         match_char = ''
         search_direction = 0
         start_pos = pos
-        
+
         if char_right in pairs:
             match_char = pairs[char_right]
             search_direction = 1
@@ -762,14 +771,14 @@ class CodeEditor(QPlainTextEdit):
             search_direction = 1
             start_pos = pos - 1
             char_right = char_left
-        
+
         if search_direction == 0:
             return selections
 
         # Search for the matching pair
         current_pos = start_pos + search_direction
         nesting_level = 1
-        
+
         while 0 <= current_pos < doc.characterCount():
             current_char = doc.characterAt(current_pos)
             if current_char == char_right:
@@ -781,9 +790,9 @@ class CodeEditor(QPlainTextEdit):
                     selections.append(create_selection(current_pos))
                     break
             current_pos += search_direction
-        
+
         return selections
-    
+
     def duplicateLine(self) -> None:
         """
         Duplicate the current line or the selected block of lines below the selection
@@ -839,7 +848,7 @@ class CodeEditor(QPlainTextEdit):
         cursor.setPosition(self.document().findBlockByNumber(end_block).position(), QTextCursor.MoveMode.KeepAnchor)
         cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
 
-        if start_block == 0 and end_block == self.document().blockCount() -1 :
+        if start_block == 0 and end_block == self.document().blockCount() - 1:
             cursor.removeSelectedText()
         elif end_block < self.document().blockCount() - 1:
             cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
@@ -882,7 +891,8 @@ class CodeEditor(QPlainTextEdit):
             cursor.insertText(fragment + "\n")
 
             cursor.setPosition(self.document().findBlockByNumber(start_block - 1).position())
-            cursor.setPosition(self.document().findBlockByNumber(end_block - 1).position(), QTextCursor.MoveMode.KeepAnchor)
+            cursor.setPosition(self.document().findBlockByNumber(end_block - 1).position(),
+                               QTextCursor.MoveMode.KeepAnchor)
             cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
             self.setTextCursor(cursor)
 
@@ -938,7 +948,7 @@ class CodeEditor(QPlainTextEdit):
         self._active_lint_worker = LintWorker(text)
         self._active_lint_worker.lint_complete.connect(self._applyLintErrors)
         self._active_lint_worker.start()
-    
+
     def _applyLintErrors(self, errors: list[LintError]) -> None:
         """
         Process the results from the LintWorker and map syntax errors to underline styles in the text
@@ -948,48 +958,49 @@ class CodeEditor(QPlainTextEdit):
         """
         self._lint_selections.clear()
         self._lint_error_map.clear()
-        
+
         doc = self.document()
         for error in errors:
             block_number: int = error.line_number - 1
             block: QTextBlock = doc.findBlockByNumber(block_number)
-            
+
             if not block.isValid():
                 continue
-            
+
             self._lint_error_map[block_number] = error.message
-            
+
             selection = QTextEdit.ExtraSelection()
             format = QTextCharFormat()
             format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
             format.setUnderlineColor(QColor("red"))
             selection.format = format
-            
+
             cursor = QTextCursor(block)
             offset: int = max(0, error.offset - 1)
             cursor.setPosition(block.position() + offset)
             cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
-            
+
             if cursor.selectedText().strip() == "":
                 cursor.setPosition(block.position())
                 cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
-            
+
             selection.cursor = cursor
             self._lint_selections.append(selection)
-        
+
         self.highlightCurrentLine()
-    
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if hasattr(self, "_lint_error_map") and self._lint_error_map:
             cursor: QTextCursor = self.cursorForPosition(event.position().toPoint())
             block_number: int = cursor.blockNumber()
-            
+
             if block_number in self._lint_error_map:
-                QToolTip.showText(event.globalPosition().toPoint(), f"SyntaxError: {self._lint_error_map[block_number]}", self)
+                QToolTip.showText(event.globalPosition().toPoint(),
+                                  f"SyntaxError: {self._lint_error_map[block_number]}", self)
             else:
                 QToolTip.hideText()
         super().mouseMoveEvent(event)
-    
+
     def wheelEvent(self, event: QWheelEvent) -> None:
         """Handles zooming with ctrl + wheel and horizontal scrolling with shift"""
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
@@ -1006,10 +1017,11 @@ class CodeEditor(QPlainTextEdit):
             return
 
         super().wheelEvent(event)
-    
+
     def keyPressEvent(self, event: QKeyEvent):
         if self.completer and self.completer.popup().isVisible():
-            if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+            if event.key() in (
+            Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
                 event.ignore()
                 return
 
@@ -1027,30 +1039,30 @@ class CodeEditor(QPlainTextEdit):
             self.setTextCursor(cursor)
             event.accept()
             return
-        
+
         is_shortcut = (event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
         if is_shortcut:
             self.startCompleter()
             return
-        
+
         cursor = self.textCursor()
         text = event.text()
 
         pairs = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
         closing_chars = {')', ']', '}', '"', "'"}
 
-        #tabs
+        # tabs
         if event.key() == Qt.Key.Key_Tab:
             if cursor.hasSelection():
                 self.indentSelection(cursor)
             else:
                 cursor.insertText(self.TAB_SPACES)
             return
-        #backtab
+        # backtab
         if event.key() == Qt.Key.Key_Backtab:
             self.unindentSelection(cursor)
             return
-        
+
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
                 self.zoomIn(1)
@@ -1058,33 +1070,36 @@ class CodeEditor(QPlainTextEdit):
             elif event.key() == Qt.Key.Key_Minus:
                 self.zoomOut(1)
                 return
-        
-        #auto indent on enter
+
+        # auto indent on enter
         if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             block = cursor.block()
             line_text = block.text()
 
             indentation = ""
             for char in line_text:
-                if char == " ": indentation += " "
-                elif char == "\t": indentation += "    "
-                else: break
+                if char == " ":
+                    indentation += " "
+                elif char == "\t":
+                    indentation += "    "
+                else:
+                    break
 
             if line_text.rstrip().endswith(":"):
                 indentation += "    "
-            #Input:(Enter)
+            # Input:(Enter)
             # Output: {
             #             |
             #         }
             pos = cursor.positionInBlock()
             if pos > 0 and pos < len(line_text):
-                char_before = line_text[pos-1]
+                char_before = line_text[pos - 1]
                 char_after = line_text[pos]
                 if char_before in "{[(" and char_after in "}])":
                     super().keyPressEvent(event)
                     self.insertPlainText(indentation)
                     cursor_pos = self.textCursor().position()
-                    self.insertPlainText("\n" + indentation[:-4] if len(indentation)>=4 else "\n")
+                    self.insertPlainText("\n" + indentation[:-4] if len(indentation) >= 4 else "\n")
 
                     new_cursor = self.textCursor()
                     new_cursor.setPosition(cursor_pos)
@@ -1095,7 +1110,7 @@ class CodeEditor(QPlainTextEdit):
             self.insertPlainText(indentation)
             return
 
-        #backspace
+        # backspace
         if event.key() == Qt.Key.Key_Backspace:
             pos = cursor.position()
             doc = self.document()
@@ -1115,7 +1130,7 @@ class CodeEditor(QPlainTextEdit):
             super().keyPressEvent(event)
             return
 
-        #typeover
+        # typeover
         if text in closing_chars:
             pos = cursor.position()
             block_text = cursor.block().text()
@@ -1128,7 +1143,7 @@ class CodeEditor(QPlainTextEdit):
                     self.setTextCursor(cursor)
                     return
 
-        #auto close quotes etc
+        # auto close quotes etc
         if text in pairs:
             super().keyPressEvent(event)
             self.insertPlainText(pairs[text])
@@ -1136,7 +1151,7 @@ class CodeEditor(QPlainTextEdit):
             return
 
         super().keyPressEvent(event)
-        
+
         if self.completer:
             if text and (text.isalnum() or text == "_"):
                 self.handleCompleterUpdate()
