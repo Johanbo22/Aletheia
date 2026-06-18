@@ -23,7 +23,7 @@ from ui.animations import AggregationAnimation, CalculationAnimation, DataFilter
 from ui.dialogs import AggregationDialog, AppendDialog, BinningDialog, ColumnReorderDialog, ComputedColumnDialog, \
     CreateDatasetDialog, FillMissingDialog, FilterAdvancedDialog, HelpDialog, MacroPreviewDialog, MeltDialog, \
     MergeDialog, OutlierDetectionDialog, PercentageChangeDialog, PivotDialog, ProgressDialog, RegexReplaceDialog, \
-    RenameColumnDialog, RollingWindowDialog, ShiftDataDialog, SplitColumnDialog, SubsetDataViewer, SubsetManagerDialog
+    RenameColumnDialog, RollingWindowDialog, ShiftDataDialog, SplitColumnDialog, SubsetDataViewer
 from ui.dialogs.ExportDialog import ExportConfig, ExportDialog
 from ui.widgets.ToastNotification import ToastLevel
 from ui.workers import AutoCreateSubsetsWorker, GoogleSheetsImportWorker
@@ -1729,7 +1729,7 @@ class DataTabController:
             return
 
         try:
-            # Create and show dialog
+            from ui.dialogs import SubsetManagerDialog
             dialog = SubsetManagerDialog(self.subset_manager, self.data_handler, self.view)
             # Request redirection to index 1
             dialog.plot_subset_requested.connect(self.handle_plot_request)

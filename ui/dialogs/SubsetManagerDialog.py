@@ -8,8 +8,10 @@ from controller.data_tab_controller import DataTabController
 from core.data_handler import DataHandler
 from core.global_signals import LogLevel, ToastLevel, global_signals
 from core.subset_manager import SubsetManager
-from ui.dialogs import CreateSubsetDialog, ProgressDialog, SubsetDataViewer
 from ui.workers import AutoCreateSubsetsWorker
+from .CreateSubsetDialog import CreateSubsetDialog
+from .ProgressDialog import ProgressDialog
+from .SubsetDataViewer import SubsetDataViewer
 
 class SubsetDialogConstants:
     Title: str = "Data Subsets Tool"
@@ -297,7 +299,7 @@ class SubsetManagerDialog(QDialog):
 
     def refresh_subset_list(self):
         """Refreshes the list of subsets"""
-        print("DEBUG: resfresh_subset_list: Starting")
+        print("DEBUG: refresh_subset_list: Starting")
         print(f"DEBUG: refresh_subset_list: subset_list widget exists: {hasattr(self, "subset_list")}")
 
         if not hasattr(self, "subset_list"):
