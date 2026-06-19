@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from ui.status_bar import LogLevel
 from ui.widgets import ColorBlindnessEffect
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ class AppearanceSettingsManager:
         self.view.bottom_spine_visible_check.setChecked(True)
         self.view.left_spine_visible_check.setChecked(True)
         self.view.right_spine_visible_check.setChecked(True)
-        self.status_bar.log("Applied preset: All Spines", "INFO")
+        self.status_bar.log("Applied preset: All Spines", LogLevel.INFO)
         self.plot_tab.on_style_changed()
 
     def preset_box_only(self) -> None:
@@ -51,7 +52,7 @@ class AppearanceSettingsManager:
         self.view.bottom_spine_visible_check.setChecked(True)
         self.view.left_spine_visible_check.setChecked(True)
         self.view.right_spine_visible_check.setChecked(False)
-        self.status_bar.log("Applied preset: Box Only", "INFO")
+        self.status_bar.log("Applied preset: Box Only", LogLevel.INFO)
         self.plot_tab.on_style_changed()
 
     def preset_no_spines(self) -> None:
@@ -60,7 +61,7 @@ class AppearanceSettingsManager:
         self.view.bottom_spine_visible_check.setChecked(False)
         self.view.left_spine_visible_check.setChecked(False)
         self.view.right_spine_visible_check.setChecked(False)
-        self.status_bar.log("Applied preset: No Spines", "INFO")
+        self.status_bar.log("Applied preset: No Spines", LogLevel.INFO)
         self.plot_tab.on_style_changed()
 
     def on_grid_toggle(self) -> None:
@@ -89,8 +90,8 @@ class AppearanceSettingsManager:
             sim_type = self.view.colorblind_type_combo.currentText()
             effect = ColorBlindnessEffect(sim_type)
             self.canvas.setGraphicsEffect(effect)
-            self.status_bar.log(f"Color blindness mode enabled: {sim_type}", "INFO")
+            self.status_bar.log(f"Color blindness mode enabled: {sim_type}", LogLevel.INFO)
         else:
             self.canvas.setGraphicsEffect(None)
-            self.status_bar.log("Color blindness mode disabled", "INFO")
+            self.status_bar.log("Color blindness mode disabled", LogLevel.INFO)
         self.plot_tab.on_style_changed()

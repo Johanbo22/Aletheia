@@ -1,6 +1,8 @@
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from PyQt6.QtWidgets import QMessageBox
+
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -27,7 +29,7 @@ class SubplotManager:
         """Activates the subplot group for visibility"""
         subplots_enabled: bool = self.view.add_subplots_check.isChecked()
         self.view.subplot_group.setVisible(subplots_enabled)
-        
+
         if not subplots_enabled:
             self.plot_tab.clear_plot()
 
@@ -44,7 +46,8 @@ class SubplotManager:
         )
         if confirmation == QMessageBox.StandardButton.Yes:
             try:
-                self.plot_engine.setup_layout(rows=rows, cols=cols, sharex=sharex, sharey=sharey, custom_grid=custom_grid)
+                self.plot_engine.setup_layout(rows=rows, cols=cols, sharex=sharex, sharey=sharey,
+                                              custom_grid=custom_grid)
 
                 max_plots = len(custom_grid)
                 self.view.active_subplot_combo.blockSignals(True)
@@ -60,16 +63,16 @@ class SubplotManager:
                 # Trigger the overlay update
                 self.on_active_subplot_changed(0)
 
-                self.status_bar.log(f"Subplot layout updated to {rows}x{cols} with {max_plots} plots", "INFO")
+                self.status_bar.log(f"Subplot layout updated to {rows}x{cols} with {max_plots} plots", LogLevel.INFO)
             except Exception as layout_err:
-                self.status_bar.log(f"Failed to apply custom grid layout: {str(layout_err)}", "ERROR")
+                self.status_bar.log(f"Failed to apply custom grid layout: {str(layout_err)}", LogLevel.ERROR)
 
     def on_active_subplot_changed(self, index: int) -> None:
         """Changes the index of the active subplot"""
         if index >= 0:
             self.plot_engine.set_active_subplot(index)
             self.update_overlay()
-            self.status_bar.log(f"Active subplot set to: {index + 1}", "INFO")
+            self.status_bar.log(f"Active subplot set to: {index + 1}", LogLevel.INFO)
 
     def update_overlay(self, is_resize: bool = False) -> None:
         """Recalculates the geometry and overlay widgets"""

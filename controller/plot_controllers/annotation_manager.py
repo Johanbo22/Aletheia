@@ -8,6 +8,7 @@ from matplotlib.text import Text
 
 from controller.plot_controllers.color_manager import ColorManager
 from core.global_signals import ToastLevel, global_signals
+from ui.status_bar import LogLevel
 from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
 
 if TYPE_CHECKING:
@@ -265,7 +266,7 @@ class AnnotationManager:
                             gid="auto_annotation"
                         )
             except Exception as err:
-                self.status_bar.log(f"Error applying annotations: {str(err)}", "ERROR")
+                self.status_bar.log(f"Error applying annotations: {str(err)}", LogLevel.ERROR)
 
     def handle_pick_event(self, artist, event) -> bool:
         """Handles selecting an annotation text object on the canvas"""
@@ -293,7 +294,7 @@ class AnnotationManager:
                     if idx < self.view.annotations_list.count():
                         self.view.annotations_list.setCurrentRow(idx)
                         self.on_annotation_selected(self.view.annotations_list.item(idx))
-                        self.status_bar.log(f"Selected annotation: {artist.get_text()}", "INFO")
+                        self.status_bar.log(f"Selected annotation: {artist.get_text()}", LogLevel.INFO)
 
                         mouse_event = getattr(event, "mouseevent", None)
                         is_dbclick = getattr(mouse_event, "dblclick", False)
@@ -350,7 +351,7 @@ class AnnotationManager:
                             item = self.view.annotations_list.item(idx)
                             item.setText(f"{self.annotations[idx]['text']} @ ({pos[0]:.2f}, {pos[1]:.2f})")
 
-                        self.status_bar.log(f"Moved annotation to ({pos[0]:.2f}, {pos[1]:.2f})", "INFO")
+                        self.status_bar.log(f"Moved annotation to ({pos[0]:.2f}, {pos[1]:.2f})", LogLevel.INFO)
                 except ValueError:
                     pass
 

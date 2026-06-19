@@ -523,7 +523,7 @@ class PlotTab(PlotTabUI):
                                              ToastLevel.INFO)
                 self.status_bar.log(f"Refreshed subset list: {subset_count} subsets available", LogLevel.INFO)
         except Exception as RefreshSubsetListError:
-            self.status_bar.log(f"Error: Could not refresh subset list", LogLevel.ERROR)
+            self.status_bar.log(f"Error: Could not refresh subset list: {str(RefreshSubsetListError)}", LogLevel.ERROR)
             global_signals.request_toast("Subset Error", "Failed to refresh the list of subsets", ToastLevel.ERROR)
 
     def get_active_dataframe(self):
@@ -785,7 +785,7 @@ class PlotTab(PlotTabUI):
         current_data_signature = tuple(data_params)
         if (hasattr(self, "_last_data_signature") and self._last_data_signature == current_data_signature and hasattr(
                 self, "_cached_active_df") and self._cached_active_df is not None):
-            self.status_bar.log("Using cached data for plotting", "INFO")
+            self.status_bar.log("Using cached data for plotting", LogLevel.INFO)
             self._generate_main_plot(
                 self._cached_active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter,
                 keep_data=True
@@ -794,7 +794,7 @@ class PlotTab(PlotTabUI):
 
         self._last_data_signature = current_data_signature
 
-        self.status_bar.log("Preparing data in background...", "INFO")
+        self.status_bar.log("Preparing data in background...", LogLevel.INFO)
         self._prep_progress_dialog = ProgressDialog(title="Preparing Data", message="Initializing background task...",
                                                     parent=self)
         self._prep_progress_dialog.show()
@@ -802,7 +802,7 @@ class PlotTab(PlotTabUI):
         from ui.workers import PlotDataPrepWorker
         worker = PlotDataPrepWorker(active_df, plot_type, x_col, y_cols, quick_filter)
         worker.signals.progress.connect(self._prep_progress_dialog.update_progress)
-        worker.signals.log.connect(lambda msg: self.status_bar.log(msg, "INFO"))
+        worker.signals.log.connect(lambda msg: self.status_bar.log(msg, LogLevel.INFO))
         worker.signals.error.connect(self._on_prep_error)
         worker.signals.finished.connect(
             lambda processed_df: self._on_prep_finished(
@@ -842,7 +842,7 @@ class PlotTab(PlotTabUI):
                 )
                 self.status_bar.log(f"Filter {query} returned 0 rows", LogLevel.WARNING)
                 return None
-            self.status_bar.log(f"Quick Filter applied: {query} ({len(df)} -> {len(filtered_df)} rows)", "INFO")
+            self.status_bar.log(f"Quick Filter applied: {query} ({len(df)} -> {len(filtered_df)} rows)", LogLevel.INFO)
             return filtered_df
         except Exception as QuickFilterError:
             self.status_bar.log(f"Quick Filter error: {str(QuickFilterError)}", LogLevel.ERROR)
@@ -881,7 +881,7 @@ class PlotTab(PlotTabUI):
             subset_name = frozen_config.get("subset_name")
             quick_filter = frozen_config.get("quick_filter", "")
             active_df = self._restore_frozen_data(subset_name)
-            self.status_bar.log(f"Using data config for plot {current_subplot_index + 1}", "INFO")
+            self.status_bar.log(f"Using data config for plot {current_subplot_index + 1}", LogLevel.INFO)
         else:
             active_df = self.get_active_dataframe()
             x_col = self.view.x_column.currentText()
@@ -985,7 +985,7 @@ class PlotTab(PlotTabUI):
                 global_signals.toast_requested.emit("Plot Generated", f"A {plot_type} plot has been generated",
                                                     ToastLevel.SUCCESS, 4000)
         except InterruptedError:
-            self.status_bar.log(f"Plot generation cancelled", "INFO")
+            self.status_bar.log(f"Plot generation cancelled", LogLevel.INFO)
             if progress_dialog:
                 progress_dialog.accept()
         except Exception as CreateMainPlotError:
@@ -1021,7 +1021,7 @@ class PlotTab(PlotTabUI):
         if progress_dialog:
             progress_dialog.update_progress(value, message)
             if progress_dialog.is_cancelled():
-                self.status_bar.log("Plot generation cancelled", "WARNING")
+                self.status_bar.log("Plot generation cancelled", LogLevel.WARNING)
                 raise InterruptedError("User cancelled")
 
     def _validate_plot_requirements(self, plot_type, x_col, y_cols) -> bool:
@@ -1110,7 +1110,7 @@ class PlotTab(PlotTabUI):
         except Exception as TightLayoutError:
             error_msg = str(TightLayoutError)
             if "ParseSyntaxException" not in error_msg and "math text" not in error_msg.lower():
-                self.status_bar.log(f"Tight layout not applied due to error: {error_msg}", "ERROR")
+                self.status_bar.log(f"Tight layout not applied due to error: {error_msg}", LogLevel.ERROR)
 
         self.canvas.draw()
 
@@ -1221,10 +1221,9 @@ class PlotTab(PlotTabUI):
         """Load plot configuration"""
         try:
             self.config_manager.load_config(config)
-            self.status_bar.log("Plot Config loaded", "INFO")
+            self.status_bar.log("Plot Config loaded", LogLevel.INFO)
         except Exception as LoadConfigError:
-            self.status_bar.log(f"Error loading plot config from saved project: {str(LoadConfigError)}")
-            traceback.print_exc()
+            self.status_bar.log(f"Error loading plot config from saved project: {str(LoadConfigError)}", LogLevel.ERROR)
 
     def get_config(self) -> Dict[str, Any]:
         """Get current plot configuration"""
@@ -1252,10 +1251,10 @@ class PlotTab(PlotTabUI):
                 with open(greeting_path, "r", encoding="utf-8") as file:
                     greeting_html = file.read()
             else:
-                self.status_bar.log("Plotting Studio Greeting HTML File not found", "ERROR")
+                self.status_bar.log("Plotting Studio Greeting HTML File not found", LogLevel.ERROR)
                 greeting_html = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Plot Studio</h2><p>Design and customize your visualizations.</p></div>"
         except Exception as ReadGreetingError:
-            self.status_bar.log(f"Failed to load greeting HTML: {str(ReadGreetingError)}", "ERROR")
+            self.status_bar.log(f"Failed to load greeting HTML: {str(ReadGreetingError)}", LogLevel.ERROR)
             greeting_html = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Plot Studio</h2></div>"
 
         if hasattr(self, "empty_state_view") and self.empty_state_view is not None:

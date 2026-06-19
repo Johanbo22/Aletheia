@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QInputDialog, QMessageBox
 
 from core.global_signals import ToastLevel, global_signals
 from ui.dialogs.PlotConfigEditorDialog import PlotConfigEditorDialog
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -93,7 +94,7 @@ class ThemeManager:
             try:
                 with open(filepath, "w") as file:
                     json.dump(theme_data, file, indent=4)
-                self.status_bar.log(f"Theme '{text}' saved", "SUCCESS")
+                self.status_bar.log(f"Theme '{text}' saved", LogLevel.SUCCESS)
                 self.refresh_theme_list()
 
                 index = self.view.theme_combo.findText(text)
@@ -101,7 +102,7 @@ class ThemeManager:
                     self.view.theme_combo.setCurrentIndex(index)
 
             except Exception as SaveThemeError:
-                self.status_bar.log(f"Failed to save theme: {SaveThemeError}", "ERROR")
+                self.status_bar.log(f"Failed to save theme: {SaveThemeError}", LogLevel.ERROR)
                 global_signals.request_toast(
                     "Error", "Could not save theme", ToastLevel.ERROR
                 )
@@ -114,26 +115,31 @@ class ThemeManager:
 
         filepath = self.theme_dir / theme_file
         if not filepath.exists():
-            self.status_bar.log(f"Theme file not found: {filepath}", "ERROR")
+            self.status_bar.log(f"Theme file not found: {filepath}", LogLevel.ERROR)
             return
 
         try:
             with open(filepath, "r") as file:
                 theme_config = json.load(file)
 
-            if "appearance" in theme_config: self.config_manager._load_appearance_config(theme_config["appearance"])
-            if "axes" in theme_config: self.config_manager._load_axes_config(theme_config["axes"])
-            if "legend" in theme_config: self.config_manager._load_legend_config(theme_config["legend"])
-            if "grid" in theme_config: self.config_manager._load_grid_config(theme_config["grid"])
-            if "advanced" in theme_config: self.config_manager._load_advanced_config(theme_config["advanced"])
+            if "appearance" in theme_config:
+                self.config_manager._load_appearance_config(theme_config["appearance"])
+            if "axes" in theme_config:
+                self.config_manager._load_axes_config(theme_config["axes"])
+            if "legend" in theme_config:
+                self.config_manager._load_legend_config(theme_config["legend"])
+            if "grid" in theme_config:
+                self.config_manager._load_grid_config(theme_config["grid"])
+            if "advanced" in theme_config:
+                self.config_manager._load_advanced_config(theme_config["advanced"])
 
-            self.status_bar.log(f"Theme '{self.view.theme_combo.currentText()}' applied", "SUCCESS")
+            self.status_bar.log(f"Theme '{self.view.theme_combo.currentText()}' applied", LogLevel.SUCCESS)
 
             if self.plot_tab.data_handler.df is not None:
                 self.plot_tab.generate_plot()
 
         except Exception as ApplyThemeError:
-            self.status_bar.log(f"Failed to load theme: {ApplyThemeError}", "ERROR")
+            self.status_bar.log(f"Failed to load theme: {ApplyThemeError}", LogLevel.ERROR)
             global_signals.request_toast(
                 "Error", "Could not load theme", ToastLevel.ERROR
             )
@@ -164,9 +170,9 @@ class ThemeManager:
                 if filepath.exists():
                     filepath.unlink()
                     self.refresh_theme_list()
-                    self.status_bar.log(f"Theme '{theme_name}' deleted", "INFO")
+                    self.status_bar.log(f"Theme '{theme_name}' deleted", LogLevel.INFO)
             except Exception as DeleteThemeError:
-                self.status_bar.log(f"Failed to delete theme: {DeleteThemeError}", "ERROR")
+                self.status_bar.log(f"Failed to delete theme: {DeleteThemeError}", LogLevel.ERROR)
 
     def edit_custom_theme(self) -> None:
         """Opens the PlotConfigEditorDialog for the selected theme"""
@@ -202,14 +208,14 @@ class ThemeManager:
                 with open(save_path, "w") as file:
                     json.dump(new_content, file, indent=4)
 
-                self.status_bar.log(f"Theme '{save_name}' updated", "SUCCESS")
+                self.status_bar.log(f"Theme '{save_name}' updated", LogLevel.INFO)
                 self.refresh_theme_list()
 
                 index = self.view.theme_combo.findText(save_name)
                 if index >= 0:
                     self.view.theme_combo.setCurrentIndex(index)
         except Exception as EditThemeJSONError:
-            self.status_bar.log(f"Failed to edit theme: {EditThemeJSONError}", "ERROR")
+            self.status_bar.log(f"Failed to edit theme: {EditThemeJSONError}", LogLevel.ERROR)
             global_signals.request_toast(
                 "Error", "Could not edit theme", ToastLevel.ERROR
             )

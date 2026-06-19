@@ -1,12 +1,14 @@
-from typing import TYPE_CHECKING, Optional, Tuple, Set
+from typing import Optional, Set, TYPE_CHECKING, Tuple
 
-from PyQt6.QtWidgets import QToolTip
+import pandas as pd
 from PyQt6.QtGui import QCursor
-from matplotlib.widgets import SpanSelector
+from PyQt6.QtWidgets import QToolTip
+from matplotlib.collections import PathCollection
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
-from matplotlib.collections import PathCollection
-import pandas as pd
+from matplotlib.widgets import SpanSelector
+
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -84,7 +86,7 @@ class CanvasInteractionManager:
 
         if selected_indices:
             self.plot_tab.brush_selection_made.emit(selected_indices)
-            self.plot_tab.status_bar.log(f"Selected {len(selected_indices)} points", "INFO")
+            self.plot_tab.status_bar.log(f"Selected {len(selected_indices)} points", LogLevel.INFO)
 
     def on_scroll(self, event) -> None:
         """Handles zoom in/out events via mouse scroll"""
@@ -131,7 +133,7 @@ class CanvasInteractionManager:
             self.plot_tab.view.xlabel_input.setFocus()
         elif artist == ax.yaxis.get_label():
             self.plot_tab.view.ylabel_input.setFocus()
-            self.plot_tab.status_bar.log(f"Selected text element: {artist.get_text()}", "INFO")
+            self.plot_tab.status_bar.log(f"Selected text element: {artist.get_text()}", LogLevel.INFO)
 
         elif isinstance(artist, Line2D):
             if artist.get_gid() in ["regression_line", "confidence_interval", "error_bar"]:
@@ -147,7 +149,7 @@ class CanvasInteractionManager:
                 index = self.plot_tab.view.line_selector_combo.findText(label)
                 if index >= 0:
                     self.plot_tab.view.line_selector_combo.setCurrentIndex(index)
-                    self.plot_tab.status_bar.log(f"Selected line: {label}", "INFO")
+                    self.plot_tab.status_bar.log(f"Selected line: {label}", LogLevel.INFO)
 
         elif isinstance(artist, Rectangle):
             self._handle_bar_pick(artist)
@@ -155,7 +157,7 @@ class CanvasInteractionManager:
         elif isinstance(artist, PathCollection):
             index_of_customization_tab = 4
             self.plot_tab.custom_tabs.setCurrentIndex(index_of_customization_tab)
-            self.plot_tab.status_bar.log("Selected scatter points", "INFO")
+            self.plot_tab.status_bar.log("Selected scatter points", LogLevel.INFO)
 
     def _handle_bar_pick(self, artist: Rectangle) -> None:
         """Handle picking a bar chart rectangle"""
@@ -178,7 +180,7 @@ class CanvasInteractionManager:
                 if self.plot_tab.view.bar_selector_combo.itemData(i) == found_container:
                     self.plot_tab.view.bar_selector_combo.setCurrentIndex(i)
                     label = self.plot_tab.view.bar_selector_combo.itemText(i)
-                    self.plot_tab.status_bar.log(f"Selected bar series: {label}", "INFO")
+                    self.plot_tab.status_bar.log(f"Selected bar series: {label}", LogLevel.INFO)
                     break
 
     def on_mouse_press(self, event) -> None:
@@ -194,7 +196,7 @@ class CanvasInteractionManager:
             if event.inaxes in self.plot_tab.plot_engine.axes_flat:
                 idx = self.plot_tab.plot_engine.axes_flat.index(event.inaxes)
                 self.plot_tab.view.active_subplot_combo.setCurrentIndex(idx)
-                self.plot_tab.status_bar.log(f"Active subplot changed to Plot {idx + 1}.", "INFO")
+                self.plot_tab.status_bar.log(f"Active subplot changed to Plot {idx + 1}.", LogLevel.INFO)
             return
 
         if event.button == middle_mouse_click:
@@ -263,7 +265,8 @@ class CanvasInteractionManager:
                 idx = ind["ind"][0]
                 x_val = line.get_xdata()[idx]
                 y_val = line.get_ydata()[idx]
-                text = f"X: {x_val:.4g}\nY: {y_val:.4g}" if isinstance(x_val, (int, float)) else f"X: {x_val}\nY: {y_val:.4g}"
+                text = f"X: {x_val:.4g}\nY: {y_val:.4g}" if isinstance(x_val,
+                                                                       (int, float)) else f"X: {x_val}\nY: {y_val:.4g}"
                 QToolTip.showText(QCursor.pos(), text, self.plot_tab.canvas)
                 found_point = True
                 break

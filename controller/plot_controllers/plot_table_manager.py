@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from core.global_signals import global_signals
+from ui.status_bar import LogLevel
 from ui.widgets.ToastNotification import ToastLevel
 
 if TYPE_CHECKING:
@@ -110,4 +111,4 @@ class PlotTableManager:
 
         except Exception as PlotTableError:
             global_signals.toast_requested.emit("Error", "Failed to add table to plot", ToastLevel.ERROR, 4000)
-            self.status_bar.log(f"Failed to add table to plot: {str(PlotTableError)}", "ERROR")
+            self.status_bar.log(f"Failed to add table to plot: {str(PlotTableError)}", LogLevel.ERROR)

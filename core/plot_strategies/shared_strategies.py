@@ -1,9 +1,12 @@
 from abc import abstractmethod
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
 import pandas as pd
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from core.plot_engine import PlotEngine
@@ -11,6 +14,7 @@ if TYPE_CHECKING:
 
 class GriddedPlotStrategy(BasePlotStrategy):
     """Base strategy for plots requireing gridded data"""
+
     @property
     @abstractmethod
     def plot_name(self) -> str:
@@ -47,7 +51,8 @@ class GriddedPlotStrategy(BasePlotStrategy):
         if len(y_cols) < 2:
             if hasattr(plot_tab, "status_bar"):
                 plot_tab.status_bar.log(
-                    f"{self.plot_name} requires a Z column. Please select a second Y column (Z-value).", "WARNING")
+                    f"{self.plot_name} requires a Z column. Please select a second Y column (Z-value).",
+                    LogLevel.WARNING)
             return f"{self.plot_name} requires a Z column."
 
         df = plot_tab.data_handler.df
@@ -123,7 +128,8 @@ class VectorPlotStrategy(BasePlotStrategy):
         if len(y_cols) < 3:
             if hasattr(plot_tab, "status_bar"):
                 plot_tab.status_bar.log(
-                    f"{self.plot_name} requires 3 Y columns: Y-position, U (x-component), V (y-component).", "WARNING")
+                    f"{self.plot_name} requires 3 Y columns: Y-position, U (x-component), V (y-component).",
+                    LogLevel.WARNING)
             return f"{self.plot_name} requires 3 Y columns: Y-position, U (x-component), V (y-component)."
 
         df = plot_tab.data_handler.df
@@ -200,11 +206,12 @@ class TriangulationPlotStrategy(BasePlotStrategy):
         if len(y_cols) < 2 and self.plot_name != "Triplot":
             if hasattr(plot_tab, "status_bar"):
                 plot_tab.status_bar.log(
-                    f"{self.plot_name} requires a Z column. Please select a second Y column (Z-axis).", "WARNING")
+                    f"{self.plot_name} requires a Z column. Please select a second Y column (Z-axis).",
+                    LogLevel.WARNING)
             return f"{self.plot_name} requires a Z column."
         elif not y_cols and self.plot_name == "Triplot":
             if hasattr(plot_tab, "status_bar"):
-                plot_tab.status_bar.log(f"{self.plot_name} requires a Y column.", "WARNING")
+                plot_tab.status_bar.log(f"{self.plot_name} requires a Y column.", LogLevel.WARNING)
             return f"{self.plot_name} requires a Y column."
 
         df = plot_tab.data_handler.df

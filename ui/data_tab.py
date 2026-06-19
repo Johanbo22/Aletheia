@@ -1,33 +1,29 @@
 # ui/data_tab.py
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QListWidgetItem, QTableView, QHeaderView, QGraphicsOpacityEffect, QMenu, QStackedWidget, QApplication, QTabWidget, QLabel, QAbstractItemView
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtSignal, QSize, QTimer, QModelIndex
-from PyQt6.QtGui import QIcon, QFont, QAction, QPalette, QColor, QShortcut, QKeySequence
-
-from core.data_handler import DataHandler
-from core.resource_loader import get_resource_path
-from ui.status_bar import StatusBar
-from ui.dialogs import TableCustomizationDialog
-from core.subset_manager import SubsetManager
 from pathlib import Path
 
-from ui.data_table_model import DataTableModel
-from ui.theme import ThemeColors
-from icons import IconBuilder, IconType
-from ui.components.data_operations_panel import DataOperationsPanel
-from ui.components.statistics_generator import StatisticsGenerator
-from ui.components.data_table_delegate import DataTableDelegate
-from ui.components.data_search_bar import DataSearchBar
-from ui.components.data_view_toolbar import DataViewToolbar
-from ui.LandingPage import LandingPage
-from icons import IconBuilder, IconType
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QGraphicsOpacityEffect, QHBoxLayout, QHeaderView, \
+    QListWidgetItem, QMenu, QStackedWidget, QTabWidget, QTableView, QVBoxLayout, QWidget
 
+from controller.data_tab_controller import DataTabController
+from core.data_handler import DataHandler
+from core.subset_manager import SubsetManager
+from icons import IconBuilder, IconType
+from ui.LandingPage import LandingPage
 from ui.animations import (
     EditModeToggleAnimation
 )
-from controller.data_tab_controller import DataTabController
-from ui.workers import SearchWorker
-
+from ui.components.data_operations_panel import DataOperationsPanel
+from ui.components.data_search_bar import DataSearchBar
+from ui.components.data_table_delegate import DataTableDelegate
+from ui.components.data_view_toolbar import DataViewToolbar
+from ui.components.statistics_generator import StatisticsGenerator
+from ui.data_table_model import DataTableModel
+from ui.dialogs import TableCustomizationDialog
+from ui.status_bar import LogLevel, StatusBar
+from ui.theme import ThemeColors
 
 class DataTab(QWidget):
     """Tab for viewing and manipulating data"""
@@ -43,17 +39,18 @@ class DataTab(QWidget):
     data_modified = pyqtSignal()
 
     def __init__(
-        self,
-        data_handler: DataHandler,
-        status_bar: StatusBar,
-        subset_manager: SubsetManager,
+            self,
+            data_handler: DataHandler,
+            status_bar: StatusBar,
+            subset_manager: SubsetManager,
     ):
         super().__init__()
 
         self.data_handler = data_handler
         self.status_bar = status_bar
         self.subset_manager = subset_manager
-        self.controller = DataTabController(data_handler=self.data_handler, status_bar=self.status_bar, view=self, subset_manager=self.subset_manager)
+        self.controller = DataTabController(data_handler=self.data_handler, status_bar=self.status_bar, view=self,
+                                            subset_manager=self.subset_manager)
         self.stats_generator = StatisticsGenerator()
         self.plot_tab = None
         self.data_table = None
@@ -62,7 +59,7 @@ class DataTab(QWidget):
         self.subset_view_label = None
         self.aggregation_view_label = None
         self.is_editing = False
-        
+
         self.current_precision = 2
         self.current_formatting_rules = []
         self.current_render_bools = True
@@ -121,8 +118,9 @@ class DataTab(QWidget):
         # Search bar
         self.search_bar = DataSearchBar(data_handler=self.data_handler, parent=self)
         self.search_bar.match_found.connect(self.highlight_cell)
-        self.search_bar.clear_selection_requested.connect(lambda: self.data_table.clearSelection() if self.data_handler else None)
-        
+        self.search_bar.clear_selection_requested.connect(
+            lambda: self.data_table.clearSelection() if self.data_handler else None)
+
         self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self.search_shortcut.activated.connect(self.open_search_bar)
 
@@ -156,7 +154,7 @@ class DataTab(QWidget):
         self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self.data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
         self.data_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
-        
+
         palette = self.data_table.palette()
         active_highlight = palette.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Highlight)
         active_text = palette.color(QPalette.ColorGroup.Active, QPalette.ColorRole.HighlightedText)
@@ -167,10 +165,10 @@ class DataTab(QWidget):
         # Data table context menu
         self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.data_table.customContextMenuRequested.connect(self.show_table_context_menu)
-        
+
         self.data_table.horizontalHeader().sectionClicked.connect(self._on_horizontal_header_clicked)
         self.data_table.verticalHeader().sectionClicked.connect(self._on_vertical_header_clicked)
-        
+
         self.copy_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self.data_table)
         self.copy_shortcut.activated.connect(self.copy_selection)
 
@@ -185,10 +183,10 @@ class DataTab(QWidget):
         self.stats_text.setGraphicsEffect(self.stats_opacity_effect)
         stats_icon = IconBuilder.build(IconType.ExploreStatisticsIcon)
         self.data_tabs.addTab(self.stats_text, stats_icon, "Statistics")
-        
+
         self.test_results_text = QWebEngineView()
         self.test_results_text.page().setBackgroundColor(QColor(Qt.GlobalColor.transparent))
-        
+
         self.set_test_results_greeting()
         test_result_icon = IconBuilder.build(IconType.Calculator)
         self.data_tabs.addTab(self.test_results_text, test_result_icon, "Test Results")
@@ -210,7 +208,7 @@ class DataTab(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
-        
+
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 6)
 
@@ -227,12 +225,12 @@ class DataTab(QWidget):
 
         if self.is_editing:
             self.data_table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.AnyKeyPressed)
-            self.status_bar.log("Edit Mode Enabled. You are now able to edit cells in the data table", "INFO")
+            self.status_bar.log("Edit Mode Enabled. You are now able to edit cells in the data table", LogLevel.INFO)
 
             EditModeToggleAnimation(parent=self, is_on=True).start(target_widget=self)
         else:
             self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
-            self.status_bar.log("Edit Mode Disabled", "INFO")
+            self.status_bar.log("Edit Mode Disabled", LogLevel.INFO)
             EditModeToggleAnimation(parent=self, is_on=False).start(target_widget=self)
 
         # Update the flags
@@ -262,7 +260,7 @@ class DataTab(QWidget):
             self.data_table.setCurrentIndex(index)
             self.data_table.scrollTo(index, QTableView.ScrollHint.PositionAtCenter)
             self.data_table.setFocus()
-    
+
     def _on_horizontal_header_clicked(self, logical_index: int) -> None:
         """Handles horizontal header clicks for inserting columns"""
         model = self.data_table.model()
@@ -270,7 +268,7 @@ class DataTab(QWidget):
             return
         if logical_index == model._data.shape[1]:
             model.insert_empty_column()
-    
+
     def _on_vertical_header_clicked(self, logical_index: int) -> None:
         """Handles vertical header clicks to insert rows"""
         model = self.data_table.model()
@@ -284,7 +282,7 @@ class DataTab(QWidget):
         if self.data_handler.df is None:
             self._handle_empty_data_view()
             return
-        
+
         # Detect if a completely new dataset or project has been loaded
         history_info = self.data_handler.get_history_info()
         nodes_dict = history_info.get("nodes", {})
@@ -302,12 +300,12 @@ class DataTab(QWidget):
                 if hasattr(self, "data_tabs") and self.data_tabs is not None:
                     self.data_tabs.setCurrentIndex(0)
             self._last_dataset_signature = dataset_signature
-        
+
         if hasattr(self, "left_stack"):
             self.left_stack.setCurrentIndex(1)
         if hasattr(self, "right_widget"):
             self.right_widget.setVisible(True)
-        
+
         # UI updaters
         self._update_data_model(reload_model)
         self._update_edit_triggers()
@@ -317,7 +315,7 @@ class DataTab(QWidget):
         self._update_subsets_status()
         self._update_history_list()
         self.data_modified.emit()
-    
+
     def _handle_empty_data_view(self) -> None:
         """Clears the UI when no data is loaded"""
         if hasattr(self, "left_stack"):
@@ -331,7 +329,7 @@ class DataTab(QWidget):
 
         if hasattr(self, "stats_text") and self.stats_text is not None:
             self.stats_text.setHtml("")
-        
+
         if hasattr(self, "test_results_text") and self.test_results_text is not None:
             self.set_test_results_greeting()
 
@@ -340,16 +338,16 @@ class DataTab(QWidget):
 
         self.status_bar.set_data_source("")
         self.status_bar.set_view_context("", "normal")
-    
+
         self._last_dataset_signature = None
         if hasattr(self, "data_tabs") and self.data_tabs is not None:
             self.data_tabs.setCurrentIndex(0)
-    
+
     def _update_data_model(self, reload_model: bool) -> None:
         """Updates the table model and restores sorting states"""
         if not reload_model:
             return
-        
+
         df = self.data_handler.df
         if hasattr(self, "model") and isinstance(self.model, DataTableModel):
             self.model.update_data()
@@ -358,7 +356,9 @@ class DataTab(QWidget):
             if self.data_table.model() is not self.model:
                 self.data_table.setModel(self.model)
         else:
-            self.model = DataTableModel(self.data_handler, editable=self.is_editing, float_precision=self.current_precision, conditional_rules=self.current_formatting_rules)
+            self.model = DataTableModel(self.data_handler, editable=self.is_editing,
+                                        float_precision=self.current_precision,
+                                        conditional_rules=self.current_formatting_rules)
             self.model.set_bool_render_style(getattr(self, "current_render_bools", True))
 
             if hasattr(self.model, "set_nan_display"):
@@ -371,10 +371,10 @@ class DataTab(QWidget):
             self.model.columnsInserted.connect(self._update_column_selectors)
             self.data_table.setSortingEnabled(False)
             self.data_table.setModel(self.model)
-        
+
         header = self.data_table.horizontalHeader()
         header.blockSignals(True)
-        
+
         if self.data_handler.sort_state:
             col_name, ascending = self.data_handler.sort_state
             try:
@@ -385,23 +385,23 @@ class DataTab(QWidget):
                 header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         else:
             header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        
+
         header.blockSignals(False)
         self.data_table.setSortingEnabled(True)
-    
+
     def _update_edit_triggers(self) -> None:
         """Sets the table edit triggers based on the editing state"""
         if self.is_editing:
             self.data_table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.AnyKeyPressed)
         else:
             self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
-            
+
     def _update_column_selectors(self) -> None:
         """Updates column selection boxes"""
         df = self.data_handler.df
         columns = list(df.columns)
         panel = self.operations_panel
-        
+
         panel.filtering_tab.filter_column.clear()
         panel.filtering_tab.filter_column.addItems(columns)
         panel.columns_tab.column_list.clear()
@@ -412,7 +412,7 @@ class DataTab(QWidget):
         panel.datetime_tab.dt_start_combo.addItems(columns)
         panel.datetime_tab.dt_end_combo.clear()
         panel.datetime_tab.dt_end_combo.addItems(columns)
-        
+
         if hasattr(panel, "transform_tab") and hasattr(panel.transform_tab, "sort_column_combo"):
             current_sort = panel.transform_tab.sort_column_combo.currentText()
             panel.transform_tab.sort_column_combo.clear()
@@ -424,17 +424,17 @@ class DataTab(QWidget):
                 panel.transform_tab.sort_column_combo.setCurrentText(self.data_handler.sort_state[0])
             elif self.data_handler.sort_state and self.data_handler.sort_state[0] is None:
                 panel.transform_tab.sort_column_combo.setCurrentText("[Index]")
-                
+
         if hasattr(panel, "subsets_tab") and hasattr(panel.subsets_tab, "subset_column_combo"):
             try:
                 panel.subsets_tab.subset_column_combo.clear()
                 panel.subsets_tab.subset_column_combo.addItems(columns)
             except Exception as Error:
                 print(f"Warning: Could not update subset columns: {str(Error)}")
-        
+
         if self.plot_tab:
             self.plot_tab.update_column_combo()
-    
+
     def _update_data_source_status(self) -> None:
         """Updates the status bar and refreshes butotns based on datat source"""
         if self.data_handler.has_google_sheets_import():
@@ -454,7 +454,7 @@ class DataTab(QWidget):
         else:
             self.status_bar.set_data_source("New")
             self.toolbar.set_refresh_visible(False)
-    
+
     def _update_subsets_status(self) -> None:
         """Refreshes subset info and updates status bar"""
         try:
@@ -464,10 +464,10 @@ class DataTab(QWidget):
                 self.controller.refresh_active_subsets()
         except Exception as Error:
             print(f"Warning: Could not refresh subsets: {Error}")
-        
+
         inserted_name = getattr(self.data_handler, "inserted_subset_name", None)
         agg_name = getattr(self.data_handler, "viewing_aggregation_name", None)
-        
+
         if agg_name:
             self.status_bar.set_view_context(f"Viewing Aggregation: {agg_name}")
         elif inserted_name:
@@ -536,7 +536,8 @@ class DataTab(QWidget):
         panel.history_tab.history_list.addItem(initial_item)
 
         for i, node_id in enumerate(path_to_current):
-            if node_id == root_id: continue
+            if node_id == root_id:
+                continue
 
             node = nodes_dict[node_id]
             operation = node.diff_record.metadata
@@ -583,7 +584,7 @@ class DataTab(QWidget):
         if hasattr(panel.history_tab, "pipeline_graph"):
             panel.history_tab.pipeline_graph.build_graph(nodes_dict, root_id, current_node_id,
                                                          self._format_operation_text)
-    
+
     def _get_icon_for_operation(self, operation_type: str) -> QIcon:
         match operation_type:
             case "filter" | "filter_multiple":
@@ -628,13 +629,13 @@ class DataTab(QWidget):
                 break
             current_widget = current_widget.parentWidget()
         if not found_tab_widget:
-            self.status_bar.log("Could not switch to plot tab: Tab Widget not found", "WARNING")
+            self.status_bar.log("Could not switch to plot tab: Tab Widget not found", LogLevel.ERROR)
 
     def update_statistics(self) -> None:
         """Update statistics display"""
         if self.data_handler.df is None:
             return
-        
+
         try:
             info = self.data_handler.get_data_info()
             df = self.data_handler.df
@@ -643,11 +644,11 @@ class DataTab(QWidget):
                 f"<p style='color: red;'>Error loading data info: {str(UpdateStatisticsError)}</p>"
             )
             return
-        
+
         # Generate HTML
         final_html = self.stats_generator.generate_html(df, info)
         self.stats_text.setHtml(final_html)
-        
+
         self.stats_animation = QPropertyAnimation(self.stats_opacity_effect, b"opacity")
         self.stats_animation.setDuration(500)
         self.stats_animation.setStartValue(0.0)
@@ -786,7 +787,7 @@ class DataTab(QWidget):
             self.open_table_customization()
         elif action == stats_test_action:
             self.controller.run_statistical_test_from_selection()
-        
+
     def copy_selection(self) -> None:
         """
         Copies the currently selected cells in the table to the system clipboard
@@ -794,35 +795,35 @@ class DataTab(QWidget):
         """
         if self.data_table is None:
             return
-        
+
         selection_model = self.data_table.selectionModel()
         if selection_model is None or not selection_model.hasSelection():
-            self.status_bar.log("No cells selected to copy", "WARNING")
+            self.status_bar.log("No cells selected to copy", LogLevel.WARNING)
             return
-        
+
         selected_indexes = selection_model.selectedIndexes()
         if not selected_indexes:
             return
-        
+
         sorted_indexes = sorted(selected_indexes, key=lambda idx: (idx.row(), idx.column()))
-        
+
         copied_text = ""
         previous_row = sorted_indexes[0].row()
-        
+
         for index in sorted_indexes:
             current_row = index.row()
-            
+
             if current_row != previous_row:
                 copied_text += "\n"
                 previous_row = current_row
             elif index != sorted_indexes[0]:
                 copied_text += "\t"
-            
+
             cell_data = index.data(Qt.ItemDataRole.DisplayRole)
             copied_text += str(cell_data) if cell_data is not None else ""
-            
+
         QApplication.clipboard().setText(copied_text)
-        self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard", "SUCCESS")
+        self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard", LogLevel.SUCCESS)
 
     def open_table_customization(self):
         """Opens the settings dialog for the table customzation"""
@@ -840,23 +841,23 @@ class DataTab(QWidget):
         )
 
         current_settings = {
-            "alternating_rows": self.data_table.alternatingRowColors(),
-            "alt_color": current_alt_color,
-            "show_grid": self.data_table.showGrid(),
-            "grid_color": getattr(self, "current_grid_color", "#D3D3D3"),
-            "grid_style": getattr(self, "current_grid_style", "Solid Line"),
-            "show_h_headers": self.data_table.horizontalHeader().isVisible(),
-            "show_v_headers": self.data_table.verticalHeader().isVisible(),
-            "font_family": current_font.family(),
-            "font_size": current_font_size,
-            "word_wrap": self.data_table.wordWrap(),
-            "selection_behavior": self.data_table.selectionBehavior(),
-            "float_precision": self.current_precision,
-            "thousands_separator": getattr(self, "current_thousands_sep", False),
-            "scientific_notation": getattr(self, "current_scientific_notation", False),
-            "nan_display": getattr(self, "current_nan_display", "NaN"),
-            "conditional_rules": self.current_formatting_rules,
-            "text_alignment": getattr(self, "current_text_alignment", "Left"),
+            "alternating_rows"          : self.data_table.alternatingRowColors(),
+            "alt_color"                 : current_alt_color,
+            "show_grid"                 : self.data_table.showGrid(),
+            "grid_color"                : getattr(self, "current_grid_color", "#D3D3D3"),
+            "grid_style"                : getattr(self, "current_grid_style", "Solid Line"),
+            "show_h_headers"            : self.data_table.horizontalHeader().isVisible(),
+            "show_v_headers"            : self.data_table.verticalHeader().isVisible(),
+            "font_family"               : current_font.family(),
+            "font_size"                 : current_font_size,
+            "word_wrap"                 : self.data_table.wordWrap(),
+            "selection_behavior"        : self.data_table.selectionBehavior(),
+            "float_precision"           : self.current_precision,
+            "thousands_separator"       : getattr(self, "current_thousands_sep", False),
+            "scientific_notation"       : getattr(self, "current_scientific_notation", False),
+            "nan_display"               : getattr(self, "current_nan_display", "NaN"),
+            "conditional_rules"         : self.current_formatting_rules,
+            "text_alignment"            : getattr(self, "current_text_alignment", "Left"),
             "render_bools_as_checkboxes": getattr(self, "current_render_bools", True)
         }
 
@@ -865,7 +866,7 @@ class DataTab(QWidget):
         if dialog.exec():
             settings = dialog.get_settings()
             self.apply_table_settings(settings)
-    
+
     def apply_table_settings(self, settings: dict) -> None:
         """
         Applies a dictionary of customization settings to the data table and its model.
@@ -873,7 +874,7 @@ class DataTab(QWidget):
         """
         self.current_precision = settings.get("float_precision", 2)
         self.current_formatting_rules = settings.get("conditional_rules", [])
-        
+
         self.current_text_alignment = settings.get("text_alignment", "Left")
         self.current_render_bools = settings.get("render_bools_as_checkboxes", True)
 
@@ -922,7 +923,7 @@ class DataTab(QWidget):
         else:
             self.data_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
             self.data_table.verticalHeader().setDefaultSectionSize(32)
-        
+
         if self.data_table.model() and isinstance(self.data_table.model(), DataTableModel):
             self.data_table.model().set_float_precision(self.current_precision)
             self.data_table.model().set_conditional_rules(self.current_formatting_rules)
@@ -937,17 +938,17 @@ class DataTab(QWidget):
 
             self.data_table.model().layoutChanged.emit()
 
-        self.status_bar.log("Table settings updated", "SUCCESS")
+        self.status_bar.log("Table settings updated", LogLevel.SUCCESS)
 
     def get_selection_state(self):
         """Returns the currently selected row indicies and column names"""
         if self.data_table is None or self.data_table.selectionModel() is None:
             return [], []
-        
+
         indexes = self.data_table.selectionModel().selectedIndexes()
         if not indexes:
             return [], []
-        
+
         selected_rows = sorted(list(set(index.row() for index in indexes)))
         if self.data_handler.df is not None:
             col_indices = sorted(list(set(index.column() for index in indexes)))
@@ -957,9 +958,9 @@ class DataTab(QWidget):
                     selected_columns.append(self.data_handler.df.columns[i])
         else:
             selected_columns = []
-        
+
         return selected_rows, selected_columns
-    
+
     def set_test_results_greeting(self):
         """Sets the initial instructions for the Test Results tab"""
         try:
@@ -970,8 +971,8 @@ class DataTab(QWidget):
             else:
                 greeting_html = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Statistical Test Suite</h2><p>Test Results will appear here.</p></div>"
         except Exception as ReadGreetingError:
-            self.status_bar.log(f"Failed to load greeting HTML: {str(ReadGreetingError)}", "ERROR")
+            self.status_bar.log(f"Failed to load greeting HTML: {str(ReadGreetingError)}", LogLevel.ERROR)
             greeting_html = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Statistical Test Suite</h2></div>"
-            
+
         if hasattr(self, 'test_results_text') and self.test_results_text is not None:
             self.test_results_text.setHtml(greeting_html)

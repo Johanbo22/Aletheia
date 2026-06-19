@@ -13,6 +13,7 @@ from scipy.stats import t as t_dist
 
 from core.global_signals import ToastLevel, global_signals
 from ui.dialogs import ScriptEditorDialog
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -74,7 +75,7 @@ class ScriptManager:
 
     def run_custom_script(self, script_content: str) -> None:
         """Executes the script from the editor. Overrides the standard plotting sequence"""
-        self.plot_tab.status_bar.log("Running custom script...", "INFO")
+        self.plot_tab.status_bar.log("Running custom script...", LogLevel.INFO)
         try:
             def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
                 allowed_modules = {
@@ -125,12 +126,12 @@ class ScriptManager:
             self.plot_tab.canvas.draw()
 
             self._sync_gui_from_ax(ax_result)
-            self.plot_tab.status_bar.log("Script Executed", "SUCCESS")
+            self.plot_tab.status_bar.log("Script Executed", LogLevel.SUCCESS)
         except Exception as ExecuteScriptError:
             global_signals.request_toast(
                 "Script Error", "An error occurred while running the script", ToastLevel.ERROR
             )
-            self.plot_tab.status_bar.log(f"Script execution failed: {str(ExecuteScriptError)}", "ERROR")
+            self.plot_tab.status_bar.log(f"Script execution failed: {str(ExecuteScriptError)}", LogLevel.ERROR)
 
     def _sync_gui_from_ax(self, ax: plt.Axes) -> None:
         """
@@ -200,7 +201,7 @@ class ScriptManager:
 
             self.plot_tab.config_manager.load_config(config)
         except Exception as sync_error:
-            self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", LogLevel.WARNING)
 
     def _sync_label(self, config: dict, section: str, key: str, value: str) -> None:
         """Sync text labels and enabled them if populated"""

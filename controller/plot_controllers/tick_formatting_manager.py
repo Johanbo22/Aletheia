@@ -1,7 +1,10 @@
+from typing import Any, Optional, TYPE_CHECKING
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, FuncFormatter, MaxNLocator, NullLocator
-from typing import Any, Optional, TYPE_CHECKING
+
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -36,7 +39,7 @@ class TickFormattingManager:
                     ax.zaxis.set_major_locator(
                         MaxNLocator(nbins=self.plot_tab.view.z_max_ticks_spin.value()))
         except Exception as e:
-            self.plot_tab.status_bar.log(f"Could not apply initial tick locators: {str(e)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Could not apply initial tick locators: {str(e)}", LogLevel.WARNING)
 
     def apply_tick_customization(self) -> None:
         """Apply tick label formatting, rotations, units, and locators."""
@@ -107,7 +110,7 @@ class TickFormattingManager:
             if hasattr(ax, "zaxis"):
                 self._set_minor_locator(ax.zaxis, needs_z_minor)
         except Exception as e:
-            self.plot_tab.status_bar.log(f"Warning mapping minor locators: {str(e)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Warning mapping minor locators: {str(e)}", LogLevel.WARNING)
 
     def _set_minor_locator(self, axis_obj: Any, needs_minor: bool) -> None:
         """Helper to set AutoMinorLocator or NullLocator based on state."""
@@ -171,7 +174,7 @@ class TickFormattingManager:
                     if z_formatter:
                         ax.zaxis.set_major_formatter(z_formatter)
         except Exception as e:
-            self.plot_tab.status_bar.log(f"Failed to apply display units: {str(e)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Failed to apply display units: {str(e)}", LogLevel.ERROR)
 
         if self.plot_tab.view.custom_datetime_check.isChecked():
             self._apply_datetime_formatters()
@@ -195,7 +198,8 @@ class TickFormattingManager:
                     ax.xaxis.set_major_formatter(mdates.DateFormatter(fmt_str))
                     ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=15))
                 except Exception as error:
-                    self.plot_tab.status_bar.log(f"Failed to apply X-axis datetime format: {str(error)}", "WARNING")
+                    self.plot_tab.status_bar.log(f"Failed to apply X-axis datetime format: {str(error)}",
+                                                 LogLevel.ERROR)
 
         y_fmt_name = self.plot_tab.view.y_datetime_format_combo.currentText()
         if y_fmt_name and y_fmt_name != "None":
@@ -206,7 +210,8 @@ class TickFormattingManager:
                     ax.yaxis.set_major_formatter(mdates.DateFormatter(fmt_str))
                     ax.yaxis.set_major_locator(mdates.AutoDateLocator(minticks=4, maxticks=15))
                 except Exception as error:
-                    self.plot_tab.status_bar.log(f"Failed to apply Y-axis datetime format: {str(error)}", "WARNING")
+                    self.plot_tab.status_bar.log(f"Failed to apply Y-axis datetime format: {str(error)}",
+                                                 LogLevel.ERROR)
 
     def _apply_axis_rotations_and_inversions(self) -> None:
         """Apply tick label rotations and axis orientation inversion."""

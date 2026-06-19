@@ -5,6 +5,7 @@ from matplotlib.ticker import MaxNLocator
 
 from controller.plot_controllers.tick_formatting_manager import TickFormattingManager
 from core.global_signals import ToastLevel, global_signals
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -147,7 +148,7 @@ class PlotFormattingManager:
             self.plot_tab.plot_engine.current_figure.set_facecolor(self.plot_tab.bg_color)
             self.plot_tab.plot_engine.current_ax.set_facecolor(self.plot_tab.face_color)
         except Exception as error:
-            self.plot_tab.status_bar.log(f"Could not apply plotting style. {str(error)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Could not apply plotting style. {str(error)}", LogLevel.WARNING)
             self.plot_tab.plot_engine.current_ax.set_facecolor(self.plot_tab.face_color)
 
     def set_axis_limit_and_scales(self) -> None:
@@ -179,7 +180,7 @@ class PlotFormattingManager:
             try:
                 self.plot_tab.plot_engine.current_ax.set_zscale(target_z_scale)
             except Exception as error:
-                self.plot_tab.status_bar.log(f"Z-Scale update ignore: {error}", "WARNING")
+                self.plot_tab.status_bar.log(f"Z-Scale update ignore: {error}", LogLevel.WARNING)
 
     def apply_plot_formatting(self, progress_dialog: Any, x_col: str, y_cols: list[str],
                               general_kwargs: dict, active_df: 'pd.DataFrame') -> None:
@@ -205,7 +206,7 @@ class PlotFormattingManager:
                     self.plot_tab.plot_engine.current_ax.zaxis.set_major_locator(
                         MaxNLocator(nbins=self.plot_tab.view.z_max_ticks_spin.value()))
         except Exception as e:
-            self.plot_tab.status_bar.log(f"Could not apply tick formatting: {str(e)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Could not apply tick formatting: {str(e)}", LogLevel.WARNING)
 
         if progress_dialog:
             self.plot_tab._update_progress(progress_dialog, 70, "Applying formatting")
@@ -494,7 +495,7 @@ class PlotFormattingManager:
             if legend.get_title():
                 legend.get_title().set_fontfamily(font_family)
         except Exception as e:
-            self.plot_tab.status_bar.log(f"Failed to apply legend: {e}", "WARNING")
+            self.plot_tab.status_bar.log(f"Failed to apply legend: {e}", LogLevel.WARNING)
 
     def apply_gridlines_customizations(self) -> None:
         """Apply gridlines customizations."""
@@ -562,7 +563,7 @@ class PlotFormattingManager:
                 try:
                     text_artist.remove()
                 except Exception as error:
-                    self.plot_tab.status_bar.log(f"Failed to remove previous textbox: {str(error)}", "WARNING")
+                    self.plot_tab.status_bar.log(f"Failed to remove previous textbox: {str(error)}", LogLevel.WARNING)
                     global_signals.request_toast(
                         "Textbox Warning", "Failed to remove previous textbox", ToastLevel.WARNING
                     )
@@ -634,4 +635,4 @@ class PlotFormattingManager:
                 else:
                     spines[key].set_visible(False)
         except Exception as e:
-            self.plot_tab.status_bar.log(f"Failed to apply spine customization: {str(e)}", "ERROR")
+            self.plot_tab.status_bar.log(f"Failed to apply spine customization: {str(e)}", LogLevel.ERROR)

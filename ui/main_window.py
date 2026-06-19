@@ -149,7 +149,7 @@ class MainWindow(QWidget):
                 first_index = min(indices)
                 model_index = self.data_tab.data_table.model().index(first_index, 0)
                 self.data_tab.data_table.scrollTo(model_index)
-                self.status_bar.log(f"Highlighted {len(indices)} selected rows in Data Explorer", "SUCCESS")
+                self.status_bar.log(f"Highlighted {len(indices)} selected rows in Data Explorer", LogLevel.SUCCESS)
 
     def _connect_subset_managers(self) -> None:
         """Connect the subset manager used in both DataTab and PlotTab"""
@@ -320,7 +320,7 @@ class MainWindow(QWidget):
         try:
             project = self.project_manager.load_project(filepath)
             self.load_project(project)
-            self.status_bar.log(f"Project loaded: {filepath}")
+            self.status_bar.log(f"Project loaded: {filepath}", LogLevel.SUCCESS)
             self._update_recent_projects(filepath)
 
             self.show_toast("Project Opened", "Project loaded", ToastLevel.SUCCESS)
@@ -625,7 +625,7 @@ class MainWindow(QWidget):
             self.progress_dialog = None
 
         self.show_toast("Error", "Failed to import file", ToastLevel.ERROR)
-        self.status_bar.log(f"Import failed: {str(error)}", "ERROR")
+        self.status_bar.log(f"Import failed: {str(error)}", LogLevel.ERROR)
         self._temp_import_filepath = None
 
     def import_google_sheets(self) -> None:
@@ -821,7 +821,7 @@ class MainWindow(QWidget):
                 self.show_toast(
                     "Export Error", "Failed to export code to file", ToastLevel.ERROR
                 )
-                self.status_bar.log(f"Failed to export code: {str(ExportPythonScriptError)}")
+                self.status_bar.log(f"Failed to export code: {str(ExportPythonScriptError)}", LogLevel.ERROR)
 
     def export_logs(self) -> None:
         """Export session log"""

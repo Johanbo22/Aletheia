@@ -25,9 +25,9 @@ from ui.dialogs import AggregationDialog, AppendDialog, BinningDialog, ColumnReo
     MergeDialog, OutlierDetectionDialog, PercentageChangeDialog, PivotDialog, ProgressDialog, RegexReplaceDialog, \
     RenameColumnDialog, RollingWindowDialog, ShiftDataDialog, SplitColumnDialog, SubsetDataViewer
 from ui.dialogs.ExportDialog import ExportConfig, ExportDialog
+from ui.status_bar import LogLevel
 from ui.widgets.ToastNotification import ToastLevel
 from ui.workers import AutoCreateSubsetsWorker, GoogleSheetsImportWorker
-from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.data_tab import DataTab
@@ -92,7 +92,7 @@ class DataTabController:
                                                          fill_value=fill_value)
                 self.view.toolbar.set_refresh_visible(False)
                 self.view.refresh_data_view()
-                self.status_bar.log(f"Created new dataset: ({rows}x{columns})", "SUCCESS")
+                self.status_bar.log(f"Created new dataset: ({rows}x{columns})", LogLevel.SUCCESS)
 
                 NewDataFrameAnimation(parent=None, message="Created New Dataframe").start(target_widget=self.view)
 
@@ -101,7 +101,7 @@ class DataTabController:
                 "Error", "Failed to create dataset", ToastLevel.ERROR, 4000
             )
             self.status_bar.log(
-                f"Failed to create dataset: {str(e)}", "ERROR"
+                f"Failed to create dataset: {str(e)}", LogLevel.ERROR
             )
 
     def refresh_google_sheets(self):
@@ -195,7 +195,7 @@ class DataTabController:
             self.progress_dialog.close()
 
         if hasattr(self, "status_bar"):
-            self.status_bar.log(f"Failed to refresh Google Sheets data: {str(error)}", "ERROR")
+            self.status_bar.log(f"Failed to refresh Google Sheets data: {str(error)}", LogLevel.ERROR)
             global_signals.request_toast(
                 "Error", f"Failed to refresh Google Sheets data:\n"
                          "Please check:\n"
@@ -207,7 +207,8 @@ class DataTabController:
 
     def remove_duplicates(self) -> None:
         """Remove duplicate rows"""
-        if self.data_handler.df is None: return
+        if self.data_handler.df is None:
+            return
         if getattr(self, "_preview_msg_box", None) is not None:
             self._preview_msg_box.close()
         try:
@@ -239,7 +240,7 @@ class DataTabController:
                 if self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes:
                     self._execute_remove_duplicates()
                 else:
-                    self.status_bar.log("Remove duplicates operation cancelled.", "INFO")
+                    self.status_bar.log("Remove duplicates operation cancelled.", LogLevel.INFO)
 
                 self._preview_msg_box.deleteLater()
                 self._preview_msg_box = None
@@ -248,7 +249,7 @@ class DataTabController:
             self._preview_msg_box.show()
 
         except (ValueError, TypeError, KeyError) as e:
-            self.status_bar.log(f"Failed to prepare duplicate preview {str(e)}", "ERROR")
+            self.status_bar.log(f"Failed to prepare duplicate preview {str(e)}", LogLevel.ERROR)
 
     def _execute_remove_duplicates(self) -> None:
         try:
@@ -273,12 +274,13 @@ class DataTabController:
                 level="SUCCESS",
             )
         except (ValueError, TypeError, KeyError) as e:
-            self.status_bar.log(f"Failed to remove duplicates: {str(e)}", "ERROR")
+            self.status_bar.log(f"Failed to remove duplicates: {str(e)}", LogLevel.ERROR)
             FailedAnimation("Failed To Remove Rows").start(target_widget=self.view)
 
     def drop_missing(self):
         """Drop rows with missing values"""
-        if self.data_handler.df is None: return
+        if self.data_handler.df is None:
+            return
         if getattr(self, "_preview_msg_box", None) is not None:
             self._preview_msg_box.close()
         try:
@@ -310,7 +312,7 @@ class DataTabController:
                 if self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes:
                     self._execute_drop_missing()
                 else:
-                    self.status_bar.log("Drop missing values operation cancelled.", "INFO")
+                    self.status_bar.log("Drop missing values operation cancelled.", LogLevel.INFO)
 
                 self._preview_msg_box.deleteLater()
                 self._preview_msg_box = None
@@ -319,7 +321,7 @@ class DataTabController:
             self._preview_msg_box.show()
 
         except Exception as DropMissingError:
-            self.status_bar.log(f"Failed to prepare missing values preview: {str(DropMissingError)}", "ERROR")
+            self.status_bar.log(f"Failed to prepare missing values preview: {str(DropMissingError)}", LogLevel.ERROR)
 
     def _execute_drop_missing(self) -> None:
         try:
@@ -345,15 +347,13 @@ class DataTabController:
             ).start(target_widget=self.view)
         except Exception as DropMissingError:
             self.status_bar.log(
-                f"Failed to drop missing values: {str(DropMissingError)}", "ERROR"
+                f"Failed to drop missing values: {str(DropMissingError)}", LogLevel.ERROR
             )
             self.failed_animation = FailedAnimation("Failed to Drop Missing values").start(target_widget=self.view)
 
     def drop_empty_columns(self) -> None:
         if self.data_handler.df is None:
-            global_signals.request_toast(
-                "No Data", "Please load data first", ToastLevel.WARNING
-            )
+            self.no_data_loaded_toast()
             return
 
         cols_before = len(self.data_handler.df.columns)
@@ -474,7 +474,7 @@ class DataTabController:
 
         selected_columns = self.view.operations_panel.get_selected_columns()
         if not selected_columns:
-            self.status_bar.log("No columns selected for normalization", "WARNING")
+            self.status_bar.log("No columns selected for normalization", LogLevel.WARNING)
             global_signals.request_toast(
                 "No Selection", f"Please select at least one column from the table to normalize", ToastLevel.WARNING
             )
@@ -555,7 +555,7 @@ class DataTabController:
 
         except Exception as ApplyFilterError:
             self.status_bar.log(
-                f"Failed to execute 'Filter': {str(ApplyFilterError)}", "ERROR"
+                f"Failed to execute 'Filter': {str(ApplyFilterError)}", LogLevel.ERROR
             )
 
     def clear_filters(self):
@@ -564,7 +564,7 @@ class DataTabController:
             return
 
         self.reset_data()
-        self.status_bar.log("Filters cleared and data reset to original state", "INFO")
+        self.status_bar.log("Filters cleared and data reset to original state", LogLevel.INFO)
 
     def open_advanced_filter(self):
         """Open advanced filter dialog"""
@@ -586,7 +586,10 @@ class DataTabController:
                 self.data_handler.filter_data(advanced_filters=filters)
 
                 self.view.refresh_data_view()
-                self.status_bar.log(f"Filters applied to data: {filters}")
+                self.status_bar.log(f"Filters applied to data: {filters}", LogLevel.SUCCESS)
+                global_signals.request_toast(
+                    "Filter Applied", f"Filters applied to data: {filters}", ToastLevel.SUCCESS
+                )
             except Exception as FilterError:
                 self.status_bar.log(f"Error applying filter: {str(FilterError)}", LogLevel.ERROR)
                 global_signals.request_toast(
@@ -653,7 +656,7 @@ class DataTabController:
         selected_columns = self.view.operations_panel.get_selected_columns()
 
         if not selected_columns:
-            self.status_bar.log("No column selected", "WARNING")
+            self.status_bar.log("No column selected", LogLevel.WARNING)
             return
 
         old_name = selected_columns[0]
@@ -684,7 +687,7 @@ class DataTabController:
                 self.rename_column_animation.start(self.view)
             except Exception as RenameColumnError:
                 self.status_bar.log(
-                    f"Failed to rename column: {str(RenameColumnError)}", "ERROR"
+                    f"Failed to rename column: {str(RenameColumnError)}", LogLevel.ERROR
                 )
 
     def duplicate_column(self) -> None:
@@ -692,7 +695,7 @@ class DataTabController:
         selected_columns = self.view.operations_panel.get_selected_columns()
 
         if not selected_columns:
-            self.status_bar.log("No column selected", "WARNING")
+            self.status_bar.log("No column selected", LogLevel.WARNING)
             return
         if len(selected_columns) > 1:
             global_signals.request_toast(
@@ -754,7 +757,7 @@ class DataTabController:
             except Exception as ComputedColumnError:
                 self.status_bar.log(
                     f"Failed to create and calculate new column: {str(ComputedColumnError)}",
-                    "ERROR",
+                    LogLevel.ERROR,
                 )
                 global_signals.toast_requested.emit(f"Error", f"Failed to create and calculate new column",
                                                     ToastLevel.ERROR, 4000)
@@ -767,7 +770,7 @@ class DataTabController:
 
         selected_columns = self.view.operations_panel.get_selected_columns()
         if not selected_columns:
-            self.status_bar.log("No Column Selected", "WARNING")
+            self.status_bar.log("No Column Selected", LogLevel.WARNING)
             return
 
         if len(selected_columns) > 1:
@@ -794,7 +797,7 @@ class DataTabController:
         elif type_str.startswith("datetime"):
             target_type = "datetime"
         else:
-            self.status_bar.log(f"Unknown DataType: {type_str}", "ERROR")
+            self.status_bar.log(f"Unknown DataType: {type_str}", LogLevel.ERROR)
             return
 
         try:
@@ -811,7 +814,7 @@ class DataTabController:
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
                 if reply == QMessageBox.StandardButton.No:
-                    self.status_bar.log("Data Type conversion cancelled", "WARNING")
+                    self.status_bar.log("Data Type conversion cancelled", LogLevel.WARNING)
                     return
 
                 self.data_handler.clean_data(
@@ -852,7 +855,7 @@ class DataTabController:
 
         selected_columns = self.view.operations_panel.get_selected_columns()
         if not selected_columns:
-            self.status_bar.log("No Column Selected", "WARNING")
+            self.status_bar.log("No Column Selected", LogLevel.WARNING)
             global_signals.request_toast(
                 "No Column Selected", "Please select a column", ToastLevel.WARNING
             )
@@ -898,7 +901,7 @@ class DataTabController:
 
             self.status_bar.log(
                 f"Successfully applied '{selected_operation}' to column '{column}'",
-                "SUCCESS",
+                LogLevel.SUCCESS,
             )
 
         except Exception as TextManipulationError:
@@ -1561,10 +1564,10 @@ class DataTabController:
                         action="reorder_columns",
                         new_order=new_order
                     )
-                    self.status_bar.log("Columns have been reordered", "SUCCESS")
+                    self.status_bar.log("Columns have been reordered", LogLevel.SUCCESS)
                     self.view.refresh_data_view()
                 except Exception as error:
-                    self.status_bar.log(f"Failed to reorder columns: {str(error)}", "ERROR")
+                    self.status_bar.log(f"Failed to reorder columns: {str(error)}", LogLevel.ERROR)
 
     def apply_sort(self):
         """Apply a permanent sorting to data"""
@@ -1692,7 +1695,7 @@ class DataTabController:
                         self.subset_manager.apply_subset(self.data_handler.df, name)
                     except Exception as ApplySubsetError:
                         self.status_bar.log(f"Warning: Could not apply subset {name}: {str(ApplySubsetError)}",
-                                            "WARNING")
+                                            LogLevel.WARNING)
 
             for name in self.subset_manager.list_subsets():
                 subset = self.subset_manager.get_subset(name)
@@ -1702,7 +1705,7 @@ class DataTabController:
                 subset_data.append((name, row_text))
             self.view.operations_panel.update_active_subsets_list(subset_data)
         except Exception as RefreshSubsetListError:
-            self.status_bar.log(f"Warning: Could not refresh subset list: {RefreshSubsetListError}", "ERROR")
+            self.status_bar.log(f"Warning: Could not refresh subset list: {RefreshSubsetListError}", LogLevel.ERROR)
         finally:
             QApplication.restoreOverrideCursor()
 
@@ -1908,7 +1911,7 @@ class DataTabController:
         )
 
         if reply == QMessageBox.StandardButton.No:
-            self.status_bar.log("Data reset cancelled", "INFO")
+            self.status_bar.log("Data reset cancelled", LogLevel.INFO)
             return
 
         try:
@@ -1964,7 +1967,7 @@ class DataTabController:
                 level="SUCCESS",
             )
         except Exception as ResetDataError:
-            self.status_bar.log(f"Failed to reset data: {str(ResetDataError)}", "ERROR")
+            self.status_bar.log(f"Failed to reset data: {str(ResetDataError)}", LogLevel.ERROR)
 
     def show_help_dialog(self, topic_id: str = None):
         """Displays the help dialog for a specific topic"""
@@ -2025,9 +2028,9 @@ class DataTabController:
         if file_path:
             try:
                 self.data_handler.export_pipeline_macro(file_path)
-                self.status_bar.log(f"Macro saved to {file_path}", "SUCCESS")
+                self.status_bar.log(f"Macro saved to {file_path}", LogLevel.SUCCESS)
             except Exception as err:
-                self.status_bar.log(f"Failed to save pipeline macro: {str(err)}", "ERROR")
+                self.status_bar.log(f"Failed to save pipeline macro: {str(err)}", LogLevel.ERROR)
 
     def load_pipeline_macro(self) -> None:
         """Loads a JSON macro file and executes the pipeline on the currently active DataFrame."""

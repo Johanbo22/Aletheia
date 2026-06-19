@@ -1,20 +1,23 @@
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+from typing import Any, Dict, List, TYPE_CHECKING
+
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from core.plot_engine import PlotEngine
     from ui.plot_tab import PlotTab
-    
+
 class ScatterPlotStrategy(BasePlotStrategy):
-    
-    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
+
+    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool,
+                font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
         df = plot_tab.data_handler.df
         engine._clear_axes()
 
         if len(y_cols) > 1:
-            plot_tab.status_bar.log(f"Scatter only supports one y column. Using: {y_cols[0]}", "WARNING")
+            plot_tab.status_bar.log(f"Scatter only supports one y column. Using: {y_cols[0]}", LogLevel.WARNING)
 
         y_col = y_cols[0]
 
@@ -46,7 +49,8 @@ class ScatterPlotStrategy(BasePlotStrategy):
 
             for i, group in enumerate(groups):
                 mask = (df[hue] == group) & df[real_x].notna() & df[real_y].notna()
-                if colors: kwargs["color"] = colors[i]
+                if colors:
+                    kwargs["color"] = colors[i]
 
                 if size_col and size_col in df.columns:
                     s_data = df.loc[mask, size_col]
@@ -54,12 +58,13 @@ class ScatterPlotStrategy(BasePlotStrategy):
                         kwargs["s"] = size_min
                     else:
                         kwargs["s"] = size_min + (size_max - size_min) * (s_data - s_min_global) / (
-                                    s_max_global - s_min_global)
+                                s_max_global - s_min_global)
 
                 engine.current_ax.scatter(df.loc[mask, real_x], df.loc[mask, real_y], label=str(group), picker=5,
                                           **kwargs)
         else:
-            if cmap_name: kwargs["cmap"] = cmap_name
+            if cmap_name:
+                kwargs["cmap"] = cmap_name
             mask = df[real_x].notna() & df[real_y].notna()
 
             if size_col and size_col in df.columns:
@@ -68,7 +73,7 @@ class ScatterPlotStrategy(BasePlotStrategy):
                     kwargs["s"] = size_min
                 else:
                     kwargs["s"] = size_min + (size_max - size_min) * (s_data - s_min_global) / (
-                                s_max_global - s_min_global)
+                            s_max_global - s_min_global)
 
             engine.current_ax.scatter(df.loc[mask, real_x], df.loc[mask, real_y], picker=5, **kwargs)
 
@@ -96,7 +101,7 @@ class ScatterPlotStrategy(BasePlotStrategy):
 
                     for val in np.linspace(s_min_global, s_max_global, 4):
                         marker_size = size_min + (size_max - size_min) * (val - s_min_global) / (
-                                    s_max_global - s_min_global)
+                                s_max_global - s_min_global)
                         dummy = engine.current_ax.scatter([], [], s=marker_size, color='gray', alpha=0.5)
 
                         handles.append(dummy)
