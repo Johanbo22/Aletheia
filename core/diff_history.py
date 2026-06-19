@@ -4,15 +4,16 @@ Memory-efficient diff-based history system for DataFrame operations.
 This module implements a copy-on-write (CoW) strategy with operation logging
 to avoid storing full DataFrame copies for each history state.
 """
-import pandas as pd
-import numpy as np
-from typing import Optional, Dict, Any, List, Callable, Union, Tuple
-from pathlib import Path
+import hashlib
+import json
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-import json
-import hashlib
-import uuid
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import pandas as pd
 
 class OperationType(str, Enum):
     """Types of operations that can be tracked."""
@@ -31,7 +32,6 @@ class OperationType(str, Enum):
     AGGREGATE = "aggregate"
     CUSTOM = "custom"
 
-
 @dataclass
 class ColumnDiff:
     """Represents changes to a single column."""
@@ -39,9 +39,8 @@ class ColumnDiff:
     operation: str
     old_data_ref: Optional[str] = None  # Reference to old buffer
     new_data_ref: Optional[str] = None  # Reference to new buffer
-    mask: Optional[np.ndarray] = None   # Boolean mask for partial changes
+    mask: Optional[np.ndarray] = None  # Boolean mask for partial changes
     metadata: Dict[str, Any] = field(default_factory=dict)
-
 
 @dataclass
 class DiffRecord:
@@ -56,7 +55,6 @@ class DiffRecord:
     renamed_columns: Dict[str, str] = field(default_factory=dict)  # old -> new
     metadata: Dict[str, Any] = field(default_factory=dict)
     inverse_params: Dict[str, Any] = field(default_factory=dict)  # For undo
-
 
 @dataclass
 class BufferRef:
@@ -75,17 +73,18 @@ class BufferManager:
     Manages shared data buffers with reference counting
     Implements a CoW system to minimize memory usage
     """
+
     def __init__(self) -> None:
         self._buffers: Dict[str, BufferRef] = {}
         self._total_memory_bytes: int = 0
-    
+
     def register_buffer(self, data: np.ndarray, buffer_id: Optional[str] = None) -> str:
         """Register a new buffer and return its ID"""
         if buffer_id is None:
             import time
             hash_input = f"{time.time()}{id(data)}{data.shape}"
             buffer_id = hashlib.md5(hash_input.encode()).hexdigest()[:16]
-        
+
         if buffer_id in self._buffers:
             self._buffers[buffer_id].ref_count += 1
         else:
@@ -97,40 +96,40 @@ class BufferManager:
             )
             self._buffers[buffer_id] = buffer_ref
             self._total_memory_bytes += data.nbytes
-        
+
         return buffer_id
-    
+
     def acquire(self, buffer_id: str) -> np.ndarray:
         """Acquire the reference to an exsisting buffer"""
         if buffer_id not in self._buffers:
             raise KeyError(f"Buffer {buffer_id} not found")
-        
+
         self._buffers[buffer_id].ref_count += 1
         return self._buffers[buffer_id].data.copy()
-    
+
     def release(self, buffer_id: str) -> None:
         """Release a reference to a buffer"""
         if buffer_id not in self._buffers:
             return
-        
+
         buffer_ref = self._buffers[buffer_id]
         buffer_ref.ref_count -= 1
-        
+
         if buffer_ref.ref_count <= 0:
             self._total_memory_bytes -= buffer_ref.size_bytes
             del self._buffers[buffer_id]
-    
+
     def get_buffer(self, buffer_id: str) -> Optional[np.ndarray]:
         """Get the buffer data without modifying reference count"""
         if buffer_id in self._buffers:
             return self._buffers[buffer_id].data
         return None
-    
+
     @property
     def total_memory_bytes(self) -> int:
         """Total memory in bytes used by all buffers"""
         return self._total_memory_bytes
-    
+
     def cleanup(self) -> None:
         """Clear all buffers"""
         self._buffers.clear()
@@ -145,19 +144,19 @@ class HistoryNode:
     children_ids: List[str] = field(default_factory=list)
     sort_state: Optional[Tuple[str, bool]] = ("[Index]", True)
     created_at: float = field(default_factory=lambda: __import__("time").time())
-    
+
 class DiffHistoryManager:
     """
     A memory-efficient history manager using a branching tree system.
     1. Stores states as nodes in a Directed Acyclic Graph (DAG)
     2. Uses Lowest Common Ancestor (LCA) algorithms for branch hopping
     """
-    
+
     def __init__(self, max_history_memory_bytes: int = 1024 * 1024 * 1024):
         self.buffer_manager = BufferManager()
         self.max_history_memory_bytes = max_history_memory_bytes
         self.current_memory_bytes = 0
-        
+
         self.root_id = str(uuid.uuid4())
         self.nodes: Dict[str, HistoryNode] = {self.root_id: HistoryNode(node_id=self.root_id, parent_id=None)}
         self.current_node_id = self.root_id
@@ -172,7 +171,7 @@ class DiffHistoryManager:
         # Track base DataFrame reference
         self._base_df_ref: Optional[str] = None
         self._current_columns: List[str] = []
-    
+
     def _compute_dataframe_memory(self, df: pd.DataFrame) -> int:
         """Calculate approximate memory footprint of a DataFrame."""
         if df is None or df.empty:
@@ -186,7 +185,7 @@ class DiffHistoryManager:
                 self.current_memory_bytes + self.buffer_manager.total_memory_bytes,
                 self.max_history_memory_bytes
             )
-    
+
     def _enforce_memory_limits(self) -> None:
         """Drop oldest history states to stay within memory limits."""
         while (self.current_memory_bytes + self.buffer_manager.total_memory_bytes) > self.max_history_memory_bytes:
@@ -209,8 +208,10 @@ class DiffHistoryManager:
                     self.nodes[target.parent_id].children_ids.remove(target.node_id)
                 del self.nodes[target.node_id]
 
-                print(
-                    f"DEBUG: Dropped inactive leaf node {target.node_id}, freed {freed_memory / (1024 * 1024):.2f} MB")
+                from core.logger import Logger
+                Logger.get_instance().info(
+                    f"Dropped inactive node {target.node_id}, freed {freed_memory / (1024 * 1024):.2f} MB"
+                )
                 continue
 
             root_node = self.nodes.get(self.root_id)
@@ -229,14 +230,16 @@ class DiffHistoryManager:
                 del self.nodes[self.root_id]
                 self.root_id = child_id
 
-                print(f"DEBUG: Pruned root node, shifted root forward, freed {freed_memory / (1024 * 1024):.2f} MB")
+                Logger.get_instance().info(
+                    f"Pruned root node, shifted root forward, freed {freed_memory / (1024 * 1024):.2f} MB"
+                )
                 continue
 
-            print("DEBUG: Memory limit exceeded, but no safe nodes left to prune.")
+            Logger.get_instance().warning("Memory limit exceeded, but no nodes left to prune.")
             break
 
         self._notify_memory_usage()
-    
+
     def _free_diff_records(self, records: List[DiffRecord]) -> int:
         """Release buffer references from diff records."""
         freed = 0
@@ -247,8 +250,9 @@ class DiffHistoryManager:
                 if col_diff.new_data_ref:
                     self.buffer_manager.release(col_diff.new_data_ref)
         return freed
-    
-    def _create_diff_from_operation(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: OperationType, params: Dict[str, Any]) -> DiffRecord:
+
+    def _create_diff_from_operation(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: OperationType,
+                                    params: Dict[str, Any]) -> DiffRecord:
         """Create a diff record by comparing old and new DataFrames."""
         import time
         record = DiffRecord(
@@ -318,8 +322,9 @@ class DiffHistoryManager:
         record.inverse_params = self._compute_inverse_params(operation_type, params, old_df, new_df)
 
         return record
-    
-    def _compute_inverse_params(self, operation_type: OperationType, params: Dict[str, Any], old_df: pd.DataFrame, new_df: pd.DataFrame) -> Dict[str, Any]:
+
+    def _compute_inverse_params(self, operation_type: OperationType, params: Dict[str, Any], old_df: pd.DataFrame,
+                                new_df: pd.DataFrame) -> Dict[str, Any]:
         """Compute parameters needed to reverse an operation."""
         inverse = {"original_operation": operation_type.value}
 
@@ -333,8 +338,9 @@ class DiffHistoryManager:
             inverse["original_names"] = {v: k for k, v in params.get("renames", {}).items()}
 
         return inverse
-    
-    def save_state(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: Union[OperationType, str], params: Dict[str, Any], operation_log_entry: Optional[Dict[str, Any]] = None) -> str:
+
+    def save_state(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: Union[OperationType, str],
+                   params: Dict[str, Any], operation_log_entry: Optional[Dict[str, Any]] = None) -> str:
         """Save a state transition as a new node, branching if necessary. Returns the new node_id."""
         if isinstance(operation_type, str):
             operation_type = OperationType(operation_type)
@@ -367,7 +373,10 @@ class DiffHistoryManager:
 
         self._enforce_memory_limits()
 
-        print(f"DEBUG: Branching State Saved. Total Nodes: {len(self.nodes)}, Memory: {self.current_memory_bytes / (1024*1024):.2f} MB")
+        from core.logger import Logger
+        Logger.get_instance().info(
+            f"Branching State Saved. Total Nodes: {len(self.nodes)}, Memory: {self.current_memory_bytes / (1024 * 1024):.2f} MB"
+        )
         return new_node_id
 
     def checkout(self, current_df: pd.DataFrame, target_node_id: str) -> Tuple[Optional[pd.DataFrame], bool]:
@@ -418,21 +427,21 @@ class DiffHistoryManager:
         self.sort_state = self.nodes[target_node_id].sort_state
 
         return df, True
-    
+
     def undo(self, current_df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], bool]:
         """Wrapper to checkout parent node"""
         parent_id = self.nodes[self.current_node_id].parent_id
         if not parent_id:
             return None, False
         return self.checkout(current_df, parent_id)
-    
+
     def redo(self, current_df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], bool]:
         """Wrapper to checkout the most recently created child node"""
         children = self.nodes[self.current_node_id].children_ids
         if not children:
             return None, False
         return self.checkout(current_df, children[-1])
-    
+
     def _apply_forward_diff(self, current_df: pd.DataFrame, diff_record: DiffRecord) -> pd.DataFrame:
         """Apply forward diff to reconstruct the state after an operation."""
         new_index = diff_record.metadata.get('new_index')
@@ -456,14 +465,19 @@ class DiffHistoryManager:
 
         # Apply modified columns
         for col_diff in diff_record.column_diffs:
-            if col_diff.operation == "modify":
-                new_data = self.buffer_manager.get_buffer(col_diff.new_data_ref)
-                if new_data is not None and col_diff.column_name in df.columns:
-                    if col_diff.mask is not None and len(new_data) == len(df):
-                        current_vals = df[col_diff.column_name].values
-                        df[col_diff.column_name] = np.where(col_diff.mask, new_data, current_vals)
-                    else:
-                        df[col_diff.column_name] = new_data
+            if col_diff.operation != "modify":
+                continue
+            new_data = self.buffer_manager.get_buffer(col_diff.new_data_ref)
+            if new_data is None or col_diff.column_name not in df.columns:
+                continue
+            if col_diff.mask is not None and len(new_data) == len(df):
+                try:
+                    current_vals = df[col_diff.column_name].values
+                    df[col_diff.column_name] = np.where(col_diff.mask, new_data, current_vals)
+                except (TypeError, ValueError):
+                    df[col_diff.column_name] = new_data
+            else:
+                df[col_diff.column_name] = new_data
 
         # Handle renamed columns
         for old_name, new_name in diff_record.renamed_columns.items():
@@ -495,23 +509,30 @@ class DiffHistoryManager:
 
         # Restore modified columns
         for col_diff in diff_record.column_diffs:
-            if col_diff.operation == "modify":
-                old_data = self.buffer_manager.get_buffer(col_diff.old_data_ref)
-                if old_data is not None and col_diff.column_name in df.columns:
-                    if col_diff.mask is not None and len(old_data) == len(df):
-                        current_vals = df[col_diff.column_name].values
-                        df[col_diff.column_name] = np.where(col_diff.mask, old_data, current_vals)
-                    else:
-                        df[col_diff.column_name] = old_data
+            if col_diff.operation != "modify":
+                continue
+            old_data = self.buffer_manager.get_buffer(col_diff.old_data_ref)
+            if old_data is None or col_diff.column_name not in df.columns:
+                continue
+            if col_diff.mask is not None and len(old_data) == len(df):
+                try:
+                    current_vals = df[col_diff.column_name].values
+                    df[col_diff.column_name] = np.where(col_diff.mask, old_data, current_vals)
+                except (TypeError, ValueError):
+                    df[col_diff.column_name] = old_data
+            else:
+                df[col_diff.column_name] = old_data
 
         return df
-    
+
     def can_undo(self) -> bool:
-        if not hasattr(self, 'nodes') or not hasattr(self, 'current_node_id'): return False
+        if not hasattr(self, 'nodes') or not hasattr(self, 'current_node_id'):
+            return False
         return self.nodes[self.current_node_id].parent_id is not None
 
     def can_redo(self) -> bool:
-        if not hasattr(self, 'nodes') or not hasattr(self, 'current_node_id'): return False
+        if not hasattr(self, 'nodes') or not hasattr(self, 'current_node_id'):
+            return False
         return len(self.nodes[self.current_node_id].children_ids) > 0
 
     def clear(self) -> None:
@@ -535,13 +556,13 @@ class DiffHistoryManager:
             curr = self.nodes[curr].parent_id
 
         return {
-            "history": self.operation_log.copy(),
+            "history"        : self.operation_log.copy(),
             "current_node_id": self.current_node_id,
-            "root_id": self.root_id,
-            "nodes": self.nodes,
-            "undo_count": len(path_to_root),
-            "redo_count": len(self.nodes[self.current_node_id].children_ids),
-            "memory_bytes": self.current_memory_bytes + self.buffer_manager.total_memory_bytes
+            "root_id"        : self.root_id,
+            "nodes"          : self.nodes,
+            "undo_count"     : len(path_to_root),
+            "redo_count"     : len(self.nodes[self.current_node_id].children_ids),
+            "memory_bytes"   : self.current_memory_bytes + self.buffer_manager.total_memory_bytes
         }
 
     def export_pipeline_macro(self, filepath: Union[str, Path]) -> None:
@@ -554,8 +575,8 @@ class DiffHistoryManager:
             json.dump(self.operation_log, f, indent=4)
 
     def load_pipeline_macro(
-        self,
-        macro_source: Union[str, Path, List[Dict[str, Any]]]
+            self,
+            macro_source: Union[str, Path, List[Dict[str, Any]]]
     ) -> List[Dict[str, Any]]:
         """Load operations from JSON file or list."""
         if isinstance(macro_source, (str, Path)):
