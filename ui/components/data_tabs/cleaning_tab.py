@@ -17,7 +17,7 @@ class CleaningTab(BaseDataTab):
         self.init_ui()
     
     def init_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        layout = self.setup_scrollable_layout()
         
         clean_info = QLabel("This tab includes operations to clean your dataset")
         clean_info.setWordWrap(True)

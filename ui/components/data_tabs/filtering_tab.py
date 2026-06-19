@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QFormLayout, QLineEdit, QGroupBox, QComboBox
+from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QLabel, QFormLayout, QLineEdit, QGroupBox, QComboBox
 from typing import Optional, TYPE_CHECKING
 
 from ui.components.data_tabs.base_data_tab import BaseDataTab
@@ -19,6 +19,12 @@ class FilteringTab(BaseDataTab):
         filter_info.setWordWrap(True)
         filter_info.setProperty("styleClass", "info_text")
         layout.addWidget(filter_info)
+        layout.addSpacing(10)
+
+        self.filter_status_label = QLabel("Status: No active filters")
+        self.filter_status_label.setWordWrap(True)
+        self.filter_status_label.setProperty("styleClass", "status_indicator_inactive")
+        layout.addWidget(self.filter_status_label)
         layout.addSpacing(10)
         
         quick_filter_group = QGroupBox("Quick Filter")
@@ -81,3 +87,20 @@ class FilteringTab(BaseDataTab):
             self.filter_condition.currentText(),
             self.filter_value.text()
         )
+
+    def set_filter_active_state(self, is_active: bool, message: str = "") -> None:
+        """
+        Updates the tab UI to reflect whether a filter is active
+
+        :param is_active: True if a filter is active
+        :param message: Optional message about the active filter
+        """
+        if is_active:
+            self.filter_status_label.setText(f"Status: {message}")
+            self.filter_status_label.setProperty("styleClass", "status_indicator_active")
+        else:
+            self.filter_status_label.setText("Status: No active filters")
+            self.filter_status_label.setProperty("styleClass", "status_indicator_inactive")
+
+        self.filter_status_label.style().unpolish(self.filter_status_label)
+        self.filter_status_label.style().polish(self.filter_status_label)

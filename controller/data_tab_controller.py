@@ -550,6 +550,10 @@ class DataTabController:
                 level="SUCCESS",
             )
 
+            self.view.operations_panel.filtering_tab.set_filter_active_state(
+                True, f"Active: {column} {condition} '{value}'"
+            )
+
             self.filter_animation = DataFilterAnimation(message="Filter Data")
             self.filter_animation.start(target_widget=self.view)
 
@@ -585,10 +589,29 @@ class DataTabController:
             try:
                 self.data_handler.filter_data(advanced_filters=filters)
 
+                formatted_parts = []
+                for i, f_dict in enumerate(filters):
+                    col = f_dict.get("column", "")
+                    cond = f_dict.get("condition", "")
+                    val = f_dict.get("value", "")
+
+                    expr = f"{col} {cond} '{val}'"
+
+                    if i == 0:
+                        formatted_parts.append(expr)
+                    else:
+                        op = f_dict.get("logical_op") or filters[i - 1].get("logical_op") or "AND"
+                        formatted_parts.append(f"{op} {expr}")
+
+                formatted_filters = " ".join(formatted_parts)
+
                 self.view.refresh_data_view()
-                self.status_bar.log(f"Filters applied to data: {filters}", LogLevel.SUCCESS)
+                self.status_bar.log(f"Filters applied to data: {formatted_filters}", LogLevel.SUCCESS)
                 global_signals.request_toast(
-                    "Filter Applied", f"Filters applied to data: {filters}", ToastLevel.SUCCESS
+                    "Filter Applied", f"Filters applied to data:\n{formatted_filters}", ToastLevel.SUCCESS
+                )
+                self.view.operations_panel.filtering_tab.set_filter_active_state(
+                    True, f"Active: {formatted_filters}"
                 )
             except Exception as FilterError:
                 self.status_bar.log(f"Error applying filter: {str(FilterError)}", LogLevel.ERROR)
@@ -1938,6 +1961,8 @@ class DataTabController:
 
             if hasattr(self.view, "operations_panel"):
                 self.view.operations_panel.set_injection_status_ui(is_subset_active=False)
+
+            self.view.operations_panel.filtering_tab.set_filter_active_state(False)
 
             rows_after = (
                 len(self.data_handler.df) if self.data_handler.df is not None else 0
