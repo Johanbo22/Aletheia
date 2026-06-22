@@ -357,7 +357,7 @@ class MainWindow(QWidget):
             self.plot_tab.refresh_subset_list()
 
         # Automatically generate the plot based on the loaded configs
-        self.plot_tab.generate_plot()
+        self.plot_tab.generation_manager.generate_plot()
 
         self._unsaved_changes = False
         self._update_tab_visibility()

@@ -1,11 +1,8 @@
 # ui/plot_tab.py
-import traceback
 from pathlib import Path
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, TYPE_CHECKING
 
-import pandas as pd
 from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QApplication
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
@@ -13,13 +10,13 @@ from controller.plot_controllers import (AnnotationManager, AppearanceSettingsMa
                                          ColorManager, DataSelectionManager, PlotExportManager, PlotFormattingManager,
                                          PlotTableManager, PlotTypeManager, ReferenceLineManager, ReferenceSpanManager,
                                          ScriptManager, SeriesCustomizationManager, SubplotManager, ThemeManager)
+from controller.plot_controllers.plot_generation_manager import PlotGenerationManager
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
 from core.global_signals import ToastLevel, global_signals
 from core.plot_config_manager import PlotConfigManager
 from core.plot_engine import PlotEngine
 from ui.animations import PlotClearedAnimation
-from ui.dialogs import ProgressDialog
 from ui.plot_tab_ui import PlotTabUI
 from ui.status_bar import LogLevel, StatusBar
 from ui.widgets.SubplotOverlay import SubplotOverlay
@@ -139,6 +136,7 @@ class PlotTab(PlotTabUI):
         self.table_manager = PlotTableManager(self)
         self.data_selection_manager = DataSelectionManager(self)
         self.appearance_settings_manager = AppearanceSettingsManager(self)
+        self.generation_manager = PlotGenerationManager(self)
 
         # Load initial data
         self.update_column_combo()
@@ -168,7 +166,7 @@ class PlotTab(PlotTabUI):
     def _connect_main_controls(self) -> None:
         """Connect the main action buttons and canvas events"""
         #  Main Buttons 
-        self.plot_button.clicked.connect(self.generate_plot)
+        self.plot_button.clicked.connect(self.generation_manager.generate_plot)
         self.editor_button.clicked.connect(self.script_manager.open_script_editor)
         self.clear_button.clicked.connect(self.clear_plot)
         self.save_plot_button.clicked.connect(self.export_manager.save_plot_image)
@@ -679,29 +677,33 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = True
             return
         if getattr(self, '_is_data_dirty', False):
-            self.generate_plot()
+            self.generation_manager.generate_plot()
             return
 
         cached_df = getattr(self, '_cached_active_df', None)
         if cached_df is None:
             return
 
-        current_subplot_index, _ = self._get_subplot_config()
+        current_subplot_index, _ = self.generation_manager._get_subplot_config()
         x_col = self.view.x_column.currentText()
         y_cols = self.get_selected_y_columns()
         hue = self.view.hue_column.currentText() if self.view.hue_column.currentText() != "None" else None
         subset_name = self.view.subset_combo.currentData() if self.view.use_subset_check.isChecked() else None
         quick_filter = self.view.quick_filter_input.text().strip()
 
-        self._generate_main_plot(
+        config = {
+            "plot_type"   : self.current_plot_type_name,
+            "x_col"       : x_col,
+            "y_cols"      : y_cols,
+            "hue"         : hue,
+            "subset_name" : subset_name,
+            "quick_filter": quick_filter
+        }
+
+        self.generation_manager.generate_main_plot(
             active_df=cached_df,
-            plot_type=self.current_plot_type_name,
-            x_col=x_col,
-            y_cols=y_cols,
-            hue=hue,
-            subset_name=subset_name,
-            current_subplot_index=current_subplot_index,
-            quick_filter=quick_filter,
+            subplot_index=current_subplot_index,
+            config=config,
             keep_data=True,
             animate=False
         )
@@ -739,283 +741,6 @@ class PlotTab(PlotTabUI):
         self.view.x_custom_datetime_input.setEnabled(text == "Custom")
         self.on_data_changed()
 
-    def generate_plot(self):
-        """Generate plot based on current settings"""
-        if self._is_clearing:
-            return
-        if not self.isVisible():
-            self._is_data_dirty = True
-            return
-        if not self._validate_data_loaded():
-            return
-
-        # Get data configuration
-        current_subplot_index, frozen_config = self._get_subplot_config()
-        active_df, x_col, y_cols, hue, subset_name, quick_filter = self._resolve_data_config(current_subplot_index,
-                                                                                             frozen_config)
-
-        if not self._validate_active_dataframe(active_df):
-            return
-
-        plot_type = self.current_plot_type_name
-        axes_flipped = self.view.flip_axes_check.isChecked()
-        x_scale, y_scale = self.view.x_scale_combo.currentText(), self.view.y_scale_combo.currentText()
-
-        x_dt_fmt = self.view.x_datetime_format_combo.currentText() if self.view.custom_datetime_check.isChecked() else None
-        y_dt_fmt = self.view.y_datetime_format_combo.currentText() if self.view.custom_datetime_check.isChecked() else None
-        x_dt_custom = self.view.x_custom_datetime_input.text() if x_dt_fmt == "Custom" else None
-        y_dt_custom = self.view.y_custom_datetime_format_input.text() if y_dt_fmt == "Custom" else None
-
-        data_params = [
-            id(active_df),
-            active_df.shape,
-            plot_type,
-            x_col,
-            tuple(y_cols) if y_cols else None,
-            subset_name,
-            quick_filter,
-            axes_flipped,
-            x_scale,
-            y_scale,
-            x_dt_fmt,
-            y_dt_fmt,
-            x_dt_custom,
-            y_dt_custom
-        ]
-        current_data_signature = tuple(data_params)
-        if (hasattr(self, "_last_data_signature") and self._last_data_signature == current_data_signature and hasattr(
-                self, "_cached_active_df") and self._cached_active_df is not None):
-            self.status_bar.log("Using cached data for plotting", LogLevel.INFO)
-            self._generate_main_plot(
-                self._cached_active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter,
-                keep_data=True
-            )
-            return
-
-        self._last_data_signature = current_data_signature
-
-        self.status_bar.log("Preparing data in background...", LogLevel.INFO)
-        self._prep_progress_dialog = ProgressDialog(title="Preparing Data", message="Initializing background task...",
-                                                    parent=self)
-        self._prep_progress_dialog.show()
-
-        from ui.workers import PlotDataPrepWorker
-        worker = PlotDataPrepWorker(active_df, plot_type, x_col, y_cols, quick_filter)
-        worker.signals.progress.connect(self._prep_progress_dialog.update_progress)
-        worker.signals.log.connect(lambda msg: self.status_bar.log(msg, LogLevel.INFO))
-        worker.signals.error.connect(self._on_prep_error)
-        worker.signals.finished.connect(
-            lambda processed_df: self._on_prep_finished(
-                processed_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter
-            )
-        )
-        self.thread_pool.start(worker)
-
-    def _on_prep_error(self, error: Exception) -> None:
-        """Handle errors from the background data preparation worker."""
-        if hasattr(self, "_prep_progress_dialog") and self._prep_progress_dialog:
-            self._prep_progress_dialog.accept()
-        self.status_bar.log(f"Data preparation failed: {str(error)}", LogLevel.ERROR)
-        global_signals.request_toast(
-            "Data Preparation Error", "An error occurred during data processing", ToastLevel.ERROR
-        )
-
-    def _on_prep_finished(self, processed_df: pd.DataFrame, plot_type: str, x_col: str, y_cols: list[str], hue: str,
-                          subset_name: str, current_subplot_index: int, quick_filter: str) -> None:
-        """Called when background data preparation completes successfully."""
-        if hasattr(self, "_prep_progress_dialog") and self._prep_progress_dialog:
-            self._prep_progress_dialog.accept()
-
-        self._cached_active_df = processed_df
-        self._generate_main_plot(
-            processed_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index, quick_filter,
-            keep_data=False
-        )
-
-    def _apply_quick_filter(self, df: pd.DataFrame, query: str) -> Optional[pd.DataFrame]:
-        """Apply a pandas query to the dataframe"""
-        try:
-            filtered_df = df.query(query)
-            if filtered_df.empty:
-                global_signals.request_toast(
-                    "Empty Result", f"The filer {query} returned an empty dataset", ToastLevel.WARNING
-                )
-                self.status_bar.log(f"Filter {query} returned 0 rows", LogLevel.WARNING)
-                return None
-            self.status_bar.log(f"Quick Filter applied: {query} ({len(df)} -> {len(filtered_df)} rows)", LogLevel.INFO)
-            return filtered_df
-        except Exception as QuickFilterError:
-            self.status_bar.log(f"Quick Filter error: {str(QuickFilterError)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Filter Error", "An error occurred applying quick filter", ToastLevel.ERROR
-            )
-
-    def _validate_data_loaded(self) -> bool:
-        """Check if data is loaded"""
-        if self.data_handler.df is None:
-            self.status_bar.log("No data loaded", LogLevel.WARNING)
-            global_signals.request_toast(
-                "No Data Loaded", "Please load data first", ToastLevel.WARNING
-            )
-            return False
-        return True
-
-    def _get_subplot_config(self):
-        """Get current subplot configuration"""
-        current_subplot_index = self.view.active_subplot_combo.currentIndex()
-        if current_subplot_index < 0:
-            current_subplot_index = 0
-
-        frozen_config = None
-        if self.view.freeze_data_check.isChecked() and self.view.add_subplots_check.isChecked():
-            frozen_config = self.subplot_manager.get_config(current_subplot_index)
-
-        return current_subplot_index, frozen_config
-
-    def _resolve_data_config(self, current_subplot_index, frozen_config: dict):
-        """Resovle data configeration from frozen config"""
-        if frozen_config:
-            x_col = frozen_config.get("x_col")
-            y_cols = frozen_config.get("y_cols")
-            hue = frozen_config.get("hue")
-            subset_name = frozen_config.get("subset_name")
-            quick_filter = frozen_config.get("quick_filter", "")
-            active_df = self._restore_frozen_data(subset_name)
-            self.status_bar.log(f"Using data config for plot {current_subplot_index + 1}", LogLevel.INFO)
-        else:
-            active_df = self.get_active_dataframe()
-            x_col = self.view.x_column.currentText()
-            y_cols = self.get_selected_y_columns()
-            hue = (self.view.hue_column.currentText() if self.view.hue_column.currentText() != "None" else None)
-            subset_name = (self.view.subset_combo.currentData() if self.view.use_subset_check.isChecked() else None)
-            quick_filter = self.view.quick_filter_input.text().strip()
-
-        return active_df, x_col, y_cols, hue, subset_name, quick_filter
-
-    def _restore_frozen_data(self, subset_name):
-        """Restore data from a frozen subset"""
-        if subset_name:
-            try:
-                if self.subset_manager:
-                    return self.subset_manager.apply_subset(
-                        self.data_handler.df, subset_name
-                    )
-                else:
-                    self.status_bar.log("Subset Manager not initialized, using full dataset", LogLevel.WARNING)
-                    return self.data_handler.df
-            except Exception as UseSubsetError:
-                self.status_bar.log(f"Could not restore subset '{subset_name}'. Error: {str(UseSubsetError)}",
-                                    LogLevel.ERROR)
-                return self.data_handler.df
-        else:
-            return self.data_handler.df
-
-    def _validate_active_dataframe(self, active_df) -> bool:
-        """Validates the active dataframe (check if has data or nah)"""
-        if active_df is None or len(active_df) == 0:
-            global_signals.request_toast(
-                "Data Is Empty", "Selected data is empty", ToastLevel.WARNING
-            )
-            return False
-        return True
-
-    def _generate_main_plot(self, active_df, plot_type, x_col, y_cols, hue, subset_name, current_subplot_index,
-                            quick_filter="", keep_data=False, animate=True):
-        """Generate plot using matplotlib settings"""
-        data_size = len(self.data_handler.df)
-        show_progress = (data_size > 1000 and not keep_data)
-        progress_dialog = None
-
-        try:
-            progress_dialog = self._init_progress_dialog(show_progress, data_size)
-
-            if not keep_data:
-                if not self._validate_plot_requirements(plot_type, x_col, y_cols):
-                    return
-
-                self._update_progress(progress_dialog, 10, "Preparing Data")
-
-            # Build config
-            axes_flipped = self.view.flip_axes_check.isChecked()
-            font_family = self.view.font_family_combo.currentText()
-
-            self._update_progress(progress_dialog, 20, "Building Plot Configuration")
-
-            general_kwargs = self.formatting_manager.build_general_kwargs(plot_type, x_col, y_cols, hue)
-            plot_kwargs = self.formatting_manager.build_plot_specific_kwargs(plot_type)
-
-            # Setup plot
-            if not keep_data:
-                self._update_progress(progress_dialog, 30, "Clearing Previous plot")
-                self.formatting_manager.setup_plot_figure(clear=True)
-            else:
-                self.formatting_manager.setup_plot_figure(clear=False)
-
-            self._update_progress(progress_dialog, 35, "Setting plot style")
-            self.formatting_manager.apply_plot_style()
-            self.formatting_manager.set_axis_limit_and_scales()
-
-            # Create
-            if not keep_data:
-                self._update_progress(progress_dialog, 40, f"Creating {plot_type} plot")
-
-                if not self._execute_plot_strategy(plot_type, active_df, x_col, y_cols, axes_flipped, font_family,
-                                                   plot_kwargs, general_kwargs):
-                    if progress_dialog:
-                        progress_dialog.accept()
-                    return
-
-            # Apply formatting and customizations
-            self.formatting_manager.apply_plot_formatting(progress_dialog, x_col, y_cols, general_kwargs, active_df)
-
-            # Finalize
-            self._update_progress(progress_dialog, 98, "Finishing up")
-            self._finalize_plot(current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter,
-                                is_fast_render=keep_data)
-
-            # Log
-            if not keep_data:
-                self._log_plot_message(plot_type, x_col, y_cols, hue, subset_name, active_df, quick_filter)
-            self._update_progress(progress_dialog, 100, "Complete")
-            if progress_dialog:
-                QTimer.singleShot(300, progress_dialog.accept)
-            self._is_data_dirty = False
-
-            if animate:
-                global_signals.toast_requested.emit("Plot Generated", f"A {plot_type} plot has been generated",
-                                                    ToastLevel.SUCCESS, 4000)
-        except InterruptedError:
-            self.status_bar.log(f"Plot generation cancelled", LogLevel.INFO)
-            if progress_dialog:
-                progress_dialog.accept()
-        except Exception as CreateMainPlotError:
-            if progress_dialog:
-                progress_dialog.accept()
-            error_msg = str(CreateMainPlotError)
-            if "ParseSyntaxException" in error_msg or "math text" in error_msg.lower():
-                self.status_bar.log("Incomplete LaTeX math expression detected. Please finish typing", LogLevel.WARNING)
-            else:
-                global_signals.request_toast("Error", f"Failed to generate plot", ToastLevel.ERROR)
-                self.status_bar.log(f"Plot generation failed: {error_msg}", LogLevel.ERROR)
-                traceback.print_exc()
-        finally:
-            if progress_dialog and progress_dialog.isVisible():
-                progress_dialog.accept()
-
-    def _init_progress_dialog(self, show_progress, data_size):
-        """Initizalixze the progress dialog"""
-        if show_progress:
-            progress_dialog = ProgressDialog(
-                title="Generating plot",
-                message=f"Processing {data_size:,} data points",
-                parent=self
-            )
-            progress_dialog.show()
-            progress_dialog.update_progress(5, "Initializing plotting engine")
-            QApplication.processEvents()
-            return progress_dialog
-        return None
-
     def _update_progress(self, progress_dialog, value, message):
         """Update the progress dialog anc check for cancellation"""
         if progress_dialog:
@@ -1023,147 +748,6 @@ class PlotTab(PlotTabUI):
             if progress_dialog.is_cancelled():
                 self.status_bar.log("Plot generation cancelled", LogLevel.WARNING)
                 raise InterruptedError("User cancelled")
-
-    def _validate_plot_requirements(self, plot_type, x_col, y_cols) -> bool:
-        """Validate the required are data is available"""
-        plots_no_x = ["Box", "Histogram", "KDE", "Heatmap", "Pie", "ECDF", "Eventplot", "GeoSpatial"]
-
-        plots_no_y = ["Count Plot", "Heatmap", "GeoSpatial"]
-        plots_gridded = ["Image Show (imshow)", "pcolormesh", "Contour", "Contourf"]
-        plots_vector = ["Barbs", "Quiver", "Streamplot"]
-        plots_triangulation_z = ["Tricontour", "Tricontourf", "Tripcolor"]
-        plots_triangulation_no_z = ["Triplot"]
-
-        if not x_col and plot_type not in plots_no_x:
-            global_signals.request_toast(
-                "Warning", f"Please select an X column for {plot_type}", ToastLevel.INFO
-            )
-            return False
-
-        if not y_cols and plot_type not in plots_no_y:
-            global_signals.request_toast(
-                "Warning", f"Please select at least one Y column for {plot_type}", ToastLevel.INFO
-            )
-            return False
-
-        if plot_type in plots_gridded and len(y_cols) < 2:
-            global_signals.request_toast(
-                "Warning", f"{plot_type} requires 2 Y columns (Y-Position, Z-value)", ToastLevel.INFO
-            )
-            return False
-
-        if plot_type in plots_vector and len(y_cols) < 3:
-            global_signals.request_toast(
-                "Warning", f"{plot_type} requires 3 Y columns (Y-Position, U-component, Y-component)", ToastLevel.INFO
-            )
-            return False
-
-        if plot_type in plots_triangulation_z and len(y_cols) < 2:
-            global_signals.request_toast(
-                "Warning", f"{plot_type} requires 2 Y columns (Y-Position, Z-value)", ToastLevel.INFO
-            )
-            return False
-
-        if plot_type in plots_triangulation_no_z and len(y_cols) < 1:
-            global_signals.request_toast(
-                "Warning", f"{plot_type} requires one Y columns (Y-Position)", ToastLevel.INFO
-            )
-            return False
-
-        return True
-
-    def _execute_plot_strategy(self, plot_type, active_df, x_col, y_cols, axes_flipped, font_family, plot_kwargs,
-                               general_kwargs) -> bool:
-        """Executes the correct plotting strategy"""
-
-        original_df = self.data_handler.df
-        self.data_handler.df = active_df
-
-        try:
-            error_message = self.plot_engine.execute_strategy(
-                plot_type=plot_type,
-                plot_tab=self,
-                x_col=x_col,
-                y_cols=y_cols,
-                axes_flipped=axes_flipped,
-                font_family=font_family,
-                plot_kwargs=plot_kwargs,
-                general_kwargs=general_kwargs
-            )
-
-            if error_message:
-                global_signals.request_toast(
-                    "Error", error_message, ToastLevel.ERROR
-                )
-                self.status_bar.log(f"Error in executing plot sequence: {str(error_message)}", LogLevel.ERROR)
-                return False
-            return True
-        finally:
-            self.data_handler.df = original_df
-
-    def _finalize_plot(self, current_subplot_index, x_col, y_cols, hue, subset_name, quick_filter,
-                       is_fast_render=False) -> None:
-        """Finalize plot and save configs"""
-        try:
-            if self.view.tight_layout_check.isChecked():
-                self.plot_engine.finalize_layout()
-        except Exception as TightLayoutError:
-            error_msg = str(TightLayoutError)
-            if "ParseSyntaxException" not in error_msg and "math text" not in error_msg.lower():
-                self.status_bar.log(f"Tight layout not applied due to error: {error_msg}", LogLevel.ERROR)
-
-        self.canvas.draw()
-
-        if hasattr(self, "canvas_stack") and hasattr(self, "canvas"):
-            self.canvas_stack.setCurrentWidget(self.canvas)
-
-        if not is_fast_render:
-            self.subplot_manager.update_overlay()
-
-        if self.view.add_subplots_check.isChecked():
-            self.subplot_manager.save_config(current_subplot_index, {
-                "x_col"       : x_col,
-                "y_cols"      : y_cols,
-                "hue"         : hue,
-                "subset_name" : subset_name,
-                "quick_filter": quick_filter
-            })
-
-        if self.view.multiline_custom_check.isChecked():
-            self.series_customization_manager.update_line_selector(preserve_selection=True)
-        if self.view.multibar_custom_check.isChecked():
-            self.series_customization_manager.update_bar_selector(preserve_selection=True)
-
-        self.script_manager.sync_script_if_open()
-
-    def _log_plot_message(self, plot_type, x_col, y_cols, hue, subset_name, active_df, quick_filter=""):
-        """Log plot generation to log"""
-        plot_details = {
-            "plot_type"  : plot_type,
-            "x_column"   : x_col,
-            "y_column"   : str(y_cols),
-            "data_points": len(self.data_handler.df),
-            "annotations": len(self.annotation_manager.annotations)
-        }
-
-        if hue:
-            plot_details["hue"] = hue
-
-        if quick_filter:
-            plot_details["filter"] = quick_filter
-
-        if self.view.use_subset_check.isChecked() and subset_name:
-            plot_details["subset"] = subset_name
-            plot_details["subset_rows"] = len(active_df)
-            plot_details["total_rows"] = len(self.data_handler.df)
-
-        status_message = f"{plot_type} plot created"
-        if self.view.use_subset_check.isChecked() and subset_name:
-            status_message += f" (Subset: {subset_name})"
-        if len(self.annotation_manager.annotations) > 0:
-            status_message += f" with {len(self.annotation_manager.annotations)} annotations"
-
-        self.status_bar.log_action(status_message, details=plot_details, level="SUCCESS")
 
     def _apply_annotations(self, df=None, x_col=None, y_cols=None):
         """Apply text annotations and reference lines"""
