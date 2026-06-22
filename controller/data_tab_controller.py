@@ -28,6 +28,9 @@ from ui.dialogs.ExportDialog import ExportConfig, ExportDialog
 from ui.status_bar import LogLevel
 from ui.widgets.ToastNotification import ToastLevel
 from ui.workers import AutoCreateSubsetsWorker, GoogleSheetsImportWorker
+from controller.data_controllers.dataset_controller import DatasetController
+from controller.data_controllers.cleaning_controller import CleaningController
+from controller.data_controllers.stats_controller import StatsController
 
 if TYPE_CHECKING:
     from ui.data_tab import DataTab
@@ -50,7 +53,9 @@ class DataTabController:
         self.aggregation_manager = AggregationManager()
         self.help_manager = HelpManager()
 
-        self.rows_before_refresh = 0
+        self.dataset_controller = DatasetController(data_handler, status_bar, view, subset_manager)
+        self.cleaning_controller = CleaningController(data_handler, status_bar, view, subset_manager)
+        self.stats_controller = StatsController(data_handler, status_bar, view, subset_manager)
 
     @property
     def view(self) -> "DataTab":
@@ -65,455 +70,34 @@ class DataTabController:
 
     def create_new_dataset(self) -> None:
         """Creates a new empty dataset"""
-        try:
-            dialog = CreateDatasetDialog(self.view)
-            if not dialog.exec():
-                return
-
-            params = dialog.get_dataset_parameters()
-            rows = params["rows"]
-            columns = params["columns"]
-            column_names = params["column_names"]
-            fill_value = params["fill_value"]
-
-            fill_display = "Missing Values (NaN)" if fill_value == "NaN" else f"'{fill_value}'"
-
-            confirm = QMessageBox.question(
-                self.view,
-                "Confirm Dataset Generation",
-                f"Initialize a new dataset with the following schema?\n\n"
-                f"• Dimensions: {rows:,} rows x {columns:,} columns\n"
-                f"• Initial Data State: {fill_display}\n\n"
-                f"Warning: This will clear the current data view entirely.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if confirm == QMessageBox.StandardButton.Yes:
-                self.data_handler.create_empty_dataframe(rows, columns, column_names=column_names,
-                                                         fill_value=fill_value)
-                self.view.toolbar.set_refresh_visible(False)
-                self.view.refresh_data_view()
-                self.status_bar.log(f"Created new dataset: ({rows}x{columns})", LogLevel.SUCCESS)
-
-                NewDataFrameAnimation(parent=None, message="Created New Dataframe").start(target_widget=self.view)
-
-        except (ValueError, TypeError, RuntimeError, MemoryError) as e:
-            global_signals.toast_requested.emit(
-                "Error", "Failed to create dataset", ToastLevel.ERROR, 4000
-            )
-            self.status_bar.log(
-                f"Failed to create dataset: {str(e)}", LogLevel.ERROR
-            )
+        self.dataset_controller.create_new_dataset()
 
     def refresh_google_sheets(self):
         """Refreshes data from the last imported google sheets document"""
-        if not self.data_handler.has_google_sheets_import():
-            global_signals.toast_requested.emit(
-                "Warning", "No Google Sheets import data found", ToastLevel.WARNING, 4000
-            )
-            return
-
-        reply = QMessageBox.question(
-            self.view,
-            "Confirm Data Refresh",
-            "Refreshing from Google Sheets will overwrite the current dataset.\n\n"
-            "Any modifications will be lost.\n\n"
-            "Are you sure you want to proceed?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.No:
-            self.status_bar.log("Google Sheet refresh cancelled", LogLevel.INFO)
-            return
-
-        sheet_id = self.data_handler.last_gsheet_id
-        sheet_name = self.data_handler.last_gsheet_name
-        delimiter = self.data_handler.last_gsheet_delimiter
-        decimal = self.data_handler.last_gsheet_decimal
-        thousands = self.data_handler.last_gsheet_thousands
-        gid = self.data_handler.last_gsheet_gid
-
-        thousands_param = (None if thousands in [None, "None", ""] else thousands)
-
-        self.progress_dialog = ProgressDialog(
-            title="Refreshing Google Sheets Data",
-            message=f"Reconnecting to {sheet_id}",
-            parent=self.view
-        )
-        self.progress_dialog.setModal(True)
-        self.progress_dialog.show()
-
-        self.rows_before_refresh = (len(self.data_handler.df) if self.data_handler.df is not None else 0)
-
-        worker = GoogleSheetsImportWorker(
-            self.data_handler,
-            sheet_id,
-            sheet_name,
-            delimiter,
-            decimal,
-            thousands_param,
-            gid
-        )
-        worker.signals.progress.connect(self.progress_dialog.update_progress)
-        worker.signals.finished.connect(self.on_refresh_google_sheets_finished)
-        worker.signals.error.connect(self.on_refresh_google_sheets_error)
-
-        QThreadPool.globalInstance().start(worker)
-
-    def on_refresh_google_sheets_finished(self, df):
-        if hasattr(self, "progress_dialog"):
-            self.progress_dialog.close()
-
-        rows_after = len(df)
-        rows_diff = rows_after - self.rows_before_refresh
-        diff_text = f"+{rows_diff}" if rows_diff > 0 else str(rows_diff)
-
-        self.view.refresh_data_view()
-
-        sheet_identifier = self.data_handler.last_gsheet_name or f"GID: {self.data_handler.last_gsheet_gid}"
-
-        self.status_bar.log_action(
-            f"Refreshed Google Sheets data: {self.data_handler.last_gsheet_id}",
-            details={
-                "sheet_name"  : sheet_identifier,
-                "sheet_id"    : self.data_handler.last_gsheet_id,
-                "rows_before" : self.rows_before_refresh,
-                "rows_after"  : rows_after,
-                "rows_changed": rows_diff,
-                "operation"   : "refresh_google_sheets"
-            },
-            level="SUCCESS"
-        )
-        global_signals.toast_requested.emit(
-            "Success",
-            "Google Sheets data refreshed successfully",
-            ToastLevel.SUCCESS,
-            4000
-        )
-
-    def on_refresh_google_sheets_error(self, error: Exception):
-        if hasattr(self, "progress_dialog"):
-            self.progress_dialog.close()
-
-        if hasattr(self, "status_bar"):
-            self.status_bar.log(f"Failed to refresh Google Sheets data: {str(error)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Error", f"Failed to refresh Google Sheets data:\n"
-                         "Please check:\n"
-                         "• Internet connection\n"
-                         "• Sheet is still shared publicly\n"
-                         "• Sheet name has not changed",
-                ToastLevel.ERROR
-            )
+        self.dataset_controller.refresh_google_sheets()
 
     def remove_duplicates(self) -> None:
         """Remove duplicate rows"""
-        if self.data_handler.df is None:
-            return
-        if getattr(self, "_preview_msg_box", None) is not None:
-            self._preview_msg_box.close()
-        try:
-            df = self.data_handler.df
-
-            duplicate_indices = set(i for i, is_dup in enumerate(df.duplicated(keep="first")) if is_dup)
-
-            if not duplicate_indices:
-                global_signals.toast_requested.emit(
-                    "No Duplicates", "No duplicate rows found in the dataset", ToastLevel.INFO, 4000
-                )
-                return
-
-            if self.view.data_table.model() is not None:
-                self.view.data_table.model().set_highlighted_rows(duplicate_indices)
-
-            self._preview_msg_box = QMessageBox(self.view)
-            self._preview_msg_box.setIcon(QMessageBox.Icon.Question)
-            self._preview_msg_box.setWindowTitle("Confirm Removal")
-            self._preview_msg_box.setText(
-                f"Found {len(duplicate_indices)} duplicate row(s) (highlighted in red)\nReview the table, then choose whether to remove or keep them.")
-            self._preview_msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            self._preview_msg_box.setWindowModality(Qt.WindowModality.NonModal)
-
-            def handle_response(button):
-                if self.view.data_table.model() is not None:
-                    self.view.data_table.model().set_highlighted_rows(set())
-
-                if self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes:
-                    self._execute_remove_duplicates()
-                else:
-                    self.status_bar.log("Remove duplicates operation cancelled.", LogLevel.INFO)
-
-                self._preview_msg_box.deleteLater()
-                self._preview_msg_box = None
-
-            self._preview_msg_box.buttonClicked.connect(handle_response)
-            self._preview_msg_box.show()
-
-        except (ValueError, TypeError, KeyError) as e:
-            self.status_bar.log(f"Failed to prepare duplicate preview {str(e)}", LogLevel.ERROR)
-
-    def _execute_remove_duplicates(self) -> None:
-        try:
-            before = len(self.data_handler.df)
-            self.data_handler.clean_data("drop_duplicates")
-            after = len(self.data_handler.df)
-            removed = before - after
-
-            self.view.refresh_data_view()
-
-            self.remove_rows_animation = RemoveRowAnimation(message="Removed Rows")
-            self.remove_rows_animation.start(target_widget=self.view)
-
-            self.status_bar.log_action(
-                f"Removed {removed:,} duplicate row(s)",
-                details={
-                    "rows_before" : before,
-                    "rows_after"  : after,
-                    "rows_removed": removed,
-                    "operation"   : "drop_duplicates",
-                },
-                level="SUCCESS",
-            )
-        except (ValueError, TypeError, KeyError) as e:
-            self.status_bar.log(f"Failed to remove duplicates: {str(e)}", LogLevel.ERROR)
-            FailedAnimation("Failed To Remove Rows").start(target_widget=self.view)
+        self.cleaning_controller.remove_duplicates()
 
     def drop_missing(self):
         """Drop rows with missing values"""
-        if self.data_handler.df is None:
-            return
-        if getattr(self, "_preview_msg_box", None) is not None:
-            self._preview_msg_box.close()
-        try:
-            df = self.data_handler.df
-
-            missing_indices = set(i for i, has_missing in enumerate(df.isnull().any(axis=1)) if has_missing)
-
-            if not missing_indices:
-                global_signals.toast_requested.emit(
-                    "No Missing Values", "No rows with missing values found in the dataset",
-                    ToastLevel.INFO, 4000
-                )
-                return
-            if self.view.data_table.model() is not None:
-                self.view.data_table.model().set_highlighted_rows(missing_indices)
-
-            self._preview_msg_box = QMessageBox(self.view)
-            self._preview_msg_box.setIcon(QMessageBox.Icon.Question)
-            self._preview_msg_box.setWindowTitle("Confirm Removal")
-            self._preview_msg_box.setText(
-                f"Found {len(missing_indices)} row(s) with missing values (highlighted in red).\nReview the table, then choose whether to remove them.")
-            self._preview_msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            self._preview_msg_box.setWindowModality(Qt.WindowModality.NonModal)
-
-            def handle_response(button):
-                if self.view.data_table.model() is not None:
-                    self.view.data_table.model().set_highlighted_rows(set())
-
-                if self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes:
-                    self._execute_drop_missing()
-                else:
-                    self.status_bar.log("Drop missing values operation cancelled.", LogLevel.INFO)
-
-                self._preview_msg_box.deleteLater()
-                self._preview_msg_box = None
-
-            self._preview_msg_box.buttonClicked.connect(handle_response)
-            self._preview_msg_box.show()
-
-        except Exception as DropMissingError:
-            self.status_bar.log(f"Failed to prepare missing values preview: {str(DropMissingError)}", LogLevel.ERROR)
-
-    def _execute_drop_missing(self) -> None:
-        try:
-            before = len(self.data_handler.df)
-            self.data_handler.clean_data("drop_missing")
-            after = len(self.data_handler.df)
-            removed = before - after
-
-            self.view.refresh_data_view()
-
-            self.status_bar.log_action(
-                f"Dropped {removed:,} row(s) with missing values",
-                details={
-                    "rows_before" : before,
-                    "rows_after"  : after,
-                    "rows_removed": removed,
-                    "operation"   : "drop_missing",
-                },
-                level="SUCCESS",
-            )
-            self.dropmissing_animation = DropMissingValueAnimation(
-                parent=None, message="Drop Missing Values"
-            ).start(target_widget=self.view)
-        except Exception as DropMissingError:
-            self.status_bar.log(
-                f"Failed to drop missing values: {str(DropMissingError)}", LogLevel.ERROR
-            )
-            self.failed_animation = FailedAnimation("Failed to Drop Missing values").start(target_widget=self.view)
+        self.cleaning_controller.drop_missing()
 
     def drop_empty_columns(self) -> None:
-        if self.data_handler.df is None:
-            self.no_data_loaded_toast()
-            return
-
-        cols_before = len(self.data_handler.df.columns)
-        try:
-            self.data_handler.clean_data("drop_empty_columns")
-            cols_after = len(self.data_handler.df.columns)
-            removed = cols_before - cols_after
-
-            if removed == 0:
-                global_signals.toast_requested.emit(
-                    "No Empty Columns", "No completely empty columns were found in the dataset",
-                    ToastLevel.INFO, 4000
-                )
-                return
-
-            self.view.refresh_data_view()
-            self.status_bar.log_action(
-                f"Dropped {removed} empty column(s)",
-                details={
-                    "columns_before" : cols_before,
-                    "columns_after"  : cols_after,
-                    "columns_removed": removed,
-                    "operation"      : "drop_empty_columns",
-                },
-                level=LogLevel.SUCCESS
-            )
-            DropColumnAnimation(message="Dropped {removed} empty columns").start(target_widget=self.view)
-        except Exception as DropEmptyColumnsError:
-            self.status_bar.log(f"Failed to drop empty columns: {str(DropEmptyColumnsError)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Error", "Failed to drop empty columns", ToastLevel.ERROR
-            )
+        self.cleaning_controller.drop_empty_columns()
 
     def fill_missing(self):
         """Fill missing values"""
-        if self.data_handler.df is None:
-            self.no_data_loaded_toast()
-            return
-
-        try:
-            columns = list(self.data_handler.df.columns)
-            dialog = FillMissingDialog(columns, df=self.data_handler.df, parent=self.view)
-
-            if dialog.exec():
-                config = dialog.get_config()
-
-                df = self.data_handler.df
-                missing_before = df.isnull().sum().sum()
-
-                self.data_handler.clean_data(
-                    "fill_missing",
-                    column=config["column"],
-                    method=config["method"],
-                    value=config["value"],
-                )
-
-                missing_after = self.data_handler.df.isnull().sum().sum()
-                filled = missing_before - missing_after
-
-                self.view.refresh_data_view()
-                col_msg = config["column"]
-                method_msg = config["method"]
-                if method_msg == "static_value":
-                    method_msg = f"value '{config['value']}'"
-
-                self.status_bar.log_action(
-                    f"Filled {filled:,} missing values in {col_msg} using {method_msg}",
-                    details={
-                        "missing_before": missing_before,
-                        "missing_after" : missing_after,
-                        "filled_count"  : filled,
-                        "method"        : config["method"],
-                        "column"        : config["column"],
-                        "operation"     : "fill_missing",
-                    },
-                    level="SUCCESS",
-                )
-                self.fill_missing_animation = FillMissingValuesAnimation(
-                    message="Fill Missing Values", fill_value=config["value"]
-                )
-                self.fill_missing_animation.start(target_widget=self.view)
-        except Exception as FillMissingValuesError:
-            self.status_bar.log(
-                f"Failed to execute 'Fill Missing values': {str(FillMissingValuesError)}",
-                LogLevel.ERROR,
-            )
-            global_signals.request_toast(
-                "Error", f"Failed to execute 'Fill Missing Values'", ToastLevel.ERROR
-            )
+        self.cleaning_controller.fill_missing()
 
     def open_outlier_dialog(self, method):
         """Opens the outlier detection dialog"""
-        if self.data_handler.df is None:
-            self.no_data_loaded_toast()
-            return
-
-        dialog = OutlierDetectionDialog(self.data_handler, method, self.view)
-        if dialog.exec():
-            self.outlier_animation = OutlierDetectionAnimation(method_name=method)
-            self.outlier_animation.start(target_widget=self.view)
-            rows_removed = len(dialog.outlier_indices)
-            self.view.refresh_data_view()
-            self.status_bar.log_action(
-                f"Removed {rows_removed} outliers using {method}",
-                details={
-                    "method"   : method,
-                    "count"    : rows_removed,
-                    "operation": "remove_outliers",
-                },
-                level="SUCCESS",
-            )
+        self.cleaning_controller.open_outlier_dialog(method)
 
     def apply_normalization(self) -> None:
-        """Apply the selected normalization method to the selected colymn"""
-        if self.data_handler.df is None:
-            self.no_data_loaded_toast()
-            return
-
-        selected_columns = self.view.operations_panel.get_selected_columns()
-        if not selected_columns:
-            self.status_bar.log("No columns selected for normalization", LogLevel.WARNING)
-            global_signals.request_toast(
-                "No Selection", f"Please select at least one column from the table to normalize", ToastLevel.WARNING
-            )
-            return
-
-        method_display = self.view.operations_panel.get_normalization_method()
-        if method_display.startswith("Min-Max"):
-            method = "min_max"
-        elif method_display.startswith("Standard"):
-            method = "standard"
-        elif method_display.startswith("Median"):
-            method = "quantile"
-        else:
-            method = "min_max"
-        try:
-            self.data_handler.clean_data("normalize", columns=selected_columns, method=method)
-            self.view.refresh_data_view()
-            self.status_bar.log_action(
-                f"Applied {method_display} to {len(selected_columns)} column(s)",
-                details={
-                    "columns"  : selected_columns,
-                    "method"   : method,
-                    "operation": "normalize_data"
-                },
-                level="SUCCESS"
-            )
-            global_signals.request_toast("Success",
-                                         f"Successfully applied {method_display} to:\n{', '.join(selected_columns)}",
-                                         ToastLevel.SUCCESS)
-        except TypeError as type_err:
-            self.status_bar.log(f"Normalization type error: {str(type_err)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Type Error", "Normalization Type Error", ToastLevel.ERROR
-            )
-        except Exception as NormError:
-            self.status_bar.log(f"Normalization failed: {str(NormError)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Normalization Error", "Failed to normalize data", ToastLevel.ERROR
-            )
+        """Apply the selected normalization method to the selected column"""
+        self.cleaning_controller.apply_normalization()
 
     def apply_filter(self):
         """Apply filter to data"""
@@ -553,10 +137,6 @@ class DataTabController:
             self.view.operations_panel.filtering_tab.set_filter_active_state(
                 True, f"Active: {column} {condition} '{value}'"
             )
-
-            self.filter_animation = DataFilterAnimation(message="Filter Data")
-            self.filter_animation.start(target_widget=self.view)
-
         except Exception as ApplyFilterError:
             self.status_bar.log(
                 f"Failed to execute 'Filter': {str(ApplyFilterError)}", LogLevel.ERROR
@@ -661,11 +241,6 @@ class DataTabController:
                     },
                     level="SUCCESS",
                 )
-
-                self.drop_column_animation = DropColumnAnimation(
-                    message="Dropped Column"
-                )
-                self.drop_column_animation.start(target_widget=self.view)
             except Exception as DropColumnError:
                 self.status_bar.log(
                     f"Failed to drop columns: {str(DropColumnError)}", LogLevel.ERROR
@@ -703,11 +278,6 @@ class DataTabController:
                     },
                     level="SUCCESS",
                 )
-
-                self.rename_column_animation = RenameColumnAnimation(
-                    message="Rename Column"
-                )
-                self.rename_column_animation.start(self.view)
             except Exception as RenameColumnError:
                 self.status_bar.log(
                     f"Failed to rename column: {str(RenameColumnError)}", LogLevel.ERROR
@@ -857,11 +427,6 @@ class DataTabController:
                     },
                     level=LogLevel.SUCCESS,
                 )
-                self.changedatatype_animation = DataTypeChangeAnimation(
-                    message="Change Data Type", old_type={old_type}, new_type={new_type}
-                )
-                self.changedatatype_animation.start(self.view)
-
         except Exception as ChangeColumnDataTypeError:
             error_msg = f"Failed to convert '{column}' to {target_type}: {str(ChangeColumnDataTypeError)}"
             global_signals.request_toast(
@@ -1031,10 +596,8 @@ class DataTabController:
             return
 
         try:
-            self.data_handler.clean_data("calculate_date_difference", start_column=start_col, end_column=end_col,
-                                         unit=unit)
+            self.data_handler.clean_data("calculate_date_difference", start_column=start_col, end_column=end_col, unit=unit)
             self.view.refresh_data_view()
-            CalculationAnimation(self.view, "Calculate Time Difference").start(self.view)
 
             self.status_bar.log_action(
                 f"Calculated duration between '{start_col}' and '{end_col}' in {unit}",
@@ -1167,11 +730,6 @@ class DataTabController:
                     },
                     level=LogLevel.SUCCESS,
                 )
-
-                self.aggregate_animation = AggregationAnimation(
-                    message="Aggregated Data"
-                )
-                self.aggregate_animation.start(self.view)
             except Exception as AggregationDialogError:
                 global_signals.request_toast(
                     "Error", "Aggregating data failed", ToastLevel.ERROR
@@ -1313,10 +871,6 @@ class DataTabController:
                         },
                         level=LogLevel.SUCCESS,
                     )
-
-                    self.melt_animation = MeltDataAnimation()
-                    self.melt_animation.start(self.view)
-
             except Exception as MeltDataError:
                 global_signals.request_toast(
                     "Error", "Failed to melt data", ToastLevel.ERROR
@@ -1362,8 +916,6 @@ class DataTabController:
                         },
                         level=LogLevel.SUCCESS
                     )
-                    self.aggregate_animation = AggregationAnimation(message="Pivoted Data")
-                    self.aggregate_animation.start(self.view)
             except Exception as PivotDataError:
                 global_signals.request_toast(
                     "Error", "Failed to pivot data", ToastLevel.ERROR
@@ -1404,8 +956,6 @@ class DataTabController:
                     },
                     level=LogLevel.SUCCESS
                 )
-                self.merge_animation = FileImportAnimation(message="Data Merged")
-                self.merge_animation.start(target_widget=self.view)
             except Exception as MergeError:
                 global_signals.request_toast(
                     "Error", "Failed to merge datasets", ToastLevel.ERROR
@@ -1437,7 +987,6 @@ class DataTabController:
                     },
                     level=LogLevel.SUCCESS
                 )
-                FileImportAnimation(message="Data Appended").start(target_widget=self.view)
             except Exception as AppendError:
                 global_signals.request_toast(
                     "Error", "Failed to append datasets", ToastLevel.ERROR
@@ -1680,7 +1229,6 @@ class DataTabController:
             self.progress_dialog.close()
 
         self.refresh_active_subsets()
-        SubsetDataAnimation(self.view).start(target_widget=self.view)
 
         self.status_bar.log_action(f"Created {len(created)} subsets from column '{column}'",
                                    details={
@@ -1761,8 +1309,6 @@ class DataTabController:
             dialog.plot_subset_requested.connect(self.handle_plot_request)
 
             dialog.exec()
-
-            SubsetDataAnimation(self.view).start(target_widget=self.view)
             # Refresh the subset list after dialog closes
             self.refresh_active_subsets()
 
@@ -1866,8 +1412,6 @@ class DataTabController:
             global_signals.request_toast(
                 "Error", "Failed to insert subset", ToastLevel.ERROR
             )
-            self.failed_animation = FailedAnimation(message="Failed to Insert Subset")
-            self.failed_animation.start(target_widget=self.view)
 
     def restore_original_dataframe(self):
         """Restore the original DataFrame into the Active Data View of the Data Table"""
@@ -1905,12 +1449,6 @@ class DataTabController:
             global_signals.request_toast(
                 "Restore Complete", f"Original DataFrame has been restored.\nRestored: {original_rows:,} rows"
             )
-
-            self.restore_animation = ResetToOriginalStateAnimation(
-                "Restored to Original", parent=None
-            )
-            self.restore_animation.start(target_widget=self.view)
-
         except Exception as RestoreOriginalDataFrameError:
             self.status_bar.log(
                 f"Failed to restore original data: {str(RestoreOriginalDataFrameError)}",
@@ -1974,12 +1512,11 @@ class DataTabController:
             )
 
             self.view.refresh_data_view()
-
-            self.reset_animation = ResetToOriginalStateAnimation(
-                "Reset to Original", parent=None
+            global_signals.request_toast(
+                "Data Reset to Original State",
+                "Data has been reset to show the original data",
+                ToastLevel.SUCCESS
             )
-            self.reset_animation.start(target_widget=self.view)
-
             self.status_bar.log_action(
                 "Data reset to original state",
                 details={
@@ -1993,6 +1530,7 @@ class DataTabController:
             )
         except Exception as ResetDataError:
             self.status_bar.log(f"Failed to reset data: {str(ResetDataError)}", LogLevel.ERROR)
+            global_signals.request_toast("Reset Data Error", "Failed to reset data", ToastLevel.ERROR)
 
     def show_help_dialog(self, topic_id: str = None):
         """Displays the help dialog for a specific topic"""
@@ -2085,320 +1623,8 @@ class DataTabController:
 
     def run_statistical_test_from_selection(self) -> None:
         """Handles the selection of columns and trigger a statistical test or opens the workspace"""
-        if self.data_handler.df is None:
-            self.no_data_loaded_toast()
-            return
-
-        _, selected_columns = self.view.get_selection_state()
-
-        if len(selected_columns) == 2:
-            col1, col2 = selected_columns
-            if not pd.api.types.is_numeric_dtype(self.data_handler.df[col1]) or not pd.api.types.is_numeric_dtype(
-                    self.data_handler.df[col2]):
-                global_signals.request_toast(
-                    "Warning", "Both selected columns must be numeric to perform statistical tests",
-                    ToastLevel.WARNING
-                )
-                self._render_test_results_page()
-                return
-
-            test_type, ok = QInputDialog.getItem(
-                self.view, "Select Statistical Test", f"Select test to run between '{col1}' and '{col2}':",
-                ["pearson", "t-test", "anova"], 0, False
-            )
-            if ok and test_type:
-                self._execute_statistical_test(col1, col2, test_type)
-        else:
-            self._render_test_results_page()
-
-    def _execute_statistical_test(self, col1: str, col2: str, test_type: str) -> None:
-        """
-        Core execution logic for statistical tests
-        Generates results and renders the workspace
-        """
-        if self.data_handler.df is None:
-            return
-
-        if not pd.api.types.is_numeric_dtype(self.data_handler.df[col1]) or not pd.api.types.is_numeric_dtype(
-                self.data_handler.df[col2]):
-            global_signals.request_toast(
-                "Warning", "Both selected columns must be numeric to perform statistical tests",
-                ToastLevel.WARNING
-            )
-            return
-
-        try:
-            results = self.data_handler.run_statistical_test(test_type, col1, col2)
-
-            stat_val = results['statistic']
-            p_val = results['p_value']
-            test_name = results['test']
-            interpretation = results['interpretation']
-
-            fig, ax = plt.subplots(figsize=(6, 4))
-            if test_type == "pearson":
-                ax.scatter(self.data_handler.df[col1], self.data_handler.df[col2], alpha=0.6, color='#3b82f6')
-                ax.set_xlabel(col1)
-                ax.set_ylabel(col2)
-                ax.set_title(f"Scatter Plot: {col1} vs {col2}", fontsize=10)
-            else:
-                data_to_plot = [self.data_handler.df[col1].dropna(), self.data_handler.df[col2].dropna()]
-                bplot = ax.boxplot(data_to_plot, patch_artist=True, labels=[col1, col2])
-                for patch in bplot['boxes']:
-                    patch.set_facecolor('#eff6ff')
-                    patch.set_edgecolor('#3b82f6')
-                for median in bplot['medians']:
-                    median.set_color('#1e3a8a')
-                ax.set_ylabel("Values")
-                ax.set_title(f"Distribution Comparison: {col1} vs {col2}", fontsize=10)
-
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            plt.tight_layout()
-
-            buffer = BytesIO()
-            fig.savefig(buffer, format="png", dpi=100, transparent=True)
-            plt.close(fig)
-            img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
-            img_html = f'<img src="data:image/png;base64,{img_str}" alt="Statistical Graph" style="max-width: 100%; height: auto; display: block; margin: 0 auto;"/>'
-
-            if not hasattr(self.data_handler, "test_results_history"):
-                self.data_handler.test_results_history = []
-
-            is_significant = p_val < 0.05
-            badge_class = "badge-significant" if is_significant else "badge-insignificant"
-            badge_text = "Significant (p < 0.05)" if is_significant else "Not Significant"
-
-            p_val_str = f"{p_val:.4e}" if p_val < 0.0001 else f"{p_val:.4f}"
-
-            raw_clipboard = (
-                f"Test: {test_name}\n"
-                f"Columns: {col1} vs {col2}\n"
-                f"Test Statistic: {stat_val:.4f}\n"
-                f"P-Value: {p_val_str}\n"
-                f"Interpretation: {interpretation}"
-            )
-            clipboard_text = html.escape(raw_clipboard).replace('\n', '&#10;')
-
-            html_result = f"""
-                <div class="test-card" data-pvalue="{p_val}" data-timestamp="{len(self.data_handler.test_results_history)}">
-                    <div class="card-header-row">
-                        <h3>{test_name}</h3>
-                        <div class="header-actions">
-                            <span class="sig-badge {badge_class}">{badge_text}</span>
-                            <button class="copy-btn" title="Copy to clipboard" data-clipboard="{clipboard_text}">
-                                &#x2398; Copy
-                            </button>
-                            <button class="dismiss-btn" title="Remove this result">&times;</button>
-                        </div>
-                    </div>
-                    <div class="test-content">
-                        <p class="compare-text"><b>Compared Columns:</b> <span>{col1}</span> vs <span>{col2}</span></p>
-                        <div class="metrics-container">
-                            <div class="metric-box">
-                                <div class="metric-label">Test Statistic</div>
-                                <div class="metric-value">{stat_val:.4f}</div>
-                            </div>
-                            <div class="metric-box">
-                                <div class="metric-label">P-Value</div>
-                                <div class="metric-value">{p_val_str}</div>
-                            </div>
-                        </div>
-                        <div class="interpretation-box">
-                            <b class="interpretation-label">Interpretation</b><br>
-                            <div style="margin-top: 6px;">{interpretation}</div>
-                        </div>
-                        <div class="visual-sub-card">
-                            <h4 class="sub-card-header"><span class="sub-toggle-icon">&#9658;</span> Visual Distribution</h4>
-                            <div class="sub-card-content" style="display: none;">
-                                {img_html}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                """
-            self.data_handler.test_results_history.insert(0, html_result)
-            self.status_bar.log(f"Ran {test_name} on '{col1}' and '{col2}' (p={p_val_str})", LogLevel.SUCCESS)
-
-            self._render_test_results_page()
-        except Exception as StatisticalTestError:
-            global_signals.request_toast(
-                "Error", f"Failed to run statistical test", ToastLevel.ERROR
-            )
-            self.status_bar.log(f"Statistical test failed: {str(StatisticalTestError)}", LogLevel.ERROR)
-            self._render_test_results_page()
-
-    def _render_test_results_page(self) -> None:
-        """Builds and renders the full test results page"""
-
-        if not hasattr(self, "stats_page_attached"):
-            self.stats_page_attached = True
-
-        css_path = Path(get_resource_path("resources/test_resultPanel/stats_test_style.css"))
-        js_path = Path(get_resource_path("resources/test_resultPanel/stats_test_script.js"))
-
-        css_content = css_path.read_text(encoding="UTF-8") if css_path.exists() else ""
-        js_content = js_path.read_text(encoding="UTF-8") if js_path.exists() else ""
-
-        history = getattr(self.data_handler, "test_results_history", [])
-
-        full_page = f"""<!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta charset="UTF-8">
-                            <style>
-                                {css_content}
-                            </style>
-                            <script>
-                                {js_content}
-                            </script>
-                        </head>
-                        <body>
-                            <div class="page-header">
-                                <h2>Statistical Analysis Results</h2>
-                                <div class="controls-row">
-                                    <input type="text" id="testSearch" class="search-box" placeholder="Search tests, columns, or results...">
-                                    <select id="sortSelect" class="sort-dropdown">
-                                        <option value="newest">Sort: Newest First</option>
-                                        <option value="pvalue">Sort: Most Significant (P-Value)</option>
-                                        <option value="type">Sort: Test Type</option>
-                                    </select>
-                                    <button id="expandAllBtn" class="global-control-btn">Expand All</button>
-                                    <button id="collapseAllBtn" class="global-control-btn">Collapse All</button>
-                                </div>
-                            </div>
-                            <div id="test-list">
-                                {"".join(history)}
-                            </div>
-                        </body>
-                        </html>
-                        """
-
-        self.view.test_results_text.setHtml(full_page)
-        self.view.data_tabs.setCurrentWidget(self.view.test_results_text)
+        self.stats_controller.run_statistical_test_from_selection()
 
     def export_data(self) -> None:
         """Handles exporting the dataframe to a file or clipboard"""
-        if self.data_handler.df is None:
-            global_signals.request_toast(
-                "Warning", "No data to export", ToastLevel.WARNING
-            )
-            return
-
-        selected_rows, selected_cols = self.view.get_selection_state()
-        dialog = ExportDialog(self.view, data_handler=self.data_handler, selected_rows=selected_rows,
-                              selected_columns=selected_cols)
-
-        if dialog.exec():
-            config: ExportConfig = dialog.get_export_config()
-            df_to_export = self._prepare_export_dataframe(config, selected_rows)
-
-            if df_to_export is None:
-                return
-
-            if config.to_clipboard:
-                self._export_to_clipboard(df_to_export, config.include_index)
-            else:
-                self._export_to_file(df_to_export, config)
-
-    def _prepare_export_dataframe(self, config: ExportConfig, selected_rows: list[int]) -> Optional[pd.DataFrame]:
-        """Slices the current dataframe based on export configuration."""
-        df = self.data_handler.df.copy()
-
-        if config.selected_rows_only and selected_rows:
-            try:
-                df = df.iloc[selected_rows]
-            except IndexError as error:
-                global_signals.request_toast(
-                    "Selection Error", f"Error slicing selected rows. They may be out of bounds", ToastLevel.ERROR
-                )
-                self.status_bar.log(f"Error slicing selected rows: {str(error)}", LogLevel.ERROR)
-                return None
-            except Exception as error:
-                global_signals.request_toast(
-                    "Slicing Error", "An unexpected error occurred while filtering rows", ToastLevel.ERROR
-                )
-                return None
-
-        if config.specific_columns:
-            if not config.selected_columns:
-                global_signals.request_toast(
-                    "No Columns Selected", "Please select at least one column to export", ToastLevel.WARNING
-                )
-                return None
-            df = df[config.selected_columns]
-
-        return df
-
-    def _export_to_clipboard(self, df: pd.DataFrame, include_index: bool) -> None:
-        """Executes clipboard export."""
-        try:
-            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-            df.to_clipboard(excel=True, index=include_index)
-            rows, cols = df.shape
-
-            global_signals.request_toast(
-                "Copied", f"Copied {rows:,} rows and {cols:,} columns to the clipboard"
-            )
-            self.status_bar.log("Export completed to Clipboard", LogLevel.SUCCESS)
-        except Exception as clipboard_error:
-            self.status_bar.log(f"Failed to copy to clipboard: {str(clipboard_error)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Error", "Failed to copy to clipboard", ToastLevel.ERROR
-            )
-        finally:
-            QApplication.restoreOverrideCursor()
-
-    def _export_to_file(self, df: pd.DataFrame, config: ExportConfig) -> None:
-        """Executes file export based on dialog configuration."""
-        format_config = ExportDialog.EXPORT_CONFIG.get(config.format, {})
-
-        file_filter = format_config.get("filter", "All Files (*.*)")
-        default_ext = format_config.get("ext", "")
-
-        filepath, _ = QFileDialog.getSaveFileName(
-            self.view,
-            "Export Data",
-            f"export{default_ext}",
-            file_filter
-        )
-
-        if not filepath:
-            return
-
-        try:
-            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-
-            method_name = format_config.get("method")
-            if not method_name:
-                raise ValueError(f"No export method defined for {config.format}")
-
-            export_kwargs = format_config.get("kwargs", {}).copy()
-
-            if config.format == "JSON":
-                export_kwargs["orient"] = "columns" if config.include_index else "records"
-            else:
-                export_kwargs["index"] = config.include_index
-
-            try:
-                export_func = getattr(df, method_name)
-                export_func(filepath, **export_kwargs)
-            except ImportError:
-                error_msg = format_config.get("error_msg", f"Missing dependency for {config.format} export.")
-                raise ImportError(error_msg)
-
-            global_signals.request_toast(
-                "Success", f"Data exported to {Path(filepath).name}", ToastLevel.SUCCESS
-            )
-            self.status_bar.log(f"Export complete to {filepath}", LogLevel.SUCCESS)
-
-            ExportFileAnimation(parent=self.view, message="Export complete", extension=config.format).start(
-                target_widget=self.view)
-
-        except Exception as error:
-            self.status_bar.log(f"Failed to export data: {str(error)}", LogLevel.ERROR)
-            global_signals.request_toast(
-                "Export Error", "Failed to export data", ToastLevel.ERROR
-            )
-        finally:
-            QApplication.restoreOverrideCursor()
+        self.dataset_controller.export_data()
