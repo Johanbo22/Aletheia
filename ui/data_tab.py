@@ -1,20 +1,22 @@
 # ui/data_tab.py
+import logging
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QAbstractItemView, QApplication, QGraphicsOpacityEffect, QHBoxLayout, QHeaderView, \
-    QListWidgetItem, QMenu, QStackedWidget, QTabWidget, QTableView, QVBoxLayout, QWidget
+    QListWidgetItem, QMenu, QSplitter, QStackedWidget, QTabWidget, QTableView, QVBoxLayout, QWidget
 
 from controller.data_tab_controller import DataTabController
 from core.data_handler import DataHandler
+from core.global_signals import global_signals
 from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
 from ui.LandingPage import LandingPage
-from ui.animations import (
-    EditModeToggleAnimation
-)
+from ui.animations import EditModeToggleAnimation
 from ui.components.data_operations_panel import DataOperationsPanel
 from ui.components.data_search_bar import DataSearchBar
 from ui.components.data_table_delegate import DataTableDelegate
@@ -24,6 +26,9 @@ from ui.data_table_model import DataTableModel
 from ui.dialogs import TableCustomizationDialog
 from ui.status_bar import LogLevel, StatusBar
 from ui.theme import ThemeColors
+from ui.widgets.ToastNotification import ToastLevel
+
+logger = logging.getLogger(__name__)
 
 class DataTab(QWidget):
     """Tab for viewing and manipulating data"""
@@ -80,7 +85,23 @@ class DataTab(QWidget):
         """Initialize the data tab UI"""
         main_layout = QHBoxLayout(self)
 
-        # Left side: Data table and operations stacked with landing page
+        left_widget = self._setup_left_panel()
+        right_widget = self._setup_right_panel()
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_widget)
+
+        splitter.setStretchFactor(0, 4)
+        splitter.setStretchFactor(1, 6)
+
+        main_layout.addWidget(splitter)
+        self.setLayout(main_layout)
+
+        self.refresh_data_view()
+
+    def _setup_left_panel(self) -> QWidget:
+        """Sets up the left panel containing the landing page and data views"""
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -88,7 +109,13 @@ class DataTab(QWidget):
         self.left_stack = QStackedWidget()
         left_layout.addWidget(self.left_stack)
 
-        # Landing page
+        self._setup_landing_page()
+        self._setup_data_view_container()
+
+        return left_widget
+
+    def _setup_landing_page(self) -> None:
+        """Initializes the landing page and its signals"""
         self.landing_page = LandingPage()
         self.landing_page.open_project_clicked.connect(self.request_open_project.emit)
         self.landing_page.recent_project_clicked.connect(self.request_recent_project.emit)
@@ -100,20 +127,26 @@ class DataTab(QWidget):
         self.landing_page.quit_clicked.connect(self.request_quit.emit)
         self.left_stack.addWidget(self.landing_page)
 
-        # Data view container
+    def _setup_data_view_container(self) -> None:
+        """Sets up the container for the data view widgets"""
         self.data_view_widget = QWidget()
         data_view_layout = QVBoxLayout(self.data_view_widget)
         data_view_layout.setContentsMargins(0, 0, 0, 0)
         data_view_layout.setSpacing(6)
         self.left_stack.addWidget(self.data_view_widget)
 
+        self._setup_toolbar_and_search(data_view_layout)
+        self._setup_data_tabs(data_view_layout)
+
+    def _setup_toolbar_and_search(self, layout: QVBoxLayout) -> None:
+        """Sets up the toolbar and search bar"""
         # Data toolbar
         self.toolbar = DataViewToolbar(parent=self)
         self.toolbar.create_dataset_requested.connect(self.controller.create_new_dataset)
         self.toolbar.refresh_data_requested.connect(self.controller.refresh_google_sheets)
         self.toolbar.python_console_requested.connect(self.request_python_console.emit)
         self.toolbar.edit_mode_toggled.connect(self.toggle_edit_mode)
-        data_view_layout.addWidget(self.toolbar)
+        layout.addWidget(self.toolbar)
 
         # Search bar
         self.search_bar = DataSearchBar(data_handler=self.data_handler, parent=self)
@@ -121,18 +154,23 @@ class DataTab(QWidget):
         self.search_bar.clear_selection_requested.connect(
             lambda: self.data_table.clearSelection() if self.data_handler else None)
 
-        self.search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
+        self.search_shortcut = QShortcut(QKeySequence.StandardKey.Find, self)
         self.search_shortcut.activated.connect(self.open_search_bar)
 
         self.esc_shortcut = QShortcut(QKeySequence("Esc"), self.search_bar)
         self.esc_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.esc_shortcut.activated.connect(self.search_bar.close_search)
-        data_view_layout.addWidget(self.search_bar)
+        layout.addWidget(self.search_bar)
 
-        # Create tabs for data and statistics
+    def _setup_data_tabs(self, layout: QVBoxLayout) -> None:
+        """Creates the tab widget for data and statistics"""
         self.data_tabs = QTabWidget()
+        self._setup_data_table()
+        self._setup_stats_and_test_tabs()
+        layout.addWidget(self.data_tabs, 1)
 
-        # Data Table Tab
+    def _setup_data_table(self) -> None:
+        """Configures the main data table view"""
         self.data_table = QTableView()
         self.data_table.setObjectName("MainDataTable")
         self.data_table.horizontalHeader().setObjectName("MainDataHeader")
@@ -144,12 +182,8 @@ class DataTab(QWidget):
         self.data_table.setItemDelegate(self.table_delegate)
         self.data_table.verticalHeader().setDefaultSectionSize(32)
 
-        self.data_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Interactive
-        )
-        self.data_table.verticalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Fixed
-        )
+        self.data_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.data_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.data_table.setWordWrap(False)
         self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self.data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
@@ -175,7 +209,9 @@ class DataTab(QWidget):
         data_table_icon = IconBuilder.build(IconType.DataExplorerIcon)
         self.data_tabs.addTab(self.data_table, data_table_icon, "Data Table")
 
-        # Statistics Tab
+    def _setup_stats_and_test_tabs(self) -> None:
+        """Sets up the statistics and test results web engine view tabs"""
+        # Statistics tab
         self.stats_text = QWebEngineView()
         self.stats_text.page().setBackgroundColor(QColor(Qt.GlobalColor.transparent))
 
@@ -184,15 +220,16 @@ class DataTab(QWidget):
         stats_icon = IconBuilder.build(IconType.ExploreStatisticsIcon)
         self.data_tabs.addTab(self.stats_text, stats_icon, "Statistics")
 
+        # Test results tab
         self.test_results_text = QWebEngineView()
-        self.test_results_text.page().setBackgroundColor(QColor(Qt.GlobalColor.transparent))
+        self.test_results_text.page().setBackgroundColor(Qt.GlobalColor.transparent)
 
         self.set_test_results_greeting()
         test_result_icon = IconBuilder.build(IconType.Calculator)
         self.data_tabs.addTab(self.test_results_text, test_result_icon, "Test Results")
 
-        data_view_layout.addWidget(self.data_tabs, 1)
-
+    def _setup_right_panel(self) -> QWidget:
+        """Sets up the right side operations panel"""
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -202,20 +239,7 @@ class DataTab(QWidget):
         right_layout.addWidget(self.operations_panel)
         self.right_widget = right_widget
 
-        # Create splitter
-        from PyQt6.QtWidgets import QSplitter
-
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
-
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 6)
-
-        main_layout.addWidget(splitter)
-        self.setLayout(main_layout)
-
-        self.refresh_data_view()
+        return right_widget
 
     def toggle_edit_mode(self, is_editing: bool) -> None:
         """
@@ -430,7 +454,8 @@ class DataTab(QWidget):
                 panel.subsets_tab.subset_column_combo.clear()
                 panel.subsets_tab.subset_column_combo.addItems(columns)
             except Exception as Error:
-                print(f"Warning: Could not update subset columns: {str(Error)}")
+                logger.warning(f"Could not update subset columns: {Error}")
+                self.status_bar.log(f"Warning: Could not update subset columns: {Error}", LogLevel.WARNING)
 
         if self.plot_tab:
             self.plot_tab.update_column_combo()
@@ -463,7 +488,8 @@ class DataTab(QWidget):
             if hasattr(self, "active_subsets_list"):
                 self.controller.refresh_active_subsets()
         except Exception as Error:
-            print(f"Warning: Could not refresh subsets: {Error}")
+            logger.warning(f"Could not refresh subsets: {Error}")
+            self.status_bar.log(f"Warning: Could not refresh subsets: {Error}", LogLevel.WARNING)
 
         inserted_name = getattr(self.data_handler, "inserted_subset_name", None)
         agg_name = getattr(self.data_handler, "viewing_aggregation_name", None)
@@ -769,8 +795,11 @@ class DataTab(QWidget):
             lambda: self.data_table.setAlternatingRowColors(alt_rows_action.isChecked())
         )
         menu.addAction(alt_rows_action)
-
         menu.addSeparator()
+
+        highlight_missing_action = menu.addAction("Highlight Missing Values")
+        menu.addSeparator()
+
         copy_action = menu.addAction("Copy Selection")
         settings_action = menu.addAction("Table Settings...")
         stats_test_action = menu.addAction("Run Statistical Test...")
@@ -781,6 +810,8 @@ class DataTab(QWidget):
             self.data_table.resizeColumnsToContents()
         elif action == resize_rows_action:
             self.data_table.resizeRowsToContents()
+        elif action == highlight_missing_action:
+            self.highlight_missing_values()
         elif action == copy_action:
             self.copy_selection()
         elif action == settings_action:
@@ -824,6 +855,43 @@ class DataTab(QWidget):
 
         QApplication.clipboard().setText(copied_text)
         self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard", LogLevel.SUCCESS)
+
+    def highlight_missing_values(self) -> None:
+        """
+        Finds and highlights all missing values in the data table.
+        It identifies NaN, NaT and empty strings across all columns
+        Displays a notification with count of highlighted cells
+        """
+        if self.data_handler.df is None or self.data_table.model() is None:
+            return
+
+        df = self.data_handler.df
+        missing_cells: set[tuple[int, int]] = set()
+        isna_mask = df.isna()
+
+        for col_idx, col_name in enumerate(df.columns):
+            col_data = df[col_name]
+            is_missing = isna_mask[col_name].copy()
+
+            if pd.api.types.is_object_dtype(col_data) or pd.api.types.is_string_dtype(col_data):
+                is_empty_str = col_data.dropna().astype(str).str.strip() == ""
+                is_missing = is_missing | is_empty_str.reindex(df.index, fill_value=False)
+
+            missing_row_ilocs = np.where(is_missing)[0]
+            for row_idx in missing_row_ilocs:
+                missing_cells.add((int(row_idx), col_idx))
+
+        model = self.data_table.model()
+        model.set_highlighted_cells(missing_cells)
+
+        if not missing_cells:
+            global_signals.request_toast("No Missing Values", "There are no missing values found in this dataset",
+                                         ToastLevel.INFO)
+            self.status_bar.log("No missing values found in the dataset", LogLevel.INFO)
+        else:
+            global_signals.request_toast("Found Missing Values", f"Highlighted {len(missing_cells)} missing values",
+                                         ToastLevel.SUCCESS)
+            self.status_bar.log(f"Highlighted {len(missing_cells)} missing values", LogLevel.SUCCESS)
 
     def open_table_customization(self):
         """Opens the settings dialog for the table customzation"""

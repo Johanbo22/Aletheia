@@ -1,3 +1,4 @@
+import logging
 import operator
 from typing import Any
 from typing import TYPE_CHECKING
@@ -7,10 +8,13 @@ import pandas as pd
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QColor, QFont
 
-from ui.status_bar import LogLevel, StatusBar
+from core.global_signals import global_signals
+from ui.widgets.ToastNotification import ToastLevel
 
 if TYPE_CHECKING:
     from core.data_handler import DataHandler
+
+logger = logging.getLogger(__name__)
 
 class DataTableModel(QAbstractTableModel):
     """ table for the data Table"""
@@ -34,6 +38,7 @@ class DataTableModel(QAbstractTableModel):
         self._data = self.data_handler.df
         self.editable = editable
         self.highlighted_rows = set(highlighted_rows) if highlighted_rows else set()
+        self.highlighted_cells: set[tuple[int, int]] = set()
         self.float_precision = float_precision
         self.conditional_rules = conditional_rules if conditional_rules else []
         self.render_bools_as_checkboxes = True
@@ -45,6 +50,7 @@ class DataTableModel(QAbstractTableModel):
 
         self._highlight_color = QColor("#ffcccc")
         self._nan_color = QColor("#a0a0a0")
+        self._missing_cell_color = QColor(255, 215, 0, 60)
         self._nan_font = QFont()
         self._nan_font.setItalic(True)
 
@@ -113,6 +119,15 @@ class DataTableModel(QAbstractTableModel):
     def set_highlighted_rows(self, rows: set) -> None:
         """Updates the highlighed rows and triggers a layout refresh on display changes"""
         self.highlighted_rows = set(rows) if rows else set()
+        self.layoutChanged.emit()
+
+    def set_highlighted_cells(self, cells: set[tuple[int, int]]) -> None:
+        """
+        Updates the highlighted cells and triggers a layout refresh
+
+        :param cells: A set of (row, col) tuples representing the cells to highlight
+        """
+        self.highlighted_cells = set(cells) if cells else set()
         self.layoutChanged.emit()
 
     def _update_column_alignments(self) -> None:
@@ -207,6 +222,7 @@ class DataTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._data = self.data_handler.df
         self.highlighted_rows.clear()
+        self.highlighted_cells.clear()
         self._update_column_alignments()
         self.endResetModel()
 
@@ -243,6 +259,8 @@ class DataTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.BackgroundRole:
             if row in self.highlighted_rows:
                 return self._highlight_color
+            if (row, col) in self.highlighted_cells:
+                return self._missing_cell_color
 
         shape = self._data.shape
         is_insert_row: bool = self.editable and row >= shape[0]
@@ -330,7 +348,7 @@ class DataTableModel(QAbstractTableModel):
             if isinstance(val, str) and len(val) > CHARACTER_LIMIT:
                 return val
         except Exception as error:
-            print(error)
+            logger.debug(f"Error formatting tooltip data: {error}")
         return None
 
     def _get_edit_data(self, val: Any, is_missing: bool = False) -> str:
@@ -354,7 +372,7 @@ class DataTableModel(QAbstractTableModel):
                     if op_func(val, target):
                         return color
         except Exception as error:
-            print(error)
+            logger.warning(f"Error evaluating foreground conditional values: {error}")
         return None
 
     def _get_font_data(self, is_missing: bool = False) -> QFont | None:
@@ -405,7 +423,8 @@ class DataTableModel(QAbstractTableModel):
             return True
 
         except Exception as UpdateDataModelError:
-            print(f"Error updating data: {str(UpdateDataModelError)}")
+            logger.error(f"Error updating cell data: {UpdateDataModelError}", exc_info=True)
+            global_signals.request_toast("Update Error", "Failed to update cell", ToastLevel.ERROR)
             return False
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
@@ -507,8 +526,8 @@ class DataTableModel(QAbstractTableModel):
                     if self._col_alignments and 0 <= section < len(self._col_alignments):
                         return self._col_alignments[section]
 
-            except Exception:
-                pass
+            except Exception as header_error:
+                logger.debug(f"Error retrieving horizontal header data for section {section}: {header_error}")
 
         elif orientation == Qt.Orientation.Vertical:
             if self.editable and section == self._data.shape[0]:
@@ -527,8 +546,8 @@ class DataTableModel(QAbstractTableModel):
             if is_display:
                 try:
                     return str(self._data.index[section])
-                except IndexError:
-                    pass
+                except IndexError as index_error:
+                    logger.debug(f"Index bounds error retrieving vertical header for {section}: {index_error}")
 
         return None
 
@@ -552,10 +571,10 @@ class DataTableModel(QAbstractTableModel):
             self.data_handler.sort_data(col_name, ascending)
             self._data = self.data_handler.df
             self.highlighted_rows.clear()
+            self.highlighted_cells.clear()
             self._update_column_alignments()
         except Exception as SortError:
-            print(f"Error sorting data: {str(SortError)}")
-            self.status_bar = StatusBar()
-            self.status_bar.log(f"Error sorting data: {str(SortError)}", LogLevel.ERROR)
+            logger.error(f"Error sorting data: {SortError}", exc_info=True)
+            global_signals.request_toast("Sort Error", "Failed to sort data", ToastLevel.ERROR)
 
         self.layoutChanged.emit()
