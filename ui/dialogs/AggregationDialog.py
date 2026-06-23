@@ -2,16 +2,15 @@ import threading
 from enum import Enum
 
 import pandas as pd
-from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, QRunnable, QSortFilterProxyModel
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, \
-    QStandardItem, \
-    QStandardItemModel
-from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, \
-    QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListView, QMenu, QLineEdit, QGroupBox, QComboBox, QPushButton
+from PyQt6.QtCore import QObject, QPoint, QRunnable, QSortFilterProxyModel, QThreadPool, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QFont, QIcon, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
+from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, \
+    QLabel, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, \
+    QVBoxLayout, QWidget
 
-from ui.workers import AggregationWorker
 from core.global_signals import ToastLevel, global_signals
 from icons import IconBuilder, IconType
+from ui.workers import AggregationWorker
 
 DEFAULT_PREVIEW_LIMIT: int = 5
 DEBOUNCE_DELAY_MS: int = 300
@@ -112,6 +111,7 @@ UNIVERSAL_FUNCTIONS: set[AggregationFunctions] = {
 
 class AggregationDialog(QDialog):
     """Dialog for data aggregation operations"""
+    agg_table: QTableWidget | QTableWidget
 
     def __init__(self, data_handler, parent=None):
         super().__init__(parent)
@@ -494,7 +494,7 @@ class AggregationDialog(QDialog):
     def move_agg_row_down(self) -> None:
         """Move the currently selected aggregation row down by one position."""
         row: int = self.agg_table.currentRow()
-        if row >= 0 and row < self.agg_table.rowCount() - 1:
+        if 0 <= row < self.agg_table.rowCount() - 1:
             self._swap_agg_rows(row, row + 1)
     
     def _swap_agg_rows(self, row1: int, row2: int) -> None:

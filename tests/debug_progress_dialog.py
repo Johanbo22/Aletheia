@@ -1,7 +1,8 @@
 import sys
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication
+
 from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication
 
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
@@ -10,7 +11,7 @@ from ui.dialogs import ProgressDialog
 
 def main() -> None:
     app = QApplication(sys.argv)
-    style_path = project_root / "ui" / "styles" / "dialogs.css"
+    style_path = project_root / "ui" / "styles" / "light_theme" / "dialogs_styles" / "progress_dialog.css"
     if style_path.exists():
         app.setStyleSheet(style_path.read_text(encoding="utf-8"))
     else:

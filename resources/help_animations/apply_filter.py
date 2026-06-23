@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QRectF, Qt, QPointF
-from PyQt6.QtGui import QColor, QPen, QPainterPath
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QColor, QPainterPath, QPen
 
 from ui.help_animation_engine import HelpAnimationEngine
 
@@ -50,7 +50,7 @@ class Animation(HelpAnimationEngine):
 
         self._draw_funnel(painter, self.center_x, self.center_y, active_intensity=phase3_process)
 
-        if phase2_drop > 0 and phase2_drop < 1.0:
+        if 0 < phase2_drop < 1.0:
             p0 = QPointF(self.left_x + (self.table_w * 0.75), self.start_y - 10)
 
             # Point1 is above funnel

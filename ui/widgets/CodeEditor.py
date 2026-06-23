@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtCore import QRect, QStringListModel, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QFont, QKeyEvent, QKeySequence, QMouseEvent, QPaintEvent, QPainter, \
-    QResizeEvent, QTextBlock, QTextCharFormat, QTextCursor, QTextFormat, QTextOption, QWheelEvent
+    QResizeEvent, QTextBlock, QTextCharFormat, QTextCursor, QTextDocument, QTextFormat, QTextOption, QWheelEvent
 from PyQt6.QtWidgets import QCompleter, QInputDialog, QPlainTextEdit, QTextEdit, QToolTip, QWidget
 
 from core.global_signals import LogLevel, ToastLevel, global_signals
@@ -1074,7 +1074,7 @@ class CodeEditor(QPlainTextEdit):
         # auto indent on enter
         if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             block = cursor.block()
-            line_text = block.text()
+            line_text: str = block.text()
 
             indentation = ""
             for char in line_text:
@@ -1092,7 +1092,7 @@ class CodeEditor(QPlainTextEdit):
             #             |
             #         }
             pos = cursor.positionInBlock()
-            if pos > 0 and pos < len(line_text):
+            if 0 < pos < len(line_text):
                 char_before = line_text[pos - 1]
                 char_after = line_text[pos]
                 if char_before in "{[(" and char_after in "}])":
@@ -1113,8 +1113,8 @@ class CodeEditor(QPlainTextEdit):
         # backspace
         if event.key() == Qt.Key.Key_Backspace:
             pos = cursor.position()
-            doc = self.document()
-            if pos > 0 and pos < doc.characterCount() - 1:
+            doc: QTextDocument | None = self.document()
+            if 0 < pos < doc.characterCount() - 1:
                 cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.KeepAnchor)
                 char_before = cursor.selectedText()
                 cursor.clearSelection()

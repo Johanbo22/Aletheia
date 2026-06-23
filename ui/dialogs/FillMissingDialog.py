@@ -1,7 +1,6 @@
-from ui.theme import ThemeColors
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget, QProgressBar, QFrame, QLineEdit, QComboBox, QCheckBox, QPushButton
-
 import pandas as pd
+from PyQt6.QtWidgets import QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar, \
+    QPushButton, QVBoxLayout, QWidget
 
 class FillMissingDialog(QDialog):
     """Dialog for the user to manipulate their data using the fill missing tool"""
@@ -250,7 +249,7 @@ class FillMissingDialog(QDialog):
         self.missing_progress.setValue(int(missing_count))
 
         severity = "low"
-        if percentage > 0 and percentage < 10:
+        if 0 < percentage < 10:
             severity = "medium"
         elif percentage >= 10:
             severity = "high"
