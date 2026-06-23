@@ -6,13 +6,13 @@ including reading and writing local files, Google Sheets import/export, database
 temporary file management
 """
 
+from enum import Enum
+from io import StringIO
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import pandas as pd
 import requests
-from io import StringIO
-from enum import Enum
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
-
 from duckdb import connect
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
@@ -235,8 +235,8 @@ class DataIOManager:
         sheet_id = sheet_id.strip()
         sheet_name = sheet_name.strip() if sheet_name else None
         gid = str(gid).strip() if gid else None
-        
-        self._reset_import_state
+
+        self._reset_import_state()
         self.last_gsheet_id = sheet_id
         self.last_gsheet_name = sheet_name
         self.last_gsheet_delimiter = delimiter
