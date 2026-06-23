@@ -6,15 +6,17 @@ This module provides the ProjectManager class which handles creating, loading
 saving and managing project files in a compressed package format.
 """
 
-from pathlib import Path
-from typing import Dict, Any, Optional
-import pandas as pd
-from resources.version import APPLICATION_VERSION, PROJECT_EXTENSION, DATA_EXTENSION
-import zipfile
+import io
 import json
 import sqlite3
 import tempfile
-import io
+import zipfile
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import pandas as pd
+
+from resources.version import APPLICATION_VERSION, DATA_EXTENSION, PROJECT_EXTENSION
 
 class ProjectManager:
     
@@ -171,7 +173,7 @@ class ProjectManager:
         """
         Extracts and loads an Aletheia project package into memory
 
-        :param filepath (str): The path to the saved project package
+        :param filepath: The path to the saved project package
         :raises FleNotFoundError: If the target .dps file does not exist
         :raises RuntimeError: If extraction or internal procedures fail
         :return: The restored project state dictionary

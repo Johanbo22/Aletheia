@@ -54,7 +54,8 @@ class PlotFormattingManager:
 
         return general_kwargs
 
-    def determine_y_label(self, plot_type: str, y_cols: list[str]) -> str:
+    @staticmethod
+    def determine_y_label(plot_type: str, y_cols: list[str]) -> str:
         """Determine the ylabel based on the input plot type"""
         plots_gridded = ["Image Show (imshow)", "pcolormesh", "Contour", "Contourf"]
         plots_vector = ["Barbs", "Quiver", "Streamplot"]

@@ -387,10 +387,10 @@ class DataIOManager:
     def export_data(self, df: pd.DataFrame, filepath: str, format: str = "csv", include_index: bool = False) -> None:
         """
         Export a dataframe to a local file
-        :param df (pd.DataFrame): The DataFrame to export
-        :param filepath (str): Destination path
-        :param format (str): The file format of the file
-        :param include_index (bool): Whether to write the row index
+        :param df: The DataFrame to export
+        :param filepath: Destination path
+        :param format: The file format of the file
+        :param include_index: Whether to write the row index
         """
         if df is None:
             raise ValueError("No data loaded")
@@ -423,10 +423,10 @@ class DataIOManager:
     def export_google_sheets(self, df: pd.DataFrame, credentials_path: str, sheet_id: str, sheet_name: str = "Sheet1") -> bool:
         """
         Export a DataFrame to a Google Sheet using a service-account file\n
-        :param df (pd.DataFrame): The Dataframe to export
-        :param credentials_path (str): Path to the service-account JSON key
-        :param sheet_id (str): Target Google Sheet ID
-        :param sheet_name (str): Target worksheet name
+        :param df: The Dataframe to export
+        :param credentials_path: Path to the service-account JSON key
+        :param sheet_id: Target Google Sheet ID
+        :param sheet_name: Target worksheet name
         :return bool: True on success
         """
         if df is None:

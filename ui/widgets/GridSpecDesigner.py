@@ -23,7 +23,7 @@ class GridSpan:
                     self.col_end <= other.col_start)
 
     def as_tuple(self) -> Tuple[int, int, int, int]:
-        return (self.row_start, self.row_end, self.col_start, self.col_end)
+        return self.row_start, self.row_end, self.col_start, self.col_end
 
 class GridSpecDesignerWidget(QWidget):
     """

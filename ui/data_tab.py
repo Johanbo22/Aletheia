@@ -424,7 +424,7 @@ class DataTab(QWidget):
         """Updates column selection boxes"""
         df = self.data_handler.df
         columns = list(df.columns)
-        panel = self.operations_panel
+        panel: DataOperationsPanel = self.operations_panel
 
         panel.filtering_tab.filter_column.clear()
         panel.filtering_tab.filter_column.addItems(columns)
@@ -444,7 +444,7 @@ class DataTab(QWidget):
             panel.transform_tab.sort_column_combo.addItems(columns)
             if current_sort and (current_sort == "[Index]" or current_sort in columns):
                 panel.transform_tab.sort_column_combo.setCurrentText(current_sort)
-            elif (self.data_handler.sort_state and self.data_handler.sort_state[0] in columns):
+            elif self.data_handler.sort_state and self.data_handler.sort_state[0] in columns:
                 panel.transform_tab.sort_column_combo.setCurrentText(self.data_handler.sort_state[0])
             elif self.data_handler.sort_state and self.data_handler.sort_state[0] is None:
                 panel.transform_tab.sort_column_combo.setCurrentText("[Index]")

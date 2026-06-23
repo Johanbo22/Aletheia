@@ -152,7 +152,7 @@ class MergeDialog(QDialog):
         join_type = self.join_type_combo.currentText().lower()
         result_count = 0
 
-        if (self.right_df is not None and self.left_on_combo.currentText() and self.right_on_combo.currentText()):
+        if self.right_df is not None and self.left_on_combo.currentText() and self.right_on_combo.currentText():
             left_col = self.left_on_combo.currentText()
             right_col = self.right_on_combo.currentText()
 

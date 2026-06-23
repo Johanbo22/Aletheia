@@ -1,8 +1,9 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QGroupBox, QComboBox
 from typing import Optional, TYPE_CHECKING
 
-from ui.components.data_tabs.base_data_tab import BaseDataTab
+from PyQt6.QtWidgets import QComboBox, QGroupBox, QLabel, QVBoxLayout
+
 from icons import IconType
+from ui.components.data_tabs.base_data_tab import BaseDataTab
 
 if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController
@@ -73,7 +74,7 @@ class DatetimeTab(BaseDataTab):
         layout.addStretch()
         
     def get_date_extraction_parameters(self) -> tuple[str, str]:
-        return (self.dt_source_combo.currentText(), self.dt_component_combo.currentText())
+        return self.dt_source_combo.currentText(), self.dt_component_combo.currentText()
     
     def get_date_diff_parameters(self) -> tuple[str, str, str]:
         return (
