@@ -1018,47 +1018,183 @@ class CodeEditor(QPlainTextEdit):
 
         super().wheelEvent(event)
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def _handle_home_key(self, event: QKeyEvent) -> None:
+        """
+        Handle the Home key to toggle cursor position between the absolute start
+        of the line and the start of the indentation
+
+        :param event: The key press event
+        """
+        cursor: QTextCursor = self.textCursor()
+        block_text: str = cursor.block().text()
+        indent_pos: int = len(block_text) - len(block_text.lstrip())
+        mode = (
+            QTextCursor.MoveMode.KeepAnchor
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+            else QTextCursor.MoveMode.MoveAnchor
+        )
+        if cursor.positionInBlock() == indent_pos:
+            cursor.setPosition(cursor.block().position(), mode)
+        else:
+            cursor.setPosition(cursor.block().position() + indent_pos, mode)
+
+        self.setTextCursor(cursor)
+        event.accept()
+
+    def _handle_tab_key(self, cursor: QTextCursor) -> None:
+        """
+        Handle the Tab key to indent selected text or insert spaces
+
+        :param cursor: The current text cursor
+        """
+        if cursor.hasSelection():
+            self.indentSelection(cursor)
+        else:
+            cursor.insertText(self.TAB_SPACES)
+
+    def _handle_return_key(self, event: QKeyEvent, cursor: QTextCursor) -> None:
+        """
+        Handle auto-indentation and paired bracket splitting on Enter/Return key events
+
+        :param event: The key press event
+        :param cursor: The current text cursor
+        """
+        block: QTextBlock = cursor.block()
+        line_text: str = block.text()
+
+        indentation: str = ""
+        for char in line_text:
+            if char == " ":
+                indentation += " "
+            elif char == "\t":
+                indentation += "    "
+            else:
+                break
+
+        if line_text.rstrip().endswith(":"):
+            indentation += "    "
+
+        pos: int = cursor.positionInBlock()
+        if 0 < pos < len(line_text):
+            char_before: str = line_text[pos - 1]
+            char_after: str = line_text[pos]
+            if char_before in "{[(" and char_after in "}])":
+                super().keyPressEvent(event)
+                self.insertPlainText(indentation)
+                cursor_pos: int = self.textCursor().position()
+
+                outdent: str = indentation[:-4] if len(indentation) >= 4 else ""
+                self.insertPlainText(f"\n{outdent}")
+
+                new_cursor: QTextCursor = self.textCursor()
+                new_cursor.setPosition(cursor_pos)
+                self.setTextCursor(new_cursor)
+                return
+
+        super().keyPressEvent(event)
+        self.insertPlainText(indentation)
+
+    def _handle_backspace_key(self, event: QKeyEvent, cursor: QTextCursor) -> None:
+        """
+        Handle backspace to delete matched pairs of brackets or quotes
+
+        :param event: The key press event
+        :param cursor: The current text cursor
+        """
+        pos: int = cursor.position()
+        doc: QTextDocument | None = self.document()
+        pairs: dict[str, str] = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
+
+        if doc and 0 < pos < doc.characterCount() - 1:
+            cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.KeepAnchor)
+            char_before: str = cursor.selectedText()
+            cursor.clearSelection()
+
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
+            char_after: str = cursor.selectedText()
+            cursor.clearSelection()
+            cursor.setPosition(pos)
+
+            if char_before in pairs and pairs[char_before] == char_after:
+                cursor.deleteChar()
+
+        super().keyPressEvent(event)
+
+    def _handle_auto_pairs(self, event: QKeyEvent, text: str, cursor: QTextCursor) -> bool:
+        """
+        Handle type-over for closing pairs and auto-closing for opening pairs
+
+        :param event: The key press event
+        :param text: The text string emitted by the event
+        :param cursor: The current text cursor
+        :return: True if the event was consumed else False
+        """
+        pairs: dict[str, str] = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
+        closing_chars: set[str] = {')', ']', '}', '"', "'"}
+
+        if text in closing_chars:
+            pos_in_block: int = cursor.positionInBlock()
+            block_text: str = cursor.block().text()
+
+            if pos_in_block < len(block_text):
+                char_after: str = block_text[pos_in_block]
+                if char_after == text:
+                    cursor.movePosition(QTextCursor.MoveOperation.Right)
+                    self.setTextCursor(cursor)
+                    return True
+
+        if text in pairs:
+            super().keyPressEvent(event)
+            self.insertPlainText(pairs[text])
+            self.moveCursor(QTextCursor.MoveOperation.Left)
+            return True
+
+        return False
+
+    def _update_completer_on_input(self, text: str) -> None:
+        """
+        Trigger or update the autocomplete popup model based on the recent typed character
+
+        :param text: The text string newly inserted
+        """
+        if not self.completer:
+            return
+
+        if text and (text.isalnum() or text == "_"):
+            self.handleCompleterUpdate()
+        elif text == ".":
+            self.startCompleter()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """
+        Handle key press events inside the CodeEditor widget
+
+        :param event: The key press event payload
+        """
         if self.completer and self.completer.popup().isVisible():
-            if event.key() in (
-            Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+            keys_to_ignore = (
+            Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab)
+            if event.key() in keys_to_ignore:
                 event.ignore()
                 return
 
         if event.key() == Qt.Key.Key_Home:
-            cursor: QTextCursor = self.textCursor()
-            block_text: str = cursor.block().text()
-            indent_pos: int = len(block_text) - len(block_text.lstrip())
-            mode = QTextCursor.MoveMode.KeepAnchor if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else QTextCursor.MoveMode.MoveAnchor
-
-            if cursor.positionInBlock() == indent_pos:
-                cursor.setPosition(cursor.block().position(), mode)
-            else:
-                cursor.setPosition(cursor.block().position() + indent_pos, mode)
-
-            self.setTextCursor(cursor)
-            event.accept()
+            self._handle_home_key(event)
             return
 
-        is_shortcut = (event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
+        is_shortcut: bool = (
+                    event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
         if is_shortcut:
             self.startCompleter()
             return
 
-        cursor = self.textCursor()
-        text = event.text()
+        cursor: QTextCursor = self.textCursor()
+        text: str = event.text()
 
-        pairs = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
-        closing_chars = {')', ']', '}', '"', "'"}
-
-        # tabs
         if event.key() == Qt.Key.Key_Tab:
-            if cursor.hasSelection():
-                self.indentSelection(cursor)
-            else:
-                cursor.insertText(self.TAB_SPACES)
+            self._handle_tab_key(cursor)
             return
-        # backtab
+
         if event.key() == Qt.Key.Key_Backtab:
             self.unindentSelection(cursor)
             return
@@ -1071,91 +1207,15 @@ class CodeEditor(QPlainTextEdit):
                 self.zoomOut(1)
                 return
 
-        # auto indent on enter
-        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
-            block = cursor.block()
-            line_text: str = block.text()
-
-            indentation = ""
-            for char in line_text:
-                if char == " ":
-                    indentation += " "
-                elif char == "\t":
-                    indentation += "    "
-                else:
-                    break
-
-            if line_text.rstrip().endswith(":"):
-                indentation += "    "
-            # Input:(Enter)
-            # Output: {
-            #             |
-            #         }
-            pos = cursor.positionInBlock()
-            if 0 < pos < len(line_text):
-                char_before = line_text[pos - 1]
-                char_after = line_text[pos]
-                if char_before in "{[(" and char_after in "}])":
-                    super().keyPressEvent(event)
-                    self.insertPlainText(indentation)
-                    cursor_pos = self.textCursor().position()
-                    self.insertPlainText("\n" + indentation[:-4] if len(indentation) >= 4 else "\n")
-
-                    new_cursor = self.textCursor()
-                    new_cursor.setPosition(cursor_pos)
-                    self.setTextCursor(new_cursor)
-                    return
-
-            super().keyPressEvent(event)
-            self.insertPlainText(indentation)
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._handle_return_key(event, cursor)
             return
 
-        # backspace
         if event.key() == Qt.Key.Key_Backspace:
-            pos = cursor.position()
-            doc: QTextDocument | None = self.document()
-            if 0 < pos < doc.characterCount() - 1:
-                cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.KeepAnchor)
-                char_before = cursor.selectedText()
-                cursor.clearSelection()
+            self._handle_backspace_key(event, cursor)
 
-                cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
-                char_after = cursor.selectedText()
-                cursor.clearSelection()
-                cursor.setPosition(pos)
-
-                if char_before in pairs and pairs[char_before] == char_after:
-                    cursor.deleteChar()
-
-            super().keyPressEvent(event)
-            return
-
-        # typeover
-        if text in closing_chars:
-            pos = cursor.position()
-            block_text = cursor.block().text()
-            pos_in_block = cursor.positionInBlock()
-
-            if pos_in_block < len(block_text):
-                char_after = block_text[pos_in_block]
-                if char_after == text:
-                    cursor.movePosition(QTextCursor.MoveOperation.Right)
-                    self.setTextCursor(cursor)
-                    return
-
-        # auto close quotes etc
-        if text in pairs:
-            super().keyPressEvent(event)
-            self.insertPlainText(pairs[text])
-            self.moveCursor(QTextCursor.MoveOperation.Left)
+        if self._handle_auto_pairs(event, text, cursor):
             return
 
         super().keyPressEvent(event)
-
-        if self.completer:
-            if text and (text.isalnum() or text == "_"):
-                self.handleCompleterUpdate()
-            elif text == ".":
-                self.startCompleter()
-            elif not text:
-                pass
+        self._update_completer_on_input(text)
