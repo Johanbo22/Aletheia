@@ -1,11 +1,12 @@
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 import numpy as np
-from typing import Optional, List, Tuple, Dict, Any, TYPE_CHECKING
+from PyQt6.QtCore import QPointF
+from matplotlib.figure import Figure
 
 if TYPE_CHECKING:
     from core.plot_engine import PlotEngine
-
 
 class PlotLayoutManager:
     """
@@ -28,7 +29,8 @@ class PlotLayoutManager:
         if self.engine.current_figure is not None:
             self.engine.current_figure.tight_layout()
 
-    def setup_layout(self, rows: int = 1, cols: int = 1, sharex: bool = False, sharey: bool = False, custom_grid: Optional[List[Tuple[int, int, int, int]]] = None) -> None:
+    def setup_layout(self, rows: int = 1, cols: int = 1, sharex: bool = False, sharey: bool = False,
+                     custom_grid: Optional[List[Tuple[int, int, int, int]]] = None) -> None:
         """Setup subplot layout gridspec or uniform grids"""
         if self.engine.current_figure is None:
             return
@@ -63,23 +65,15 @@ class PlotLayoutManager:
             else:
                 self.engine.axes_flat = [axes]
 
-        if self.engine.axes_flat:
-            self.engine.current_ax = self.engine.axes_flat[0]
+        if not self.engine.axes_flat:
+            self.engine.current_figure.tight_layout()
+            return
 
-            if sharex or sharey:
-                for ax in self.engine.axes_flat:
-                    ss = ax.get_subplotspec()
-                    if ss is not None:
-                        if sharex and not ss.is_last_row():
-                            for label in ax.get_xticklabels(which="both"):
-                                label.set_visible(False)
-                            ax.xaxis.get_offset_text().set_visible(False)
-                            ax.set_xlabel("")
-                        if sharey and not ss.is_first_col():
-                            for label in ax.get_yticklabels(which="both"):
-                                label.set_visible(False)
-                            ax.yaxis.get_offset_text().set_visible(False)
-                            ax.set_ylabel("")
+        self.engine.current_ax = self.engine.axes_flat[0]
+
+        if sharex or sharey:
+            for ax in self.engine.axes_flat:
+                self._apply_axis_sharing_visibility(ax, sharex, sharey)
 
         self.engine.current_figure.tight_layout()
 
@@ -90,33 +84,44 @@ class PlotLayoutManager:
 
     def clear_current_axis(self) -> None:
         """Clear the active subplot"""
-        if self.engine.current_ax:
-            if hasattr(self.engine.current_ax, "_cbar_obj") and self.engine.current_ax._cbar_obj is not None:
-                try:
-                    self.engine.current_ax._cbar_obj.remove()
-                except Exception:
-                    pass
-                self.engine.current_ax._cbar_obj = None
-            if hasattr(self.engine.current_ax, "_cax") and self.engine.current_ax._cax is not None:
-                try:
-                    if self.engine.current_figure:
-                        self.engine.current_figure.delaxes(self.engine.current_ax._cax)
-                    else:
-                        self.engine.current_ax._cax.remove()
-                except Exception:
-                    pass
-                self.engine.current_ax._cax = None
+        if not self.engine.current_ax:
+            return
 
-            self.engine.current_ax.set_axes_locator = None
-            self.engine.current_ax.clear()
+        self._remove_axis_colorbars(self.engine.current_ax)
+
+        self.engine.current_ax.set_axes_locator = None
+        self.engine.current_ax.clear()
+
+    def _remove_axis_colorbars(self, ax: Any) -> None:
+        """
+        Removes colorbars and their associated axes from a given subplot
+        :param ax: The matplotlib subplot axis to remove colorbar from
+        """
+        if getattr(ax, "_cbar_obj", None) is not None:
+            try:
+                ax._cbar_obj.remove()
+            except (ValueError, AttributeError, TypeError):
+                self.engine.logger.debug("Failed to remove colorbar object")
+            ax._cbar_obj = None
+
+        cax = getattr(ax, "_cax", None)
+        if cax is not None:
+            try:
+                if self.engine.current_figure and cax in self.engine.current_figure.axes:
+                    self.engine.current_figure.delaxes(cax)
+                elif hasattr(cax, "remove"):
+                    cax.remove()
+            except (ValueError, AttributeError, TypeError):
+                self.engine.logger.debug("Failed to remove colorbar axis")
+            ax._cax = None
 
     def clear_axes(self) -> None:
         """Clears the entire active subplot and handles secondary axes removal globally."""
         if self.engine.secondary_ax:
             try:
                 self.engine.secondary_ax.remove()
-            except Exception:
-                pass
+            except (ValueError, AttributeError, TypeError):
+                self.engine.logger.debug("Failed to remove secondary axis")
             self.engine.secondary_ax = None
 
         self.clear_current_axis()
@@ -125,31 +130,53 @@ class PlotLayoutManager:
             if hasattr(coll, "colorbar") and coll.colorbar is not None:
                 try:
                     coll.colorbar.remove()
-                except Exception:
-                    pass
+                except (ValueError, AttributeError, TypeError):
+                    self.engine.logger.debug("Failed to remove collection colobar")
 
         for img in self.engine.current_ax.images:
             if hasattr(img, "colorbar") and img.colorbar is not None:
                 try:
                     img.colorbar.remove()
-                except Exception:
-                    pass
+                except (ValueError, AttributeError, TypeError):
+                    self.engine.logger.debug("Failed to remove image colorbar")
 
-        if getattr(self.engine, '_sharex', False) or getattr(self.engine, '_sharey', False):
+        sharex = getattr(self.engine, "_sharex", False)
+        sharey = getattr(self.engine, "_sharey", False)
+
+        if sharex or sharey:
             for ax in self.engine.axes_flat:
-                if hasattr(ax, "get_subplotspec"):
-                    ss = ax.get_subplotspec()
-                    if ss is not None:
-                        if getattr(self.engine, '_sharex', False) and not ss.is_last_row():
-                            for label in ax.get_xticklabels(which="both"):
-                                label.set_visible(False)
-                            ax.xaxis.get_offset_text().set_visible(False)
-                            ax.set_xlabel("")
-                        if getattr(self.engine, '_sharey', False) and not ss.is_first_col():
-                            for label in ax.get_yticklabels(which="both"):
-                                label.set_visible(False)
-                            ax.yaxis.get_offset_text().set_visible(False)
-                            ax.set_ylabel("")
+                self._apply_axis_sharing_visibility(ax, sharex, sharey)
+
+    def _apply_axis_sharing_visibility(self, ax: Any, sharex: bool, sharey: bool) -> None:
+        """
+        Hide inner tick labels when axes are shared to avoid visual clutter
+
+        :param ax: The matplotlib subplot axis to update
+        :param sharex: Boolean indicating if X axes are shared
+        :param sharey: Boolean indicating if Y axes are shared
+        """
+        if not hasattr(ax, "get_subplotspec"):
+            return
+
+        ss = ax.get_subplotspec()
+        if ss is None:
+            return
+
+        if sharex and not ss.is_last_row():
+            for label in ax.get_xticklabels(which="both"):
+                label.set_visible(False)
+            offset_text = ax.xaxis.get_offset_text()
+            if offset_text is not None:
+                offset_text.set_visible(False)
+            ax.set_xlabel("")
+
+        if sharey and not ss.is_first_row():
+            for label in ax.get_yticklabels(which="both"):
+                label.set_visible(False)
+            offset_text = ax.yaxis.get_offset_text()
+            if offset_text is not None:
+                offset_text.set_visible(False)
+            ax.set_ylabel("")
 
     def ensure_projection(self, is_3d: bool) -> None:
         """Replaces the current axis with 3D or 2D projection"""
@@ -206,7 +233,8 @@ class PlotLayoutManager:
             w = px_w / dpr
             h = px_h / dpr
 
-        except Exception:
+        except (AttributeError, ValueError, TypeError) as e:
+            self.engine.logger.debug(f"Falling back to bbox geometry calculation due to: {e}")
             bbox = self.engine.current_ax.get_position()
             width_in, height_in = self.engine.current_figure.get_size_inches()
             dpi = self.engine.current_figure.get_dpi()
@@ -225,7 +253,6 @@ class PlotLayoutManager:
             h = px_h / dpr
 
         if canvas:
-            from PyQt6.QtCore import QPointF
             global_pos = canvas.mapToGlobal(QPointF(x, y)).toPoint()
             x, y = global_pos.x(), global_pos.y()
 
