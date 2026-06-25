@@ -2,7 +2,7 @@ from typing import Optional
 
 from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, \
     pyqtProperty
-from PyQt6.QtGui import QBrush, QColor, QPaintEvent, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QBrush, QColor, QLinearGradient, QPaintEvent, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QCheckBox, QWidget
 
 from ui.theme import ThemeColors
@@ -37,8 +37,9 @@ class ToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
         self._handle_position = 1.0 if self.isChecked() else 0.0
 
         self._handle_animation = QPropertyAnimation(self, b"handle_position", self)
-        self._handle_animation.setDuration(200)
-        self._handle_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        handle_animation_duration: int = 250
+        self._handle_animation.setDuration(handle_animation_duration)
+        self._handle_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         self.toggled.connect(self._on_toggled)
 
@@ -139,8 +140,7 @@ class ToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
         handle_rect = self._calculate_handle_rect(x_offset, y_offset)
         self._draw_handle(painter, handle_rect, handle_color)
 
-        if self._handle_position > 0.0:
-            self._draw_checkmark(painter, handle_rect, track_color, opacity)
+        self._draw_handle_icon(painter, handle_rect, track_color, opacity)
 
         if self.text():
             painter.setFont(self.font())
@@ -160,7 +160,11 @@ class ToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
         color_on = ThemeColors.ACCENT_COLOR
 
         track_color = self._interpolate_color(color_off, color_on, self._handle_position)
-        return 1.0, track_color, ThemeColors.BG_WHITE, ThemeColors.TEXT_PRIMARY
+
+        text_active = self._interpolate_color(ThemeColors.TEXT_PRIMARY, ThemeColors.ACCENT_COLOR,
+                                              self._handle_position * 0.8)
+
+        return 1.0, track_color, ThemeColors.BG_WHITE, text_active
 
     def _interpolate_color(self, start_color: QColor, end_color: QColor, progress: float) -> QColor:
         red = start_color.red() + (end_color.red() - start_color.red()) * progress
@@ -175,6 +179,15 @@ class ToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
         painter.setBrush(QBrush(track_color))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(track_rect, radius, radius)
+
+        if self.isEnabled():
+            shadow_rect = track_rect.adjusted(0, 0, 0, -self._track_height * 0.3)
+            gradient = QLinearGradient(shadow_rect.topLeft(), shadow_rect.bottomLeft())
+            gradient.setColorAt(0.0, QColor(0, 0, 0, 30))
+            gradient.setColorAt(1.0, QColor(0, 0, 0, 0))
+
+            painter.setBrush(QBrush(gradient))
+            painter.drawRoundedRect(track_rect, radius, radius)
 
         try:
             border_color = self.animated_border_color
@@ -210,37 +223,44 @@ class ToggleSwitch(HoverFocusAnimationMixin, QCheckBox):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(handle_rect)
 
-    def _draw_checkmark(self, painter: QPainter, handle_rect: QRectF, track_color: QColor, base_opacity: float) -> None:
-        painter.setOpacity(base_opacity * self._handle_position)
+    def _draw_handle_icon(self, painter: QPainter, handle_rect: QRectF, track_color: QColor,
+                          base_opacity: float) -> None:
+        painter.setOpacity(base_opacity)
 
-        checkmark_pen = QPen(track_color, 2.0)
-        checkmark_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        checkmark_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        painter.setPen(checkmark_pen)
+        icon_pen = QPen(track_color, 2.0)
+        icon_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        icon_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(icon_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
 
         center_x = handle_rect.center().x()
         center_y = handle_rect.center().y()
         handle_radius = handle_rect.height() / 2.0
 
+        progress = self._handle_position
+
+        def interpolate_coordinates(p_off: tuple[float, float], p_on: tuple[float, float]) -> QPointF:
+            """Interpolates coordinates geometrically based on animation progress"""
+            x = p_off[0] + (p_on[0] - p_off[0]) * progress
+            y = p_off[1] + (p_on[1] - p_off[1]) * progress
+            return QPointF(center_x + x * handle_radius, center_y + y * handle_radius)
+
+        # Two segments forming \ in the X and the shortest leg in the checkmark
+        # Second segment forms the / in the X and the longest leg in the checkmark
+        p1a = interpolate_coordinates((-0.35, -0.35), (-0.4, 0.0))
+        p1b = interpolate_coordinates((0.35, 0.35), (-0.1, 0.3))
+
+        p2a = interpolate_coordinates((-0.35, 0.35), (-0.1, 0.3))
+        p2b = interpolate_coordinates((0.35, -0.35), (0.4, -0.4))
+
         path = QPainterPath()
-        p1 = QPointF(center_x - handle_radius * 0.4, center_y)
-        p2 = QPointF(center_x - handle_radius * 0.1, center_y + handle_radius * 0.3)
-        p3 = QPointF(center_x + handle_radius * 0.4, center_y - handle_radius * 0.4)
+        path.moveTo(p1a)
+        path.lineTo(p1b)
 
-        path.moveTo(p1)
-        path.moveTo(p2)
-        path.moveTo(p3)
-
-        painter.save()
-        painter.translate(center_x, center_y)
-        painter.scale(self._handle_position, self._handle_position)
-        painter.translate(-center_x, -center_y)
+        path.moveTo(p2a)
+        path.lineTo(p2b)
 
         painter.drawPath(path)
-        painter.restore()
-
-        painter.setOpacity(base_opacity)
 
     def _draw_text(self, painter: QPainter, content_rect: QRect, x_offset: float, text_color: QColor) -> None:
         text_rect = QRectF(content_rect)
