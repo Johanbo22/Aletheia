@@ -1,19 +1,19 @@
-import traceback
 import copy
 from typing import TYPE_CHECKING
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import matplotlib.dates as mdates
-from matplotlib.colors import to_hex
-from scipy.stats import t as t_dist
-from matplotlib.ticker import MaxNLocator
-from PyQt6.QtWidgets import QMessageBox
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from PyQt6.QtCore import QTimer
+from matplotlib.colors import to_hex
+from matplotlib.ticker import MaxNLocator
+from scipy.stats import t as t_dist
 
+from core.global_signals import ToastLevel, global_signals
 from ui.dialogs import ScriptEditorDialog
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -47,7 +47,9 @@ class ScriptManager:
     def open_script_editor(self) -> None:
         """Opens the Python script editor dialog"""
         if self.plot_tab.data_handler.df is None:
-            QMessageBox.warning(self.plot_tab, "No Data", "Please load data first before opening the editor")
+            global_signals.request_toast(
+                "No Data", "Please load data first before opening the editor", ToastLevel.WARNING
+            )
             return
 
         # Start by generating initial code
@@ -73,11 +75,12 @@ class ScriptManager:
 
     def run_custom_script(self, script_content: str) -> None:
         """Executes the script from the editor. Overrides the standard plotting sequence"""
-        self.plot_tab.status_bar.log("Running custom script...", "INFO")
+        self.plot_tab.status_bar.log("Running custom script...", LogLevel.INFO)
         try:
             def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
                 allowed_modules = {
-                    "pandas", "numpy", "matplotlib", "seaborn", "scipy", "math", "datetime", "random", "re", "io", "typing", "collections", "itertools", "functools", "sqlalchemy", "traceback", "requests"
+                    "pandas", "numpy", "matplotlib", "seaborn", "scipy", "math", "datetime", "random", "re", "io",
+                    "typing", "collections", "itertools", "functools", "sqlalchemy", "traceback", "requests"
                 }
                 base_name = name.split(".")[0]
                 if base_name not in allowed_modules:
@@ -87,14 +90,15 @@ class ScriptManager:
             safe_globals = {
                 "__builtins__": {
                     "__import__": safe_import,
-                    "print": print, "range": range, "len": len, "list": list, "dict": dict, "set": set, "str": str,
-                    "int": int, "float": float, "bool": bool,
-                    "zip": zip, "enumerate": enumerate, "min": min, "max": max, "sum": sum, "abs": abs, "sorted": sorted,
-                    "tuple": tuple, "None": None,
-                    "True": True, "False": False, "hasattr": hasattr, "getattr": getattr, "isinstance": isinstance
+                    "print"     : print, "range": range, "len": len, "list": list, "dict": dict, "set": set, "str": str,
+                    "int"       : int, "float": float, "bool": bool,
+                    "zip"       : zip, "enumerate": enumerate, "min": min, "max": max, "sum": sum, "abs": abs,
+                    "sorted"    : sorted,
+                    "tuple"     : tuple, "None": None,
+                    "True"      : True, "False": False, "hasattr": hasattr, "getattr": getattr, "isinstance": isinstance
                 },
-                "pd": pd, "np": np, "plt": plt, "sns": sns, "mdates": mdates, "t_dist": t_dist,
-                "MaxNLocator": MaxNLocator
+                "pd"          : pd, "np": np, "plt": plt, "sns": sns, "mdates": mdates, "t_dist": t_dist,
+                "MaxNLocator" : MaxNLocator
             }
 
             df_active = self.plot_tab.get_active_dataframe().copy()
@@ -122,11 +126,12 @@ class ScriptManager:
             self.plot_tab.canvas.draw()
 
             self._sync_gui_from_ax(ax_result)
-            self.plot_tab.status_bar.log("Script Executed", "SUCCESS")
+            self.plot_tab.status_bar.log("Script Executed", LogLevel.SUCCESS)
         except Exception as ExecuteScriptError:
-            QMessageBox.critical(self.plot_tab, "Script Error", f"An error occurred while running the script:\n{str(ExecuteScriptError)}")
-            self.plot_tab.status_bar.log(f"Script execution failed: {str(ExecuteScriptError)}", "ERROR")
-            traceback.print_exc()
+            global_signals.request_toast(
+                "Script Error", "An error occurred while running the script", ToastLevel.ERROR
+            )
+            self.plot_tab.status_bar.log(f"Script execution failed: {str(ExecuteScriptError)}", LogLevel.ERROR)
 
     def _sync_gui_from_ax(self, ax: plt.Axes) -> None:
         """
@@ -196,7 +201,7 @@ class ScriptManager:
 
             self.plot_tab.config_manager.load_config(config)
         except Exception as sync_error:
-            self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", "WARNING")
+            self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", LogLevel.WARNING)
 
     def _sync_label(self, config: dict, section: str, key: str, value: str) -> None:
         """Sync text labels and enabled them if populated"""

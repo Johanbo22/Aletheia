@@ -1,41 +1,40 @@
+from .AboutDialog import AboutDialog
 from .AggregationDialog import AggregationDialog
-from ui.widgets.CodeEditor import CodeEditor
+from .AppendDialog import AppendDialog
+from .BinningDialog import BinningDialog
 from .ColormapPickerDialog import ColormapPickerDialog
+from .ColumnReorderDialog import ColumnReorderDialog
+from .ComputedColumnDialog import ComputedColumnDialog
+from .ConsoleDialog import ConsoleDialog
+from .CreateDatasetDialog import CreateDatasetDialog
 from .CreateSubsetDialog import CreateSubsetDialog
 from .DatabaseConnectionDialog import DatabaseConnectionDialog
 from .ExportDialog import ExportDialog
 from .FillMissingDialog import FillMissingDialog
 from .FilterAdvancedDialog import FilterAdvancedDialog
 from .GoogleSheetsDialog import GoogleSheetsDialog
+from .GoogleSheetsExportDialog import GoogleSheetsExportDialog
 from .HelpDialog import HelpDialog
+from .HelpExplorerDialog import HelpExplorerDialog
+from .LogHistoryPopup import LogHistoryPopup
+from .MacroPreviewDialog import MacroPreviewDialog
 from .MeltDialog import MeltDialog
+from .MergeDialog import MergeDialog
+from .OutlierDetectionDialog import OutlierDetectionDialog
+from .PercentageChangeDialog import PercentageChangeDialog
+from .PivotDialog import PivotDialog
+from .PlotExportDialog import PlotExportDialog
 from .ProgressDialog import ProgressDialog
+from .RegexReplaceDialog import RegexReplaceDialog
 from .RenameColumnDialog import RenameColumnDialog
+from .RollingWindowDialog import RollingWindowDialog
 from .ScriptEditorDialog import ScriptEditorDialog
 from .SettingsDialog import SettingsDialog
+from .ShiftDataDialog import ShiftDataDialog
+from .SplitColumnDialog import SplitColumnDialog
 from .SubsetDataViewer import SubsetDataViewer
 from .SubsetManagerDialog import SubsetManagerDialog
-from .AboutDialog import AboutDialog
-from .OutlierDetectionDialog import OutlierDetectionDialog
-from .LogHistoryPopup import LogHistoryPopup
 from .TableCustomizationDialog import TableCustomizationDialog
-from .PivotDialog import PivotDialog
-from .MergeDialog import MergeDialog
-from .BinningDialog import BinningDialog
-from .ComputedColumnDialog import ComputedColumnDialog
-from .PlotExportDialog import PlotExportDialog
-from .GoogleSheetsExportDialog import GoogleSheetsExportDialog
-from .SplitColumnDialog import SplitColumnDialog
-from .RegexReplaceDialog import RegexReplaceDialog
-from .AppendDialog import AppendDialog
-from .MacroPreviewDialog import MacroPreviewDialog
-from .ConsoleDialog import ConsoleDialog
-from .ColumnReorderDialog import ColumnReorderDialog
-from .HelpExplorerDialog import HelpExplorerDialog
-from .RollingWindowDialog import RollingWindowDialog
-from .ShiftDataDialog import ShiftDataDialog
-from .PercentageChangeDialog import PercentageChangeDialog
-from .CreateDatasetDialog import CreateDatasetDialog
 
 __all__ = [
     "CreateDatasetDialog",
@@ -50,7 +49,6 @@ __all__ = [
     "AppendDialog",
     "SplitColumnDialog",
     "RegexReplaceDialog",
-    "CodeEditor",
     "ColormapPickerDialog",
     "CreateSubsetDialog",
     "DatabaseConnectionDialog",

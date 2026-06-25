@@ -152,6 +152,7 @@ td {
     font-weight: 500;
     border-bottom: 1px solid #f1f5f9;
     transition: background-color 0.15s ease, color 0.15s ease;
+    cursor: cell;
 }
 
 tr:last-child td {
@@ -161,6 +162,18 @@ tr:last-child td {
 tr:hover td {
     background-color: #eff6ff;
     color: #0f172a;
+}
+
+tr.selected-row td {
+    background-color: #e0e7ff !important;
+    color: #312e81 !important;
+    border-bottom-color: #c7d2fe !important;
+}
+
+td.copy-success {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+    transition: background-color 0.1s ease, color 0.1s ease !important;
 }
 
 .numeric-col {

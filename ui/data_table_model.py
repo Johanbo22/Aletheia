@@ -1,16 +1,20 @@
-import pandas as pd
-import numpy as np
+import logging
 import operator
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, QVariant
-from PyQt6.QtGui import QColor, QFont
 from typing import Any
-
-from sqlalchemy.sql.dml import isinsert
-
-from ui.status_bar import StatusBar
 from typing import TYPE_CHECKING
+
+import numpy as np
+import pandas as pd
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt6.QtGui import QColor, QFont
+
+from core.global_signals import global_signals
+from ui.widgets.ToastNotification import ToastLevel
+
 if TYPE_CHECKING:
     from core.data_handler import DataHandler
+
+logger = logging.getLogger(__name__)
 
 class DataTableModel(QAbstractTableModel):
     """ table for the data Table"""
@@ -26,12 +30,15 @@ class DataTableModel(QAbstractTableModel):
         Qt.ItemDataRole.CheckStateRole
     }
 
-    def __init__(self, data_handler: "DataHandler", editable: bool=False, parent: Any=None, highlighted_rows: list[int] | None=None, float_precision: int = 2, conditional_rules: list[dict[str, Any]] | None = None):
+    def __init__(self, data_handler: "DataHandler", editable: bool = False, parent: Any = None,
+                 highlighted_rows: list[int] | None = None, float_precision: int = 2,
+                 conditional_rules: list[dict[str, Any]] | None = None):
         super().__init__(parent)
         self.data_handler = data_handler
         self._data = self.data_handler.df
         self.editable = editable
         self.highlighted_rows = set(highlighted_rows) if highlighted_rows else set()
+        self.highlighted_cells: set[tuple[int, int]] = set()
         self.float_precision = float_precision
         self.conditional_rules = conditional_rules if conditional_rules else []
         self.render_bools_as_checkboxes = True
@@ -40,12 +47,13 @@ class DataTableModel(QAbstractTableModel):
         self.scientific_notation = False
         self._compiled_rules: list[tuple] = []
         self._compile_rules(self.conditional_rules)
-        
+
         self._highlight_color = QColor("#ffcccc")
         self._nan_color = QColor("#a0a0a0")
+        self._missing_cell_color = QColor(255, 215, 0, 60)
         self._nan_font = QFont()
         self._nan_font.setItalic(True)
-        
+
         self._col_alignments: list[Qt.AlignmentFlag] = []
         self._col_is_bool: list[bool] = []
         self._header_tooltips: list[str] = []
@@ -54,12 +62,12 @@ class DataTableModel(QAbstractTableModel):
             self._is_numeric = [
                 pd.api.types.is_numeric_dtype(dtype) for dtype in self._data.dtypes
             ]
-    
+
     def set_float_precision(self, precision: int):
         """Updates the floating point precision and refreshes the datble"""
         self.float_precision = precision
         self.layoutChanged.emit()
-    
+
     def set_bool_render_style(self, as_checkboxes: bool) -> None:
         """Updates how boolean values are rendered (checkboxes vs text) and refreshes the table"""
         self.render_bools_as_checkboxes = as_checkboxes
@@ -79,20 +87,20 @@ class DataTableModel(QAbstractTableModel):
         """Toggles scientific notation for numerical formatting"""
         self.scientific_notation = use_sci
         self.layoutChanged.emit()
-    
+
     def set_conditional_rules(self, rules: list):
         """Updates the conditional formatting rules and refreshes the dtable"""
         self.conditional_rules = rules
         self._compile_rules(rules)
         self.layoutChanged.emit()
-    
+
     def _compile_rules(self, rules: list) -> None:
         """Pre-compiles conditional rules to eliminate dict lookups and string parsing from the render loop"""
         self._compiled_rules.clear()
         op_map = {
-            "<": operator.lt,
-            ">": operator.gt,
-            "=": operator.eq,
+            "<" : operator.lt,
+            ">" : operator.gt,
+            "=" : operator.eq,
             "<=": operator.le,
             ">=": operator.ge
         }
@@ -103,37 +111,46 @@ class DataTableModel(QAbstractTableModel):
             except (ValueError, TypeError):
                 target = 0.0
             color_hex: str = rule.get("color", "#000000")
-            
+
             op_func = op_map.get(op_str)
             if op_func:
                 self._compiled_rules.append((op_func, target, QColor(color_hex)))
-    
+
     def set_highlighted_rows(self, rows: set) -> None:
         """Updates the highlighed rows and triggers a layout refresh on display changes"""
         self.highlighted_rows = set(rows) if rows else set()
         self.layoutChanged.emit()
-        
+
+    def set_highlighted_cells(self, cells: set[tuple[int, int]]) -> None:
+        """
+        Updates the highlighted cells and triggers a layout refresh
+
+        :param cells: A set of (row, col) tuples representing the cells to highlight
+        """
+        self.highlighted_cells = set(cells) if cells else set()
+        self.layoutChanged.emit()
+
     def _update_column_alignments(self) -> None:
         """Pre-computes and caches the Qt Alignment flags for each column based on its dtype"""
-        if not hasattr(self, '_col_alignments'): 
+        if not hasattr(self, '_col_alignments'):
             self._col_alignments = []
-        else: 
+        else:
             self._col_alignments.clear()
-        if not hasattr(self, '_col_is_bool'): 
+        if not hasattr(self, '_col_is_bool'):
             self._col_is_bool = []
-        else: 
+        else:
             self._col_is_bool.clear()
-        if not hasattr(self, '_header_tooltips'): 
+        if not hasattr(self, '_header_tooltips'):
             self._header_tooltips = []
-        else: 
+        else:
             self._header_tooltips.clear()
-            
+
         if self._data is None:
             return
-            
+
         align_right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         align_left = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        
+
         for i in range(len(self._data.columns)):
             try:
                 dtype = self._data.dtypes.iloc[i]
@@ -141,7 +158,7 @@ class DataTableModel(QAbstractTableModel):
             except Exception:
                 dtype = "unknown"
                 col_name = f"Column {i}"
-                
+
             try:
                 if pd.api.types.is_numeric_dtype(dtype):
                     self._col_alignments.append(align_right)
@@ -149,33 +166,33 @@ class DataTableModel(QAbstractTableModel):
                     self._col_alignments.append(align_left)
             except Exception:
                 self._col_alignments.append(align_left)
-                
+
             try:
                 self._col_is_bool.append(self._infer_boolean_column(i))
             except Exception:
                 self._col_is_bool.append(False)
-            
+
             try:
                 missing_count = int(self._data.iloc[:, i].isna().sum())
                 self._header_tooltips.append(f"Column: {col_name}\nType: {dtype}\nMissing Values: {missing_count:,}")
             except Exception:
                 self._header_tooltips.append(f"Column: {col_name}\nType: {dtype}")
-    
+
     def _infer_boolean_column(self, col_idx: int) -> bool:
         """Infers if a column represents booleans, even if stored as strings or integers"""
         dtype = self._data.dtypes.iloc[col_idx]
-        
+
         if pd.api.types.is_bool_dtype(dtype):
             return True
-        
+
         if pd.api.types.is_object_dtype(dtype) or pd.api.types.is_string_dtype(dtype):
             series = self._data.iloc[:, col_idx].dropna()
             if series.empty:
                 return False
-            
+
             uniques = series.unique()
             valid_text_bools = {"true", "false", "t", "f", "yes", "no"}
-            
+
             for val in uniques:
                 if isinstance(val, bool):
                     continue
@@ -188,7 +205,7 @@ class DataTableModel(QAbstractTableModel):
                 else:
                     return False
             return True
-        
+
         if pd.api.types.is_integer_dtype(dtype):
             series = self._data.iloc[:, col_idx].dropna()
             if series.empty:
@@ -198,13 +215,14 @@ class DataTableModel(QAbstractTableModel):
                 if val not in (0, 1):
                     return False
             return True
-            
+
         return False
-    
+
     def update_data(self) -> None:
         self.beginResetModel()
         self._data = self.data_handler.df
         self.highlighted_rows.clear()
+        self.highlighted_cells.clear()
         self._update_column_alignments()
         self.endResetModel()
 
@@ -214,14 +232,14 @@ class DataTableModel(QAbstractTableModel):
             return 0
         base_count: int = self._data.shape[0]
         return base_count + 1 if self.editable else base_count
-    
+
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Returns the number of columns in the dataframe"""
         if parent.isValid() or self._data is None:
             return 0
         base_count: int = self._data.shape[1]
         return base_count + 1 if self.editable else base_count
-    
+
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Returns le data"""
         if not index.isValid() or self._data is None:
@@ -229,10 +247,10 @@ class DataTableModel(QAbstractTableModel):
 
         if role not in self._SUPPORTED_ROLES:
             return None
-        
+
         row: int = index.row()
         col: int = index.column()
-        
+
         if role == Qt.ItemDataRole.TextAlignmentRole:
             if self._col_alignments and col < len(self._col_alignments):
                 return self._col_alignments[col]
@@ -241,6 +259,8 @@ class DataTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.BackgroundRole:
             if row in self.highlighted_rows:
                 return self._highlight_color
+            if (row, col) in self.highlighted_cells:
+                return self._missing_cell_color
 
         shape = self._data.shape
         is_insert_row: bool = self.editable and row >= shape[0]
@@ -257,11 +277,11 @@ class DataTableModel(QAbstractTableModel):
             return None
 
         is_missing = (
-            val is None or
-            val is pd.NA or
-            val is pd.NaT or
-            (isinstance(val, float) and val != val) or
-            (isinstance(val, np.floating) and np.isnan(val))
+                val is None or
+                val is pd.NA or
+                val is pd.NaT or
+                (isinstance(val, float) and val != val) or
+                (isinstance(val, np.floating) and np.isnan(val))
         )
         if role == Qt.ItemDataRole.DisplayRole:
             return self._get_display_data(val, col, is_missing)
@@ -282,7 +302,7 @@ class DataTableModel(QAbstractTableModel):
             return self._get_edit_data(val, is_missing)
 
         return None
-    
+
     def _get_display_data(self, val: Any, col: int, is_missing: bool = False) -> Any:
         """Formats and returns the data for the DisplayRole"""
         try:
@@ -320,7 +340,7 @@ class DataTableModel(QAbstractTableModel):
 
         except Exception:
             return None
-        
+
     def _get_tooltip_data(self, val: Any) -> str | None:
         """Formats and returns data for the ToolTipRole for long strings"""
         try:
@@ -328,9 +348,9 @@ class DataTableModel(QAbstractTableModel):
             if isinstance(val, str) and len(val) > CHARACTER_LIMIT:
                 return val
         except Exception as error:
-            print(error)
+            logger.debug(f"Error formatting tooltip data: {error}")
         return None
-    
+
     def _get_edit_data(self, val: Any, is_missing: bool = False) -> str:
         """Formats and returns data tailored for the EditRole"""
         try:
@@ -341,7 +361,7 @@ class DataTableModel(QAbstractTableModel):
             return str(val)
         except Exception:
             return ""
-    
+
     def _get_foreground_data(self, val: Any, is_missing: bool = False) -> QColor | None:
         """Evaluates conditional rules and returns the QColor for ForegroundRole"""
         try:
@@ -352,15 +372,15 @@ class DataTableModel(QAbstractTableModel):
                     if op_func(val, target):
                         return color
         except Exception as error:
-            print(error)
+            logger.warning(f"Error evaluating foreground conditional values: {error}")
         return None
-    
+
     def _get_font_data(self, is_missing: bool = False) -> QFont | None:
         """Applies italics to missing data to distinctively demote it"""
         if is_missing:
             return self._nan_font
         return None
-    
+
     def _parse_bool(self, val: Any) -> bool:
         """Safely extracts boolean state from mixed data types"""
         if isinstance(val, bool) or isinstance(val, np.bool_):
@@ -370,66 +390,68 @@ class DataTableModel(QAbstractTableModel):
         if isinstance(val, (int, float, np.number)):
             return bool(val)
         return False
-    
+
     def _get_check_state_data(self, val: Any, col: int, is_missing: bool = False) -> int | None:
         """Renders actual checkboxes for boolean columns"""
         if not self.render_bools_as_checkboxes:
             return None
-        
+
         if self._col_is_bool and 0 <= col < len(self._col_is_bool):
             if self._col_is_bool[col] and not is_missing:
                 is_checked = self._parse_bool(val)
                 return Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked
         return None
-    
+
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
         """Data Updater"""
         if not index.isValid() or not self.editable:
             return False
-        
+
         if role == Qt.ItemDataRole.CheckStateRole:
             value = bool(value == Qt.CheckState.Checked.value)
         elif role != Qt.ItemDataRole.EditRole:
             return False
-        
+
         try:
             row = index.row()
             column = index.column()
-            
+
             self.data_handler.update_cell(row, column, value)
 
-            self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, Qt.ItemDataRole.CheckStateRole])
+            self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
+                                                 Qt.ItemDataRole.CheckStateRole])
             return True
-        
+
         except Exception as UpdateDataModelError:
-            print(f"Error updating data: {str(UpdateDataModelError)}")
+            logger.error(f"Error updating cell data: {UpdateDataModelError}", exc_info=True)
+            global_signals.request_toast("Update Error", "Failed to update cell", ToastLevel.ERROR)
             return False
-    
+
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Return item flags"""
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
-        
+
         row: int = index.row()
         col: int = index.column()
-        
+
         is_insert_row: bool = self.editable and self._data is not None and row == self._data.shape[0]
         is_insert_col: bool = self.editable and self._data is not None and col == self._data.shape[1]
-        
+
         if is_insert_row or is_insert_col:
             return Qt.ItemFlag.NoItemFlags
-        
+
         default_flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-        
+
         if self.render_bools_as_checkboxes and self._col_is_bool and 0 <= col < len(self._col_is_bool):
             if self._col_is_bool[col]:
                 default_flags |= Qt.ItemFlag.ItemIsUserCheckable
 
         if self.editable:
             return default_flags | Qt.ItemFlag.ItemIsEditable
-        
+
         return default_flags
-    
+
     def set_editable(self, editable: bool) -> None:
         """Update the editable state of the table model"""
         if self.editable == editable:
@@ -437,44 +459,44 @@ class DataTableModel(QAbstractTableModel):
         self.layoutAboutToBeChanged.emit()
         self.editable = editable
         self.layoutChanged.emit()
-    
+
     def insert_empty_row(self) -> None:
         """Inserts a new row with NaN values at the end of the DataFrame"""
         if self._data is None:
             return
-        
+
         row_idx: int = self._data.shape[0]
         self.beginInsertRows(QModelIndex(), row_idx, row_idx)
         self.data_handler.df.loc[row_idx] = pd.NA
         self._data = self.data_handler.df
-        
+
         self.endInsertRows()
-    
+
     def insert_empty_column(self) -> None:
         """Append a new column with NaN values ath the of the DF"""
         if self._data is None:
             return
-        
+
         col_idx: int = self._data.shape[1]
         self.beginInsertColumns(QModelIndex(), col_idx, col_idx)
-        
+
         new_col_name: str = f"Column_{col_idx + 1}"
         self.data_handler.df[new_col_name] = pd.NA
         self._data = self.data_handler.df
-        
+
         self._update_column_alignments()
         self.endInsertColumns()
-    
+
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Returns the header of the data"""
         if self._data is None:
             return None
-        
+
         is_display = (role == Qt.ItemDataRole.DisplayRole or role == 0)
         is_tooltip = (role == Qt.ItemDataRole.ToolTipRole or role == 3)
         is_alignment = (role == Qt.ItemDataRole.TextAlignmentRole or role == 7)
         is_font = (role == Qt.ItemDataRole.FontRole or role == 6)
-        
+
         if orientation == Qt.Orientation.Horizontal:
             if self.editable and section == self._data.shape[1]:
                 if is_display:
@@ -492,20 +514,21 @@ class DataTableModel(QAbstractTableModel):
             try:
                 if is_display:
                     return str(self._data.columns[section])
-                    
+
                 elif is_tooltip:
-                    if hasattr(self, '_header_tooltips') and self._header_tooltips and 0 <= section < len(self._header_tooltips):
+                    if hasattr(self, '_header_tooltips') and self._header_tooltips and 0 <= section < len(
+                            self._header_tooltips):
                         return self._header_tooltips[section]
-                        
+
                     return f"Column: {self._data.columns[section]}"
-                    
+
                 elif is_alignment:
                     if self._col_alignments and 0 <= section < len(self._col_alignments):
                         return self._col_alignments[section]
-                        
-            except Exception:
-                pass
-                
+
+            except Exception as header_error:
+                logger.debug(f"Error retrieving horizontal header data for section {section}: {header_error}")
+
         elif orientation == Qt.Orientation.Vertical:
             if self.editable and section == self._data.shape[0]:
                 if is_display:
@@ -523,22 +546,22 @@ class DataTableModel(QAbstractTableModel):
             if is_display:
                 try:
                     return str(self._data.index[section])
-                except IndexError:
-                    pass
-        
+                except IndexError as index_error:
+                    logger.debug(f"Index bounds error retrieving vertical header for {section}: {index_error}")
+
         return None
-    
+
     def sort(self, column: int, order: Qt.SortOrder) -> None:
         """Sorts the dataframe based on the given column and the given order"""
         if self._data is None:
             return
-        
+
         # Validate column index to prevent error on empty dataframe
         # Suppresses sorting errors for index -1 is out of bounds when 
         # creating a new project with 0x0 row/cols
         if column < -1 or column >= len(self._data.columns) or (column == -1 and self._data.empty):
             return
-        
+
         self.layoutAboutToBeChanged.emit()
 
         try:
@@ -548,10 +571,10 @@ class DataTableModel(QAbstractTableModel):
             self.data_handler.sort_data(col_name, ascending)
             self._data = self.data_handler.df
             self.highlighted_rows.clear()
+            self.highlighted_cells.clear()
             self._update_column_alignments()
         except Exception as SortError:
-            print(f"Error sorting data: {str(SortError)}")
-            self.status_bar = StatusBar()
-            self.status_bar.log(f"Error sorting data: {str(SortError)}")
-        
+            logger.error(f"Error sorting data: {SortError}", exc_info=True)
+            global_signals.request_toast("Sort Error", "Failed to sort data", ToastLevel.ERROR)
+
         self.layoutChanged.emit()

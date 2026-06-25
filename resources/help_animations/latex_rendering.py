@@ -1,5 +1,5 @@
-from PyQt6.QtCore import QRectF, Qt, QPointF
-from PyQt6.QtGui import QColor, QPen, QPainterPath, QFont
+from PyQt6.QtCore import QPointF, QRectF, Qt
+from PyQt6.QtGui import QColor, QFont, QPainterPath, QPen
 
 from ui.help_animation_engine import HelpAnimationEngine
 
@@ -52,7 +52,7 @@ class Animation(HelpAnimationEngine):
         
         # Interpolate Color for transition effect
         text_color = self.c_text
-        if toggle_prog > 0 and toggle_prog < 1.0:
+        if 0 < toggle_prog < 1.0:
             flash = 1.0 - abs(toggle_prog - 0.5) * 2
             text_color = self.lerp_color(self.c_text, QColor("#ffffff"), flash)
             

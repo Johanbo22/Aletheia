@@ -44,6 +44,7 @@ class Animation(HelpAnimationEngine):
 
         self.end_x: List[float] = [
             self.col_widths[1] + self.col_widths[2],
+            0.0,
             self.col_widths[1]
         ]
 

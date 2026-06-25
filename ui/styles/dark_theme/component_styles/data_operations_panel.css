@@ -28,3 +28,18 @@ QLabel[statusState="warning"] {
     color: #fbbf24;
     font-weight: 500;
 }
+
+QLabel[styleClass="status_indicator_inactive"]{
+    color: #9ca3af;
+    background-color: transparent;
+    font-style: italic;
+    padding: 4px 0px;
+}
+QLabel[styleClass="status_indicator_active"]{
+    color: #4ade80;
+    background-color: rgba(74, 222, 128, 0.1);
+    border: 1px solid rgba(72, 222, 128, 0.3);
+    border-radius: 4px;
+    padding: 6px;
+    font-weight: bold;
+}

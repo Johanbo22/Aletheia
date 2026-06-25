@@ -4,11 +4,10 @@ from enum import Enum, auto
 from functools import lru_cache
 from pathlib import Path
 
-from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import QByteArray
+from PyQt6.QtGui import QIcon, QPixmap
 
 from ui.theme import ThemeColors
-
 
 class IconType(Enum):
     """
@@ -114,10 +113,10 @@ def _get_icon_content(icon_type: IconType) -> str | tuple[str, str]:
     :return: A string containing the SVG path(s), or a tuple of (viewBox, path) if specified.
     """
     icon_db = _load_icon_database()
-    icon_data = icon_db.get(icon_type.name, "")
+    icon_data: str | list[str] = icon_db.get(icon_type.name, "")
     
     if isinstance(icon_data, list) and len(icon_data) == 2:
-        return (icon_data[0], icon_data[1])
+        return icon_data[0], icon_data[1]
     return icon_data
 
 class IconBuilder:
@@ -178,7 +177,7 @@ class IconBuilder:
     
     @classmethod
     def _build_native_app_icon(cls, resolution: int = 512) -> QIcon:
-        from PyQt6.QtGui import QPainter, QRadialGradient, QColor, QPen, QBrush, QGuiApplication, QPolygonF
+        from PyQt6.QtGui import QPainter, QRadialGradient, QColor, QPen, QBrush, QPolygonF
         from PyQt6.QtCore import Qt, QPointF
         import math
         

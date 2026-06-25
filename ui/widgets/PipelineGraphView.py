@@ -1,5 +1,7 @@
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsRectItem, QGraphicsTextItem, QGraphicsPathItem, QWidget, QGraphicsDropShadowEffect, QGraphicsObject
-from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve
+from PyQt6.QtWidgets import QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView, QGraphicsScene, \
+    QGraphicsRectItem, \
+    QGraphicsTextItem, QGraphicsPathItem, QWidget, QGraphicsDropShadowEffect, QGraphicsObject
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QRectF, pyqtProperty, QPropertyAnimation, QEasingCurve, QTimer
 from PyQt6.QtGui import QColor, QPen, QBrush, QPainterPath, QFont, QPainter, QFontMetrics, QKeyEvent, QWheelEvent, QMouseEvent, QPixmap
 
 from typing import List, Dict, Any, Callable, Optional
@@ -123,36 +125,41 @@ class GraphNode(QGraphicsObject):
                 self.shadow.setBlurRadius(10)
                 self.shadow.setOffset(0, 3)
 
-    def hoverEnterEvent(self, event):
+    def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent):
         self.is_hovered = True
         self._update_styling()
         self.update()
         super().hoverEnterEvent(event)
 
-    def hoverLeaveEvent(self, event):
+    def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent):
         self.is_hovered = False
         self._update_styling()
         self.update()
         super().hoverLeaveEvent(event)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setScale(0.98)
             if self.shadow.isEnabled():
                 self.shadow.setOffset(0, 1)
                 self.shadow.setBlurRadius(4)
                 self.update()
-            self.clicked.emit(self.node_id)
             event.accept()
         else:
             super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setScale(1.0)
             self._update_styling()
             self.update()
-        super().mouseReleaseEvent(event)
+
+            if self.boundingRect().contains(event.pos()):
+                self.clicked.emit(self.node_id)
+
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
     def paint(self, painter: QPainter, option, widget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -267,8 +274,8 @@ class PipelineGraphView(QGraphicsView):
         if self._scroll_animation:
             self._scroll_animation.stop()
         
-        self._scroll_animation = QPropertyAnimation(self, b"viewCenter")
-        self._scroll_animation.setDuration(600)
+        self._scroll_animation = QPropertyAnimation(self, b"viewCenter", self)
+        self._scroll_animation.setDuration(500)
         self._scroll_animation.setStartValue(self.viewCenter)
         self._scroll_animation.setEndValue(item.sceneBoundingRect().center())
         self._scroll_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
@@ -460,7 +467,7 @@ class PipelineGraphView(QGraphicsView):
     
     def _handle_node_clicked(self, node_id: str) -> None:
         if self.current_id != node_id:
-            self.node_selected.emit(node_id)
+            QTimer.singleShot(20, lambda: self.node_selected.emit(node_id))
 
     def _update_selection_in_place(self, nodes_dict: Dict[str, Any], new_node_id: str):
         if not self.nodes or not self.focus_selector:
@@ -493,8 +500,8 @@ class PipelineGraphView(QGraphicsView):
             if self._pill_animation:
                 self._pill_animation.stop()
 
-            self._pill_animation = QPropertyAnimation(self.focus_selector, b"animated_pos")
-            self._pill_animation.setDuration(400)
+            self._pill_animation = QPropertyAnimation(self.focus_selector, b"pos", self)
+            self._pill_animation.setDuration(500)
             self._pill_animation.setStartValue(old_pos)
             self._pill_animation.setEndValue(new_pos)
             self._pill_animation.setEasingCurve(QEasingCurve.Type.OutBack)

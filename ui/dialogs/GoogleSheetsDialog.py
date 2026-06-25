@@ -1,14 +1,15 @@
 import re
 from typing import NamedTuple, Optional
 
-from PyQt6.QtCore import QSettings, Qt, QTimer
+from PyQt6.QtCore import QSettings, QTimer, Qt
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget, QTabWidget, QFrame, QLineEdit, QGroupBox, QComboBox, QPushButton
+from PyQt6.QtWidgets import QComboBox, QDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+    QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
-from resources.version import APPLICATION_NAME
-from ui.theme import ThemeColors
-from icons import IconBuilder, IconType
+from core.global_signals import ToastLevel, global_signals
 from core.resource_loader import get_resource_path
+from icons import IconBuilder, IconType
+from resources.version import APPLICATION_NAME
 
 class GoogleSheetsImportConfig(NamedTuple):
     """Payload for Google Sheets import config"""
@@ -21,7 +22,7 @@ class GoogleSheetsImportConfig(NamedTuple):
 
 class GoogleSheetsDialog(QDialog):
     """Dialog for importing data from Google Sheets"""
-    
+
     _SHEET_ID_PATTERN = re.compile(r"/d/([a-zA-Z0-0-_]+)")
     _GID_PATTERN = re.compile(r"[#&?]gid=([0-9]+)")
 
@@ -43,40 +44,40 @@ class GoogleSheetsDialog(QDialog):
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
-        
+
         self.tab_widget = QTabWidget()
         connection_tab = QWidget()
         connection_layout_main = QVBoxLayout(connection_tab)
         connection_layout_main.setContentsMargins(20, 20, 20, 20)
         connection_layout_main.setSpacing(15)
-        
+
         header_layout = QHBoxLayout()
         # Info label
         info_label = QLabel("Enter your Google Sheets details below")
         info_label.setObjectName("google_sheets_info_label")
         header_layout.addWidget(info_label)
-        
+
         # A timer to prevent lag on user typing
         self._parse_timer = QTimer(self)
         self._parse_timer.setSingleShot(True)
         self._parse_timer.setInterval(300)
         self._parse_timer.timeout.connect(self._execute_parsing)
-        
+
         header_layout.addStretch()
-        
+
         self.help_button = QPushButton("How to Import?", parent=self)
         self.help_button.setToolTip("View instructions for importing Google Sheets data")
         self.help_button.setIcon(IconBuilder.build(IconType.Information))
         self.help_button.clicked.connect(self.show_instructions)
         header_layout.addWidget(self.help_button)
-        
+
         connection_layout_main.addLayout(header_layout)
-        
+
         # Form layout for inputs
         connection_group = QGroupBox("Connection Details", parent=self)
         connection_form_layout = QFormLayout()
         connection_form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        
+
         # Shee ID
         sheet_id_label = QLabel("Google Sheet Link or Sheet ID:")
         self.sheet_id = QComboBox()
@@ -86,25 +87,25 @@ class GoogleSheetsDialog(QDialog):
         self.sheet_id.lineEdit().setClearButtonEnabled(True)
         self.sheet_id.setMinimumWidth(350)
         self.sheet_id.editTextChanged.connect(self.parse_input)
-        
+
         sheet_id_layout = QHBoxLayout()
         sheet_id_layout.setContentsMargins(0, 0, 0, 0)
         sheet_id_layout.addWidget(self.sheet_id)
-        
+
         self.status_icon = QLabel()
         self.status_icon.setFixedSize(20, 20)
         self.status_icon.setScaledContents(True)
-        
+
         icon_size_policy = self.status_icon.sizePolicy()
         icon_size_policy.setRetainSizeWhenHidden(True)
         self.status_icon.setSizePolicy(icon_size_policy)
         self.status_icon.hide()
         sheet_id_layout.addWidget(self.status_icon)
-        
+
         self.sheet_id.editTextChanged.connect(self._on_input_changed)
         self.sheet_id.lineEdit().returnPressed.connect(self._on_return_pressed)
         connection_form_layout.addRow(sheet_id_label, sheet_id_layout)
-        
+
         # Sheet Name
         sheet_name_label = QLabel("Sheet Name:")
         self.sheet_name = QLineEdit()
@@ -115,13 +116,13 @@ class GoogleSheetsDialog(QDialog):
         self.sheet_name.textChanged.connect(lambda: self._clear_validation_state(self.sheet_name))
         self.sheet_name.returnPressed.connect(self._on_return_pressed)
         connection_form_layout.addRow(sheet_name_label, self.sheet_name)
-        
+
         connection_group.setLayout(connection_form_layout)
         connection_layout_main.addWidget(connection_group)
         connection_layout_main.addStretch()
-        
+
         self.tab_widget.addTab(connection_tab, QIcon(IconBuilder.build(IconType.Connect)), "Connection")
-        
+
         # Advanced Settings Tab
         advanced_tab = QWidget()
         advanced_layout_main = QVBoxLayout(advanced_tab)
@@ -158,13 +159,14 @@ class GoogleSheetsDialog(QDialog):
         self.custom_delimiter_input.setMaxLength(1)
         self.custom_delimiter_input.setEnabled(False)
         self.custom_delimiter_input.setMaximumWidth(150)
-        self.custom_delimiter_input.textChanged.connect(lambda: self._clear_validation_state(self.custom_delimiter_input))
-        
+        self.custom_delimiter_input.textChanged.connect(
+            lambda: self._clear_validation_state(self.custom_delimiter_input))
+
         custom_delimiter_hbox = QHBoxLayout()
         custom_delimiter_hbox.addWidget(self.custom_delimiter_input)
         custom_delimiter_hbox.addStretch()
         delimiter_form_layout.addRow("Custom Delimiter:", custom_delimiter_hbox)
-        
+
         parsing_separator = QFrame()
         parsing_separator.setFrameShape(QFrame.Shape.HLine)
         parsing_separator.setProperty("styleClass", "horizontal_divider")
@@ -198,9 +200,9 @@ class GoogleSheetsDialog(QDialog):
         advanced_layout_main.addStretch()
 
         self.tab_widget.addTab(advanced_tab, QIcon(IconBuilder.build(IconType.Settings)), "Advanced Settings")
-        
+
         main_layout.addWidget(self.tab_widget)
-        
+
         button_container = QWidget()
         button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(10, 5, 10, 10)
@@ -225,7 +227,7 @@ class GoogleSheetsDialog(QDialog):
         self._setup_tab_order()
         self.load_history()
         self.sheet_id.setFocus()
-    
+
     def _setup_tab_order(self) -> None:
         """Define tab order for keyboard navigation"""
         self.setTabOrder(self.sheet_id, self.sheet_name)
@@ -234,7 +236,7 @@ class GoogleSheetsDialog(QDialog):
         self.setTabOrder(self.custom_delimiter_input, self.decimal_combo)
         self.setTabOrder(self.decimal_combo, self.thousands_combo)
         self.setTabOrder(self.thousands_combo, self.import_button)
-    
+
     def show_instructions(self) -> None:
         help_text = (
             "<b>How to use Google Sheets Import:</b><br><br>"
@@ -253,22 +255,22 @@ class GoogleSheetsDialog(QDialog):
         msg_box.setTextFormat(Qt.TextFormat.RichText)
         msg_box.setText(help_text)
         msg_box.exec()
-    
+
     def _on_input_changed(self, text: str) -> None:
         """Triggers the timer when text changes to prevent sutter"""
         self._pending_parse_text = text
         self._parse_timer.start()
-    
+
     def _execute_parsing(self) -> None:
         """Executes parsing after timer deboucne"""
         self.parse_input(self._pending_parse_text)
         self._update_import_button_state()
-    
+
     def _on_return_pressed(self) -> None:
         """Submit form with Key_Return if all validations are met"""
         if self.import_button.isEnabled():
             self.validate_and_accept()
-    
+
     def _update_import_button_state(self) -> None:
         """Enable the import button only when required fields are populated"""
         has_name_or_gid = bool(self.gid) or bool(self.sheet_name.text().strip())
@@ -281,7 +283,7 @@ class GoogleSheetsDialog(QDialog):
         if is_custom:
             self.custom_delimiter_input.clear()
             self.custom_delimiter_input.setFocus()
-    
+
     def _clear_validation_state(self, widget: QWidget) -> None:
         """Clears the visual error state from widget"""
         if widget.property("validationState") == "error":
@@ -292,11 +294,11 @@ class GoogleSheetsDialog(QDialog):
     def parse_input(self, text: str) -> None:
         """Parse the input for URL and extract sheet ID and GID"""
         clean_text = text.strip()
-        
+
         # Regex to match sheet id
         id_match = self._SHEET_ID_PATTERN.search(clean_text)
         is_valid_id = False
-        
+
         if id_match:
             is_valid_id = True
             extracted_id = id_match.group(1)
@@ -304,7 +306,7 @@ class GoogleSheetsDialog(QDialog):
                 self.sheet_id.blockSignals(True)
                 self.sheet_id.setCurrentText(extracted_id)
                 self.sheet_id.blockSignals(False)
-            
+
             # Look for a GID
             gid_match = self._GID_PATTERN.search(clean_text)
             if gid_match:
@@ -327,9 +329,9 @@ class GoogleSheetsDialog(QDialog):
                 self.sheet_name.setToolTip("The name of the sheet you want to import data from")
                 if len(clean_text) > 20 and re.match(r"^[a-zA-Z0-9-_]+$", clean_text):
                     is_valid_id = True
-        
+
         self._is_current_id_valid = is_valid_id
-        
+
         if is_valid_id:
             self.status_icon.setPixmap(QIcon(IconBuilder.build(IconType.Checkmark)).pixmap(20, 20))
             self.status_icon.setToolTip("Valid Google Sheet ID")
@@ -340,7 +342,7 @@ class GoogleSheetsDialog(QDialog):
             self.status_icon.show()
         else:
             self.status_icon.hide()
-        
+
     def reject(self) -> None:
         """Reject override to ensure resources are cleaned up when dialog is destroyed"""
         if self._parse_timer.isActive():
@@ -354,13 +356,20 @@ class GoogleSheetsDialog(QDialog):
             self.sheet_name.blockSignals(True)
             self.sheet_name.setText(cleaned_sheet_name)
             self.sheet_name.blockSignals(False)
-            
+
         for widget in [self.sheet_name, self.custom_delimiter_input]:
             if widget.property("validationState") != "normal":
                 widget.setProperty("validationState", "error")
                 widget.style().unpolish(widget)
                 widget.style().polish(widget)
-        
+
+        if not self.sheet_id.currentText().strip():
+            self._route_validation_error(
+                widget=self.sheet_id,
+                tab_index=0,
+                error_message="Please enter a valid Google Sheet URL or ID"
+            )
+
         if not self.gid and not self.sheet_name.text():
             self._route_validation_error(
                 widget=self.sheet_name,
@@ -368,7 +377,7 @@ class GoogleSheetsDialog(QDialog):
                 error_message="Please enter a Sheet Name or provide a URl with a 'gid'"
             )
             return
-        
+
         if self.delimiter_combo.currentText() == "Custom":
             if not self.custom_delimiter_input.text().strip():
                 self._route_validation_error(
@@ -377,29 +386,29 @@ class GoogleSheetsDialog(QDialog):
                     error_message="Please enter a single custom delimiter character"
                 )
                 return
-        
+
         self.save_history()
         self.accept()
-    
+
     def _route_validation_error(self, widget: QWidget, tab_index: int, error_message: str) -> None:
         """Highlights the offending widget, switches parent tab and grants it focus"""
         widget.setProperty("validationState", "error")
         widget.style().unpolish(widget)
         widget.style().polish(widget)
-        
+
         # Force the tab containing the rror
         if self.tab_widget.currentIndex() != tab_index:
             self.tab_widget.setCurrentIndex(tab_index)
-        
+
         widget.setFocus()
-        QMessageBox.warning(self, "Validation Error", error_message)
+        global_signals.request_toast("Validation Error", error_message, ToastLevel.ERROR)
 
     def get_inputs(self) -> GoogleSheetsImportConfig:
         """Return the sheet ID and name and delimiter settings"""
         sheet_id = self.sheet_id.currentText().strip()
         sheet_name = self.sheet_name.text().strip()
 
-        #delimiter
+        # delimiter
         delimiter_text = self.delimiter_combo.currentText()
         if delimiter_text.startswith("Comma"):
             delimiter = ","
@@ -416,7 +425,7 @@ class GoogleSheetsDialog(QDialog):
         else:
             delimiter = ","
 
-        #get decimal separator
+        # get decimal separator
         decimal_text = self.decimal_combo.currentText()
         decimal = "," if decimal_text.startswith("Comma") else "."
 
@@ -456,23 +465,23 @@ class GoogleSheetsDialog(QDialog):
         self.sheet_id.addItems(history)
         self.sheet_id.setCurrentIndex(-1)
         self.sheet_id.blockSignals(False)
-        
+
         self.sheet_id.activated.connect(self._auto_fill_sheet_name)
-    
+
     def _auto_fill_sheet_name(self, index: int) -> None:
         """Populate the sheet name if it already is associated with a Sheet ID"""
         selected_id = self.sheet_id.itemText(index)
         if selected_id in self._history_names and self.sheet_name.isEnabled():
             self.sheet_name.setText(self._history_names[selected_id])
-    
+
     def save_history(self) -> None:
         """Save the current sheet id to history"""
         current_id = self.sheet_id.currentText().strip()
         current_name = self.sheet_name.text().strip()
-        
+
         if not current_id:
             return
-        
+
         settings = QSettings(f"{APPLICATION_NAME}", "GoogleSheetsImport")
         history = settings.value("history", [], type=list)
         history_names = settings.value("history_names", {}, type=dict)
@@ -481,12 +490,12 @@ class GoogleSheetsDialog(QDialog):
 
         if current_id in history:
             history.remove(current_id)
-        
+
         history.insert(0, current_id)
         history = history[:10]
 
         self._history_names = {key: val for key, val in history_names.items() if key in history}
-        
+
         if current_name:
             history_names[current_id] = current_name
 

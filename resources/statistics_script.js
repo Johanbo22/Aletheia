@@ -35,21 +35,6 @@ document.addEventListener('DOMContentLoaded', function () {
         rowsArray.forEach(row => tbody.appendChild(row));
     }
 
-    const searchInput = document.getElementById('columnSearch');
-    if (searchInput) {
-        searchInput.addEventListener('input', function (e) {
-            const term = e.target.value.toLowerCase();
-            const colTable = document.getElementById('columnInfoTable');
-            if (colTable) {
-                const rows = Array.from(colTable.rows).slice(1);
-                rows.forEach(row => {
-                    const colName = row.cells[0]?.textContent.toLowerCase() || '';
-                    row.style.display = colName.includes(term) ? '' : 'none';
-                });
-            }
-        });
-    }
-
     const sectionHeaders = document.querySelectorAll('h2');
     sectionHeaders.forEach(header => {
         header.style.cursor = 'pointer';
@@ -169,34 +154,103 @@ document.addEventListener('DOMContentLoaded', function () {
         thresholdSlider.addEventListener('change', applyThreshold);
     }
 
-    const missingToggle = document.getElementById('missingDataToggle');
-    if (missingToggle) {
-        missingToggle.addEventListener('change', function (e) {
-            const showOnlyMissing = e.target.checked;
-            const colTable = document.getElementById('columnInfoTable');
-            const searchBox = document.getElementById('columnSearch');
-            const searchTerm = searchBox ? searchBox.value.toLowerCase() : '';
-
-            if (colTable) {
-                const rows = Array.from(colTable.rows).slice(1);
-                rows.forEach(row => {
-                    const missingCell = row.cells[3];
-                    const missingCount = parseInt(missingCell ? missingCell.textContent.replace(/,/g, '') : '0');
-                    const colName = row.cells[0]?.textContent.toLowerCase() || '';
-
-                    const matchesSearch = colName.includes(searchTerm);
-                    const matchesToggle = !showOnlyMissing || missingCount > 0;
-
-                    row.style.display = (matchesSearch && matchesToggle) ? '' : 'none';
-                });
-            }
-        });
-
+    function filterTables() {
         const searchInput = document.getElementById('columnSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => {
-                missingToggle.dispatchEvent(new Event('change'));
+        const missingToggle = document.getElementById('missingDataToggle');
+        
+        const term = searchInput ? searchInput.value.toLowerCase() : '';
+        const showOnlyMissing = missingToggle ? missingToggle.checked : false;
+
+        const colTable = document.getElementById('columnInfoTable');
+        if (colTable) {
+            const rows = Array.from(colTable.rows).slice(1);
+            rows.forEach(row => {
+                const colName = row.cells[0]?.textContent.toLowerCase() || '';
+                const missingCell = row.cells[3];
+                const missingCount = parseInt(missingCell ? missingCell.textContent.replace(/,/g, '') : '0');
+                
+                const matchesSearch = colName.includes(term);
+                const matchesToggle = !showOnlyMissing || missingCount > 0;
+                
+                row.style.display = (matchesSearch && matchesToggle) ? '' : 'none';
+            });
+        }
+
+        const catTable = document.getElementById('categoricalStatsTable');
+        if (catTable) {
+            const rows = Array.from(catTable.rows).slice(1);
+            rows.forEach(row => {
+                const colName = row.cells[0]?.textContent.toLowerCase() || '';
+                row.style.display = colName.includes(term) ? '' : 'none';
             });
         }
     }
+
+    const searchInput = document.getElementById('columnSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterTables);
+    }
+
+    const missingToggle = document.getElementById('missingDataToggle');
+    if (missingToggle) {
+        missingToggle.addEventListener('change', filterTables);
+    }
+
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        } else {
+            return new Promise((resolve, reject) => {
+                let textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.opacity = "0";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                } finally {
+                    textArea.remove();
+                }
+            });
+        }
+    }
+
+    tables.forEach(table => {
+        const rows = table.querySelectorAll('tr');
+        rows.forEach((row, rowIndex) => {
+            if (rowIndex === 0) return;
+
+            row.addEventListener('click', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'A') return;
+                row.classList.toggle('selected-row');
+            });
+
+            const cells = row.querySelectorAll('td');
+            cells.forEach(cell => {
+                if (!cell.title) {
+                    cell.title = 'Click to copy';
+                } else if (!cell.title.includes('copy')) {
+                    cell.title += ' (Click to copy)';
+                }
+
+                cell.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const textToCopy = cell.innerText.trim();
+                    if (!textToCopy) return;
+
+                    copyToClipboard(textToCopy).then(() => {
+                        cell.classList.add('copy-success');
+                        setTimeout(() => {
+                            cell.classList.remove('copy-success');
+                        }, 400);
+                    }).catch(err => console.error('Failed to copy text!', err));
+                });
+            });
+        });
+    });
 });

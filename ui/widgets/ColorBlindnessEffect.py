@@ -5,6 +5,12 @@ from PyQt6.QtGui import QImage, QPainter, QPixmap
 from PyQt6.QtCore import Qt, QObject
 
 class ColorBlindnessType(str, Enum):
+    """
+    Enumeration defining the supported types of color blindness simulations.
+
+    These types correspond to specific transformation matricies used to simulate
+    how individuals with varying forms of color vision deficiency perceive visuals
+    """
     Protanopia = "Protanopia (No Red)"
     Deuteranopia = "Deuteranopia (No Green)"
     Tritanopia = "Tritanopia (No Blue)"
@@ -14,8 +20,13 @@ class ColorBlindnessEffect(QGraphicsEffect):
     """
     A QGraphicsEffect that applies a color matrix transformation
     to simulate color blindness
+
+    This effect intercepts the drawing of the target widget, converts its
+    visuals into an image and applies a numpy-based matrix multiplication to adjust
+    the RGB channels. Caching at the pixmap level to prevent redundant recalculations
+    during standard paint events.
     """
-    
+
     # Standard SVG color matricies for CBS
     MATRICES: dict[ColorBlindnessType, np.ndarray] = {
         ColorBlindnessType.Protanopia: np.array([
@@ -39,72 +50,103 @@ class ColorBlindnessEffect(QGraphicsEffect):
             [0.299, 0.587, 0.114]
         ])
     }
-    
-    def __init__(self, simulation_type: ColorBlindnessType | str = ColorBlindnessType.Protanopia, parent: QObject | None = None):
+
+    def __init__(self, simulation_type: ColorBlindnessType | str = ColorBlindnessType.Protanopia, parent: QObject | None = None) -> None:
+        """
+        Initialize the ColorBlindness Effect
+
+        :param simulation_type: The specific type of colorblindness to simulate.
+                                Defaults to Protanopia. Can be passed as an Enum
+                                member or its corresponding string value.
+        :param parent: The parent object to own this effect
+        """
         super().__init__(parent)
         self.simulation_type = ColorBlindnessType(simulation_type) if isinstance(simulation_type, str) else simulation_type
-        
+
         # Caching to avoid CPU overusage
         self._cached_pixmap: QPixmap | None = None
         self._last_source_cache_key: int | None = None
         self._last_sim_type: ColorBlindnessType | None = None
-    
+
     def set_simulation_type(self, sim_type: ColorBlindnessType | str) -> None:
-        """Update the simulaton type to trigger redrawEvent"""
+        """
+        Update the active color blindness simulation type
+
+        Changing this value invalidates the current cache and schedules a
+        redraw of the target widget to reflect the selected transformation
+
+        :param sim_type: The new simulation type to apply
+        """
         new_type = ColorBlindnessType(sim_type) if isinstance(sim_type, str) else sim_type
         if self.simulation_type != new_type:
             self.simulation_type = new_type
             self.update()
-    
+
     def draw(self, painter: QPainter) -> None:
-        """Applies the color matrix to a pixmap"""
+        """
+        Intercepts the standard drawing routine to apply the color blindness filter
+
+        This method retrieves the source pixmap from the widget and applies
+        the currently selected color matrix. To optimize performance, it caches the
+        processed pixmap and reuses it unless the source widget's cache key or
+        simulation type has changed.
+
+        :param painter: The QPainter instance for rendering the effect
+        :return:
+        """
         pixmap, offset = self.sourcePixmap(Qt.CoordinateSystem.LogicalCoordinates)
         if pixmap.isNull():
             return
-        
+
         current_cache_key = pixmap.cacheKey()
-        
-        if (self._cached_pixmap is not None and self._last_source_cache_key == current_cache_key and self._last_sim_type == self.simulation_type):
+
+        if self._cached_pixmap is not None and self._last_source_cache_key == current_cache_key and self._last_sim_type == self.simulation_type:
             painter.drawPixmap(offset, self._cached_pixmap)
             return
-        
+
         original_image = pixmap.toImage()
         processed_image = self._apply_color_blindness_filter(original_image)
-        
+
         self._cached_pixmap = QPixmap.fromImage(processed_image)
         self._last_source_cache_key = current_cache_key
         self._last_sim_type = self.simulation_type
-        
+
         painter.drawPixmap(offset, self._cached_pixmap)
-    
+
     def _apply_color_blindness_filter(self, original_image: QImage) -> QImage:
         """
         Transforms the image pixels using the selected color blindness matrix
+
+        This internal method converts the QImage to a raw numpy array for matrix
+        multiplication.
+
+        :param original_image: The unmodified source QImage captured by the widget
+        :return: A new QImage containing the transformed pixels
         """
         original_image.convertTo(QImage.Format.Format_RGB32)
         device_pixel_ratio = original_image.devicePixelRatio()
-        
+
         image_pointer = original_image.bits()
         image_pointer.setsize(original_image.sizeInBytes())
-        
+
         image_data_array = np.array(image_pointer).reshape((original_image.height(), original_image.width(), 4))
         color_matrix = self.MATRICES.get(self.simulation_type, np.eye(3))
-        
+
         rgb_chanels = image_data_array[:, :, :3]
         red_channel = rgb_chanels[:, :, 2]
         green_channel = rgb_chanels[:, :, 1]
         blue_channel = rgb_chanels[:, :, 0]
-        
+
         image_shape = red_channel.shape
         flattened_pixels = np.vstack([red_channel.ravel(), green_channel.ravel(), blue_channel.ravel()])
-        
+
         transformed_pixels = color_matrix @ flattened_pixels
         transformed_pixels = np.clip(transformed_pixels, 0, 255).astype(np.uint8)
-        
+
         image_data_array[:, :, 2] = transformed_pixels[0].reshape(image_shape)
         image_data_array[:, :, 1] = transformed_pixels[1].reshape(image_shape)
         image_data_array[:, :, 0] = transformed_pixels[2].reshape(image_shape)
-        
+
         processed_image = QImage(
             image_data_array.data,
             original_image.width(),

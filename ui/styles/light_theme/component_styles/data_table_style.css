@@ -73,3 +73,11 @@ QTableCornerButton::section {
 #MainDataTable QScrollBar::sub-page:horizontal {
     background: none;
 }
+
+#tableCellEditor {
+    background-color: #FFFFFF;
+    border-color: 1px solid #2563eb;
+    color: #2D2D2D;
+    margin: 0px;
+    padding: 0px 8px;
+}

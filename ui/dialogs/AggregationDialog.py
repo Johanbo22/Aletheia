@@ -2,15 +2,15 @@ import threading
 from enum import Enum
 
 import pandas as pd
-from PyQt6.QtCore import Qt, QThreadPool, QTimer, QPoint, QObject, pyqtSignal, QRunnable, QSortFilterProxyModel
-from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QIcon, \
-    QStandardItem, \
-    QStandardItemModel
-from PyQt6.QtWidgets import QDialog, QFormLayout, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QTableWidget, \
-    QHeaderView, QAbstractItemView, QTableWidgetItem, QSplitter, QWidget, QListView, QMenu, QLineEdit, QGroupBox, QComboBox, QPushButton
+from PyQt6.QtCore import QObject, QPoint, QRunnable, QSortFilterProxyModel, QThreadPool, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QFont, QIcon, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
+from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, \
+    QLabel, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, \
+    QVBoxLayout, QWidget
 
-from ui.workers import AggregationWorker
+from core.global_signals import ToastLevel, global_signals
 from icons import IconBuilder, IconType
+from ui.workers import AggregationWorker
 
 DEFAULT_PREVIEW_LIMIT: int = 5
 DEBOUNCE_DELAY_MS: int = 300
@@ -111,6 +111,7 @@ UNIVERSAL_FUNCTIONS: set[AggregationFunctions] = {
 
 class AggregationDialog(QDialog):
     """Dialog for data aggregation operations"""
+    agg_table: QTableWidget | QTableWidget
 
     def __init__(self, data_handler, parent=None):
         super().__init__(parent)
@@ -493,7 +494,7 @@ class AggregationDialog(QDialog):
     def move_agg_row_down(self) -> None:
         """Move the currently selected aggregation row down by one position."""
         row: int = self.agg_table.currentRow()
-        if row >= 0 and row < self.agg_table.rowCount() - 1:
+        if 0 <= row < self.agg_table.rowCount() - 1:
             self._swap_agg_rows(row, row + 1)
     
     def _swap_agg_rows(self, row1: int, row2: int) -> None:
@@ -781,40 +782,24 @@ class AggregationDialog(QDialog):
         group_cols, agg_config, date_grouping, _ = self.get_current_config()
 
         if not group_cols:
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                "Please select at least one column to group by",
-            )
+            global_signals.request_toast("Validation Error", "Please select at least one column to group by", ToastLevel.WARNING)
             self.group_by_search_input.setFocus()
             return
 
         if not agg_config:
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                "Please select at least one column to aggregate",
-            )
+            global_signals.request_toast("Validation Error", "Please select at least one column to aggregate", ToastLevel.WARNING)
             self.column_search_input.setFocus()
             return
 
         # check for overlap
         overlap = set(group_cols) & set(agg_config.keys())
         if overlap:
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                f"Columns cannot be both grouped and aggregated:\n{', '.join(overlap)}",
-            )
+            global_signals.request_toast("Validation Error", f"Columns cannot be both grouped and aggregated:\n{', '.join(overlap)}", ToastLevel.WARNING)
             return
 
         # check if name is given
         if self.save_agg_group.isChecked() and not self.save_name_input.text().strip():
-            QMessageBox.warning(
-                self,
-                "Validation Error",
-                "Please enter a name for the aggregation you want to save.",
-            )
+            global_signals.request_toast("Validation Error", "Please enter a name for the aggregation you want to save", ToastLevel.WARNING)
             self.save_name_input.setFocus()
             return
 
@@ -827,16 +812,17 @@ class AggregationDialog(QDialog):
         worker.signals.error.connect(self.on_aggregation_error)
         self.thread_pool.start(worker)
     
-    def on_aggregation_finished(self, result_df):
+    def on_aggregation_finished(self, result_df) -> None:
         self.result_df = result_df
         self.setEnabled(True)
         self.accept()
     
-    def on_aggregation_error(self, error):
+    def on_aggregation_error(self, error) -> None:
         self.setEnabled(True)
         self.button_add.setEnabled(True)
         self.button_remove.setEnabled(True)
-        QMessageBox.critical(self, "Aggregation Error", f"An error occurred:\n{str(error)}")
+        global_signals.request_toast("Aggregation Error", f"An error occurred", ToastLevel.ERROR)
+        global_signals.log_requested.emit(f"An error occurred while aggregation: {str(error)}", "ERROR")
 
     def get_aggregation_config(self):
         """Return the aggregation config"""

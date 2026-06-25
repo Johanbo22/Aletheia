@@ -1,19 +1,22 @@
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+from typing import Any, Dict, List, TYPE_CHECKING
+
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from core.plot_engine import PlotEngine
     from ui.plot_tab import PlotTab
 
 class HistogramPlotStrategy(BasePlotStrategy):
-    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
+    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool,
+                font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
         df = plot_tab.data_handler.df
         engine._clear_axes()
 
         if len(y_cols) > 1:
-            plot_tab.status_bar.log(f"Histogram only supports one column. Using: {y_cols[0]}", "WARNING")
+            plot_tab.status_bar.log(f"Histogram only supports one column. Using: {y_cols[0]}", LogLevel.WARNING)
 
         # Use first y_col as the data source, or x_col if y_cols is empty
         data_col = y_cols[0] if y_cols else x_col

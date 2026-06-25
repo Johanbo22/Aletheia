@@ -1,5 +1,5 @@
-from PyQt6.QtGui import QPainterPath, QFont, QColor, QPen
-from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QColor, QFont, QPainterPath, QPen
 
 from ui.animations import OverlayAnimationEngine
 
@@ -94,7 +94,7 @@ class DataTypeChangeAnimation(OverlayAnimationEngine):
             
         painter.restore()
 
-        if self.progress > flip_start and self.progress < 1.0:
+        if flip_start < self.progress < 1.0:
             arrow_opacity = 1.0 - abs(self.progress - 0.6) / 0.4
             
             arrow_color = QColor(200, 200, 200)

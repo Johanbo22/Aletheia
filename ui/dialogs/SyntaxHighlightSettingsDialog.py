@@ -2,48 +2,50 @@ import json
 from pathlib import Path
 from typing import Dict
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QPushButton, QComboBox, QColorDialog, QDialogButtonBox, QPlainTextEdit, QGroupBox, QSplitter, QFileDialog, QMessageBox, QWidget, QScrollArea
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFontDatabase, QFont, QPaintEvent, QPainter, QBrush, QPen
+from PyQt6.QtGui import QBrush, QColor, QFont, QFontDatabase, QPaintEvent, QPainter, QPen
+from PyQt6.QtWidgets import QColorDialog, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, \
+    QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QScrollArea, QSplitter, QVBoxLayout, QWidget
 
-from ui.PythonHighlighter import SyntaxCategory, DefaultColorScheme, PythonHighlighter
+from core.global_signals import LogLevel, ToastLevel, global_signals
+from ui.PythonHighlighter import DefaultColorScheme, PythonHighlighter, SyntaxCategory
 
 PREDEFINED_SCHEMES: Dict[str, Dict[SyntaxCategory, str]] = {
     "Default (Dracula)": DefaultColorScheme,
-    "Light Theme": {
-        SyntaxCategory.Keyword: "#0000ff",
-        SyntaxCategory.Builtin: "#795e26",
-        SyntaxCategory.Self_Cls: "#0000ff",
-        SyntaxCategory.Decorator: "#af00db",
-        SyntaxCategory.String: "#a31515",
-        SyntaxCategory.Docstring: "#008000",
-        SyntaxCategory.Number: "#098658",
-        SyntaxCategory.Function: "#795e26",
-        SyntaxCategory.ClassName: "#267f99",
+    "Light Theme"      : {
+        SyntaxCategory.Keyword    : "#0000ff",
+        SyntaxCategory.Builtin    : "#795e26",
+        SyntaxCategory.Self_Cls   : "#0000ff",
+        SyntaxCategory.Decorator  : "#af00db",
+        SyntaxCategory.String     : "#a31515",
+        SyntaxCategory.Docstring  : "#008000",
+        SyntaxCategory.Number     : "#098658",
+        SyntaxCategory.Function   : "#795e26",
+        SyntaxCategory.ClassName  : "#267f99",
         SyntaxCategory.MagicMethod: "#795e26",
-        SyntaxCategory.Operator: "#000000",
-        SyntaxCategory.Comment: "#008000"
+        SyntaxCategory.Operator   : "#000000",
+        SyntaxCategory.Comment    : "#008000"
     },
-    "Solarized Dark": {
-        SyntaxCategory.Keyword: "#859900",
-        SyntaxCategory.Builtin: "#b58900",
-        SyntaxCategory.Self_Cls: "#268bd2",
-        SyntaxCategory.Decorator: "#d33682",
-        SyntaxCategory.String: "#2aa198",
-        SyntaxCategory.Docstring: "#586e75",
-        SyntaxCategory.Number: "#d33682",
-        SyntaxCategory.Function: "#268bd2",
-        SyntaxCategory.ClassName: "#b58900",
+    "Solarized Dark"   : {
+        SyntaxCategory.Keyword    : "#859900",
+        SyntaxCategory.Builtin    : "#b58900",
+        SyntaxCategory.Self_Cls   : "#268bd2",
+        SyntaxCategory.Decorator  : "#d33682",
+        SyntaxCategory.String     : "#2aa198",
+        SyntaxCategory.Docstring  : "#586e75",
+        SyntaxCategory.Number     : "#d33682",
+        SyntaxCategory.Function   : "#268bd2",
+        SyntaxCategory.ClassName  : "#b58900",
         SyntaxCategory.MagicMethod: "#cb4b16",
-        SyntaxCategory.Operator: "#839496",
-        SyntaxCategory.Comment: "#586e75"
+        SyntaxCategory.Operator   : "#839496",
+        SyntaxCategory.Comment    : "#586e75"
     }
 }
 
 class ColorPickerButton(QPushButton):
-    
+
     color_changed = pyqtSignal(str)
-    
+
     def __init__(self, initial_color: str, parent=None) -> None:
         super().__init__(parent)
         self._color: str = initial_color
@@ -51,17 +53,17 @@ class ColorPickerButton(QPushButton):
         self.setFixedSize(40, 24)
         self.setProperty("isColorPicker", True)
         self.clicked.connect(self._choose_color)
-    
+
     def get_color(self) -> str:
         return self._color
-    
+
     def set_color(self, color: str, emit_signal: bool = True) -> None:
         if self._color != color:
             self._color = color
             self.update()
             if emit_signal:
                 self.color_changed.emit(self._color)
-    
+
     def paintEvent(self, event: QPaintEvent) -> None:
         """PaintEvent for drawing color button"""
         painter = QPainter(self)
@@ -74,33 +76,34 @@ class ColorPickerButton(QPushButton):
         painter.drawRoundedRect(rect, 4, 4)
 
         painter.end()
-    
+
     def _choose_color(self) -> None:
         color = QColorDialog.getColor(QColor(self._color), self.window(), "Select Syntax Color")
         if color.isValid():
             self.set_color(color.name())
-    
+
 class SyntaxHighlightSettingsDialog(QDialog):
     """
     Dialog to customize the syntax highlighting colors
     """
+
     def __init__(self, current_scheme: Dict[SyntaxCategory, str], parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Syntax Highlighting Settings")
         self.resize(800, 500)
         self.setObjectName("syntax_highlight_settings_dialog")
-    
+
         self.color_buttons: Dict[SyntaxCategory, ColorPickerButton] = {}
         self._init_ui(current_scheme)
-    
+
     def _init_ui(self, current_scheme: Dict[SyntaxCategory, str]) -> None:
         main_layout = QVBoxLayout(self)
-        
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        
+
         controls_widget = QGroupBox("Color Scheme")
         controls_layout = QVBoxLayout(controls_widget)
-        
+
         theme_layout = QHBoxLayout()
         theme_layout.addWidget(QLabel("Predefined Theme:"))
         self.theme_combo = QComboBox()
@@ -109,21 +112,21 @@ class SyntaxHighlightSettingsDialog(QDialog):
         self.theme_combo.currentTextChanged.connect(self._on_theme_changed)
         theme_layout.addWidget(self.theme_combo)
         controls_layout.addLayout(theme_layout)
-        
+
         management_layout = QHBoxLayout()
         self.import_btn = QPushButton("Import JSON")
         self.import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.import_btn.clicked.connect(self._import_theme)
-        
+
         self.export_btn = QPushButton("Export JSON")
         self.export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.export_btn.clicked.connect(self._export_theme)
-        
+
         self.reset_btn = QPushButton("Reset")
         self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.reset_btn.setToolTip("Reset to Default (Dracula) Theme")
         self.reset_btn.clicked.connect(self._reset_to_default)
-        
+
         management_layout.addWidget(self.import_btn)
         management_layout.addWidget(self.export_btn)
         management_layout.addWidget(self.reset_btn)
@@ -141,9 +144,9 @@ class SyntaxHighlightSettingsDialog(QDialog):
 
         for category in SyntaxCategory:
             btn = ColorPickerButton(current_scheme.get(category, "#ffffff"))
-            
+
             btn.color_changed.connect(self._on_custom_color_picked)
-            
+
             self.color_buttons[category] = btn
             form_layout.addRow(category.value + ":", btn)
 
@@ -151,43 +154,43 @@ class SyntaxHighlightSettingsDialog(QDialog):
         controls_layout.addWidget(scroll_area)
 
         splitter.addWidget(controls_widget)
-        
+
         preview_widget = QGroupBox("Preview")
         preview_layout = QVBoxLayout(preview_widget)
-        
+
         self.preview_editor = QPlainTextEdit()
         self.preview_editor.setReadOnly(True)
         self.preview_editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.preview_editor.setObjectName("syntax_preview_editor")
-        
+
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         font.setPointSize(11)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.preview_editor.setFont(font)
-        
+
         self.preview_highlighter = PythonHighlighter(self.preview_editor.document(), current_scheme)
-        
+
         self.preview_editor.setPlainText(self._get_preview_text())
         preview_layout.addWidget(self.preview_editor)
-        
+
         splitter.addWidget(preview_widget)
-        
+
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
 
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
-        
+
         main_layout.addWidget(splitter)
-        
+
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         main_layout.addWidget(self.button_box)
-        
+
         self._match_current_scheme_to_theme(current_scheme)
         self._update_preview_background()
-        
+
     def _get_preview_text(self) -> str:
         """Returns a sample python code covering the syntax tokens"""
         return (
@@ -212,12 +215,12 @@ class SyntaxHighlightSettingsDialog(QDialog):
             "                case 1:\n"
             "                    pass\n"
         )
-        
+
     def _update_live_preview(self) -> None:
         new_scheme = self.get_color_scheme()
         self.preview_highlighter.set_color_scheme(new_scheme)
         self._update_preview_background()
-    
+
     def _update_preview_background(self) -> None:
         """Adjusts the background of the preview to help visibility"""
         is_light_theme = self.theme_combo.currentText() == "Light Theme"
@@ -242,17 +245,17 @@ class SyntaxHighlightSettingsDialog(QDialog):
                 self.theme_combo.setCurrentText(theme_name)
                 return
         self.theme_combo.setCurrentText("Custom")
-    
+
     def _on_theme_changed(self, theme_name: str) -> None:
         if theme_name in PREDEFINED_SCHEMES:
             theme_scheme = PREDEFINED_SCHEMES[theme_name]
             for category, btn in self.color_buttons.items():
                 btn.set_color(theme_scheme[category], emit_signal=False)
             self._update_live_preview()
-    
+
     def _reset_to_default(self) -> None:
         self.theme_combo.setCurrentText("Default (Dracula)")
-    
+
     def _export_theme(self) -> None:
         """Exports the current color scheme to a JSON file."""
         safe_theme_name = self.theme_combo.currentText().replace(" ", "_").lower()
@@ -263,28 +266,35 @@ class SyntaxHighlightSettingsDialog(QDialog):
         )
         if not file_path_str:
             return
-        
+
         try:
             scheme: Dict[SyntaxCategory, str] = self.get_color_scheme()
             export_data: Dict[str, str] = {category.value: color for category, color in scheme.items()}
-            
+
             export_path: Path = Path(file_path_str)
             with export_path.open("w", encoding="utf-8") as file:
                 json.dump(export_data, file, indent=4)
-            
-            QMessageBox.information(self, "Export Successful", f"Theme saved to:\n{export_path.name}")
+
+            global_signals.request_toast(
+                "Export Successful", f"Theme saved to:\n{export_path.name}", ToastLevel.SUCCESS
+            )
         except Exception as err:
-            QMessageBox.critical(self, "Export Error", f"Failed to export theme:\n{err}")
-    
+            global_signals.request_toast(
+                "Export Error", f"Failed to export syntax theme:\n{err}", ToastLevel.ERROR
+            )
+            global_signals.request_log(
+                f"Failed to export theme to file: {str(err)}", LogLevel.ERROR
+            )
+
     def _import_theme(self) -> None:
         """Imports a JSON theme file and applies it"""
         file_path_str, _ = QFileDialog.getOpenFileName(
             self, "Import Syntax Theme", "", "JSON Files (*.json)"
         )
-        
+
         if not file_path_str:
             return
-            
+
         try:
             import_path: Path = Path(file_path_str)
             with import_path.open('r', encoding='utf-8') as file:
@@ -301,18 +311,24 @@ class SyntaxHighlightSettingsDialog(QDialog):
                     continue
 
             if imported_count == 0:
-                QMessageBox.warning(self, "Import Warning", "No valid syntax categories found in the file.")
+                global_signals.request_toast(
+                    "No Valid Syntax", "No valid syntax categories found in the file", ToastLevel.WARNING
+                )
                 return
-            
+
             self.theme_combo.setCurrentText("Custom")
             self._update_live_preview()
-            QMessageBox.information(self, "Import Successful", f"Successfully imported {imported_count} color settings.")
-            
+            global_signals.request_toast(
+                "Import Successful", f"Imported {imported_count} color settings", ToastLevel.SUCCESS
+            )
+
         except json.JSONDecodeError:
-            QMessageBox.critical(self, "Import Error", "The selected file is not a valid JSON document.")
+            global_signals.request_toast(
+                "Invalid JSON", "The selected file is not a valid JSON document", ToastLevel.ERROR
+            )
         except Exception as err:
-            QMessageBox.critical(self, "Import Error", f"Failed to import theme:\n{err}")
-    
+            global_signals.request_toast("Import Error", f"Failed to import syntax theme:\n{err}", ToastLevel.ERROR)
+            global_signals.request_log(f"Failed to import syntax theme due to: {err}", LogLevel.ERROR)
+
     def get_color_scheme(self) -> Dict[SyntaxCategory, str]:
         return {cat: btn.get_color() for cat, btn in self.color_buttons.items()}
-    

@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING, Optional
+from typing import Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QColorDialog, QLabel, QPushButton
-from PyQt6.QtGui import QColor, QPixmap, QPainter, QIcon, QPen
 from PyQt6.QtCore import Qt
-
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PyQt6.QtWidgets import QColorDialog, QLabel, QPushButton
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -12,6 +11,7 @@ class ColorManager:
     """
     Manages all color selection and storage for plot elements
     """
+
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
 
@@ -56,7 +56,7 @@ class ColorManager:
         if color.isValid():
             return color.name()
         return None
-    
+
     @staticmethod
     def update_button_color_swatch(button: QPushButton, color: QColor, swatch_size: int = 16) -> None:
         """
@@ -69,20 +69,20 @@ class ColorManager:
         """
         pixmap = QPixmap(swatch_size, swatch_size)
         pixmap.fill(Qt.GlobalColor.transparent)
-        
+
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(color)
-        
+
         border_color = QColor("#000000") if color.lightnessF() > 0.8 else QColor("#ffffff")
         border_pen = QPen(border_color)
         border_pen.setWidth(1)
         border_pen.setCosmetic(True)
         painter.setPen(border_pen)
-        
+
         painter.drawRect(0, 0, swatch_size - 1, swatch_size - 1)
         painter.end()
-        
+
         button.setIcon(QIcon(pixmap))
 
     def _update_color_button(self, button: QPushButton, label: QLabel, color_hex: str) -> None:
@@ -256,7 +256,7 @@ class ColorManager:
                 self.plot_tab.view.bar_color_label,
                 color
             )
-            self.plot_tab._update_bar_customization_live()
+            self.plot_tab.series_customization_manager.update_bar_customization_live()
             self.plot_tab.on_style_changed()
 
     def choose_bar_edge_color(self) -> None:
@@ -269,7 +269,7 @@ class ColorManager:
                 self.plot_tab.view.bar_edge_label,
                 color
             )
-            self.plot_tab._update_bar_customization_live()
+            self.plot_tab.series_customization_manager.update_bar_customization_live()
             self.plot_tab.on_style_changed()
 
     def choose_error_bar_color(self) -> None:

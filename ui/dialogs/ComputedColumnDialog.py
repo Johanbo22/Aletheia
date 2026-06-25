@@ -6,10 +6,13 @@ import json
 from enum import Enum
 from typing import NamedTuple
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy, QMenu, QListWidget, QLineEdit, QGroupBox, QPushButton
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, \
+    QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy, QMenu, QListWidget, QLineEdit, \
+    QGroupBox, QPushButton, QComboBox
 from PyQt6.QtCore import QModelIndex, QPoint, Qt, QTimer, QSettings, QEvent, QObject
 from PyQt6.QtGui import QAction, QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
 
+from core.global_signals import ToastLevel, global_signals
 from resources.version import APPLICATION_NAME
 from ui.widgets.CodeEditor import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
@@ -34,7 +37,7 @@ class ComputedColumnDialog(QDialog):
     DialogHeight: int = 700
 
     CustomFunctionsSettingsKey: str = "custom_functions"
-    
+
     OperatorDefinitions: list[OperatorDefinition] = [
         OperatorDefinition("+", " + ", 0, 0),
         OperatorDefinition("-", " - ", 0, 1),
@@ -54,7 +57,7 @@ class ComputedColumnDialog(QDialog):
         OperatorDefinition("(", "(", 2, 3),
         OperatorDefinition(")", ")", 2, 4),
     ]
-    
+
     def __init__(self, columns: list[str], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Create Computed Column")
@@ -78,6 +81,25 @@ class ComputedColumnDialog(QDialog):
         self.name_input.setClearButtonEnabled(True)
         input_layout.addWidget(self.name_input)
 
+        datatype_label_layout = QHBoxLayout()
+        datatype_label_layout.setContentsMargins(0, 0, 0, 0)
+        datatype_label_layout.setSpacing(6)
+
+        data_type_label = QLabel("Data Type")
+        optional_badge = QLabel("Optional")
+        optional_badge.setProperty("styleClass", "optional_badge")
+
+        datatype_label_layout.addWidget(data_type_label)
+        datatype_label_layout.addWidget(optional_badge, alignment=Qt.AlignmentFlag.AlignVCenter)
+        datatype_label_layout.addStretch()
+        input_layout.addLayout(datatype_label_layout)
+
+        self.datatype_combo = QComboBox()
+        self.datatype_combo.addItems(["Auto-infer", "string", "int", "float", "category", "datetime"])
+        self.datatype_combo.setToolTip(
+            "Select the desired data type for the new column.\nIf auto-infer is selected, the system will infer the type based on the computed values")
+        input_layout.addWidget(self.datatype_combo)
+
         input_layout.addWidget(QLabel("Expression"))
         expression_layout = QHBoxLayout()
         equals_label = QLabel("=")
@@ -87,15 +109,16 @@ class ComputedColumnDialog(QDialog):
         self.expression_input = CodeEditor()
         self.expression_input.setObjectName("computed_column_expression")
         self.expression_input.setPlaceholderText("e.g., Price * Quantity")
-        self.expression_input.setToolTip("Construct your mathematical or logical expression here. Columns with spaces must be wrapped in backticks.")
+        self.expression_input.setToolTip(
+            "Construct your mathematical or logical expression here. Columns with spaces must be wrapped in backticks.")
         self.expression_input.setMinimumHeight(80)
-        
+
         fixed_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         self.expression_input.setFont(fixed_font)
-        
+
         self.highlighter = PythonHighlighter(self.expression_input.document())
         expression_layout.addWidget(self.expression_input)
-        
+
         clear_expression_button = QPushButton("Clear")
         clear_expression_button.setToolTip("Clear the expression editor")
         clear_expression_button.clicked.connect(self._clear_expression)
@@ -112,14 +135,14 @@ class ComputedColumnDialog(QDialog):
         for operator in self.OperatorDefinitions:
             operator_button = QPushButton(operator.label)
             operator_button.setToolTip(f"Insert '{operator.label}'")
-            
+
             operator_button.clicked.connect(
                 lambda checked, v=operator.value: self.insert_text(v)
             )
             operators_layout.addWidget(operator_button, operator.row, operator.column)
 
         input_layout.addLayout(operators_layout)
-        
+
         self.status_label = QLabel("")
         self.status_label.setObjectName("validation_status_label")
         self.status_label.setMinimumHeight(20)
@@ -135,7 +158,7 @@ class ComputedColumnDialog(QDialog):
         input_layout.addWidget(help_text)
 
         input_group.setLayout(input_layout)
-        
+
         self.main_splitter = QSplitter(Qt.Orientation.Vertical)
         self.main_splitter.addWidget(input_group)
 
@@ -149,20 +172,20 @@ class ComputedColumnDialog(QDialog):
         insert_column_info.setProperty("styleClass", "list_header_info")
         insert_column_info.setWordWrap(True)
         column_layout.addWidget(insert_column_info)
-        
+
         self.column_filter_input = QLineEdit()
         self.column_filter_input.setPlaceholderText("Search columns...")
         self.column_filter_input.setClearButtonEnabled(True)
-        
+
         self.column_search_timer = QTimer(self)
         self.column_search_timer.setSingleShot(True)
         self.column_search_timer.setInterval(250)
         self.column_search_timer.timeout.connect(self._apply_column_filter)
         self.column_filter_input.textChanged.connect(self.column_search_timer.start)
         self.column_filter_input.returnPressed.connect(self._insert_single_filtered_column)
-        
+
         column_layout.addWidget(self.column_filter_input)
-        
+
         self.column_no_results_label = QLabel("No columns match your search")
         self.column_no_results_label.setProperty("styleClass", "no_results_label")
         self.column_no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -187,11 +210,11 @@ class ComputedColumnDialog(QDialog):
         insert_func_info = QLabel("Function Library:")
         insert_func_info.setProperty("styleClass", "list_header_info")
         function_layout.addWidget(insert_func_info)
-        
+
         self.function_filter_input = QLineEdit()
         self.function_filter_input.setPlaceholderText("Search functions...")
         self.function_filter_input.setClearButtonEnabled(True)
-        
+
         self.function_search_timer = QTimer(self)
         self.function_search_timer.setSingleShot(True)
         self.function_search_timer.setInterval(250)
@@ -210,7 +233,7 @@ class ComputedColumnDialog(QDialog):
         function_search_layout.addWidget(self.add_custom_func_btn)
 
         function_layout.addLayout(function_search_layout)
-        
+
         self.function_no_results_label = QLabel("No functions match your search")
         self.function_no_results_label.setProperty("styleClass", "no_results_label")
         self.function_no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -244,7 +267,7 @@ class ComputedColumnDialog(QDialog):
 
         self.helpers_splitter.setStretchFactor(0, 1)
         self.helpers_splitter.setStretchFactor(1, 1)
-        
+
         self.main_splitter.addWidget(self.helpers_splitter)
         self.main_splitter.setStretchFactor(0, 0)
         self.main_splitter.setStretchFactor(1, 1)
@@ -264,30 +287,31 @@ class ComputedColumnDialog(QDialog):
 
         layout.addLayout(button_layout)
         self.setLayout(layout)
-        
+
         self.validation_timer = QTimer(self)
         self.validation_timer.setSingleShot(True)
         self.validation_timer.setInterval(300)
         self.validation_timer.timeout.connect(self._perform_validation)
-        
+
         self.name_input.textChanged.connect(self._queue_validation)
         self.expression_input.textChanged.connect(self._queue_validation)
         self._perform_validation()
-        
+
         # Keyboard shortcuts
         self.submit_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
         self.submit_shortcut.activated.connect(self.validate_and_accept)
         self.submit_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        
+
         self.focus_func_search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         self.focus_func_search_shortcut.activated.connect(self.function_filter_input.setFocus)
         self.focus_func_search_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        
+
         self.focus_col_search_shortcut = QShortcut(QKeySequence("Alt+C"), self)
         self.focus_col_search_shortcut.activated.connect(self.column_filter_input.setFocus)
         self.focus_col_search_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
-        
-        QWidget.setTabOrder(self.name_input, self.expression_input)
+
+        QWidget.setTabOrder(self.name_input, self.datatype_combo)
+        QWidget.setTabOrder(self.datatype_combo, self.expression_input)
         QWidget.setTabOrder(self.expression_input, self.column_filter_input)
         QWidget.setTabOrder(self.column_filter_input, self.column_list)
         QWidget.setTabOrder(self.column_list, self.function_filter_input)
@@ -296,30 +320,30 @@ class ComputedColumnDialog(QDialog):
         QWidget.setTabOrder(self.create_button, self.cancel_button)
 
         self.name_input.setFocus()
-    
+
     def read_settings(self) -> None:
         """Load the saved window geometry and splitter states"""
         settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
-        
+
         geometry = settings.value("geometry")
         if geometry:
             self.restoreGeometry(geometry)
-        
+
         main_splitter_state = settings.value("main_splitter")
         if main_splitter_state:
             self.main_splitter.restoreState(main_splitter_state)
-        
+
         helpers_splitter_state = settings.value("helpers_splitter")
         if helpers_splitter_state:
             self.helpers_splitter.restoreState(helpers_splitter_state)
-    
+
     def write_settings(self) -> None:
         """Save the current window geometry and splitter states."""
         settings = QSettings(f"{APPLICATION_NAME}", "ComputedColumnDialog")
         settings.setValue("geometry", self.saveGeometry())
         settings.setValue("main_splitter", self.main_splitter.saveState())
         settings.setValue("helpers_splitter", self.helpers_splitter.saveState())
-    
+
     def _confirm_discard(self) -> bool:
         """Prompt for discarding unsaved expressions"""
         if self.expression_input.toPlainText().strip():
@@ -332,21 +356,21 @@ class ComputedColumnDialog(QDialog):
             )
             return reply == QMessageBox.StandardButton.Discard
         return True
-    
+
     def closeEvent(self, event: QCloseEvent) -> None:
         """Ensure settings are saved when the dialog is closed directly (e.g., via the 'X' button)."""
         if not self._confirm_discard():
             event.ignore()
             return
-        
+
         self.write_settings()
         super().closeEvent(event)
-    
+
     def accept(self) -> None:
         """Ensure settings are saved when the dialog is accepted."""
         self.write_settings()
         super().accept()
-    
+
     def reject(self) -> None:
         """Ensure settings are saved when dialog is rejected"""
         if not self._confirm_discard():
@@ -359,12 +383,12 @@ class ComputedColumnDialog(QDialog):
         if watched == self.function_tree.viewport() and event.type() == QEvent.Type.Leave:
             self.function_tree.viewport().unsetCursor()
         return super().eventFilter(watched, event)
-    
+
     def _clear_expression(self) -> None:
         """Clear the expression editor and immediately return focus to it."""
         self.expression_input.clear()
         self.expression_input.setFocus()
-    
+
     def _queue_validation(self) -> None:
         """Restart the validation timer"""
         self.validation_timer.start()
@@ -373,11 +397,11 @@ class ComputedColumnDialog(QDialog):
         """ enable or disable the submit button based on input presence."""
         name = self.name_input.text().strip()
         expression = self.expression_input.toPlainText().strip()
-        
+
         is_valid = True
         error_message = ""
         error_source = None
-        
+
         if not name:
             is_valid = False
         elif keyword.iskeyword(name):
@@ -400,14 +424,14 @@ class ComputedColumnDialog(QDialog):
             is_valid = False
             error_message = f"Error: Column '{name}' already exists"
             error_source = "name"
-        
+
         if is_valid:
             if not expression:
                 is_valid = False
             else:
                 backticked_columns = re.findall(r"`([^`]+)`", expression)
                 missing_columns = [col for col in backticked_columns if col not in self.columns]
-                
+
                 if missing_columns:
                     is_valid = False
                     error_message = f"Error: Column '{missing_columns[0]}' does not exist"
@@ -428,17 +452,17 @@ class ComputedColumnDialog(QDialog):
                         is_valid = False
                         error_message = f"Error: {str(error)}"
                         error_source = "expression"
-        
+
         self.create_button.setEnabled(is_valid)
-        
+
         self.name_input.setProperty("validationState", "error" if error_source == "name" else "default")
         self.name_input.style().unpolish(self.name_input)
         self.name_input.style().polish(self.name_input)
-        
+
         self.expression_input.setProperty("validationState", "error" if error_source == "expression" else "default")
         self.expression_input.style().unpolish(self.expression_input)
         self.expression_input.style().polish(self.expression_input)
-        
+
         if not name and not expression:
             self.status_label.setText("")
             self.status_label.setProperty("status", ValidationStatus.Idle.value)
@@ -448,7 +472,7 @@ class ComputedColumnDialog(QDialog):
         else:
             self.status_label.setText(error_message)
             self.status_label.setProperty("status", ValidationStatus.Error.value)
-        
+
         self.status_label.style().unpolish(self.status_label)
         self.status_label.style().polish(self.status_label)
 
@@ -456,21 +480,21 @@ class ComputedColumnDialog(QDialog):
         """Populate the function library with some functions (math, trigs, etc)"""
         self.function_tree.clear()
         functions = {
-            "Math": [
-                ("abs", "Absolute value"), 
-                ("sqrt", "Square root"), 
-                ("log", "Natural logarithm"), 
-                ("exp", "Exponential"), 
-                ("round", "Round to nearest integer"), 
-                ("ceil", "Round up to the nearest integer"), 
-                ("floor", "Round down to the nearest integer"), 
+            "Math"           : [
+                ("abs", "Absolute value"),
+                ("sqrt", "Square root"),
+                ("log", "Natural logarithm"),
+                ("exp", "Exponential"),
+                ("round", "Round to nearest integer"),
+                ("ceil", "Round up to the nearest integer"),
+                ("floor", "Round down to the nearest integer"),
                 ("pow", "Power")
             ],
-            "Trigonometry": [
-                ("sin", "Sine"), 
-                ("cos", "Cosine"), 
-                ("tan", "Tangent"), 
-                ("degrees", "Convert radians to degrees"), 
+            "Trigonometry"   : [
+                ("sin", "Sine"),
+                ("cos", "Cosine"),
+                ("tan", "Tangent"),
+                ("degrees", "Convert radians to degrees"),
                 ("radians", "Convert degrees to radians")
             ],
             "String Accessor": [
@@ -560,7 +584,7 @@ class ComputedColumnDialog(QDialog):
         categories = sorted(list(set(f.get("category", "Custom Functions") for f in funcs)))
         built_in = ["Math", "Trigonometry", "String Accessor"]
         all_categories = sorted(list(set(categories + built_in)))
-        
+
         dialog = AddCustomFunctionDialog(existing_categories=all_categories, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             name, category, desc, snippet = dialog.get_function_data()
@@ -584,7 +608,7 @@ class ComputedColumnDialog(QDialog):
         old_desc = item.toolTip(0)
         old_snippet = item.data(0, Qt.ItemDataRole.UserRole)
         old_category = item.parent().text(0) if item.parent() else "Custom Functions"
-        
+
         funcs = self._load_custom_functions()
         categories = sorted(list(set(f.get("category", "Custom Functions") for f in funcs)))
         built_in = ["Math", "Trigonometry", "String Accessor"]
@@ -636,17 +660,17 @@ class ComputedColumnDialog(QDialog):
             delete_action.triggered.connect(lambda: self._delete_custom_function(item.text(0)))
             menu.addAction(delete_action)
             menu.exec(self.function_tree.viewport().mapToGlobal(position))
-    
+
     def _apply_function_filter(self) -> None:
         """Filter the function tree based on query"""
         search_text = self.function_filter_input.text().strip()
         self.function_tree.clearSelection()
         visible_count = 0
-        
+
         for i in range(self.function_tree.topLevelItemCount()):
             parent_item = self.function_tree.topLevelItem(i)
             parent_visible = False
-            
+
             for j in range(parent_item.childCount()):
                 child_item = parent_item.child(j)
                 child_matches = search_text in child_item.text(0).lower()
@@ -654,7 +678,7 @@ class ComputedColumnDialog(QDialog):
                 if child_matches:
                     parent_visible = True
                     visible_count += 1
-            
+
             # Show parent if it matches the search text of child
             if search_text in parent_item.text(0).lower():
                 parent_visible = True
@@ -662,12 +686,12 @@ class ComputedColumnDialog(QDialog):
                 for j in range(parent_item.childCount()):
                     parent_item.child(j).setHidden(False)
                     visible_count += 1
-            
+
             parent_item.setHidden(not parent_visible)
-            
+
             if search_text and parent_visible:
                 parent_item.setExpanded(True)
-        
+
         self.function_tree.setHidden(visible_count == 0)
         self.function_no_results_label.setHidden(visible_count > 0)
 
@@ -686,27 +710,28 @@ class ComputedColumnDialog(QDialog):
             if not snippet.endswith(")"):
                 snippet += "()"
             self.insert_text(snippet)
-    
+
     def _apply_column_filter(self) -> None:
         """Filter the column list based on input"""
         search_text = self.column_filter_input.text().lower()
         self.column_list.clearSelection()
         visible_count = 0
-        
+
         for i in range(self.column_list.count()):
             item = self.column_list.item(i)
             is_match = search_text in item.text().lower()
             item.setHidden(not is_match)
             if is_match:
                 visible_count += 1
-        
+
         self.column_list.setHidden(visible_count == 0)
         self.column_no_results_label.setHidden(visible_count > 0)
-    
+
     def _insert_single_filtered_column(self) -> None:
         """if the signal returnPressed is fired and one col is visible in list. insert that col"""
-        visible_items = [self.column_list.item(i) for i in range(self.column_list.count()) if not self.column_list.item(i).isHidden()]
-        
+        visible_items = [self.column_list.item(i) for i in range(self.column_list.count()) if
+                         not self.column_list.item(i).isHidden()]
+
         number_of_visible_items = 1
         if len(visible_items) == number_of_visible_items:
             self.insert_column_into_expression(visible_items[0])
@@ -715,7 +740,7 @@ class ComputedColumnDialog(QDialog):
     def insert_text(self, text: str) -> None:
         """Insert the text at the current cursor position and refocus"""
         cursor = self.expression_input.textCursor()
-        
+
         if cursor.hasSelection():
             selected_text = cursor.selectedText()
             if text.endswith("()"):
@@ -729,7 +754,7 @@ class ComputedColumnDialog(QDialog):
             if text.endswith("()") or text.strip() == "(":
                 cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.MoveAnchor, 1)
                 self.expression_input.setTextCursor(cursor)
-        
+
         self.expression_input.setFocus()
 
     def insert_column_into_expression(self, item: QListWidgetItem) -> None:
@@ -746,10 +771,14 @@ class ComputedColumnDialog(QDialog):
         if self.create_button.isEnabled():
             self.accept()
         else:
-            QMessageBox.warning(self, "Validation Error", "Please resolve the highlighted errors before creating the column")
+            global_signals.request_toast(
+                "Validation Error", "Please resolve the highlighted errors before creating the column",
+                ToastLevel.WARNING
+            )
 
-    def get_data(self) -> tuple[str, str]:
+    def get_data(self) -> tuple[str, str, str]:
         return (
             self.name_input.text().strip(),
             self.expression_input.toPlainText().strip(),
+            self.datatype_combo.currentText(),
         )

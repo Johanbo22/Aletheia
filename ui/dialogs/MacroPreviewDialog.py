@@ -143,7 +143,7 @@ class MacroPreviewDialog(QDialog):
                 raw_op_type = op.get("type", "Unknown Operation")
                 op_title = raw_op_type.replace("_", " ").title()
                 
-                params = [f"<b>{k}</b>: {v}" for k, v in op.items() if k != "type"]
+                params = [f"<b>{k}</b>: {v}" for k, v in op.items() if k not in ["type", "node_id", "parent_id"]]
                 params_str = " | ".join(params) if params else "No parameters required"
                 
                 is_skipped = raw_op_type in ["merge", "concatenate", "export_google_sheets"]

@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QStyle, QApplication
+from PyQt6.QtWidgets import QLineEdit, QStyledItemDelegate, QStyleOptionViewItem, QStyle, QApplication, QWidget
 from PyQt6.QtCore import Qt, QModelIndex, QObject
 from PyQt6.QtGui import QPainter, QPen, QBrush, QPalette
 
@@ -63,3 +63,35 @@ class DataTableDelegate(QStyledItemDelegate):
             painter.drawText(padded_rect, align, opt.text)
 
         painter.restore()
+
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+        """
+        Instantiates the editor widget for a given cell
+
+        This overrides the default implementation to intercept the created editor
+        of a QLineEdit and configure it for precise alignment and styling of the Table.
+
+        :param parent: The parent widget of the editor
+        :param option: The style options for the item view
+        :param index: The model index of the item being edited
+        :return: The configured editor widget (QWidget)
+        """
+        editor = super().createEditor(parent, option, index)
+
+        if isinstance(editor, QLineEdit):
+            editor.setObjectName("tableCellEditor")
+
+            editor.setFrame(False)
+
+        return editor
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        """
+        Updates the geometry of the editor to match the cell
+        Maps the editor's geometry to the cell's layout rectangle
+
+        :param editor: The editor widget to resize
+        :param option: The style options containing the cell's bounding rect
+        :param index: The model index of the item being edited
+        """
+        editor.setGeometry(option.rect)

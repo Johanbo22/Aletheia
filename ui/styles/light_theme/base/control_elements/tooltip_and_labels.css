@@ -25,3 +25,17 @@ QLabel {
 QLabel:disabled {
     color: #95a5a6;
 }
+
+QLabel#selectedColumnsStickyLabel{
+    color: #2c3e50;
+    background-color: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+    font-weight: bold;
+    margin-top: 4px;
+}
+
+QFrame#selectedColumnsSeparator{
+    color: #e0e0e0;
+}

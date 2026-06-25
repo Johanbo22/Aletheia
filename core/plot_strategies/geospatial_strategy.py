@@ -1,6 +1,9 @@
-from typing import TYPE_CHECKING, List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+
 import pandas as pd
+
 from core.plot_strategies.base_strategy import BasePlotStrategy
+from ui.status_bar import LogLevel
 
 try:
     import geopandas as gpd
@@ -16,7 +19,6 @@ except ImportError:
 if TYPE_CHECKING:
     from core.plot_engine import PlotEngine
     from ui.plot_tab import PlotTab
-
 
 class GeoSpatialPlotStrategy(BasePlotStrategy):
     """Strategy for generating GeoSpatial plots."""
@@ -102,11 +104,11 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
             try:
                 provider = ctx.providers.OpenStreetMap.Mapnik
                 source_map = {
-                    "OpenStreetMap": ctx.providers.OpenStreetMap.Mapnik,
-                    "CartoDB Positron": ctx.providers.CartoDB.Positron,
+                    "OpenStreetMap"     : ctx.providers.OpenStreetMap.Mapnik,
+                    "CartoDB Positron"  : ctx.providers.CartoDB.Positron,
                     "CartoDB DarkMatter": ctx.providers.CartoDB.DarkMatter,
-                    "Esri Satellite": ctx.providers.Esri.WorldImagery,
-                    "Esri Street": ctx.providers.Esri.WorldStreetMap
+                    "Esri Satellite"    : ctx.providers.Esri.WorldImagery,
+                    "Esri Street"       : ctx.providers.Esri.WorldStreetMap
                 }
                 if basemap_source in source_map:
                     provider = source_map[basemap_source]
@@ -130,7 +132,7 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
                 font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> Optional[str]:
         if gpd is None:
             if hasattr(plot_tab, "status_bar"):
-                plot_tab.status_bar.log("GeoPandas library not found. Please install it.", "WARNING")
+                plot_tab.status_bar.log("GeoPandas library not found. Please install it.", LogLevel.WARNING)
             return "GeoPandas library not found. Please install it first (`pip install geopandas`) to use geospatial plotting functions."
 
         df = plot_tab.data_handler.df

@@ -278,7 +278,7 @@ class StatisticsGenerator:
             if len(categorical_df.columns) > 0:
                 html += "<h2>Categorical Column Statistics</h2>"
                 html += "<div class='table-container'>"
-                html += "<table>"
+                html += "<table id='categoricalStatsTable'>"
                 html += "<tr><th>Column</th><th class='numeric-col'>Unique Values</th><th>Most Common</th><th class='numeric-col'>Frequency</th></tr>"
 
                 for col in categorical_df.columns:

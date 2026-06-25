@@ -1,9 +1,10 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QGroupBox, QComboBox, QPushButton
-from PyQt6.QtCore import Qt
 from typing import Optional, TYPE_CHECKING
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout
+
+from icons import IconBuilder, IconType
 from ui.components.data_tabs.base_data_tab import BaseDataTab
-from icons import IconType, IconBuilder
 
 if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController
@@ -158,7 +159,7 @@ class TransformTab(BaseDataTab):
         layout.addStretch()
     
     def get_sort_parameters(self) -> tuple[str, str]:
-        return (self.sort_column_combo.currentText(), self.sort_order_combo.currentText())
+        return self.sort_column_combo.currentText(), self.sort_order_combo.currentText()
     
     def get_selected_saved_aggregations(self) -> Optional[str]:
         item = self.saved_agg_list.currentItem()

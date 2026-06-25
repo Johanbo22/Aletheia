@@ -156,43 +156,4 @@ document.addEventListener('DOMContentLoaded', function() {
             cardElements.forEach(card => container.appendChild(card));
         });
     }
-
-    const newTestBtn = document.getElementById('newTestBtn');
-    const newTestForm = document.getElementById('newTestForm');
-    const cancelTestBtn = document.getElementById('cancelTestBtn');
-    const runTestBtn = document.getElementById('runTestBtn');
-
-    if (newTestBtn && newTestForm) {
-        newTestBtn.addEventListener('click', () => {
-            newTestBtn.style.display = 'none';
-            newTestForm.style.display = 'flex';
-        });
-
-        cancelTestBtn.addEventListener('click', () => {
-            newTestForm.style.display = 'none';
-            newTestBtn.style.display = 'block';
-        });
-
-        runTestBtn.addEventListener('click', () => {
-            const col1 = document.getElementById('col1Select').value;
-            const col2 = document.getElementById('col2Select').value;
-
-            if (!col1 || !col2) {
-                alert("Please select numeric columns first. If none are available, ensure data with numeric types is loaded");
-                return;
-            }
-
-            if (col1 === col2) {
-                alert("Please select two different columns for the statistical test");
-                return;
-            }
-
-            runTestBtn.innerText = "Running...";
-            runTestBtn.disabled = true;
-            runTestBtn.style.opacity = "0.7";
-            runTestBtn.style.cursor = "wait";
-
-            window.location.hash = `STATSTEST|${encodeURIComponent(col1)}|${encodeURIComponent(col2)}|${encodeURIComponent(type)}|${Date.now()}`;
-        });
-    }
 }); 

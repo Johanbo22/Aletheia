@@ -1,9 +1,9 @@
 import threading
 from typing import Dict, List, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QListWidget, QListWidgetItem
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QListWidget, QListWidgetItem
 
 from core.resource_loader import get_resource_path
 
@@ -114,6 +114,7 @@ class PlotTypeManager:
                     import contextily
                 except ImportError:
                     pass
+
             threading.Thread(target=_pre_import_geo_deps, daemon=True).start()
 
         self.update_customization_visibility(plot_type)

@@ -1,10 +1,12 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QDialogButtonBox, QWidget, QFontComboBox, QAbstractItemView, QColorDialog, QListWidget, QListWidgetItem, QTabWidget, QSpinBox, QGroupBox, QDoubleSpinBox, QComboBox, QPushButton
-from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import QAbstractItemView, QColorDialog, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, \
+    QFontComboBox, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSpinBox, QTabWidget, \
+    QVBoxLayout, QWidget
 
+from controller.plot_controllers.color_manager import ColorManager
 from resources.version import APPLICATION_NAME
 from ui.widgets import ToggleSwitch
-from controller.plot_controllers.color_manager import ColorManager
 
 DIALOG_WIDTH: int = 600
 DIALOG_HEIGHT: int = 500
@@ -413,7 +415,7 @@ class TableCustomizationDialog(QDialog):
 
         row: int = self.rule_list.currentRow()
         self.move_up_button.setEnabled(has_selection and row > 0)
-        self.move_down_button.setEnabled(has_selection and row < self.rule_list.count() - 1 and row >= 0)
+        self.move_down_button.setEnabled(has_selection and self.rule_list.count() - 1 > row >= 0)
 
         if has_selection:
             rule_data: dict | None = selected_items[0].data(Qt.ItemDataRole.UserRole)

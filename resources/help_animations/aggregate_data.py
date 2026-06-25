@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QColor, QPen, QPainterPath
+from PyQt6.QtGui import QColor, QPainterPath, QPen
 
 from ui.help_animation_engine import HelpAnimationEngine
 
@@ -75,8 +75,8 @@ class Animation(HelpAnimationEngine):
                 painter.setOpacity(opacity)
                 self._draw_row(painter, self.left_x, y, row["vals"], bg, self.c_text)
                 painter.setOpacity(1.0)
-            
-            if merge_prog > 0 and merge_prog < 1.0:
+
+            if 0 < merge_prog < 1.0:
                 # Target Y depends on which aggregate row it belongs to
                 target_idx = 0 if row["cat"] == "A" else 1
                 target_y = self.start_y + (target_idx * self.row_h)

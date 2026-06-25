@@ -1,17 +1,14 @@
-import importlib.util
 import logging
-import sys
-from pathlib import Path
 
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, QUrl, QModelIndex
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QDesktopServices
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QLineEdit, QTextBrowser, QLabel, QWidget, \
-    QFrame, QSizePolicy, QTreeView, QPushButton
+from PyQt6.QtCore import QModelIndex, QSettings, QSortFilterProxyModel, QTimer, QUrl, Qt
+from PyQt6.QtGui import QCloseEvent, QDesktopServices, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, \
+    QSplitter, QTextBrowser, QTreeView, QVBoxLayout, QWidget
 
 from core.help_manager import HelpManager, HelpTopicDetail
-from core.resource_loader import get_resource_path
-from resources.version import APPLICATION_NAME
 from icons.icon_registry import IconBuilder, IconType
+from resources.version import APPLICATION_NAME
+from ui.help_animation_engine import load_help_animation_widget
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +23,17 @@ class HelpExplorerDialog(QDialog):
         self.help_manager = HelpManager()
         self.current_link: str | None = None
 
+        self._search_debounce_timer = QTimer(self)
+        self._search_debounce_timer.setSingleShot(True)
+        self._search_debounce_timer.setInterval(250)
+
         if parent is None:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
+            self.setWindowFlags(
+                self.windowFlags()
+                | Qt.WindowType.Window
+                | Qt.WindowType.WindowMaximizeButtonHint
+                | Qt.WindowType.WindowMinimizeButtonHint
+            )
         
         self.setWindowTitle(f"{APPLICATION_NAME} Help Explorer")
         self.setMinimumSize(1450, 850)
@@ -37,6 +43,8 @@ class HelpExplorerDialog(QDialog):
         self._setup_models()
         self._connect_signals()
         self._load_topics()
+
+        self.search_input.setFocus()
         
     def _init_ui(self) -> None:
         main_layout = QVBoxLayout()
@@ -45,7 +53,7 @@ class HelpExplorerDialog(QDialog):
         
         self.splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self.splitter.setObjectName("helpSplitter")
-        self.splitter.setHandleWidth(1)
+        self.splitter.setChildrenCollapsible(False)
         self.splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Left side with topics and search bar
@@ -100,7 +108,7 @@ class HelpExplorerDialog(QDialog):
         
         self.content_browser = QTextBrowser()
         self.content_browser.setObjectName("helpContentBrowser")
-        self.content_browser.setOpenExternalLinks(False)
+        self.content_browser.setOpenExternalLinks(True)
         self.content_browser.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         self.link_button = QPushButton("Read More")
@@ -119,6 +127,11 @@ class HelpExplorerDialog(QDialog):
         self.splitter.setStretchFactor(1, 3)
         
         main_layout.addWidget(self.splitter)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        main_layout.addWidget(self.button_box)
+
+        self._read_settings()
     
     def _setup_models(self) -> None:
         self.source_model = QStandardItemModel(self)
@@ -133,13 +146,29 @@ class HelpExplorerDialog(QDialog):
         self.topic_tree.setModel(self.proxy_model)
         
     def _connect_signals(self) -> None:
-        self.search_input.textChanged.connect(self.proxy_model.setFilterFixedString)
+        self.search_input.textChanged.connect(self._on_search_text_changed)
+        self._search_debounce_timer.timeout.connect(self._apply_search_filter)
         self.topic_tree.selectionModel().currentChanged.connect(self._on_current_changed)
-        self.topic_tree.clicked.connect(self._on_item_clicked)
         self.link_button.clicked.connect(self._open_external_link)
-    
-    def _on_item_clicked(self, proxy_index: QModelIndex) -> None:
-        self._on_current_changed(proxy_index)
+
+        self.button_box.rejected.connect(self.reject)
+
+        self.search_shortcut = QShortcut(QKeySequence.StandardKey.Find, self)
+        self.search_shortcut.activated.connect(self.search_input.setFocus)
+        self.search_shortcut.activated.connect(self.search_input.selectAll)
+
+    def _on_search_text_changed(self) -> None:
+        """Triggers the debounce timer for search filtering"""
+        self._search_debounce_timer.start()
+
+    def _apply_search_filter(self) -> None:
+        """Applies the filter to the proxy model and automatically expands the tree if filtering"""
+        search_text = self.search_input.text()
+        self.proxy_model.setFilterFixedString(search_text)
+
+        if search_text:
+            self.topic_tree.collapseAll()
+            self.topic_tree.expandToDepth(0)
     
     def _load_topics(self) -> None:
         grouped_topics = self.help_manager.get_all_help_topics()
@@ -167,7 +196,11 @@ class HelpExplorerDialog(QDialog):
         topic_id: str | None = self.source_model.data(source_index, Qt.ItemDataRole.UserRole)
         
         if not topic_id:
-            self._clear_detail_pane()
+            category_name = self.source_model.data(source_index, Qt.ItemDataRole.DisplayRole)
+            self._clear_detail_pane(
+                title=f"Category: {category_name}",
+                content="Expand and select a specific topic below to view its details and animations"
+            )
             is_expanded = self.topic_tree.isExpanded(current)
             self.topic_tree.setExpanded(current, not is_expanded)
             return
@@ -188,7 +221,7 @@ class HelpExplorerDialog(QDialog):
             self.current_animation_widget.deleteLater()
             self.current_animation_widget = None
             
-        self.current_animation_widget = self._load_animation(detail.topic_id)
+        self.current_animation_widget = load_help_animation_widget(detail.topic_id)
         self.animation_layout.addWidget(self.current_animation_widget)
         self.animation_container.setVisible(True)
         
@@ -198,8 +231,8 @@ class HelpExplorerDialog(QDialog):
         self.current_link = detail.link
         self.link_button.setVisible(bool(detail.link))
     
-    def _clear_detail_pane(self) -> None:
-        self.title_label.setText("Select a topic to view details")
+    def _clear_detail_pane(self, title: str = "Select a topic to view details", content: str = "") -> None:
+        self.title_label.setText(title)
         
         if self.current_animation_widget:
             self.animation_layout.removeWidget(self.current_animation_widget)
@@ -207,49 +240,30 @@ class HelpExplorerDialog(QDialog):
             self.current_animation_widget = None
         
         self.animation_container.setVisible(False)
-        self.content_browser.clear()
+        self.content_browser.setMarkdown(content)
         self.current_link = None
         self.link_button.setVisible(False)
-    
-    def _load_animation(self, topic_id: str) -> QWidget:
-        current_dir = Path(__file__).resolve().parent
-        ui_dir = current_dir.parent
-        project_root = ui_dir.parent
-        
-        if str(project_root) not in sys.path:
-            sys.path.insert(0, str(project_root))
-        
-        clean_filename = f"{str(topic_id).lower()}.py"
-        anim_path_obj = project_root / "resources" / "help_animations" / clean_filename
-        anim_path = get_resource_path(str(anim_path_obj))
-        
-        if not Path(anim_path).exists():
-            logger.debug(f"HelpExplorer: Animation file missing at {anim_path}")
-            return self._create_placeholder(f"No animation found for '{topic_id}'")
-
-        try:
-            spec = importlib.util.spec_from_file_location(f"anim_{topic_id}", anim_path)
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[f"anim_{topic_id}"] = module
-                spec.loader.exec_module(module)
-                
-                if hasattr(module, "Animation"):
-                    return module.Animation()
-        except Exception as err:
-            logger.error(f"HelpExplorer: Error loading {anim_path}: {str(err)}")
-        
-        return self._create_placeholder("Preview unavailable")
-
-    def _create_placeholder(self, text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setFixedSize(550, 350)
-        lbl.setObjectName("help_animation_placeholder")
-        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        return lbl
     
     def _open_external_link(self) -> None:
         if self.current_link:
             logger.info(f"Opening link: {self.current_link}")
             QDesktopServices.openUrl(QUrl(self.current_link))
-        
+
+    def _read_settings(self) -> None:
+        """Restores the window geometry and splitter sizes from the last session"""
+        settings = QSettings(f"{APPLICATION_NAME}", "HelpExplorer")
+
+        geometry = settings.value("geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+        splitter_state = settings.value("splitterState")
+        if splitter_state:
+            self.splitter.restoreState(splitter_state)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Saves the window geometry and splitter sizes before closing"""
+        settings = QSettings(f"{APPLICATION_NAME}", "HelpExplorer")
+        settings.setValue("geometry", self.saveGeometry())
+        settings.setValue("splitterState", self.splitter.saveState())
+        super().closeEvent(event)

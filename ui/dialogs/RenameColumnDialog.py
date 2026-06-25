@@ -1,10 +1,11 @@
 import keyword
 from enum import Enum, auto
-from typing import Optional, List, Tuple
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QLineEdit, QPushButton
-from ui.theme import ThemeColors
+from typing import List, Optional, Tuple
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
+
+from core.global_signals import ToastLevel, global_signals
 
 class ValidationState(Enum):
     Valid = auto()
@@ -35,26 +36,26 @@ class RenameColumnDialog(QDialog):
         """Initialize dialog UI"""
         layout = QVBoxLayout()
         layout.setObjectName("rename_dialog_main_layout")
-        
+
         # Old name display
         old_name_layout = QHBoxLayout()
         current_name_label = QLabel("Current Name:")
         current_name_label.setObjectName("current_name_label")
         old_name_layout.addWidget(current_name_label)
-        
+
         old_name_display = QLineEdit()
         old_name_display.setObjectName("current_name_display")
         old_name_display.setText(self.column_name)
         old_name_display.setReadOnly(True)
         old_name_layout.addWidget(old_name_display)
         layout.addLayout(old_name_layout)
-        
+
         # New name input
         new_name_layout = QHBoxLayout()
         new_name_label = QLabel("New Name:")
         new_name_label.setObjectName("new_name_label")
         new_name_layout.addWidget(new_name_label)
-        
+
         self.new_name_input = QLineEdit()
         self.new_name_input.setObjectName("new_name_input")
         self.new_name_input.setPlaceholderText(f"Enter new name for '{self.column_name}'")
@@ -62,18 +63,18 @@ class RenameColumnDialog(QDialog):
         self.new_name_input.textChanged.connect(self.on_name_text_changed)
         new_name_layout.addWidget(self.new_name_input)
         layout.addLayout(new_name_layout)
-        
+
         # Error display label
         self.error_label = QLabel("")
         self.error_label.setObjectName("rename_error_label")
         self.error_label.setVisible(False)
         layout.addWidget(self.error_label)
-        
+
         layout.addSpacing(20)
-        
+
         # Buttons
         button_layout = QHBoxLayout()
-        
+
         self.rename_button = QPushButton("Rename")
         self.rename_button.setObjectName("MainActonButton")
         self.rename_button.setMinimumWidth(100)
@@ -81,15 +82,15 @@ class RenameColumnDialog(QDialog):
         self.rename_button.setDefault(True)
         self.rename_button.clicked.connect(self.validate_and_accept)
         button_layout.addWidget(self.rename_button)
-        
+
         cancel_button = QPushButton("Cancel", parent=self)
         cancel_button.setMinimumWidth(100)
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
-        
+
         layout.addLayout(button_layout)
         self.setLayout(layout)
-        
+
         self.new_name_input.setFocus()
         self.new_name_input.returnPressed.connect(self.rename_button.click)
 
@@ -104,16 +105,16 @@ class RenameColumnDialog(QDialog):
             return ValidationState.Keyword, f"'{new_name}' is a reserved Python keyword"
         if "`" in new_name:
             return ValidationState.InvalidCharacter, "Column names cannot contain backticks (`)"
-        
+
         return ValidationState.Valid, ""
-    
+
     def on_name_text_changed(self, text: str) -> None:
         if not self.error_label or not self.rename_button or not self.new_name_input:
             return
-        
+
         clean_text: str = text.strip()
         state, error_message = self.validate_name(clean_text)
-        
+
         if state == ValidationState.Valid:
             self.error_label.setVisible(False)
             self.rename_button.setEnabled(True)
@@ -123,19 +124,21 @@ class RenameColumnDialog(QDialog):
             self.error_label.setVisible(True)
             self.rename_button.setEnabled(False)
             self.new_name_input.setProperty("inputState", "error")
-        
+
         self.new_name_input.style().unpolish(self.new_name_input)
         self.new_name_input.style().polish(self.new_name_input)
-        
+
     def validate_and_accept(self) -> None:
         if not self.new_name_input:
             return
-        
+
         new_name: str = self.new_name_input.text().strip()
         state, error_message = self.validate_name(new_name)
-        
+
         if state != ValidationState.Valid:
-            QMessageBox.warning(self, "Validation Error", error_message)
+            global_signals.request_toast(
+                "Validation Error", error_message, ToastLevel.ERROR
+            )
             return
         self.accept()
 

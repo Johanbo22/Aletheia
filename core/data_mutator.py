@@ -8,11 +8,12 @@ on pandas DataFrames. This modules API redirects to DataHandler to bridge
 import keyword
 import logging
 import re
-import pandas as pd
-import numpy as np
-from typing import Any, Dict, List, Optional, Union, Callable
 from enum import Enum
 from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import numpy as np
+import pandas as pd
 
 try:
     from scipy import stats
@@ -136,10 +137,9 @@ class DataMutator:
     def clean_data(self, df: pd.DataFrame, action: "DataOperation | str", sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
         """
         Caller for the cleaning/transformation action via operaton registry\n
-        :param df (pd.DataFrame): The DataFrame to work on
-        :param action (DataOperation): A DataOperation to execute
-        :param sort_state (Optional[tuple]): Current sort state
-        :param **kwargs: Arguments forwarded to each action 
+        :param df: The DataFrame to work on
+        :param action: A DataOperation to execute
+        :param sort_state: Current sort state
         :return (changed_df, updated_sort_state):
         """
         if isinstance(action, str):
@@ -200,10 +200,10 @@ class DataMutator:
         """
         Update a single cell in the DataTableModel and forcing value to match column datatype
 
-        :param df (pd.DataFrame): the DataFrame to change
-        :param row_index (int): Row positon
-        :param column_index (int): Column Position
-        :param value (Any): The new cell value
+        :param df: the DataFrame to change
+        :param row_index: Row positon
+        :param column_index: Column Position
+        :param value: The new cell value
         :return (pd.DataFrame): The changed DataFrame
         """
         try:
@@ -221,11 +221,11 @@ class DataMutator:
     def filter_data(self, df: pd.DataFrame, column: str = None, condition: str = None, value: Any = None, advanced_filters: List[Dict] = None) -> pd.DataFrame:
         """
         Filter data based on a single condition or multiple filters\n
-        :param df (pd.DataFrame): The DataFrame to filter
-        :param column (str): Column to apply filter to
-        :param condition (str): Comparison operator string
-        :param value (Any): Value to compare against
-        :param advanced_filters (List[Dict]): List of filter dicts for multi-conditional queries
+        :param df: The DataFrame to filter
+        :param column: Column to apply filter to
+        :param condition: Comparison operator string
+        :param value: Value to compare against
+        :param advanced_filters: List of filter dicts for multi-conditional queries
         :return (pd.DataFrame): The filtered DataFrame
         """
         if not isinstance(df, pd.DataFrame):
@@ -316,10 +316,10 @@ class DataMutator:
     def sort_data(self, df: pd.DataFrame, column: str, ascending: bool = True, current_sort_state: Optional[tuple] = None) -> tuple[pd.DataFrame, tuple]:
         """
         Sort df by column\n
-        :param df (pd.DataFrame): DataFrame to target
-        :param column (str): Column to sort
-        :param ascending (bool): Is Sort order ascending
-        :param current_sort_state (Optional[tuple]): The current sort of the df
+        :param df: DataFrame to target
+        :param column: Column to sort
+        :param ascending: Is Sort order ascending
+        :param current_sort_state: The current sort of the df
         :return (tuple[pd.DataFrame, tuple]): sorted_df, new_sort_state
         """
         if current_sort_state == (column, ascending):
@@ -471,8 +471,22 @@ class DataMutator:
                 )
             if "`" in clean_name:
                 raise ValueError("Column names cannot contain backticks (`)")
+            try:
+                df[new_column_name] = df.eval(expression)
+            except Exception as eval_e:
+                error_str = str(eval_e).lower()
+                if "pyarrow" in error_str or "unsupported operand" in error_str or "notimplementederror" in error_str:
+                    temp_df = df.convert_dtypes(dtype_backend="numpy_nullable")
+                    df[new_column_name] = temp_df.eval(expression)
+                else:
+                    raise eval_e
 
-            df[new_column_name] = df.eval(expression)
+            has_pyarrow = hasattr(pd, "ArrowDtype") and any(isinstance(dt, pd.ArrowDtype) for dt in df.dtypes)
+            backend = "pyarrow" if has_pyarrow else "numpy_nullable"
+
+            # Auto infer optimal datatype
+            df[new_column_name] = df[new_column_name].convert_dtypes(dtype_backend=backend)
+
             return df
         except (ValueError, KeyError, TypeError, SyntaxError) as e:
             logger.error(f"Error computing and creating new column: {e}", exc_info=True)
@@ -482,13 +496,14 @@ class DataMutator:
     def bin_column(self, df: pd.DataFrame, column: str, new_column_name: str, method: str, bins: Any, labels: List[str] = None, right_inclusive: bool = True, drop_original: bool = False) -> pd.DataFrame:
         """
         Bin a continuous variable into categorical buckets\n
-        :param df (pd.DataFrame): The DataFrame to change
-        :param column (str): The Target numerical column
-        :param method (str): 'cut' for value-based, 'qcut' for quantile-based
-        :param bins (Any): Number of bins or explicit bin edges
-        :param labels (List[str]): Optional labels for the bins
-        :param right_inclusive (bool): Whether intervals are closed on the right
-        :param drop_original (bool): Whether to drop the tartget column after binning
+        :param df: The DataFrame to change
+        :param column: The Target numerical column
+        :param new_column_name: The column name for the new column to be created
+        :param method: 'cut' for value-based, 'qcut' for quantile-based
+        :param bins: Number of bins or explicit bin edges
+        :param labels: Optional labels for the bins
+        :param right_inclusive: Whether intervals are closed on the right
+        :param drop_original: Whether to drop the tartget column after binning
         :return (pd.DataFrame):
         """
         if column not in df.columns:
@@ -518,10 +533,10 @@ class DataMutator:
         """
         Run a statistical test on two numerical columns
         Supports T-test, ANOVA and Pearson corr test\n
-        :param df (pd.DataFrame): The DataFrame to analyse
-        :param test_type (StatisticalTest): A StatisticalTest type
-        :param col1 (str): Name of the first column
-        :param col2 (str): Name of the second column
+        :param df: The DataFrame to analyse
+        :param test_type: A StatisticalTest type
+        :param col1: Name of the first column
+        :param col2: Name of the second column
         :return dict with keys (Dict[str, Any]): test, statistics, p_value, interpretation 
         """
         if not stats:
@@ -597,10 +612,9 @@ class DataMutator:
     def detect_outliers(self, df: pd.DataFrame, method: str, columns: List[str], **kwargs) -> List[int]:
         """
         Detect outlier row indices in the *df*\n
-        :param df (pd.DataFrame): DataFrame to analyse
-        :param method (str): 'z_score', 'iqr', 'isolation_forest'
-        :param columns (List[str]): Numeric column names
-        :param **kwargs: Threshold, multuplier contamination 
+        :param df: DataFrame to analyse
+        :param method: 'z_score', 'iqr', 'isolation_forest'
+        :param columns: Numeric column names
         :return List[int]: Sorted list of row indices identified as outliers
         """
         if df is None:
@@ -766,12 +780,17 @@ class DataMutator:
         if not column or not new_type:
             raise ValueError("Column and new data type are needed to change data type")
 
+        has_pyarrow = hasattr(pd, "ArrowDtype") and any(isinstance(dt, pd.ArrowDtype) for dt in df.dtypes)
+
         if new_type == "string":
-            df[column] = df[column].astype(pd.StringDtype())
+            dtype = "string[pyarrow]" if has_pyarrow else pd.StringDtype()
+            df[column] = df[column].astype(dtype)
         elif new_type == "int":
-            df[column] = pd.to_numeric(df[column], errors="coerce").astype(pd.Int64Dtype())
+            dtype = "int64[pyarrow]" if has_pyarrow else pd.Int64Dtype()
+            df[column] = pd.to_numeric(df[column], errors="coerce").astype(dtype)
         elif new_type == "float":
-            df[column] = pd.to_numeric(df[column], errors="coerce").astype(pd.Float64Dtype())
+            dtype = "float64[pyarrow]" if has_pyarrow else pd.Float64Dtype()
+            df[column] = pd.to_numeric(df[column], errors="coerce").astype(dtype)
         elif new_type == "category":
             df[column] = df[column].astype("category")
         elif new_type == "datetime":
