@@ -5,11 +5,11 @@ Provides methods for storing, retrieving and reapplying
 data aggregation configurations
 """
 
-from typing import Dict, List, Any, Optional, Union
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
+
 import pandas as pd
-from core.data_mutator import resolve_agg_config
 
 @dataclass
 class SavedAggregation:
@@ -25,7 +25,15 @@ class SavedAggregation:
     rename_mapping: Optional[Dict[str, str]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Converts the aggregation metadata to a dictionary for serialization."""
+        """
+        Convert the aggregation metadata to a dictionary for serialization
+
+        This method handles the storage of the aggregation configuration
+        by exporting the dataclass attributes to a dictionary. The resulting
+        DataFrame is excluded.
+
+        :return: A dictionary representation of the saved aggregation metadata
+        """
         return {
             "name": self.name,
             "description": self.description,
@@ -39,7 +47,16 @@ class SavedAggregation:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SavedAggregation":
-        """Creates a SavedAggregation instance from a dictionary, maintaining legacy compatibility."""
+        """
+        Create a SavedAggregation instance from a dictionary representation
+
+        This class method is used during the deserialization of project files.
+        It maintains older compatibility by checking for the older version of keys ("agg_columns" and "agg_func")
+        if the primary "agg_config" is missing from project data
+
+        :param data: The dictionary containing the aggregation metadata
+        :return: A newly instantiated SavedAggregation object
+        """
         created_at_str = data.get("created_at")
         created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.now()
         
@@ -66,10 +83,29 @@ class AggregationManager:
     """Manages saved data aggregations, allowing storage, retrieval, and reapplication."""
 
     def __init__(self) -> None:
+        """
+        Creates an empty registry for storing SavedAggregation instances
+        in memory, key by a name that has to be unique.
+        """
         self.saved_aggregations: Dict[str, SavedAggregation] = {}
     
     def save_aggregation(self, name: str, description: str, group_by: List[str], agg_config: Dict[str, str], result_df: pd.DataFrame, date_grouping: Optional[Dict[str, str]] = None, rename_mapping: Optional[Dict[str, str]] = None) -> SavedAggregation:
-        """Saves a new aggregation configuration and its initial result."""
+        """
+        Save a new aggregation configuration and its initial resulting DataFrame
+
+        Stores the configuration necessary to reproduce the aggregation and keeps a copy of
+        computed dataset for retrieval. Ensures names are unique to prevent overrides
+
+        :param name: The unique identifier for the aggregation
+        :param description: A summary of the aggregation's purpose
+        :param group_by: A list of column names used to group the data
+        :param agg_config: A mapping of column names to aggregation functions
+        :param result_df: The DataFrame resulting from the initial aggregation
+        :param date_grouping: Configurations for grouping by date components
+        :param rename_mapping: Mapping for renaming columns in the result
+        :raises ValueError: If an aggregation with the given name already exists
+        :return: The newly created SavedAggregation instance
+        """
         if name in self.saved_aggregations:
             raise ValueError(f"Aggregation '{name}' already exists")
         
@@ -88,72 +124,33 @@ class AggregationManager:
         return agg
     
     def get_aggregation(self, name: str) -> Optional[SavedAggregation]:
-        """Retrieves a saved aggregation by its exact name."""
+        """
+        Retrieve a saved aggregation by its name
+        :param name: The name identifier for the aggregation to retrieve
+        :return: The SavedAggregation instance if found, otherwise None
+        """
         return self.saved_aggregations.get(name)
     
     def list_aggregations(self) -> List[str]:
-        """Lists all stored aggregation names."""
+        """
+        Lists all stored aggregation names
+        :return: A list of registered aggregation names
+        """
         return list(self.saved_aggregations.keys())
     
     def delete_aggregation(self, name: str) -> bool:
-        """Deletes an aggregation. Returns True if successfully found and deleted."""
+        """
+        Deletes an aggregation of the manager's registry
+        :param name: The identifier of the aggregation to remove
+        :return: True if the aggregation was found and deleted, False otherwise
+        """
         return self.saved_aggregations.pop(name, None) is not None
     
     def get_aggregation_df(self, name: str) -> Optional[pd.DataFrame]:
-        """Returns a safe copy of the resulting dataframe for a saved aggregation."""
+        """
+        Return a copy of the resulting DataFrame for a saved aggregation
+        :param name: The identifier of the aggregation
+        :return: A copy of the aggregated DataFrame if it exists else None
+        """
         agg = self.saved_aggregations.get(name)
         return agg.result_df.copy() if agg and agg.result_df is not None else None
-    
-    def reapply_aggregation(self, name: str, df: pd.DataFrame) -> pd.DataFrame:
-        """Reapplies an existing aggregation configuration to a new dataset."""
-        agg = self.saved_aggregations.get(name)
-
-        if not agg:
-            raise ValueError(f"Aggregation '{name}' not found")
-        
-        if not agg.group_by:
-            raise ValueError(f"Aggregation '{name}' requires at least one group_by column")
-        
-        # Fail if the required columns are missing in the new dataframe
-        df_columns_set = set(df.columns)
-        missing_group_cols = list(set(agg.group_by) - df_columns_set)
-        if missing_group_cols:
-            raise KeyError(f"Cannot reapply aggregation. Missing grouping columns: {missing_group_cols}")
-
-        missing_agg_cols = list(set(agg.agg_config.keys()) - df_columns_set)
-        if missing_agg_cols:
-            raise KeyError(f"Cannot reapply aggregation. Missing aggregation columns: {missing_agg_cols}")
-
-        try:
-            resolved_agg_config = resolve_agg_config(agg.agg_config)
-            result = df.groupby(agg.group_by, dropna=False).agg(resolved_agg_config).reset_index()
-
-            if isinstance(result.columns, pd.MultiIndex):
-                result.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in
-                                  result.columns]
-            if agg.rename_mapping:
-                result = result.rename(columns=agg.rename_mapping)
-        except Exception as error:
-            raise RuntimeError(f"Failed to apply Pandas aggregation: {str(error)}")
-        
-        # update the manager state
-        agg.result_df = result.copy()
-        agg.row_count = len(result)
-        
-        return result
-    
-    def export_aggregation(self) -> Dict[str, Any]:
-        """Exports all aggregations to a dictionary format for project file saving."""
-        return {
-            name: agg.to_dict() for name, agg in self.saved_aggregations.items()
-        }
-    
-    def import_aggregations(self, data: Dict[str, Any]) -> None:
-        """Imports aggregations from a parsed dictionary project file."""
-        self.saved_aggregations.clear()
-        for name, agg_data in data.items():
-            self.saved_aggregations[name] = SavedAggregation.from_dict(agg_data)
-    
-    def clear_all(self) -> None:
-        """Clears all stored aggregations from memory."""
-        self.saved_aggregations.clear()
