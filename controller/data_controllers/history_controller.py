@@ -71,6 +71,18 @@ class HistoryController(BaseDataController):
                     self.status_bar.log(f"Applying macro failed: {str(err)}", LogLevel.ERROR)
                     global_signals.request_toast("Error", "Macro Execution Failed", ToastLevel.ERROR)
 
+    def _clear_handler_volatile_state(self) -> None:
+        """Clears internal state attributes on the data handler during hard resets"""
+        volatile_attrs = [
+            "pre_insert_df",
+            "inserted_subset_name",
+            "viewing_aggregation_name",
+            "pre_agg_view_df"
+        ]
+        for attr in volatile_attrs:
+            if hasattr(self.data_handler, attr):
+                setattr(self.data_handler, attr, None)
+
     def reset_data(self) -> None:
         """Reset data back to the original unmodified root dataset state."""
         reply = QMessageBox.question(
@@ -91,19 +103,9 @@ class HistoryController(BaseDataController):
             cols_before = len(self.data_handler.df.columns) if self.data_handler.df is not None else 0
 
             self.data_handler.reset_data()
+            self._clear_handler_volatile_state()
 
-            if hasattr(self.data_handler, "pre_insert_df"):
-                self.data_handler.pre_insert_df = None
-            if hasattr(self.data_handler, "inserted_subset_name"):
-                self.data_handler.inserted_subset_name = None
-            if hasattr(self.data_handler, "viewing_aggregation_name"):
-                self.data_handler.viewing_aggregation_name = None
-            if hasattr(self.data_handler, "pre_agg_view_df"):
-                self.data_handler.pre_agg_view_df = None
-
-            if hasattr(self.view, "operations_panel"):
-                self.view.operations_panel.set_injection_status_ui(is_subset_active=False)
-
+            self.view.operations_panel.set_injection_status_ui(is_subset_active=False)
             self.view.operations_panel.filtering_tab.set_filter_active_state(False)
 
             rows_after = len(self.data_handler.df) if self.data_handler.df is not None else 0

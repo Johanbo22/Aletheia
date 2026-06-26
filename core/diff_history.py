@@ -6,6 +6,7 @@ to avoid storing full DataFrame copies for each history state.
 """
 import hashlib
 import json
+import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -108,7 +109,6 @@ class BufferManager:
         :return: The assigned or generated unique buffer identifier
         """
         if buffer_id is None:
-            import time
             hash_input = f"{time.time()}{id(data)}{data.shape}"
             buffer_id = hashlib.md5(hash_input.encode()).hexdigest()[:16]
 
@@ -196,7 +196,7 @@ class HistoryNode:
     diff_record: Optional[DiffRecord] = None
     children_ids: List[str] = field(default_factory=list)
     sort_state: Optional[Tuple[str, bool]] = ("[Index]", True)
-    created_at: float = field(default_factory=lambda: __import__("time").time())
+    created_at: float = field(default_factory=time.time)
 
 class DiffHistoryManager:
     """
@@ -312,10 +312,66 @@ class DiffHistoryManager:
                     self.buffer_manager.release(col_diff.new_data_ref)
         return freed
 
+    def _get_dropped_column_diffs(self, old_df: pd.DataFrame, dropped_cols: set) -> List[ColumnDiff]:
+        """Generate ColumnDiffs for columns removed in the new state"""
+        diffs = []
+        for col in dropped_cols:
+            buffer_id = self.buffer_manager.register_buffer(old_df[col].values.copy())
+            diffs.append(ColumnDiff(
+                column_name=col,
+                operation="drop",
+                old_data_ref=buffer_id,
+                metadata={"dtype": str(old_df[col].dtype)}
+            ))
+        return diffs
+
+    def _get_added_columns_diffs(self, new_df: pd.DataFrame, added_cols: set) -> List[ColumnDiff]:
+        """Generate ColumnDiffs for newly introduced columns"""
+        diffs = []
+        for col in added_cols:
+            buffer_id = self.buffer_manager.register_buffer(new_df[col].values.copy())
+            diffs.append(ColumnDiff(
+                column_name=col,
+                operation="add",
+                new_data_ref=buffer_id,
+                metadata={"dtype": str(new_df[col].dtype)}
+            ))
+        return diffs
+
+    def _get_modified_column_diffs(self, old_df: pd.DataFrame, new_df: pd.DataFrame, common_cols: set) -> List[
+        ColumnDiff]:
+        """Generate ColumnDiffs with bitmasks for modified columns to maximize memory usage"""
+        diffs = []
+        indices_identical = old_df.index.equals(new_df.index)
+
+        for col in common_cols:
+            if old_df[col].equals(new_df[col]):
+                continue
+
+            old_ref = self.buffer_manager.register_buffer(old_df[col].values.copy())
+            new_ref = self.buffer_manager.register_buffer(new_df[col].values.copy())
+
+            mask = None
+            if indices_identical:
+                try:
+                    s1, s2 = old_df[col], new_df[col]
+                    mask = (s1.values != s2.values) & ~(s1.isna().values & s2.isna().values)
+                except (TypeError, ValueError):
+                    mask = np.ones(len(old_df), dtype=bool)
+
+            diffs.append(ColumnDiff(
+                column_name=col,
+                operation="modify",
+                old_data_ref=old_ref,
+                new_data_ref=new_ref,
+                mask=mask,
+                metadata={"dtype": str(new_df[col].dtype)}
+            ))
+        return diffs
+
     def _create_diff_from_operation(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: OperationType,
                                     params: Dict[str, Any]) -> DiffRecord:
         """Create a diff record by comparing old and new DataFrames."""
-        import time
         record = DiffRecord(
             operation_type=operation_type,
             timestamp=time.time(),
@@ -323,62 +379,19 @@ class DiffHistoryManager:
             metadata=params.copy()
         )
 
-        record.metadata['old_index'] = old_df.index.copy(deep=True)
-        record.metadata['new_index'] = new_df.index.copy(deep=True)
+        record.metadata["old_index"] = old_df.index.copy(deep=True)
+        record.metadata["new_index"] = new_df.index.copy(deep=True)
 
         old_cols = set(old_df.columns)
         new_cols = set(new_df.columns)
 
-        dropped = old_cols - new_cols
-        record.dropped_columns = list(dropped)
-        for col in dropped:
-            buffer_id = self.buffer_manager.register_buffer(old_df[col].values.copy())
-            col_diff = ColumnDiff(
-                column_name=col,
-                operation="drop",
-                old_data_ref=buffer_id,
-                metadata={"dtype": str(old_df[col].dtype)}
-            )
-            record.column_diffs.append(col_diff)
-
-        added = new_cols - old_cols
-        record.added_columns = list(added)
-        for col in added:
-            buffer_id = self.buffer_manager.register_buffer(new_df[col].values.copy())
-            col_diff = ColumnDiff(
-                column_name=col,
-                operation="add",
-                new_data_ref=buffer_id,
-                metadata={"dtype": str(new_df[col].dtype)}
-            )
-            record.column_diffs.append(col_diff)
-
+        record.dropped_columns = list(old_cols - new_cols)
+        record.added_columns = list(new_cols - old_cols)
         common_cols = old_cols & new_cols
-        indices_identical = old_df.index.equals(new_df.index)
 
-        for col in common_cols:
-            if not old_df[col].equals(new_df[col]):
-                old_ref = self.buffer_manager.register_buffer(old_df[col].values.copy())
-                new_ref = self.buffer_manager.register_buffer(new_df[col].values.copy())
-
-                mask = None
-                if indices_identical:
-                    try:
-                        s1 = old_df[col]
-                        s2 = new_df[col]
-                        mask = (s1.values != s2.values) & ~(s1.isna().values & s2.isna().values)
-                    except (TypeError, ValueError):
-                        mask = np.ones(len(old_df), dtype=bool)
-
-                col_diff = ColumnDiff(
-                    column_name=col,
-                    operation="modify",
-                    old_data_ref=old_ref,
-                    new_data_ref=new_ref,
-                    mask=mask,
-                    metadata={"dtype": str(new_df[col].dtype)}
-                )
-                record.column_diffs.append(col_diff)
+        record.column_diffs.extend(self._get_dropped_column_diffs(old_df, set(record.dropped_columns)))
+        record.column_diffs.extend(self._get_added_columns_diffs(new_df, set(record.added_columns)))
+        record.column_diffs.extend(self._get_modified_column_diffs(old_df, new_df, common_cols))
 
         record.inverse_params = self._compute_inverse_params(operation_type, params, old_df, new_df)
 
@@ -452,6 +465,23 @@ class DiffHistoryManager:
         )
         return new_node_id
 
+    def _get_path_to_root(self, start_node_id: str) -> List[str]:
+        """Traverse upwards to retrieve the path from a node to the root"""
+        path = []
+        curr = start_node_id
+        while curr:
+            path.append(curr)
+            curr = self.nodes[curr].parent_id
+        return path
+
+    def _find_lowest_common_ancestor(self, path_a: List[str], path_b: List[str]) -> Optional[str]:
+        """Find the most recent common ancestor between two lineage paths."""
+        set_b = set(path_b)
+        for node_id in path_a:
+            if node_id in set_b:
+                return node_id
+        return None
+
     def checkout(self, current_df: pd.DataFrame, target_node_id: str) -> Tuple[Optional[pd.DataFrame], bool]:
         """
         Navigate to any specified node in the history tree using the LCA algorithm
@@ -469,23 +499,9 @@ class DiffHistoryManager:
         if target_node_id == self.current_node_id:
             return current_df, True
 
-        current_path = []
-        curr = self.current_node_id
-        while curr:
-            current_path.append(curr)
-            curr = self.nodes[curr].parent_id
-
-        target_path = []
-        curr = target_node_id
-        while curr:
-            target_path.append(curr)
-            curr = self.nodes[curr].parent_id
-
-        lca_id = None
-        for node_id in current_path:
-            if node_id in target_path:
-                lca_id = node_id
-                break
+        current_path = self._get_path_to_root(self.current_node_id)
+        target_path = self._get_path_to_root(target_node_id)
+        lca_id = self._find_lowest_common_ancestor(current_path, target_path)
 
         if not lca_id:
             return None, False
