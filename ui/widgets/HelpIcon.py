@@ -1,9 +1,8 @@
 from typing import Optional
 
-from PyQt6.QtCore import QEvent, QSize, Qt, pyqtSignal, QTimer, QPoint, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QCursor, QEnterEvent, QMouseEvent
-from PyQt6.QtWidgets import QApplication, QLabel, QStyle, QWidget, QVBoxLayout
-from dearpygui.dearpygui import popup
+from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 from ui.help_animation_engine import load_help_animation_widget
 
@@ -12,6 +11,7 @@ class HelpAnimationPreviewPopup(QWidget):
     A popup widget to preview the help animation
     on hover over the HelpIcon
     """
+
     def __init__(self, topic_id: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
@@ -57,7 +57,6 @@ class HelpAnimationPreviewPopup(QWidget):
         self._opacity_anim.finished.connect(self.close)
         self._opacity_anim.start()
 
-
 class HelpIcon(QLabel):
     """Creates a clickable '?' that emits a signal to an id in the tutorial.db database"""
 
@@ -82,23 +81,29 @@ class HelpIcon(QLabel):
 
         self._preview_popup: Optional[HelpAnimationPreviewPopup] = None
 
-        try:
-            style = QApplication.style()
-            icon = style.standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)
-            pixmap = icon.pixmap(QSize(size, size))
-            self.setPixmap(pixmap)
-        except Exception:
-            #fallback
-            self.setText("?")
-            self.setObjectName("HelpIconFallBack")
-            self.setStyleSheet("border: 1px solid grey; border-radius: 9px; font-weight: bold; qproperty-alignment: 'AlignCenter';")
+        self.setObjectName("HelpIconWidget")
         self.setFixedSize(size, size)
-        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip("Click for help")
+
+        self._text_label = QLabel("?", self)
+        self._text_label.setFixedSize(size, size)
+        self._text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._text_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        self._hover_anim = QPropertyAnimation(self._text_label, b"pos", self)
+        self._hover_anim.setDuration(350)
+        self._hover_anim.setStartValue(QPoint(0, 0))
+        self._hover_anim.setKeyValueAt(0.4, QPoint(0, -3))
+        self._hover_anim.setKeyValueAt(0.7, QPoint(0, 1))
+        self._hover_anim.setEndValue(QPoint(0, 0))
+        self._hover_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
 
     def enterEvent(self, event: QEnterEvent) -> None:
         """Starts the hover timer to show the preview popup"""
         self._hover_timer.start()
+        self._hover_anim.stop()
+        self._hover_anim.start()
         super().enterEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:

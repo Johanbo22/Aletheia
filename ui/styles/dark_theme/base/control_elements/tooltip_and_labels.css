@@ -37,3 +37,11 @@ QLabel#selectedColumnsStickyLabel {
 QFrame#selectedColumnsSeparator {
     color: #3b4048;
 }
+#HelpIconWidget {
+    background-color: #3d3d3d;
+    color: #ffffff;
+    border-radius: 9px;
+    font-weight: bold;
+    font-size: 11px;
+    border: 1px solid #5a5a5a;
+}
