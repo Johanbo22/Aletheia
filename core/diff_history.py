@@ -381,6 +381,8 @@ class DiffHistoryManager:
 
         record.metadata["old_index"] = old_df.index.copy(deep=True)
         record.metadata["new_index"] = new_df.index.copy(deep=True)
+        record.metadata["old_columns"] = list(old_df.columns)
+        record.metadata["new_columns"] = list(new_df.columns)
 
         old_cols = set(old_df.columns)
         new_cols = set(new_df.columns)
@@ -592,6 +594,11 @@ class DiffHistoryManager:
             if old_name in df.columns and new_name not in df.columns:
                 df = df.rename(columns={old_name: new_name})
 
+        new_columns = diff_record.metadata.get("new_columns")
+        if new_columns is not None:
+            existing_cols = [col for col in new_columns if col in df.columns]
+            df = df[existing_cols]
+
         return df
 
     def _apply_inverse_diff(self, current_df: pd.DataFrame, diff_record: DiffRecord) -> pd.DataFrame:
@@ -630,6 +637,11 @@ class DiffHistoryManager:
                     df[col_diff.column_name] = old_data
             else:
                 df[col_diff.column_name] = old_data
+
+        old_columns = diff_record.metadata.get("old_columns")
+        if old_columns is not None:
+            existing_cols = [col for col in old_columns if col in df.columns]
+            df = df[existing_cols]
 
         return df
 
