@@ -141,6 +141,12 @@ class TransformTab(BaseDataTab):
         self.view_agg_btn.clicked.connect(self.controller.view_saved_aggregations)
         saved_agg_buttons.addWidget(self.view_agg_btn)
 
+        self.restore_view_btn = QPushButton("Restore View", parent=self)
+        self.restore_view_btn.setIcon(IconBuilder.build(IconType.Undo))
+        self.restore_view_btn.setToolTip("Restore data view back to the unaggregated state")
+        self.restore_view_btn.clicked.connect(self.controller.restore_aggregation_view)
+        saved_agg_buttons.addWidget(self.restore_view_btn)
+
         self.refresh_agg_list_btn = QPushButton("Refresh", parent=self)
         self.refresh_agg_list_btn.setIcon(IconBuilder.build(IconType.RefreshItem))
         self.refresh_agg_list_btn.clicked.connect(self.controller.refresh_saved_agg_list)

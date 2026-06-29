@@ -117,6 +117,10 @@ class AggregationController(BaseDataController):
             if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
                 self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
 
+            self.view.data_table.setModel(None)
+            if hasattr(self.view, "model"):
+                del self.view.model
+
             self.data_handler.df = agg_df.copy()
             self.data_handler.viewing_aggregation_name = agg_name
             self.data_handler.inserted_subset_name = None
@@ -132,6 +136,38 @@ class AggregationController(BaseDataController):
         except Exception as e:
             global_signals.request_toast("Error", "Failed to view aggregation", ToastLevel.ERROR)
             self.status_bar.log(f"Failed to view aggregation: {str(e)}", LogLevel.ERROR)
+
+    def restore_aggregation_view(self) -> None:
+        """Restore the data view back to the unaggregated state"""
+        if not getattr(self.data_handler, "viewing_aggregation_name", None):
+            global_signals.request_toast("Info", "You are not currently viewing an aggregation", ToastLevel.INFO)
+            return
+
+        try:
+            if hasattr(self.data_handler, "pre_agg_view_df") and self.data_handler.pre_agg_view_df is not None:
+                self.data_handler.df = self.data_handler.pre_agg_view_df.copy()
+                self.data_handler.pre_agg_view_df = None
+                self.data_handler.viewing_aggregation_name = None
+                self.data_handler.inserted_subset_name = None
+
+                self.view.data_table.setModel(None)
+                if hasattr(self.view, "model"):
+                    del self.view.model
+
+                self.view.refresh_data_view()
+
+                self.status_bar.log_action(
+                    "Restored data view from aggregation",
+                    details={"operation": "restore_aggregation_view"},
+                    level=LogLevel.INFO,
+                )
+                global_signals.request_toast("View Restored", "Restored to the unaggregated data view.")
+            else:
+                global_signals.request_toast("Error", "No previous data state to restore.", ToastLevel.ERROR)
+
+        except Exception as e:
+            global_signals.request_toast("Error", "Failed to restore view.", ToastLevel.ERROR)
+            self.status_bar.log(f"Failed to restore view: {str(e)}", LogLevel.ERROR)
 
     def delete_saved_aggregation(self) -> None:
         """Delete a saved aggregation from the internal manager."""
