@@ -6,7 +6,6 @@ from PyQt6.QtCore import QSettings, QThreadPool, QTimer, Qt, pyqtSignal, pyqtSlo
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QMessageBox, QTabWidget, QVBoxLayout, QWidget)
 
-from controller.data_tab_controller import DataTabController
 from controller.toast_manager import ToastManager
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
@@ -114,6 +113,7 @@ class MainWindow(QWidget):
         self.data_tab.request_import_db.connect(self.import_from_database)
         self.data_tab.request_quit.connect(QApplication.instance().quit)
         self.data_tab.data_modified.connect(self._mark_as_unsaved)
+        self.data_tab.request_switch_to_plot.connect(lambda: self.tabs.setCurrentWidget(self.plot_tab))
 
         self.tabs.addTab(self.data_tab, data_icon, data_explorer_name)
 
@@ -238,6 +238,9 @@ class MainWindow(QWidget):
                 if source_info and source_info.get("file_path"):
                     file_name = Path(source_info.get("file_path")).name
                     base_title = f"{APPLICATION_NAME} - {file_name} (Unsaved Project)"
+                elif source_info and source_info.get("type") == "google_sheets":
+                    sheet_name = source_info.get("sheet_name", "Unknown Sheet")
+                    base_title = f"{APPLICATION_NAME} - {sheet_name} (Google Sheets)"
                 else:
                     base_title = f"{APPLICATION_NAME} - Untitled Project"
 
@@ -444,11 +447,16 @@ class MainWindow(QWidget):
         self.console_dialog.show()
 
     def _on_console_sync(self) -> None:
-        self.data_tab.refresh_data_view()
-        self.plot_tab.update_column_combo()
-        self.unsaved_changes = True
-        self.status_bar.update_data_stats(self.data_handler.df)
-        self._update_tab_visibility()
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            self.data_tab.refresh_data_view()
+            self.plot_tab.update_column_combo()
+            self.unsaved_changes = True
+            self.status_bar.update_data_stats(self.data_handler.df)
+            self._update_tab_visibility()
+            self.show_toast("Console Sync", "Workspace synchronized with console state", ToastLevel.INFO, 3000)
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def clear_all(self) -> None:
         """Clear all data"""
@@ -530,6 +538,10 @@ class MainWindow(QWidget):
 
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle the dropped event as import file"""
+        if not self._confirm_discard_changes():
+            event.ignore()
+            return
+
         urls = event.mimeData().urls()
         if urls:
             if len(urls) > 1:
@@ -714,10 +726,14 @@ class MainWindow(QWidget):
                 self.progress_dialog = ProgressDialog(title=f"Importing from {db_type}", message="Connecting...",
                                                       parent=self)
                 self.progress_dialog.show()
-                self.progress_dialog.update_progress(10, "Connecting...")
+                self.progress_dialog.update_progress(10, "Connecting and executing query...")
+                QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
                 QApplication.processEvents()
 
-                self.data_handler.import_from_database(connection_string, query)
+                try:
+                    self.data_handler.import_from_database(connection_string, query)
+                finally:
+                    QApplication.restoreOverrideCursor()
 
                 self.status_bar.set_progress(90)
 
@@ -756,7 +772,9 @@ class MainWindow(QWidget):
     def export_code(self) -> None:
         """Export data manipulation and plotting code"""
         if self.data_handler.df is None:
-            DataTabController.no_data_loaded_toast()
+            self.show_toast(
+                "No Data", "Please load data before attempting to export a script", ToastLevel.WARNING
+            )
             return
 
         source_info = self.data_handler.get_data_source()
@@ -774,11 +792,14 @@ class MainWindow(QWidget):
                 return
 
         if is_temp:
-            if QMessageBox.question(
-                    self,
-                    "Google Sheet Source",
-                    "Data source is temporary. Continue?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Cancel:
+            reply = QMessageBox.question(
+                self,
+                "Temporary Data Source",
+                "This data was imported from a temporary source.\n\n"
+                "The exported Python Script will lack a direct file-loading step and will require you to manually insert the path to your local data.\n\n"
+                "Do you wish to continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+            if reply == QMessageBox.StandardButton.Cancel:
                 return
 
         dialog = QMessageBox(self)
@@ -791,7 +812,7 @@ class MainWindow(QWidget):
 
         button_data = dialog.addButton("Data Pipeline Only", QMessageBox.ButtonRole.YesRole)
         button_plot = dialog.addButton("Data + Plotting logic", QMessageBox.ButtonRole.NoRole)
-        dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        dialog.addButton(QMessageBox.StandardButton.Cancel)
         dialog.exec()
 
         plot_config = {}
@@ -843,7 +864,9 @@ class MainWindow(QWidget):
                     self,
                     "Export Log",
                     "Include detailed timestamps?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                ) == QMessageBox.StandardButton.Yes
                 self.logger.export_logs(filepath, detailed)
 
                 self.show_toast(
@@ -909,7 +932,7 @@ class MainWindow(QWidget):
             finally:
                 self.status_bar.show_progress(False)
                 if self.progress_dialog:
-                    self.progress_dialog.accept()
+                    QTimer.singleShot(300, self.progress_dialog.accept)
                     self.progress_dialog = None
 
     def undo(self) -> None:
@@ -920,6 +943,8 @@ class MainWindow(QWidget):
             self.unsaved_changes = True
             self.status_bar.log("Undo: Previous state restored")
         else:
+            self.show_toast("History", "Reached beginning of history. Nothing to undo", ToastLevel.INFO,
+                            duration_ms=2000)
             self.status_bar.log("Nothing to undo")
 
     def redo(self) -> None:
@@ -930,6 +955,7 @@ class MainWindow(QWidget):
             self.unsaved_changes = True
             self.status_bar.log("Redo: Action restored")
         else:
+            self.show_toast("History", "Nothing to redo", ToastLevel.INFO, duration_ms=2000)
             self.status_bar.log("Nothing to redo")
 
     def zoom_in(self) -> None:
@@ -941,7 +967,7 @@ class MainWindow(QWidget):
         w, h = fig.get_size_inches()
         fig.set_size_inches(min(w * 1.1, 20), min(h * 1.1, 20))
         self.plot_tab.canvas.draw()
-        self.status_bar.log("Zoomed in")
+        self.show_toast("Zoom", "Canvas Zoomed In", ToastLevel.INFO, duration_ms=1500)
 
     def zoom_out(self) -> None:
         """Zooms out of the canvas"""
@@ -952,7 +978,7 @@ class MainWindow(QWidget):
         w, h = fig.get_size_inches()
         fig.set_size_inches(max(w * 0.9, 4), max(h * 0.9, 3))
         self.plot_tab.canvas.draw()
-        self.status_bar.log("Zoomed out")
+        self.show_toast("Zoom", "Canvas Zoomed Out", ToastLevel.INFO, duration_ms=1500)
 
     def zoom_reset(self) -> None:
         """
@@ -967,4 +993,4 @@ class MainWindow(QWidget):
         fig = self.plot_tab.plot_engine.current_figure
         fig.set_size_inches(DEFAULT_WIDTH_INCHES, DEFAULT_HEIGHT_INCHES)
         self.plot_tab.canvas.draw()
-        self.status_bar.log("Zoom reset to default")
+        self.show_toast("Zoom", "Zoom Reset to Default", ToastLevel.INFO, duration_ms=1500)

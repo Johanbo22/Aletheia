@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QItemSelectionModel, QPropertyAnimation, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QAbstractItemView, QGraphicsOpacityEffect, QHBoxLayout, QHeaderView, \
@@ -41,6 +41,7 @@ class DataTab(QWidget):
     request_open_settings = pyqtSignal()
     request_quit = pyqtSignal()
     request_python_console = pyqtSignal()
+    request_switch_to_plot = pyqtSignal()
     data_modified = pyqtSignal()
 
     def __init__(
@@ -157,11 +158,17 @@ class DataTab(QWidget):
             lambda: self.data_table.clearSelection() if self.data_handler else None)
 
         self.search_shortcut = QShortcut(QKeySequence.StandardKey.Find, self)
+        self.search_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.search_shortcut.activated.connect(self.open_search_bar)
 
         self.esc_shortcut = QShortcut(QKeySequence("Esc"), self.search_bar)
-        self.esc_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.esc_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcutShortcut)
         self.esc_shortcut.activated.connect(self.search_bar.close_search)
+
+        self.clear_selection_shortcut = QShortcut(QKeySequence("Esc"), self.data_table)
+        self.clear_selection_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self.clear_selection_shortcut.activated.connect(self.data_table.clearSelection)
+
         layout.addWidget(self.search_bar)
 
     def _setup_data_tabs(self, layout: QVBoxLayout) -> None:
@@ -260,7 +267,6 @@ class DataTab(QWidget):
 
         index = self.data_table.model().index(row_index, column_index)
         if index.isValid():
-            from PyQt6.QtCore import QItemSelectionModel
             self.data_table.selectionModel().select(
                 index,
                 QItemSelectionModel.SelectionFlag.ClearAndSelect
@@ -618,18 +624,7 @@ class DataTab(QWidget):
 
     def switch_to_plot_tab(self):
         """Helper to swtich to the plot tab"""
-        current_widget: DataTab | None = self.parentWidget()
-        found_tab_widget: bool = False
-        while current_widget:
-            if not isinstance(current_widget, QTabWidget):
-                current_widget = current_widget.parentWidget()
-                continue
-            current_widget.setCurrentWidget(self.plot_tab)
-            found_tab_widget = True
-            break
-        if found_tab_widget:
-            return
-        self.status_bar.log("Could not switch to plot tab: Tab Widget not found", LogLevel.ERROR)
+        self.request_switch_to_plot.emit()
 
     def update_statistics(self) -> None:
         """Update statistics display"""
@@ -881,13 +876,23 @@ class DataTab(QWidget):
         try:
             greeting_path: Path = Path.cwd() / "resources" / "stats_test_result_greeting.html"
             if not greeting_path.exists():
-                greeting_html: str = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Statistical Test Suite</h2><p>Test Results will appear here.</p></div>"
+                greeting_html: str = (
+                    "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'>"
+                    "<h2>Statistical Test Suite</h2>"
+                    "<p>Run a statistical test from the table to see results here.</p>"
+                    "</div>"
+                )
             else:
                 with open(greeting_path, "r", encoding="utf-8") as file:
                     greeting_html = file.read()
         except Exception as ReadGreetingError:
             self.status_bar.log(f"Failed to load greeting HTML: {str(ReadGreetingError)}", LogLevel.ERROR)
-            greeting_html = "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'><h2>Statistical Test Suite</h2></div>"
+            greeting_html = (
+                "<div style='text-align: center; font-family: sans-serif; padding: 40px; color: #64748b;'>"
+                "<h2>Statistical Test Suite</h2>"
+                "<p>Test Results will appear here.</p>"
+                "</div>"
+            )
 
         if not hasattr(self, 'test_results_text') or self.test_results_text is None:
             return
