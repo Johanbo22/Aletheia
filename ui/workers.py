@@ -1,12 +1,13 @@
-from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot, QThread
-import pandas as pd
-import numpy as np
+from typing import TYPE_CHECKING
 
+import numpy as np
+import pandas as pd
+from PyQt6.QtCore import QObject, QRunnable, QThread, pyqtSignal, pyqtSlot
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from core.data_handler import DataHandler
-from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.exc import SQLAlchemyError
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from core.subset_manager import SubsetManager
 
@@ -331,9 +332,13 @@ class SearchWorker(QThread):
         search_text_lower = str(self.search_text).lower()
         try:
             for col_index, col_name in enumerate(self.df.columns):
-                col_series_str = self.df[col_name].astype(str)
-                mask = col_series_str.str.contains(search_text_lower, case=False, regex=False, na=False)
-                
+                col_series = self.df[col_name]
+
+                if pd.api.types.is_object_dtype(col_series) or pd.api.types.is_string_dtype(col_series):
+                    mask = col_series.str.contains(search_text_lower, case=False, regex=False, na=False)
+                else:
+                    mask = col_series.astype(str).str.contains(search_text_lower, case=False, regex=False, na=False)
+
                 matched_row_indices = np.where(mask)[0]
 
                 for row_idx in matched_row_indices:
@@ -341,6 +346,5 @@ class SearchWorker(QThread):
 
             matches.sort(key=lambda x: (x[0], x[1]))
             self.finished_search.emit(matches, self.token)
-                
         except Exception:
             self.finished_search.emit([], self.token)
