@@ -19,6 +19,25 @@ and this project adheres to Semantic Versioning.
 - Feature to define the resulting DataType (`string`, `int`, `float`, `datetime`, `category`, `Auto-infer`) when creating a Computed Column.
 - A sticky header label in ColumnsTab to persistently display the currently selected column(s) regardless of scroll position.
 - Full implementation of ToastNotification system
+- Added an action to the table context menu to highlight missing values
+- Added a 'X' and a checkmark to the ToggleSwitch when OFF and ON.
+- Added a "Restore View" button within the "Transform" tab under "Saved Aggregation" to revert to the unaggregated data
+  view.
+- Added an "Open Report Folder" button to the fatal crash dialog (`core/error_handler.py`) to allow users immediate
+  access to generated logs.
+- Added a Toast notification to explicitly inform users when multiple files are dragged and dropped that only the first
+  file is processed.
+- Implemented `QApplication.processEvents()` and wait cursors during synchronous Database Imports to prevent full UI
+  freezes before the Progress Dialog has rendered (`ui/main_window.py`).
+- Added Toast notifications to Plot Canvas Zoom actions (In/Out/Reset) to keep user visual focus on the canvas rather
+  than checking the status bar (`ui/main_window.py`).
+- Added a transparent Toast notification when synchronizing data back from the Python Console to explain the UI refresh
+  state (`ui/main_window.py`).
+- Added explicit default buttons to the "Export Python Script" and "Export Log" dialogs to fully support keyboard-only
+  workflow (`ui/main_window.py`).
+- Added an info toast when attempting to double-click on a cell to edit it.
+- Added a confirmation dialog to `PlotTab.clear_plot()` to prevent work loss
+- Global WaitCursor toggles for file import
 
 ### Changed
 - UI layout for both ReferenceLines and ReferenceSpans
@@ -38,6 +57,22 @@ and this project adheres to Semantic Versioning.
 - Added _on_theme_selection_changed handler in ThemeManager to dynamically toggle theme-dependent buttons, preventing invalid theme file manipulation operations.
 - Enhancements for the statistics tab and the test results tab with embedded JavaScript, visualizations, css etc.
 - Updated p-value formatting in the statistical test result view to only use scientific notation for very small numbers (p < 0.0001). Standard, more readable decimal formatting is now applied for larger values.
+- Optimized is_missing checks in DataTableModel.data() by replacing chained Python-level isinstance and isnan
+  evaluations with pandas' native pd.isna(). This significantly reduces CPU overhead and eliminates UI stuttering during
+  rapid table repainting and scrolling.
+- Substituted iterative pandas Series aggregations in DataTableModel._update_column_alignments with a single vectorized
+  self._data.isna().sum() operation, drastically reducing UI thread blockage when processing large DataFrames.
+- Optimized `SearchWorker` global data search by preventing redundant string casting (`astype(str)`) on text columns,
+  drastically improving search performance and reducing memory usage on large datasets.
+- Optimized Google Sheets data parsing by switching the pandas.read_csv engine from "python" to "c" in
+  DataIOManager.import_google_sheets, resolving a significant performance and memory bottleneck for large datasets.
+- Improved the formatting and clarity of the Python Script Export dialog options (`ui/main_window.py`).
+- Streamlined the "Clear Workspace" routine to eliminate redundant user prompting (asking to clear, then asking to
+  save).
+- Refined the `Ctrl+F` Find shortcut's `Qt.ShortcutContext` to `WidgetWithChildrenShortcut`, preventing the Data Search
+  Bar from intercepting keyboard events while the user is actively working in the Plot Studio tab (`ui/data_tab.py`).
+- Refactored the autosave recovery dialog to have more explicit buttons
+- Update the Critical Error dialog to remind that system recovering is enabled.
 
 ### Fixed
 - Python syntax highlighting overwriting string literals if they contained a # (hash) character.
@@ -66,6 +101,12 @@ and this project adheres to Semantic Versioning.
 - Fixed visual bug when editing Table cells where underlying data text was visible when editing
 - Fixed visual bug when editing Table cells where cell layout border did not match cell before editing.
 - Fixed an IndexError in the column reordering animation caused by a missing end-position coordinate for the middle column.
+- Fixed an AttributeError on the available columns list in AggregationDialog where the QListWidgetItem was not updated
+  to a QModelIndex.
+- Fixed a bug where jumping backwards to previous states in the history tree would not reset the visual order of
+  reordered columns
+- Removed the persistent `status_bar.log` entry for background autosaves (`ui/main_window.py`) to reduce log noise and
+  preserve the visibility of meaningful user-driven actions in the console history.
 
 ## v 0.3.1 [Patch]
 ### Added

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, TYPE_CHECKING
 
 from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QMessageBox
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
@@ -757,6 +758,17 @@ class PlotTab(PlotTabUI):
 
     def clear_plot(self) -> None:
         """Clear the plot"""
+        if self._last_data_signature is not None or self.current_plot_type_name != "Line":
+            reply_box = QMessageBox(self)
+            reply_box.setWindowTitle("Clear Plot")
+            reply_box.setText("Are you sure you want to clear the current plot?")
+            reply_box.setInformativeText("All formatting, annotations and customizations will be lost")
+            reply_box.setIcon(QMessageBox.Icon.Warning)
+            reply_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            reply_box.setDefaultButton(QMessageBox.StandardButton.No)
+            if reply_box.exec() == QMessageBox.StandardButton.No:
+                return
+
         self._is_clearing = True
         self.style_update_timer.stop()
         self.plot_engine.clear_plot()

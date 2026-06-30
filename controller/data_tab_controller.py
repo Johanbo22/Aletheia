@@ -187,6 +187,10 @@ class DataTabController:
         """View the current selected agg in the table"""
         self.aggregation_controller.view_saved_aggregations()
 
+    def restore_aggregation_view(self):
+        """Restore the data view to the unaggregated state"""
+        self.aggregation_controller.restore_aggregation_view()
+
     def delete_saved_aggregation(self):
         """Delete a saved aggregation"""
         self.aggregation_controller.delete_saved_aggregation()

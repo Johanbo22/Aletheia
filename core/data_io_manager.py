@@ -274,7 +274,7 @@ class DataIOManager:
                 thousands=thousands,
                 encoding="utf-8",
                 on_bad_lines="error",
-                engine="python"
+                engine="c"
             )
         except Exception as parse_error:
             raise ValueError(f"Google Sheets Parsing Failed: {str(parse_error)}")

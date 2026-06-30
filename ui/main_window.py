@@ -6,7 +6,6 @@ from PyQt6.QtCore import QSettings, QThreadPool, QTimer, Qt, pyqtSignal, pyqtSlo
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QMessageBox, QTabWidget, QVBoxLayout, QWidget)
 
-from controller.data_tab_controller import DataTabController
 from controller.toast_manager import ToastManager
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
@@ -114,6 +113,7 @@ class MainWindow(QWidget):
         self.data_tab.request_import_db.connect(self.import_from_database)
         self.data_tab.request_quit.connect(QApplication.instance().quit)
         self.data_tab.data_modified.connect(self._mark_as_unsaved)
+        self.data_tab.request_switch_to_plot.connect(lambda: self.tabs.setCurrentWidget(self.plot_tab))
 
         self.tabs.addTab(self.data_tab, data_icon, data_explorer_name)
 
@@ -174,7 +174,6 @@ class MainWindow(QWidget):
                 self.autosave_indicator.show_indicator()
                 QApplication.processEvents()
                 self.project_manager.auto_save(self.get_project_data())
-                self.status_bar.log("Project autosaved", LogLevel.SUCCESS)
             except Exception as e:
                 self.status_bar.log(f"Autosave failed: {str(e)}", LogLevel.ERROR)
             finally:
@@ -187,15 +186,18 @@ class MainWindow(QWidget):
         prompts to recovery after a crash
         """
         if self.project_manager.has_autosave():
-            reply = QMessageBox.question(
-                self,
-                "Recover Project",
-                "It looks like the application closed unexpectedly during your last session.\n\n"
-                "Would you like to recover your unsaved work?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
-            )
-            if reply == QMessageBox.StandardButton.Yes:
+            reply_box = QMessageBox(self)
+            reply_box.setWindowTitle("Recover Project")
+            reply_box.setText("It looks like the application closed unexpectedly during your last session.")
+            reply_box.setInformativeText("Would you like to recover your unsaved work?")
+            reply_box.setIcon(QMessageBox.Icon.Information)
+
+            recover_btn = reply_box.addButton("Recover Session", QMessageBox.ButtonRole.AcceptRole)
+            discard_btn = reply_box.addButton("Discard Autosave", QMessageBox.ButtonRole.DestructiveRole)
+            reply_box.setDefaultButton(recover_btn)
+            reply_box.exec()
+
+            if reply_box.clickedButton() == recover_btn:
                 try:
                     project_data = self.project_manager.recover_autosave()
                     self.load_project(project_data)
@@ -239,6 +241,9 @@ class MainWindow(QWidget):
                 if source_info and source_info.get("file_path"):
                     file_name = Path(source_info.get("file_path")).name
                     base_title = f"{APPLICATION_NAME} - {file_name} (Unsaved Project)"
+                elif source_info and source_info.get("type") == "google_sheets":
+                    sheet_name = source_info.get("sheet_name", "Unknown Sheet")
+                    base_title = f"{APPLICATION_NAME} - {sheet_name} (Google Sheets)"
                 else:
                     base_title = f"{APPLICATION_NAME} - Untitled Project"
 
@@ -313,7 +318,6 @@ class MainWindow(QWidget):
                 self.show_toast(
                     "File Not Found", "The project file could not be found", ToastLevel.WARNING
                 )
-                QMessageBox.warning(self, "File Not Found", f"The project file could not be found:\n{filepath}")
 
     def _load_project_from_path(self, filepath: str) -> None:
         """Helper method to load project data and handle animations."""
@@ -445,26 +449,35 @@ class MainWindow(QWidget):
         self.console_dialog.show()
 
     def _on_console_sync(self) -> None:
-        self.data_tab.refresh_data_view()
-        self.plot_tab.update_column_combo()
-        self.unsaved_changes = True
-        self.status_bar.update_data_stats(self.data_handler.df)
-        self._update_tab_visibility()
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            self.data_tab.refresh_data_view()
+            self.plot_tab.update_column_combo()
+            self.unsaved_changes = True
+            self.status_bar.update_data_stats(self.data_handler.df)
+            self._update_tab_visibility()
+            self.show_toast("Console Sync", "Workspace synchronized with console state", ToastLevel.INFO, 3000)
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def clear_all(self) -> None:
         """Clear all data"""
         if self.data_handler.df is not None:
-            reply = QMessageBox.question(
-                self, "Confirm Clear Workspace",
-                "Are you sure you want to clear all data, subsets, and plot configurations?\n\nThis action cannot be undone.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.No:
-                return
+            if self._unsaved_changes:
+                if not self._confirm_discard_changes():
+                    return
+            else:
+                reply_box = QMessageBox(self)
+                reply_box.setWindowTitle("Confirm Clear Workspace")
+                reply_box.setText("Are you sure you want to clear all data, subsets, and plot configurations?")
+                reply_box.setInformativeText("This action cannot be undone")
+                reply_box.setIcon(QMessageBox.Icon.Warning)
+                reply_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                reply_box.setDefaultButton(QMessageBox.StandardButton.No)
+                reply = reply_box.exec()
 
-            if not self._confirm_discard_changes():
-                return
+                if reply == QMessageBox.StandardButton.No:
+                    return
 
         self.data_handler.df = None
         self.data_handler.original_df = None
@@ -530,16 +543,28 @@ class MainWindow(QWidget):
 
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle the dropped event as import file"""
-        urls = event.mimeData().urls()
-        if urls and urls[0].isLocalFile():
-            filepath = urls[0].toLocalFile()
-            path_obj = Path(filepath)
-            project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+        if not self._confirm_discard_changes():
+            event.ignore()
+            return
 
-            if path_obj.suffix.lower() == project_ext:
-                self._load_project_from_path(filepath)
-            else:
-                self.load_file_from_path(filepath)
+        urls = event.mimeData().urls()
+        if urls:
+            if len(urls) > 1:
+                self.show_toast(
+                    "Multiple Files Dropped",
+                    "Only the first file will be loaded",
+                    ToastLevel.INFO
+                )
+
+            if urls[0].isLocalFile():
+                filepath = urls[0].toLocalFile()
+                path_obj = Path(filepath)
+                project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+
+                if path_obj.suffix.lower() == project_ext:
+                    self._load_project_from_path(filepath)
+                else:
+                    self.load_file_from_path(filepath)
 
     def load_file_from_path(self, filepath: str) -> None:
         """Process and import file from a path string"""
@@ -560,6 +585,8 @@ class MainWindow(QWidget):
             self.progress_dialog.update_progress(10, "Reading file")
         else:
             self.status_bar.log(f"Importing. {filepath}...")
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
 
         worker = FileImportWorker(self.data_handler, filepath)
         worker.signals.finished.connect(self._on_import_finished)
@@ -594,6 +621,7 @@ class MainWindow(QWidget):
 
     @pyqtSlot(object)
     def _on_import_finished(self, loaded_dataframe) -> None:
+        QApplication.restoreOverrideCursor()
         self.status_bar.show_progress(False)
         if self.progress_dialog:
             self.progress_dialog.update_progress(90, "Updating Interface")
@@ -618,6 +646,7 @@ class MainWindow(QWidget):
 
     @pyqtSlot(Exception)
     def _on_import_error(self, error: Exception) -> None:
+        QApplication.restoreOverrideCursor()
         self.status_bar.show_progress(False)
         if self.progress_dialog:
             self.progress_dialog.accept()
@@ -706,10 +735,14 @@ class MainWindow(QWidget):
                 self.progress_dialog = ProgressDialog(title=f"Importing from {db_type}", message="Connecting...",
                                                       parent=self)
                 self.progress_dialog.show()
-                self.progress_dialog.update_progress(10, "Connecting...")
+                self.progress_dialog.update_progress(10, "Connecting and executing query...")
+                QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
                 QApplication.processEvents()
 
-                self.data_handler.import_from_database(connection_string, query)
+                try:
+                    self.data_handler.import_from_database(connection_string, query)
+                finally:
+                    QApplication.restoreOverrideCursor()
 
                 self.status_bar.set_progress(90)
 
@@ -748,7 +781,9 @@ class MainWindow(QWidget):
     def export_code(self) -> None:
         """Export data manipulation and plotting code"""
         if self.data_handler.df is None:
-            DataTabController.no_data_loaded_toast()
+            self.show_toast(
+                "No Data", "Please load data before attempting to export a script", ToastLevel.WARNING
+            )
             return
 
         source_info = self.data_handler.get_data_source()
@@ -766,22 +801,28 @@ class MainWindow(QWidget):
                 return
 
         if is_temp:
-            if QMessageBox.question(
-                    self,
-                    "Google Sheet Source",
-                    "Data source is temporary. Continue?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel) == QMessageBox.StandardButton.Cancel:
+            reply = QMessageBox.question(
+                self,
+                "Temporary Data Source",
+                "This data was imported from a temporary source.\n\n"
+                "The exported Python Script will lack a direct file-loading step and will require you to manually insert the path to your local data.\n\n"
+                "Do you wish to continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+            if reply == QMessageBox.StandardButton.Cancel:
                 return
 
         dialog = QMessageBox(self)
-        dialog.setWindowTitle("Export code")
-        dialog.setText("What would you like to export?")
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setWindowTitle("Export Python Script")
+        dialog.setText("Choose the components to include in the exported Python script:")
         dialog.setInformativeText(
-            "You can export just the data manipulation pipeline, or include the current Plotting configuration as well")
+            "* Data Pipeline Only: Exports data loading and transformation steps.\n"
+            "* Data + Plotting Logic: Includes both data steps and current plot configurations."
+        )
 
         button_data = dialog.addButton("Data Pipeline Only", QMessageBox.ButtonRole.YesRole)
         button_plot = dialog.addButton("Data + Plotting logic", QMessageBox.ButtonRole.NoRole)
-        dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        dialog.addButton(QMessageBox.StandardButton.Cancel)
         dialog.exec()
 
         plot_config = {}
@@ -833,7 +874,9 @@ class MainWindow(QWidget):
                     self,
                     "Export Log",
                     "Include detailed timestamps?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                ) == QMessageBox.StandardButton.Yes
                 self.logger.export_logs(filepath, detailed)
 
                 self.show_toast(
@@ -899,7 +942,7 @@ class MainWindow(QWidget):
             finally:
                 self.status_bar.show_progress(False)
                 if self.progress_dialog:
-                    self.progress_dialog.accept()
+                    QTimer.singleShot(300, self.progress_dialog.accept)
                     self.progress_dialog = None
 
     def undo(self) -> None:
@@ -910,6 +953,8 @@ class MainWindow(QWidget):
             self.unsaved_changes = True
             self.status_bar.log("Undo: Previous state restored")
         else:
+            self.show_toast("History", "Reached beginning of history. Nothing to undo", ToastLevel.INFO,
+                            duration_ms=2000)
             self.status_bar.log("Nothing to undo")
 
     def redo(self) -> None:
@@ -920,6 +965,7 @@ class MainWindow(QWidget):
             self.unsaved_changes = True
             self.status_bar.log("Redo: Action restored")
         else:
+            self.show_toast("History", "Nothing to redo", ToastLevel.INFO, duration_ms=2000)
             self.status_bar.log("Nothing to redo")
 
     def zoom_in(self) -> None:
@@ -931,7 +977,7 @@ class MainWindow(QWidget):
         w, h = fig.get_size_inches()
         fig.set_size_inches(min(w * 1.1, 20), min(h * 1.1, 20))
         self.plot_tab.canvas.draw()
-        self.status_bar.log("Zoomed in")
+        self.show_toast("Zoom", "Canvas Zoomed In", ToastLevel.INFO, duration_ms=1500)
 
     def zoom_out(self) -> None:
         """Zooms out of the canvas"""
@@ -942,7 +988,7 @@ class MainWindow(QWidget):
         w, h = fig.get_size_inches()
         fig.set_size_inches(max(w * 0.9, 4), max(h * 0.9, 3))
         self.plot_tab.canvas.draw()
-        self.status_bar.log("Zoomed out")
+        self.show_toast("Zoom", "Canvas Zoomed Out", ToastLevel.INFO, duration_ms=1500)
 
     def zoom_reset(self) -> None:
         """
@@ -957,4 +1003,4 @@ class MainWindow(QWidget):
         fig = self.plot_tab.plot_engine.current_figure
         fig.set_size_inches(DEFAULT_WIDTH_INCHES, DEFAULT_HEIGHT_INCHES)
         self.plot_tab.canvas.draw()
-        self.status_bar.log("Zoom reset to default")
+        self.show_toast("Zoom", "Zoom Reset to Default", ToastLevel.INFO, duration_ms=1500)

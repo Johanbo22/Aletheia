@@ -1,8 +1,8 @@
 from typing import Any, Dict, List
 
 import pandas as pd
-from PyQt6.QtCore import QDate, QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QThreadPool, QTimer, \
-    Qt
+from PyQt6.QtCore import QDate, QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QThreadPool, \
+    QTimer, Qt
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QComboBox, QCompleter, QDateEdit, QDialog, QDoubleSpinBox, \
     QGraphicsOpacityEffect, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea, \
@@ -62,8 +62,9 @@ class FilterAdvancedDialog(QDialog):
         self._loading_timer.timeout.connect(self._update_loading_text)
         self._loading_dots = 0
 
-        self._setup_shortcuts()
+        self.animation_duration_ms: int = 250
 
+        self._setup_shortcuts()
         self.init_ui()
 
     def _setup_shortcuts(self) -> None:
@@ -242,13 +243,68 @@ class FilterAdvancedDialog(QDialog):
             widget.setGraphicsEffect(None)
 
     def add_filter_row(self) -> None:
-        """ adds a new filter configuration row to the dialog."""
-        row_index = len(self.filter_rows)
+        """Adds a new filter configuration row to the dialog."""
+        row_index: int = len(self.filter_rows)
         filter_group = QGroupBox(f"Filter {row_index + 1}", parent=self)
         filter_group.setObjectName("FilterGroupBox")
         filter_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        filter_layout = QHBoxLayout()
 
+        filter_layout = QHBoxLayout(filter_group)
+
+        logic_combo = self._create_logic_combo(row_index)
+        column_combo = self._create_column_combo()
+        condition_combo = self._create_condition_combo()
+        input_stack, inputs_dict = self._create_input_stack()
+        remove_btn = self._create_remove_btn()
+
+        filter_layout.addWidget(logic_combo)
+
+        col_label = QLabel("Column:")
+        col_label.setFixedWidth(55)
+        filter_layout.addWidget(col_label)
+        filter_layout.addWidget(column_combo, 1)
+
+        cond_label = QLabel("Condition:")
+        cond_label.setFixedWidth(65)
+        filter_layout.addWidget(cond_label)
+        filter_layout.addWidget(condition_combo, 1)
+
+        val_label = QLabel("Value:")
+        val_label.setFixedWidth(40)
+        filter_layout.addWidget(val_label)
+        filter_layout.addWidget(input_stack, 2)
+        filter_layout.addWidget(remove_btn)
+
+        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, filter_group)
+
+        row_data = {
+            "logic"    : logic_combo,
+            "column"   : column_combo,
+            "condition": condition_combo,
+            "stack"    : input_stack,
+            "val_label": val_label,
+            "inputs"   : inputs_dict,
+            "group"    : filter_group
+        }
+        self.filter_rows.append(row_data)
+
+        self._setup_filter_row_animations(filter_group)
+        self._connect_filter_row_signals(row_data, remove_btn)
+
+        self.update_row_ui(row_data)
+        self._update_logic_styling(row_data, "ROOT" if row_index == 0 else logic_combo.currentText())
+
+        if row_index > 0:
+            column_combo.setFocus()
+
+        self.update_preview()
+        QTimer.singleShot(60, self._scroll_to_bottom)
+
+    def _create_logic_combo(self, row_index: int) -> QComboBox:
+        """
+        Create and configure the logic (AND/OR) combo box
+        :param row_index: The index of the current row
+        """
         logic_combo = QComboBox()
         logic_combo.addItems(["AND", "OR"])
         logic_combo.setFixedWidth(70)
@@ -260,9 +316,10 @@ class FilterAdvancedDialog(QDialog):
 
         if row_index == 0:
             logic_combo.setVisible(False)
-        filter_layout.addWidget(logic_combo)
+        return logic_combo
 
-        # Column selector
+    def _create_column_combo(self) -> QComboBox:
+        """Create and configure the column selection combo box"""
         column_combo = QComboBox()
         column_combo.addItems(self.columns)
         column_combo.setMinimumWidth(120)
@@ -270,105 +327,83 @@ class FilterAdvancedDialog(QDialog):
         column_combo.setEditable(True)
         column_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         column_combo.completer().setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        return column_combo
 
-        col_label = QLabel("Column:")
-        col_label.setFixedWidth(55)
-        filter_layout.addWidget(col_label)
-        filter_layout.addWidget(column_combo, 1)
-
-        # Condition selector
+    def _create_condition_combo(self) -> QComboBox:
+        """Create and configure the condition selection combo box"""
         condition_combo = QComboBox()
         condition_combo.addItems(list(self.ConditionMap.keys()))
         condition_combo.setMinimumWidth(170)
         condition_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        cond_label = QLabel("Condition:")
-        cond_label.setFixedWidth(65)
-        filter_layout.addWidget(cond_label)
-        filter_layout.addWidget(condition_combo, 0)
+        return condition_combo
 
+    def _create_input_stack(self) -> tuple[QStackedWidget, Dict[str, QWidget]]:
+        """Create the stack of different input widgets (text, number, category, date)"""
         input_stack = QStackedWidget()
 
-        # text input
         text_input = QLineEdit()
         text_input.setPlaceholderText("Enter text...")
         text_input.setClearButtonEnabled(True)
-        text_input.returnPressed.connect(self.validate_and_accept)
         input_stack.addWidget(text_input)
 
-        # Numerical inputs
         number_input = QDoubleSpinBox()
         number_input.setRange(-999999999, 999999999)
         number_input.setDecimals(4)
         number_input.setGroupSeparatorShown(True)
         input_stack.addWidget(number_input)
 
-        # categorical INputs
         category_input = QComboBox()
         input_stack.addWidget(category_input)
 
-        # date input
         date_input = QDateEdit()
         date_input.setCalendarPopup(True)
         date_input.setDisplayFormat("yyyy-MM-dd")
         date_input.setDate(QDate.currentDate())
         input_stack.addWidget(date_input)
 
-        # Explicit state for Null checks
         empty_widget = QLineEdit()
         empty_widget.setPlaceholderText("No value required")
         empty_widget.setEnabled(False)
         input_stack.addWidget(empty_widget)
 
-        val_label = QLabel("Value:")
-        val_label.setFixedWidth(40)
-        filter_layout.addWidget(val_label)
-        filter_layout.addWidget(input_stack, 2)
+        inputs = {
+            "text"    : text_input,
+            "number"  : number_input,
+            "category": category_input,
+            "date"    : date_input
+        }
+        return input_stack, inputs
 
+    def _create_remove_btn(self) -> QPushButton:
+        """Create the filter row removal button"""
         remove_btn = QPushButton()
         remove_btn.setIcon(IconBuilder.build(IconType.Close))
         remove_btn.setToolTip("Remove this filter")
         remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         remove_btn.setFixedWidth(30)
         remove_btn.setProperty("styleClass", "remove_filter_btn")
-        filter_layout.addWidget(remove_btn)
+        return remove_btn
 
-        filter_group.setLayout(filter_layout)
-
-        # Animation states
-        effect = QGraphicsOpacityEffect(filter_group)
-        filter_group.setGraphicsEffect(effect)
+    def _setup_filter_row_animations(self, group: QGroupBox) -> None:
+        """
+        Setup and start the entrance animations for a new filter row
+        :param group: The parent group box area
+        """
+        effect = QGraphicsOpacityEffect(group)
+        group.setGraphicsEffect(effect)
         effect.setOpacity(0.0)
-        filter_group.setMaximumHeight(0)
+        group.setMaximumHeight(0)
 
-        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, filter_group)
-
-        row_data = {
-            'logic'    : logic_combo,
-            'column'   : column_combo,
-            'condition': condition_combo,
-            'stack'    : input_stack,
-            'val_label': val_label,
-            'inputs'   : {
-                'text'    : text_input,
-                'number'  : number_input,
-                'category': category_input,
-                'date'    : date_input
-            },
-            'group'    : filter_group
-        }
-        self.filter_rows.append(row_data)
-
-        # Execute animation sequence
         anim_group = QParallelAnimationGroup(self)
 
-        height_anim = QPropertyAnimation(filter_group, b"maximumHeight")
-        height_anim.setDuration(250)
+        height_anim = QPropertyAnimation(group, b"maximumHeight")
+        height_anim.setDuration(self.animation_duration_ms)
         height_anim.setStartValue(0)
         height_anim.setEndValue(120)
         height_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
         opacity_anim = QPropertyAnimation(effect, b"opacity")
-        opacity_anim.setDuration(250)
+        opacity_anim.setDuration(self.animation_duration_ms)
         opacity_anim.setStartValue(0.0)
         opacity_anim.setEndValue(1.0)
         opacity_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
@@ -378,29 +413,30 @@ class FilterAdvancedDialog(QDialog):
 
         self._active_animations.append(anim_group)
         anim_group.finished.connect(
-            lambda: self._active_animations.remove(anim_group) if anim_group in self._active_animations else None)
+            lambda: self._active_animations.remove(anim_group) if anim_group in self._active_animations else None
+        )
         anim_group.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
 
-        column_combo.currentTextChanged.connect(lambda _, r=row_data: self.update_row_ui(r))
-        condition_combo.currentTextChanged.connect(lambda _, r=row_data: self.update_row_ui(r))
-        logic_combo.currentTextChanged.connect(self.update_preview)
+    def _connect_filter_row_signals(self, row_data: dict, remove_btn: QPushButton) -> None:
+        """
+        Connect signals for a given filter row
+        :param row_data: The data for the current row
+        :param remove_btn: The remove button slot for the current row
+        """
+        row_data["column"].currentTextChanged.connect(lambda _, r=row_data: self.update_row_ui(r))
+        row_data["condition"].currentTextChanged.connect(lambda _, r=row_data: self.update_row_ui(r))
+        row_data["logic"].currentTextChanged.connect(self.update_preview)
+        row_data["logic"].currentTextChanged.connect(lambda text, r=row_data: self._update_logic_styling(r, text))
 
-        logic_combo.currentTextChanged.connect(lambda text, r=row_data: self._update_logic_styling(r, text))
-
+        text_input = row_data["inputs"]["text"]
         text_input.textChanged.connect(self.update_preview)
-        number_input.valueChanged.connect(self.update_preview)
-        category_input.currentTextChanged.connect(self.update_preview)
-        date_input.dateChanged.connect(self.update_preview)
+        text_input.returnPressed.connect(self.validate_and_accept)
+
+        row_data["inputs"]["number"].valueChanged.connect(self.update_preview)
+        row_data["inputs"]["category"].currentTextChanged.connect(self.update_preview)
+        row_data["inputs"]["date"].dateChanged.connect(self.update_preview)
+
         remove_btn.clicked.connect(lambda _, r=row_data: self.remove_filter_row(r))
-
-        self.update_row_ui(row_data)
-        self._update_logic_styling(row_data, "ROOT" if row_index == 0 else logic_combo.currentText())
-
-        if row_index > 0:
-            column_combo.setFocus()
-
-        self.update_preview()
-        QTimer.singleShot(60, self._scroll_to_bottom)
 
     def _scroll_to_bottom(self) -> None:
         """Scrolls to the bottom of the filter list"""
@@ -462,36 +498,21 @@ class FilterAdvancedDialog(QDialog):
                 row["logic"].setVisible(True)
                 self._update_logic_styling(row, row["logic"].currentText())
 
-    def update_row_ui(self, row: dict):
+    def update_row_ui(self, row: dict) -> None:
         """Update the input widget based on the datatype of selected column and the selected condition"""
         col_name = row["column"].currentText()
         cond_combo = row["condition"]
 
+        col_dtype = pd.Series(dtype="object").dtype
         df = self.data_handler.df
-        if df is None or col_name not in df.columns:
-            col_dtype = pd.Series(dtype="object").dtype
-        else:
+        if df is None and col_name in df.columns:
             col_dtype = df[col_name].dtype
 
-        if pd.api.types.is_numeric_dtype(col_dtype) or pd.api.types.is_datetime64_any_dtype(col_dtype):
-            valid_conditions = self.NumericConditions
-        else:
-            valid_conditions = self.StringConditions
-        current_cond = cond_combo.currentText()
-        current_items = [cond_combo.itemText(i) for i in range(cond_combo.count())]
-
-        if current_items != valid_conditions:
-            cond_combo.blockSignals(True)
-            cond_combo.clear()
-            cond_combo.addItems(valid_conditions)
-            if current_cond in valid_conditions:
-                cond_combo.setCurrentText(current_cond)
-            else:
-                cond_combo.setCurrentIndex(0)
-            cond_combo.blockSignals(False)
+        self._update_condition_combo_for_dtype(cond_combo, col_dtype)
 
         cond_display = cond_combo.currentText()
         condition = self.ConditionMap.get(cond_display, cond_display)
+
         stack = row["stack"]
         val_label = row["val_label"]
 
@@ -505,92 +526,95 @@ class FilterAdvancedDialog(QDialog):
         stack.setVisible(True)
         val_label.setVisible(True)
 
-        if col_name not in self._column_stats_cache:
-            stats: Dict[str, Any] = {}
+        col_stats = self._get_or_compute_col_stats(col_name, col_dtype)
+        self._configure_input_stack_for_column(row, col_dtype, col_stats, condition)
 
-            if df is not None and col_name in df.columns:
-                col_data = df[col_name].dropna()
+        active_widget = stack.currentWidget()
+        if active_widget.isVisible() and active_widget.isEnabled():
+            active_widget.setFocus()
+            self._animate_widget_transition(active_widget)
 
-                if pd.api.types.is_numeric_dtype(col_dtype):
-                    if not col_data.empty:
-                        stats["min"] = float(col_data.min())
-                        stats["max"] = float(col_data.max())
-                    elif pd.api.types.is_datetime64_any_dtype(col_dtype):
-                        if not col_data.empty:
-                            stats["max_date"] = col_data.max()
-                    elif pd.api.types.is_object_dtype(col_dtype) or pd.api.types.is_categorical_dtype(
-                            col_dtype) or pd.api.types.is_string_dtype(col_dtype):
-                        sample_data = col_data if len(col_data) <= 500000 else col_data.head(500000)
-                        unique_vals = sample_data.unique()
-                        if len(unique_vals) < 1000:
-                            stats["unique"] = sorted([str(v) for v in unique_vals])
+        self.update_preview()
 
-                self._column_stats_cache[col_name] = stats
+    def _update_condition_combo_for_dtype(self, cond_combo: QComboBox, col_dtype: Any) -> None:
+        """
+        Ensures the conditon combo box only shows valid options for the data type
+        :param cond_combo: The conditional combo box widget
+        :param col_dtype: The data type of the column
+        """
+        if pd.api.types.is_numeric_dtype(col_dtype) or pd.api.types.is_datetime64_any_dtype(col_dtype):
+            valid_conditions = self.NumericConditions
+        else:
+            valid_conditions = self.StringConditions
 
-        col_stats = self._column_stats_cache.get(col_name, {})
+        current_cond = cond_combo.currentText()
+        current_items = [cond_combo.itemText(i) for i in range(cond_combo.count())]
+
+        if current_items != valid_conditions:
+            cond_combo.blockSignals(True)
+            cond_combo.clear()
+            cond_combo.addItems(valid_conditions)
+            if current_cond in valid_conditions:
+                cond_combo.setCurrentText(current_cond)
+            else:
+                cond_combo.setCurrentIndex(0)
+            cond_combo.blockSignals(False)
+
+    def _get_or_compute_col_stats(self, col_name: str, col_dtype: Any) -> Dict[str, Any]:
+        """
+        Fetch column statistics or compute them if they are not already calculated
+        :param col_name: The name of the column to be calculated
+        :param col_dtype: The data type of the column
+        """
+        if col_name in self._column_stats_cache:
+            return self._column_stats_cache[col_name]
+
+        stats: Dict[str, Any] = {}
+        df = self.data_handler.df
+
+        if df is not None and col_name in df.columns:
+            col_data = df[col_name].dropna()
+
+            if pd.api.types.is_numeric_dtype(col_dtype) and not col_data.empty:
+                stats["min"] = float(col_data.min())
+                stats["max"] = float(col_data.max())
+            elif pd.api.types.is_datetime64_any_dtype(col_dtype) and not col_data.empty:
+                stats["max_date"] = col_data.max()
+            elif pd.api.types.is_object_dtype(col_dtype) or pd.api.types.is_categorical_dtype(
+                    col_dtype) or pd.api.types.is_string_dtype(col_dtype):
+                sample_data = col_data if len(col_data) <= 500000 else col_data.head(500000)
+                unique_vals = sample_data.unique()
+                if len(unique_vals) < 1000:
+                    stats["unique"] = sorted([str(v) for v in unique_vals])
+
+        self._column_stats_cache[col_name] = stats
+        return stats
+
+    def _configure_input_stack_for_column(self,
+                                          row: dict,
+                                          col_dtype: Any,
+                                          col_stats: Dict[str, Any],
+                                          condition: str) -> None:
+        """
+        Activates and configures the appropriate input widget based on the column data type
+        :param row: The current row
+        :param col_dtype: The data type of the selected column
+        :param col_stats: The statistics of the selected column
+        :param condition: The current condition of the filter
+        """
+        stack = row["stack"]
 
         if pd.api.types.is_numeric_dtype(col_dtype):
-            number_index = 1
-            stack.setCurrentIndex(number_index)
-            if "min" in col_stats and "max" in col_stats:
-                min_val = col_stats["min"]
-                max_val = col_stats["max"]
-                margin = abs(max_val - min_val) * 0.1 if max_val != min_val else 10.0
-                spinbox = row["inputs"]["number"]
-                spinbox.setRange(min_val - margin, max_val + margin)
-
-                range_span = abs(max_val - min_val)
-                if range_span == 0:
-                    step_size = 1.0
-                elif range_span <= 10.0:
-                    step_size = 0.1
-                elif range_span <= 100.0:
-                    step_size = 1.0
-                else:
-                    step_size = round(range_span / 100.0)
-
-                spinbox.setSingleStep(step_size)
-
+            stack.setCurrentIndex(1)
+            self._configure_numeric_input(row["inputs"]["number"], col_stats)
         elif pd.api.types.is_datetime64_any_dtype(col_dtype):
-            datetime_index = 3
-            stack.setCurrentIndex(datetime_index)
-            if "max_date" in col_stats:
-                max_date = col_stats["max_date"]
-                try:
-                    qdate = QDate(max_date.year, max_date.month, max_date.day)
-                    if qdate.isValid():
-                        row["inputs"]["date"].setDate(qdate)
-                except Exception:
-                    pass
+            stack.setCurrentIndex(3)
+            self._configure_date_input(row["inputs"]["date"], col_stats)
         elif pd.api.types.is_object_dtype(col_dtype) or pd.api.types.is_categorical_dtype(
                 col_dtype) or pd.api.types.is_string_dtype(col_dtype):
             if "unique" in col_stats:
-                unique_vals_index = 2
-                stack.setCurrentIndex(unique_vals_index)
-                combo = row["inputs"]["category"]
-
-                sorted_vals = col_stats["unique"]
-                current_vals = [combo.itemText(i) for i in range(combo.count())]
-                if current_vals != sorted_vals:
-                    combo.clear()
-                    combo.addItems(sorted_vals)
-                    if combo.lineEdit():
-                        combo.lineEdit().clear()
-                combo.setEditable(True)
-                combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-                if combo.lineEdit():
-                    combo.lineEdit().setPlaceholderText("Select or type...")
-                    try:
-                        combo.lineEdit().returnPressed.disconnect()
-                    except TypeError:
-                        pass
-                    combo.lineEdit().returnPressed.connect(self.validate_and_accept)
-
-                completer = QCompleter(sorted_vals, combo)
-                completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-                completer.setFilterMode(Qt.MatchFlag.MatchContains)
-                completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
-                combo.setCompleter(completer)
+                stack.setCurrentIndex(2)
+                self._configure_category_input(row["inputs"]["category"], col_stats["unique"])
             else:
                 stack.setCurrentIndex(0)
                 self._update_text_placeholder(row, condition)
@@ -598,23 +622,96 @@ class FilterAdvancedDialog(QDialog):
             stack.setCurrentIndex(0)
             self._update_text_placeholder(row, condition)
 
-        active_widget = stack.currentWidget()
-        if active_widget.isVisible() and active_widget.isEnabled():
-            active_widget.setFocus()
+    def _configure_numeric_input(self, spinbox: QDoubleSpinBox, col_stats: Dict[str, Any]) -> None:
+        """
+        Setup numerical spinbox ranges and steps
+        :param spinbox: The QDoubleSpinBox widget to be configured
+        :param col_stats: The statistics for the column to determine ranges and steps
+        """
+        if "min" not in col_stats or "max" not in col_stats:
+            return
 
-            effect = QGraphicsOpacityEffect(active_widget)
-            active_widget.setGraphicsEffect(effect)
-            morph_anim = QPropertyAnimation(effect, b"opacity")
-            morph_anim.setDuration(250)
-            morph_anim.setStartValue(0.0)
-            morph_anim.setEndValue(1.0)
-            morph_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        min_val = col_stats["min"]
+        max_val = col_stats["max"]
+        margin = abs(max_val - min_val) * 0.1 if max_val != min_val else 10.0
+        spinbox.setRange(min_val - margin, max_val + margin)
 
-            self._active_animations.append(morph_anim)
-            morph_anim.finished.connect(lambda: self._cleanup_effect_animation(morph_anim, active_widget))
-            morph_anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+        range_span = abs(max_val - min_val)
+        if range_span == 0:
+            step_size = 1.0
+        elif range_span <= 10.0:
+            step_size = 0.1
+        elif range_span <= 100.0:
+            step_size = 1.0
+        else:
+            step_size = round(range_span / 100.0)
 
-        self.update_preview()
+        spinbox.setSingleStep(step_size)
+
+    def _configure_date_input(self, date_input: QDateEdit, col_stats: Dict[str, Any]) -> None:
+        """
+        Setup date input and field maximums for dates
+        :param date_input: The QDateEdit widget
+        :param col_stats: The statistics of the datetime column
+        """
+        if "max_date" not in col_stats:
+            return
+
+        max_date = col_stats["max_date"]
+        try:
+            qdate = QDate(max_date.year, max_date.month, max_date.day)
+            if qdate.isValid():
+                date_input.setDate(qdate)
+        except (TypeError, ValueError):
+            global_signals.request_toast("Datetime Error", "There is an error in the datetime column",
+                                         ToastLevel.WARNING)
+
+    def _configure_category_input(self, combo: QComboBox, unique_vals: list[str]) -> None:
+        """
+        Setup combo box with auto-completer for categorical inputs
+        :param combo: The combobox widget
+        :param unique_vals: The unique values for the categorical column
+        """
+        current_vals = [combo.itemText(i) for i in range(combo.count())]
+        if current_vals != unique_vals:
+            combo.clear()
+            combo.addItems(unique_vals)
+            if combo.lineEdit():
+                combo.lineEdit().clear()
+
+        combo.setEditable(True)
+        combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+
+        if combo.lineEdit():
+            combo.lineEdit().setPlaceholderText("Select or type...")
+            try:
+                combo.lineEdit().returnPressed.disconnect()
+            except TypeError:
+                pass
+            combo.lineEdit().returnPressed.connect(self.validate_and_accept)
+
+        completer = QCompleter(unique_vals, combo)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        combo.setCompleter(completer)
+
+    def _animate_widget_transition(self, widget: QWidget) -> None:
+        """
+        Apply a fade-in animation to a newly visible widget
+        :param widget: The target widget
+        """
+        effect = QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(effect)
+        morph_anim = QPropertyAnimation(effect, b"opacity")
+        morph_anim.setDuration(self.animation_duration_ms)
+        morph_anim.setStartValue(0.0)
+        morph_anim.setEndValue(1.0)
+        morph_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._active_animations.append(morph_anim)
+        morph_anim.finished.connect(lambda: self._cleanup_effect_animation(morph_anim, widget))
+        morph_anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
 
     def _update_text_placeholder(self, row: dict, condition: str) -> None:
         """Dynamically update placeholder text to guide the user based on the selected condition."""

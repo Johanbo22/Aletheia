@@ -7,9 +7,10 @@ complete, executable Python scripts that replicate the data loading, processing,
 and visualization steps performed in Aletheia
 """
 
-from typing import Dict, Any, List, Set, Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Set
+
 import pandas as pd
 
 from resources.version import APPLICATION_NAME
@@ -18,6 +19,9 @@ class CodeExporter:
     """
     Generates a complete, runnable Python script by inspecting
     the final UI state of the DataHandler and PlotTab.
+
+    This class is providing a reproducible artifact of the user's workflow
+    to ensure greater interoperability.
     """
     
     def __init__(self) -> None:
@@ -69,7 +73,15 @@ class CodeExporter:
             self.imports.add("from scipy.stats import gaussian_kde")
 
     def _clean_value(self, value: Any) -> str:
-        """Helper to format values for insertion into code safely."""
+        """
+        Sanitizes and formats values for insertion into generated Python code strings
+
+        This method ensures that retrieved configuration values are correctly stringified with
+        appropriate Python syntax. This is done to prevent syntax errors and injection flaws in the
+        final exported scrip
+        :param value: The raw value retrieved from the configuration
+        :return: A string representation of the value
+        """
         if hasattr(value, "tolist") and hasattr(value, "dtype"):
             return self._clean_value(value.tolist())
         if isinstance(value, str):
@@ -1362,7 +1374,15 @@ class CodeExporter:
                             export_type: str = "Data + Plot"
                             ) -> str:
         """
-        Generate complete script with both data manipulation and plotting.
+        The main method to create a standalone, executable Python script
+
+        :param df: The underlying DataFrame object, used primarily for type inspection and structure checks
+        :param data_filepath: The local path to the data file, used in the generated scripts loading logic
+        :param source_info: A dictionary containing database/Google Sheets credentials / queries
+        :param data_operations: Sequential list of data mutations performed
+        :param plot_config: Plot configuration settings defining the plot
+        :param export_type: Defines the scope of the export
+        :return: A fully formatted, executable Python script as a string.
         """
     
         self._add_imports(plot_config)
@@ -1388,7 +1408,16 @@ class CodeExporter:
         return full_script
 
     def get_plot_script_only(self, df: pd.DataFrame, plot_config: Dict[str, Any]) -> str:
-        """get the create_plot script for the script editor"""
+        """
+        Generates an isolated script containing only the plotting logic
+
+        This is designed for scenarios where data is loaded in memory and is
+        to be used inside the embedded ScriptEditor
+
+        :param df: The source DataFrame to be visualized
+        :param plot_config: Configuration dictionary with the visual appearance of the plot
+        :return: Python code string containing the plot creation logic
+        """
         
         self._add_imports(plot_config)
         

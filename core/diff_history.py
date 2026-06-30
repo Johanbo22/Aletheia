@@ -6,6 +6,7 @@ to avoid storing full DataFrame copies for each history state.
 """
 import hashlib
 import json
+import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -34,7 +35,12 @@ class OperationType(str, Enum):
 
 @dataclass
 class ColumnDiff:
-    """Represents changes to a single column."""
+    """
+    Represents changes isolated to a single column during a DataFrame operation
+
+    This tracks references to the underlying memory buffers before and after an operation
+    allowing the reconstruction of columns without retaining full DataFrame copies
+    """
     column_name: str
     operation: str
     old_data_ref: Optional[str] = None  # Reference to old buffer
@@ -44,7 +50,12 @@ class ColumnDiff:
 
 @dataclass
 class DiffRecord:
-    """A complete diff record for a single operation."""
+    """
+    A delta record capturing the transformation from one DataFrame state to another
+
+    Maintains references to added, dropped, and modified columns as well as parameters required
+    to invert the operation
+    """
     operation_type: OperationType
     timestamp: float
     description: str
@@ -58,7 +69,12 @@ class DiffRecord:
 
 @dataclass
 class BufferRef:
-    """Reference-counted buffer for memory management."""
+    """
+    A reference-counted memory buffer for managing underlying DataFrame arrays
+
+    Used by the BufferManager to track active usages of a specific data array across
+    different states in the history tree, ensuring memory is freed when no longer needed
+    """
     buffer_id: str
     data: np.ndarray
     ref_count: int = 1
@@ -71,7 +87,10 @@ class BufferRef:
 class BufferManager:
     """
     Manages shared data buffers with reference counting
-    Implements a CoW system to minimize memory usage
+
+    This class implements a Copy-on-Write (Cow) system to minimize memory usage
+    by making sure duplicate data columns across different state share the same
+    NumPy array in memory
     """
 
     def __init__(self) -> None:
@@ -79,9 +98,17 @@ class BufferManager:
         self._total_memory_bytes: int = 0
 
     def register_buffer(self, data: np.ndarray, buffer_id: Optional[str] = None) -> str:
-        """Register a new buffer and return its ID"""
+        """
+        Register a new data buffer or increment the reference count of an existing one
+
+        By sharing references to identical data arrays, memory footprint is reduced during operations
+        that only alter specific columns
+
+        :param data: The NumPy array containing column data to be stored
+        :param buffer_id: An optional identifier. If None, an MD5 hash of the data properties is generated
+        :return: The assigned or generated unique buffer identifier
+        """
         if buffer_id is None:
-            import time
             hash_input = f"{time.time()}{id(data)}{data.shape}"
             buffer_id = hashlib.md5(hash_input.encode()).hexdigest()[:16]
 
@@ -100,7 +127,13 @@ class BufferManager:
         return buffer_id
 
     def acquire(self, buffer_id: str) -> np.ndarray:
-        """Acquire the reference to an exsisting buffer"""
+        """
+        Acquire a copy of the data from an existing buffer and increment the reference count
+
+        :param buffer_id: The identifier of the target buffer
+        :return: A copy of the NumPy array
+        :raises KeyError: If the provided buffer_id does not exist
+        """
         if buffer_id not in self._buffers:
             raise KeyError(f"Buffer {buffer_id} not found")
 
@@ -108,7 +141,11 @@ class BufferManager:
         return self._buffers[buffer_id].data.copy()
 
     def release(self, buffer_id: str) -> None:
-        """Release a reference to a buffer"""
+        """
+        Release a reference to a buffer, freeing memory if the count is zero
+
+        :param buffer_id: The identifier of the target buffer
+        """
         if buffer_id not in self._buffers:
             return
 
@@ -120,39 +157,63 @@ class BufferManager:
             del self._buffers[buffer_id]
 
     def get_buffer(self, buffer_id: str) -> Optional[np.ndarray]:
-        """Get the buffer data without modifying reference count"""
+        """
+        Retrieve the buffer data without modifying its reference count
+
+        :param buffer_id: The identifier of the target buffer
+        :return: The NumPy array if found, else None
+        """
         if buffer_id in self._buffers:
             return self._buffers[buffer_id].data
         return None
 
     @property
     def total_memory_bytes(self) -> int:
-        """Total memory in bytes used by all buffers"""
+        """
+        Calculate the total memory footprint currently used by all stored buffers
+
+        :return: Total memory in bytes
+        """
         return self._total_memory_bytes
 
     def cleanup(self) -> None:
-        """Clear all buffers"""
+        """
+        Clear all stored buffers and reset memory tracking to zero
+        """
         self._buffers.clear()
         self._total_memory_bytes = 0
 
 @dataclass
 class HistoryNode:
-    """Represents a discrete state in the transformation tree"""
+    """
+    Represents a discrete state in the transformation tree
+
+    Each node points to its parent and children, and contains the DiffRecord
+    necessary to transition from its parent state to its own state
+    """
     node_id: str
     parent_id: Optional[str]
     diff_record: Optional[DiffRecord] = None
     children_ids: List[str] = field(default_factory=list)
     sort_state: Optional[Tuple[str, bool]] = ("[Index]", True)
-    created_at: float = field(default_factory=lambda: __import__("time").time())
+    created_at: float = field(default_factory=time.time)
 
 class DiffHistoryManager:
     """
-    A memory-efficient history manager using a branching tree system.
-    1. Stores states as nodes in a Directed Acyclic Graph (DAG)
-    2. Uses Lowest Common Ancestor (LCA) algorithms for branch hopping
+    A memory-efficient history manager using a branching tree system
+
+    Stores DataFrame transition states as nodes in a Directed Acyclic Graph
+    and uses Lowest Common Ancestor algorithms to reconstruct states when
+    jumping between branches. This prevents the need to duplicate entire DataFrames
+    at each procedural step
     """
 
-    def __init__(self, max_history_memory_bytes: int = 1024 * 1024 * 1024):
+    def __init__(self, max_history_memory_bytes: int = 1024 * 1024 * 1024) -> None:
+        """
+        Initialize the history manager with memory constraints
+
+        :param max_history_memory_bytes: Maximum memory allowed for data in bytes, defaults to 1GB
+        """
         self.buffer_manager = BufferManager()
         self.max_history_memory_bytes = max_history_memory_bytes
         self.current_memory_bytes = 0
@@ -251,10 +312,66 @@ class DiffHistoryManager:
                     self.buffer_manager.release(col_diff.new_data_ref)
         return freed
 
+    def _get_dropped_column_diffs(self, old_df: pd.DataFrame, dropped_cols: set) -> List[ColumnDiff]:
+        """Generate ColumnDiffs for columns removed in the new state"""
+        diffs = []
+        for col in dropped_cols:
+            buffer_id = self.buffer_manager.register_buffer(old_df[col].values.copy())
+            diffs.append(ColumnDiff(
+                column_name=col,
+                operation="drop",
+                old_data_ref=buffer_id,
+                metadata={"dtype": str(old_df[col].dtype)}
+            ))
+        return diffs
+
+    def _get_added_columns_diffs(self, new_df: pd.DataFrame, added_cols: set) -> List[ColumnDiff]:
+        """Generate ColumnDiffs for newly introduced columns"""
+        diffs = []
+        for col in added_cols:
+            buffer_id = self.buffer_manager.register_buffer(new_df[col].values.copy())
+            diffs.append(ColumnDiff(
+                column_name=col,
+                operation="add",
+                new_data_ref=buffer_id,
+                metadata={"dtype": str(new_df[col].dtype)}
+            ))
+        return diffs
+
+    def _get_modified_column_diffs(self, old_df: pd.DataFrame, new_df: pd.DataFrame, common_cols: set) -> List[
+        ColumnDiff]:
+        """Generate ColumnDiffs with bitmasks for modified columns to maximize memory usage"""
+        diffs = []
+        indices_identical = old_df.index.equals(new_df.index)
+
+        for col in common_cols:
+            if old_df[col].equals(new_df[col]):
+                continue
+
+            old_ref = self.buffer_manager.register_buffer(old_df[col].values.copy())
+            new_ref = self.buffer_manager.register_buffer(new_df[col].values.copy())
+
+            mask = None
+            if indices_identical:
+                try:
+                    s1, s2 = old_df[col], new_df[col]
+                    mask = (s1.values != s2.values) & ~(s1.isna().values & s2.isna().values)
+                except (TypeError, ValueError):
+                    mask = np.ones(len(old_df), dtype=bool)
+
+            diffs.append(ColumnDiff(
+                column_name=col,
+                operation="modify",
+                old_data_ref=old_ref,
+                new_data_ref=new_ref,
+                mask=mask,
+                metadata={"dtype": str(new_df[col].dtype)}
+            ))
+        return diffs
+
     def _create_diff_from_operation(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: OperationType,
                                     params: Dict[str, Any]) -> DiffRecord:
         """Create a diff record by comparing old and new DataFrames."""
-        import time
         record = DiffRecord(
             operation_type=operation_type,
             timestamp=time.time(),
@@ -262,62 +379,21 @@ class DiffHistoryManager:
             metadata=params.copy()
         )
 
-        record.metadata['old_index'] = old_df.index.copy(deep=True)
-        record.metadata['new_index'] = new_df.index.copy(deep=True)
+        record.metadata["old_index"] = old_df.index.copy(deep=True)
+        record.metadata["new_index"] = new_df.index.copy(deep=True)
+        record.metadata["old_columns"] = list(old_df.columns)
+        record.metadata["new_columns"] = list(new_df.columns)
 
         old_cols = set(old_df.columns)
         new_cols = set(new_df.columns)
 
-        dropped = old_cols - new_cols
-        record.dropped_columns = list(dropped)
-        for col in dropped:
-            buffer_id = self.buffer_manager.register_buffer(old_df[col].values.copy())
-            col_diff = ColumnDiff(
-                column_name=col,
-                operation="drop",
-                old_data_ref=buffer_id,
-                metadata={"dtype": str(old_df[col].dtype)}
-            )
-            record.column_diffs.append(col_diff)
-
-        added = new_cols - old_cols
-        record.added_columns = list(added)
-        for col in added:
-            buffer_id = self.buffer_manager.register_buffer(new_df[col].values.copy())
-            col_diff = ColumnDiff(
-                column_name=col,
-                operation="add",
-                new_data_ref=buffer_id,
-                metadata={"dtype": str(new_df[col].dtype)}
-            )
-            record.column_diffs.append(col_diff)
-
+        record.dropped_columns = list(old_cols - new_cols)
+        record.added_columns = list(new_cols - old_cols)
         common_cols = old_cols & new_cols
-        indices_identical = old_df.index.equals(new_df.index)
 
-        for col in common_cols:
-            if not old_df[col].equals(new_df[col]):
-                old_ref = self.buffer_manager.register_buffer(old_df[col].values.copy())
-                new_ref = self.buffer_manager.register_buffer(new_df[col].values.copy())
-
-                mask = None
-                if indices_identical:
-                    try:
-                        s1 = old_df[col]
-                        s2 = new_df[col]
-                        mask = (s1.values != s2.values) & ~(s1.isna().values & s2.isna().values)
-                    except (TypeError, ValueError):
-                        mask = np.ones(len(old_df), dtype=bool)
-
-                col_diff = ColumnDiff(
-                    column_name=col,
-                    operation="modify",
-                    old_data_ref=old_ref,
-                    new_data_ref=new_ref,
-                    mask=mask,
-                    metadata={"dtype": str(new_df[col].dtype)}
-                )
-                record.column_diffs.append(col_diff)
+        record.column_diffs.extend(self._get_dropped_column_diffs(old_df, set(record.dropped_columns)))
+        record.column_diffs.extend(self._get_added_columns_diffs(new_df, set(record.added_columns)))
+        record.column_diffs.extend(self._get_modified_column_diffs(old_df, new_df, common_cols))
 
         record.inverse_params = self._compute_inverse_params(operation_type, params, old_df, new_df)
 
@@ -341,7 +417,19 @@ class DiffHistoryManager:
 
     def save_state(self, old_df: pd.DataFrame, new_df: pd.DataFrame, operation_type: Union[OperationType, str],
                    params: Dict[str, Any], operation_log_entry: Optional[Dict[str, Any]] = None) -> str:
-        """Save a state transition as a new node, branching if necessary. Returns the new node_id."""
+        """
+        Save a state transition as a new node in the history DAG, branching if necessary
+
+        This method calculates the delta between old and new DataFrames, creating a DiffRecord
+        It force a memory limit after state creation and can delete old nodes
+
+        :param old_df: The DataFrame prior to the operation
+        :param new_df: The DataFrame state after the operation
+        :param operation_type: The type of operation performed
+        :param params: Metadata and parameters associated with the operation
+        :param operation_log_entry: Optional log entry for macro generation
+        :return: The UUID of the created history node
+        """
         if isinstance(operation_type, str):
             operation_type = OperationType(operation_type)
 
@@ -379,31 +467,43 @@ class DiffHistoryManager:
         )
         return new_node_id
 
+    def _get_path_to_root(self, start_node_id: str) -> List[str]:
+        """Traverse upwards to retrieve the path from a node to the root"""
+        path = []
+        curr = start_node_id
+        while curr:
+            path.append(curr)
+            curr = self.nodes[curr].parent_id
+        return path
+
+    def _find_lowest_common_ancestor(self, path_a: List[str], path_b: List[str]) -> Optional[str]:
+        """Find the most recent common ancestor between two lineage paths."""
+        set_b = set(path_b)
+        for node_id in path_a:
+            if node_id in set_b:
+                return node_id
+        return None
+
     def checkout(self, current_df: pd.DataFrame, target_node_id: str) -> Tuple[Optional[pd.DataFrame], bool]:
-        """Navigate to any node in the tree using LCA algorithm"""
+        """
+        Navigate to any specified node in the history tree using the LCA algorithm
+
+        This allows for jumping between disconnected branches by rewinding to a common ancestor
+        and applying the forward diffs toward the target state
+
+        :param current_df: The current active DataFrame to apply the transformation against
+        :param target_node_id: The UUID of the destination node.
+        :return: A tuple containing a reconstructed DataFrame and a success flag
+        """
         if target_node_id not in self.nodes:
             return None, False
 
         if target_node_id == self.current_node_id:
             return current_df, True
 
-        current_path = []
-        curr = self.current_node_id
-        while curr:
-            current_path.append(curr)
-            curr = self.nodes[curr].parent_id
-
-        target_path = []
-        curr = target_node_id
-        while curr:
-            target_path.append(curr)
-            curr = self.nodes[curr].parent_id
-
-        lca_id = None
-        for node_id in current_path:
-            if node_id in target_path:
-                lca_id = node_id
-                break
+        current_path = self._get_path_to_root(self.current_node_id)
+        target_path = self._get_path_to_root(target_node_id)
+        lca_id = self._find_lowest_common_ancestor(current_path, target_path)
 
         if not lca_id:
             return None, False
@@ -429,14 +529,24 @@ class DiffHistoryManager:
         return df, True
 
     def undo(self, current_df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], bool]:
-        """Wrapper to checkout parent node"""
+        """
+        Navigate to the parent node of the currently active history state
+
+        :param current_df: The currently active DataFrame object
+        :return: A tuple containing the reconstructed data and a success flag
+        """
         parent_id = self.nodes[self.current_node_id].parent_id
         if not parent_id:
             return None, False
         return self.checkout(current_df, parent_id)
 
     def redo(self, current_df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], bool]:
-        """Wrapper to checkout the most recently created child node"""
+        """
+        Navigate to the most recently created child node of the current state
+
+        :param current_df: The currently active DataFrame object
+        :return: A tuple containing the reconstructed child DataFrame and a success flag
+        """
         children = self.nodes[self.current_node_id].children_ids
         if not children:
             return None, False
@@ -484,6 +594,11 @@ class DiffHistoryManager:
             if old_name in df.columns and new_name not in df.columns:
                 df = df.rename(columns={old_name: new_name})
 
+        new_columns = diff_record.metadata.get("new_columns")
+        if new_columns is not None:
+            existing_cols = [col for col in new_columns if col in df.columns]
+            df = df[existing_cols]
+
         return df
 
     def _apply_inverse_diff(self, current_df: pd.DataFrame, diff_record: DiffRecord) -> pd.DataFrame:
@@ -523,20 +638,32 @@ class DiffHistoryManager:
             else:
                 df[col_diff.column_name] = old_data
 
+        old_columns = diff_record.metadata.get("old_columns")
+        if old_columns is not None:
+            existing_cols = [col for col in old_columns if col in df.columns]
+            df = df[existing_cols]
+
         return df
 
     def can_undo(self) -> bool:
+        """Check if an undo operation is possible from the current state"""
         if not hasattr(self, 'nodes') or not hasattr(self, 'current_node_id'):
             return False
         return self.nodes[self.current_node_id].parent_id is not None
 
     def can_redo(self) -> bool:
+        """Check if a redo operation is possible from the current state"""
         if not hasattr(self, 'nodes') or not hasattr(self, 'current_node_id'):
             return False
         return len(self.nodes[self.current_node_id].children_ids) > 0
 
     def clear(self) -> None:
-        """Clear all history and free all buffers."""
+        """
+        Clear all history branches and free memory buffers
+
+        This resets the DAG back to a single root node and triggers a memory cleanup
+        :return:
+        """
         self.root_id = str(uuid.uuid4())
         self.nodes = {self.root_id: HistoryNode(node_id=self.root_id, parent_id=None)}
         self.current_node_id = self.root_id
@@ -548,7 +675,11 @@ class DiffHistoryManager:
         self._notify_memory_usage()
 
     def get_history_info(self) -> Dict[str, Any]:
-        """Get information about history state using tree traversal."""
+        """
+        Retrieve diagnostics and state information regarding the current history DAG
+
+        :return: A dictionary payload containing node metrics, macro history and memory usage
+        """
         path_to_root = []
         curr = self.current_node_id
         while curr and curr != self.root_id:
@@ -566,7 +697,12 @@ class DiffHistoryManager:
         }
 
     def export_pipeline_macro(self, filepath: Union[str, Path]) -> None:
-        """Export operation log to JSON file."""
+        """
+        Export the continuous operation log to a JSON file
+
+        :param filepath: The destination file path to save the macro
+        :raises ValueError: If the operation log is currently empty
+        """
         if not self.operation_log:
             raise ValueError("No operations to export")
 
@@ -578,7 +714,13 @@ class DiffHistoryManager:
             self,
             macro_source: Union[str, Path, List[Dict[str, Any]]]
     ) -> List[Dict[str, Any]]:
-        """Load operations from JSON file or list."""
+        """
+        Load a sequence of operations from a JSON file or list
+
+        :param macro_source: The source path or direct list of operations to load
+        :return: A list of operation dictonaries representing the operation steps
+        :raises ValueError: If the provided source is invalid or unreadable.
+        """
         if isinstance(macro_source, (str, Path)):
             source_path = Path(macro_source)
             with source_path.open("r", encoding="utf-8") as f:
