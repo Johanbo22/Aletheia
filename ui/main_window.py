@@ -186,15 +186,18 @@ class MainWindow(QWidget):
         prompts to recovery after a crash
         """
         if self.project_manager.has_autosave():
-            reply = QMessageBox.question(
-                self,
-                "Recover Project",
-                "It looks like the application closed unexpectedly during your last session.\n\n"
-                "Would you like to recover your unsaved work?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
-            )
-            if reply == QMessageBox.StandardButton.Yes:
+            reply_box = QMessageBox(self)
+            reply_box.setWindowTitle("Recover Project")
+            reply_box.setText("It looks like the application closed unexpectedly during your last session.")
+            reply_box.setInformativeText("Would you like to recover your unsaved work?")
+            reply_box.setIcon(QMessageBox.Icon.Information)
+
+            recover_btn = reply_box.addButton("Recover Session", QMessageBox.ButtonRole.AcceptRole)
+            discard_btn = reply_box.addButton("Discard Autosave", QMessageBox.ButtonRole.DestructiveRole)
+            reply_box.setDefaultButton(recover_btn)
+            reply_box.exec()
+
+            if reply_box.clickedButton() == recover_btn:
                 try:
                     project_data = self.project_manager.recover_autosave()
                     self.load_project(project_data)
@@ -315,7 +318,6 @@ class MainWindow(QWidget):
                 self.show_toast(
                     "File Not Found", "The project file could not be found", ToastLevel.WARNING
                 )
-                QMessageBox.warning(self, "File Not Found", f"The project file could not be found:\n{filepath}")
 
     def _load_project_from_path(self, filepath: str) -> None:
         """Helper method to load project data and handle animations."""
@@ -465,12 +467,15 @@ class MainWindow(QWidget):
                 if not self._confirm_discard_changes():
                     return
             else:
-                reply = QMessageBox.question(
-                    self, "Confirm Clear Workspace",
-                    "Are you sure you want to clear all, subsets and plot configurations?\n\nThis action cannot be undone",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No
-                )
+                reply_box = QMessageBox(self)
+                reply_box.setWindowTitle("Confirm Clear Workspace")
+                reply_box.setText("Are you sure you want to clear all data, subsets, and plot configurations?")
+                reply_box.setInformativeText("This action cannot be undone")
+                reply_box.setIcon(QMessageBox.Icon.Warning)
+                reply_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                reply_box.setDefaultButton(QMessageBox.StandardButton.No)
+                reply = reply_box.exec()
+
                 if reply == QMessageBox.StandardButton.No:
                     return
 
@@ -581,6 +586,8 @@ class MainWindow(QWidget):
         else:
             self.status_bar.log(f"Importing. {filepath}...")
 
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+
         worker = FileImportWorker(self.data_handler, filepath)
         worker.signals.finished.connect(self._on_import_finished)
         worker.signals.error.connect(self._on_import_error)
@@ -614,6 +621,7 @@ class MainWindow(QWidget):
 
     @pyqtSlot(object)
     def _on_import_finished(self, loaded_dataframe) -> None:
+        QApplication.restoreOverrideCursor()
         self.status_bar.show_progress(False)
         if self.progress_dialog:
             self.progress_dialog.update_progress(90, "Updating Interface")
@@ -638,6 +646,7 @@ class MainWindow(QWidget):
 
     @pyqtSlot(Exception)
     def _on_import_error(self, error: Exception) -> None:
+        QApplication.restoreOverrideCursor()
         self.status_bar.show_progress(False)
         if self.progress_dialog:
             self.progress_dialog.accept()
@@ -803,6 +812,7 @@ class MainWindow(QWidget):
                 return
 
         dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Icon.Question)
         dialog.setWindowTitle("Export Python Script")
         dialog.setText("Choose the components to include in the exported Python script:")
         dialog.setInformativeText(

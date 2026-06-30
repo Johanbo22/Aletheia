@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
             header.title = 'Click to collapse/expand result';
             
             const indicator = document.createElement('span');
-            indicator.innerHTML = '&#9660;';
+            indicator.textContent = '▼';
             indicator.className = 'toggle-icon';
             header.prepend(indicator);
             
@@ -82,14 +82,14 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const successful = document.execCommand('copy');
                 if (successful) {
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '&#10003; Copied!';
+                    const originalText = btn.textContent;
+                    btn.textContent = '✓ Copied!';
                     btn.style.color = '#166534';
                     btn.style.backgroundColor = '#dcfce7';
                     btn.style.borderColor = '#bbf7d0';
 
                     setTimeout(() => {
-                        btn.innerHTML = originalText;
+                        btn.textContent = originalText;
                         btn.style.color = '';
                         btn.style.backgroundColor = '';
                         btn.style.borderColor = '';

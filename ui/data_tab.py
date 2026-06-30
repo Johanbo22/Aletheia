@@ -12,6 +12,7 @@ from pandas import DataFrame
 
 from controller.data_tab_controller import DataTabController
 from core.data_handler import DataHandler
+from core.global_signals import ToastLevel, global_signals
 from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
 from ui.LandingPage import LandingPage
@@ -162,12 +163,8 @@ class DataTab(QWidget):
         self.search_shortcut.activated.connect(self.open_search_bar)
 
         self.esc_shortcut = QShortcut(QKeySequence("Esc"), self.search_bar)
-        self.esc_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcutShortcut)
+        self.esc_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.esc_shortcut.activated.connect(self.search_bar.close_search)
-
-        self.clear_selection_shortcut = QShortcut(QKeySequence("Esc"), self.data_table)
-        self.clear_selection_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
-        self.clear_selection_shortcut.activated.connect(self.data_table.clearSelection)
 
         layout.addWidget(self.search_bar)
 
@@ -186,6 +183,8 @@ class DataTab(QWidget):
         self.data_table.setItemDelegate(self.table_delegate)
         self.data_table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
         self.data_table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerItem)
+
+        self.data_table.doubleClicked.connect(self._on_table_double_clicked)
 
         palette: QPalette = self.data_table.palette()
         active_highlight: QColor | Any = palette.color(QPalette.ColorGroup.Active, QPalette.ColorRole.Highlight)
@@ -231,6 +230,15 @@ class DataTab(QWidget):
         self.right_widget = right_widget
 
         return right_widget
+
+    def _on_table_double_clicked(self) -> None:
+        """
+        Guidance if trying to edit without edit mode enabled
+        DataTable.EditTrigger is set to NoEditTriggers to avoid unintentional data changes
+        """
+        if not self.is_editing:
+            global_signals.request_toast("Read-Only Mode", "Enable Edit Mode in the toolbar to modify cell values",
+                                         ToastLevel.INFO)
 
     def toggle_edit_mode(self, is_editing: bool) -> None:
         """
