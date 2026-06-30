@@ -174,7 +174,6 @@ class MainWindow(QWidget):
                 self.autosave_indicator.show_indicator()
                 QApplication.processEvents()
                 self.project_manager.auto_save(self.get_project_data())
-                self.status_bar.log("Project autosaved", LogLevel.SUCCESS)
             except Exception as e:
                 self.status_bar.log(f"Autosave failed: {str(e)}", LogLevel.ERROR)
             finally:
@@ -454,17 +453,18 @@ class MainWindow(QWidget):
     def clear_all(self) -> None:
         """Clear all data"""
         if self.data_handler.df is not None:
-            reply = QMessageBox.question(
-                self, "Confirm Clear Workspace",
-                "Are you sure you want to clear all data, subsets, and plot configurations?\n\nThis action cannot be undone.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.No:
-                return
-
-            if not self._confirm_discard_changes():
-                return
+            if self._unsaved_changes:
+                if not self._confirm_discard_changes():
+                    return
+            else:
+                reply = QMessageBox.question(
+                    self, "Confirm Clear Workspace",
+                    "Are you sure you want to clear all, subsets and plot configurations?\n\nThis action cannot be undone",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
 
         self.data_handler.df = None
         self.data_handler.original_df = None
@@ -531,15 +531,23 @@ class MainWindow(QWidget):
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle the dropped event as import file"""
         urls = event.mimeData().urls()
-        if urls and urls[0].isLocalFile():
-            filepath = urls[0].toLocalFile()
-            path_obj = Path(filepath)
-            project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+        if urls:
+            if len(urls) > 1:
+                self.show_toast(
+                    "Multiple Files Dropped",
+                    "Only the first file will be loaded",
+                    ToastLevel.INFO
+                )
 
-            if path_obj.suffix.lower() == project_ext:
-                self._load_project_from_path(filepath)
-            else:
-                self.load_file_from_path(filepath)
+            if urls[0].isLocalFile():
+                filepath = urls[0].toLocalFile()
+                path_obj = Path(filepath)
+                project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+
+                if path_obj.suffix.lower() == project_ext:
+                    self._load_project_from_path(filepath)
+                else:
+                    self.load_file_from_path(filepath)
 
     def load_file_from_path(self, filepath: str) -> None:
         """Process and import file from a path string"""
@@ -774,10 +782,12 @@ class MainWindow(QWidget):
                 return
 
         dialog = QMessageBox(self)
-        dialog.setWindowTitle("Export code")
-        dialog.setText("What would you like to export?")
+        dialog.setWindowTitle("Export Python Script")
+        dialog.setText("Choose the components to include in the exported Python script:")
         dialog.setInformativeText(
-            "You can export just the data manipulation pipeline, or include the current Plotting configuration as well")
+            "* Data Pipeline Only: Exports data loading and transformation steps.\n"
+            "* Data + Plotting Logic: Includes both data steps and current plot configurations."
+        )
 
         button_data = dialog.addButton("Data Pipeline Only", QMessageBox.ButtonRole.YesRole)
         button_plot = dialog.addButton("Data + Plotting logic", QMessageBox.ButtonRole.NoRole)

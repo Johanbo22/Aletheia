@@ -5,17 +5,17 @@ Provides mechanisms to catch unhandled exceptions across all threads
 generates a detailed crash report, saves it to disk and transmits to a
 remote server if allowed.
 """
-import sys
 import platform
-import traceback
+import sys
 import threading
+import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Type, Any, Optional
+from typing import Any, Optional, Type
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QApplication, QMessageBox
-from mypyc.crash import crash_report
 
 from core.logger import Logger
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION
@@ -46,10 +46,10 @@ class GlobalErrorHandler:
         sys.excepthook = self._handle_main_thread_exception
         threading.excepthook = self._handle_worker_thread_exception
 
-    def _handle_main_thread_exception( self,
-            exc_type: Type[BaseException],
-            exc_value: BaseException,
-            exc_traceback: Any) -> None:
+    def _handle_main_thread_exception(self,
+                                      exc_type: Type[BaseException],
+                                      exc_value: BaseException,
+                                      exc_traceback: Any) -> None:
         """Handle exceptions occurring in the primary thread"""
         self._process_exception(exc_type, exc_value, exc_traceback)
 
@@ -98,7 +98,7 @@ class GlobalErrorHandler:
             f"OS: {platform.system()} {platform.release()} ({platform.version()})\n"
             f"Python Version: {platform.python_version()}\n"
             f"Platform Architecture: {platform.machine()}\n"
-            f"{'-'*80}\n"
+            f"{'-' * 80}\n"
         )
         try:
             with open(report_path, "w", encoding="utf-8") as f:
@@ -127,9 +127,14 @@ class GlobalErrorHandler:
         msg_box.setText("An unexpected critical error has occurred and the application must close")
         msg_box.setInformativeText(f"A detailed crash report has been saved to:\n{report_path}")
         msg_box.setDetailedText(traceback_str)
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+        open_folder_btn = msg_box.addButton("Open Report Folder", QMessageBox.ButtonRole.ActionRole)
+        msg_box.addButton(QMessageBox.StandardButton.Close)
 
         msg_box.setObjectName("CrashReporter")
         msg_box.exec()
+
+        if msg_box.clickedButton() == open_folder_btn:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(report_path).parent.absolute())))
 
         sys.exit(1)
