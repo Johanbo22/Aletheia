@@ -151,6 +151,11 @@ class DataTableModel(QAbstractTableModel):
         align_right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         align_left = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
 
+        try:
+            missing_counts = self._data.isna().sum()
+        except Exception:
+            missing_counts = None
+
         for i in range(len(self._data.columns)):
             try:
                 dtype = self._data.dtypes.iloc[i]
@@ -161,7 +166,7 @@ class DataTableModel(QAbstractTableModel):
 
             try:
                 if pd.api.types.is_numeric_dtype(dtype):
-                    self._col_alignments.append(align_right)
+                    self._col_alignments.append(alignr_right)
                 else:
                     self._col_alignments.append(align_left)
             except Exception:
@@ -173,10 +178,13 @@ class DataTableModel(QAbstractTableModel):
                 self._col_is_bool.append(False)
 
             try:
-                missing_count = int(self._data.iloc[:, i].isna().sum())
-                self._header_tooltips.append(f"Column: {col_name}\nType: {dtype}\nMissing Values: {missing_count:,}")
+                missing_count = int(missing_counts.iloc[i]) if missing_counts is not None else 0
+                self._header_tooltips.append(
+                    f"Column: {col_name}\nData type: {dtype}"
+                    f"Missing Values: {missing_count:,}"
+                )
             except Exception:
-                self._header_tooltips.append(f"Column: {col_name}\nType: {dtype}")
+                self._header_tooltips.append(f"Column: {col_name}\nData type: {dtype}")
 
     def _infer_boolean_column(self, col_idx: int) -> bool:
         """Infers if a column represents booleans, even if stored as strings or integers"""
