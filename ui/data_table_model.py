@@ -276,13 +276,8 @@ class DataTableModel(QAbstractTableModel):
         except Exception:
             return None
 
-        is_missing = (
-                val is None or
-                val is pd.NA or
-                val is pd.NaT or
-                (isinstance(val, float) and val != val) or
-                (isinstance(val, np.floating) and np.isnan(val))
-        )
+        is_missing = bool(pd.isna(val))
+
         if role == Qt.ItemDataRole.DisplayRole:
             return self._get_display_data(val, col, is_missing)
 
