@@ -118,3 +118,19 @@
 #helpExplorerDialog QScrollBar::sub-page:vertical {
     background: transparent;
 }
+QFrame#helpContentTextPane,
+QFrame#helpContentAnimationPane {
+    background-color: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+QSplitter#helpContentSplitter::handle{
+    background-color: transparent;
+    width: 6px;
+}
+
+QSplitter#helpContentSplitter::handle:hover,
+QSplitter#helpContentSplitter::handle:pressed{
+    background-color: #d1d5db;
+}
