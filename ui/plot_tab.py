@@ -640,7 +640,6 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = True
             self.selection_overlay.show_update_required(True)
             self.status_bar.log("Data change detected. Click 'Generate Plot' to update.", LogLevel.INFO)
-            global_signals.request_toast("Data Changed", "Click 'Generate Plot' to update", ToastLevel.INFO)
 
     def on_style_changed(self) -> None:
         if self._is_clearing:
