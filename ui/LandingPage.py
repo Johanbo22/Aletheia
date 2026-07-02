@@ -299,16 +299,23 @@ class LandingPage(QWidget):
                 content = f"<h3 style='color:red'>Error reading changelog</h3><p>{str(Error)}</p>"
 
         dialog = ChangelogViewer(title, content, self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.exec()
 
     def _populate_recent_projects(self, button_width: int) -> None:
         settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
         recent_files = settings.value("recent_files", [])
 
-        if isinstance(recent_files, str):
+        if not recent_files:
+            recent_files = []
+        elif isinstance(recent_files, str):
             recent_files = [recent_files]
+        elif not isinstance(recent_files, list):
+            recent_files = list(recent_files)
 
-        valid_files = []
+        valid_files: list[str] = []
+        max_history_limit: int = 20
+        max_display_limit: int = 4
 
         while self.recent_projects_layout.count():
             item = self.recent_projects_layout.takeAt(0)
@@ -317,27 +324,45 @@ class LandingPage(QWidget):
                 widget.deleteLater()
 
         if not recent_files:
-            no_recent_label = QLabel("No recent project found")
-            no_recent_label.setObjectName("no_recent_label")
-            no_recent_label.setFixedWidth(button_width)
-            no_recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.recent_projects_layout.addWidget(no_recent_label)
+            self._show_no_recent_projects_label(button_width)
             return
 
         for file_path_str in recent_files:
-            if len(valid_files) >= 4:
+            if len(valid_files) >= max_history_limit:
                 break
+
+            if not isinstance(file_path_str, str):
+                continue
+
             file_path = Path(file_path_str)
-            if file_path.exists():
+            if file_path.exists() and file_path_str not in valid_files:
                 valid_files.append(file_path_str)
+
+        display_files = valid_files[:max_display_limit]
+
+        if not display_files:
+            self._show_no_recent_projects_label(button_width)
+        else:
+            for file_path_str in display_files:
+                file_path = Path(file_path_str)
                 btn = QPushButton(file_path.name)
                 btn.setProperty("size_variant", "large")
                 btn.setToolTip(str(file_path.absolute()))
                 btn.setIcon(IconBuilder.build(IconType.OpenProject))
                 btn.setFixedWidth(button_width)
 
-                btn.clicked.connect(lambda checked, path=file_path_str: self.recent_project_clicked.emit(path))
+                btn.clicked.connect(
+                    lambda checked, path=file_path_str: self.recent_project_clicked.emit(path)
+                )
                 self.recent_projects_layout.addWidget(btn)
 
-        if len(valid_files) != len(recent_files):
+        if valid_files != recent_files:
             settings.setValue("recent_files", valid_files)
+
+    def _show_no_recent_projects_label(self, button_width: int) -> None:
+        """Displays and empty state indicator when no recent projects exist"""
+        no_recent_label = QLabel("No recent projects found")
+        no_recent_label.setObjectName("no_recent_label")
+        no_recent_label.setFixedWidth(button_width)
+        no_recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.recent_projects_layout.addWidget(no_recent_label)
