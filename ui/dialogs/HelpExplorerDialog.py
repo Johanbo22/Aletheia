@@ -308,3 +308,31 @@ class HelpExplorerDialog(QDialog):
         settings.setValue("splitterState", self.splitter.saveState())
         settings.setValue("contentSplitterState", self.content_splitter.saveState())
         super().closeEvent(event)
+
+    def navigate_to_topic(self, topic_id: str) -> None:
+        """
+        Finds the given topic in the tree and selects it.
+
+        :param topic_id: The identifier of the topic to navigate to
+        """
+        if not topic_id:
+            return
+
+        if self.search_input.text():
+            self.search_input.clear()
+
+        for row in range(self.source_model.rowCount()):
+            parent_item = self.source_model.item(row)
+            if not parent_item:
+                continue
+
+            for child_row in range(parent_item.rowCount()):
+                child_item = parent_item.child(child_row)
+                if child_item and child_item.data(Qt.ItemDataRole.UserRole) == topic_id:
+                    source_index = child_item.index()
+                    proxy_index = self.proxy_model.mapFromSource(source_index)
+
+                    if proxy_index.isValid():
+                        self.topic_tree.setCurrentIndex(proxy_index)
+                        self.topic_tree.scrollTo(proxy_index)
+                    return

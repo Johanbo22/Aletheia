@@ -1,22 +1,18 @@
-import importlib.util
-import sys
-from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QUrl, QEvent, QObject
-from PyQt6.QtGui import QDesktopServices, QMouseEvent, QHideEvent, QShowEvent
-from PyQt6.QtWidgets import (
-    QDialog, QDialogButtonBox, QFrame, QLabel,
-    QScrollArea, QVBoxLayout, QWidget, QPushButton, QApplication
-)
+from PyQt6.QtCore import QEvent, QObject, QUrl, Qt
+from PyQt6.QtGui import QDesktopServices, QHideEvent, QMouseEvent, QShowEvent
+from PyQt6.QtWidgets import (QApplication, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
+                             QWidget)
 
+from core.global_signals import global_signals
 from ui.help_animation_engine import load_help_animation_widget
-
 
 class HelpDialog(QDialog):
     """Dialog window do display help content"""
 
-    def __init__(self, parent: Optional[QWidget], topic_id: str, title: str, description: str, link: Optional[str] = None) -> None:
+    def __init__(self, parent: Optional[QWidget], topic_id: str, title: str, description: str,
+                 link: Optional[str] = None) -> None:
         super().__init__(parent)
 
         self.topic_id = topic_id
@@ -24,7 +20,7 @@ class HelpDialog(QDialog):
         self.valid_link: Optional[str] = None
         if link and isinstance(link, str) and link.strip().startswith("http"):
             self.valid_link = link.strip()
-        
+
         # Window
         self.setWindowTitle(f"Help: {title}")
         self.resize(600, 700)
@@ -35,7 +31,7 @@ class HelpDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.setLayout(layout)
-        
+
         header_frame = QFrame()
         header_frame.setObjectName("HelpDialogHeader")
         header_layout = QVBoxLayout(header_frame)
@@ -48,14 +44,14 @@ class HelpDialog(QDialog):
         header_layout.addWidget(self.title_label)
         layout.addWidget(header_frame)
 
-        #Animation area
-        
+        # Animation area
+
         content_frame = QFrame()
         content_frame.setObjectName("HelpDialogContent")
         content_layout = QVBoxLayout(content_frame)
         content_layout.setContentsMargins(20, 20, 20, 20)
         content_layout.setSpacing(15)
-        
+
         animation_widget = load_help_animation_widget(topic_id)
         content_layout.addWidget(animation_widget, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -74,40 +70,48 @@ class HelpDialog(QDialog):
         display_desc = description if description else "No description available."
         self.description_label = QLabel(display_desc)
         self.description_label.setWordWrap(True)
-        
+
         self.description_label.setTextFormat(Qt.TextFormat.MarkdownText)
         self.description_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.description_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.description_label.setProperty("styleClass", "help_description")
-        
+
         scroll_layout.addWidget(self.description_label)
         scroll_area.setWidget(scroll_content)
         content_layout.addWidget(scroll_area)
-        
+
         layout.addWidget(content_frame)
-        
+
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setObjectName("HelpDialogSeparator")
         layout.addWidget(separator)
 
-        #Buttons
+        # Buttons
         button_container = QWidget()
-        button_layout = QVBoxLayout(button_container)
+        button_layout = QHBoxLayout(button_container)
         button_layout.setContentsMargins(20, 10, 20, 20)
-        
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        button_box.rejected.connect(self.reject)
-        
+        button_layout.setSpacing(10)
+
+        self.explorer_btn = QPushButton("More details")
+        self.explorer_btn.setObjectName("HelpDialogExplorerBtn")
+        self.explorer_btn.clicked.connect(self._open_help_explorer)
+        button_layout.addWidget(self.explorer_btn)
+
         if self.valid_link:
             self.help_btn = QPushButton("More information")
             self.help_btn.setObjectName("HelpDialogInfoBtn")
             self.help_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             self.help_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_MessageBoxInformation))
             self.help_btn.clicked.connect(self._open_link)
-            button_box.addButton(self.help_btn, QDialogButtonBox.ButtonRole.HelpRole)
-        
-        button_layout.addWidget(button_box)
+            button_layout.addWidget(self.help_btn)
+
+        button_layout.addStretch()
+
+        self.close_btn = QPushButton("Close")
+        self.close_btn.clicked.connect(self.reject)
+        button_layout.addWidget(self.close_btn)
+
         layout.addWidget(button_container)
 
     def showEvent(self, event: QShowEvent) -> None:
@@ -144,3 +148,8 @@ class HelpDialog(QDialog):
     def _open_link(self):
         if self.valid_link:
             QDesktopServices.openUrl(QUrl(self.valid_link))
+
+    def _open_help_explorer(self) -> None:
+        """Requests the main shell to open the HelpExplorer panel at this topic ID"""
+        global_signals.request_help_explorer(self.topic_id)
+        self.accept()

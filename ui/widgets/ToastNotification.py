@@ -7,20 +7,12 @@ require user interaction, for messages that do require user interaction assign Q
 The widget consists of the following properties:
 TODO
 """
-from enum import StrEnum
-
 from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy, QStyle, QVBoxLayout, QWidget
 
+from core.global_signals import ToastLevel
 from icons import IconBuilder, IconType
-
-class ToastLevel(StrEnum):
-    """Enumeration of available severity levels for the Toast Notification"""
-    INFO = "info"
-    SUCCESS = "success"
-    WARNING = "warning"
-    ERROR = "error"
 
 class ToastNotification(QWidget):
     """

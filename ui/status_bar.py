@@ -11,15 +11,9 @@ from PyQt6.QtGui import QAction, QMouseEvent
 from PyQt6.QtWidgets import QApplication, QFrame, QGraphicsOpacityEffect, QLabel, QLineEdit, QMenu, QProgressBar, \
     QPushButton, QStatusBar, QWidget
 
+from core.global_signals import LogLevel
 from core.logger import Logger
 from ui.dialogs.LogHistoryPopup import LogHistoryPopup
-
-class LogLevel(Enum):
-    """Defines the logging levels"""
-    SUCCESS = "SUCCESS"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
 
 class LogColor(Enum):
     """Logging level color maps"""
