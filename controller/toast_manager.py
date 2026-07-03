@@ -1,10 +1,10 @@
 import logging
 from typing import List
 
-from PyQt6.QtCore import QObject, QEvent, QPoint
+from PyQt6.QtCore import QEvent, QObject, QPoint
 from PyQt6.QtWidgets import QWidget
 
-from ui.widgets.ToastNotification import ToastNotification, ToastLevel
+from ui.widgets.ToastNotification import ToastLevel, ToastNotification
 
 class ToastManager(QObject):
     """
@@ -24,9 +24,23 @@ class ToastManager(QObject):
         super().__init__(parent_widget)
         self._parent_widget = parent_widget
         self._active_toasts: List[ToastNotification] = []
+        self._event_filters_installed = set()
 
-        self._parent_widget.installEventFilter(self)
+        self._install_filter_on_window()
         self._logger = logging.getLogger(__name__)
+
+    def _install_filter_on_window(self) -> None:
+        if self._parent_widget not in self._event_filters_installed:
+            self._parent_widget.installEventFilter(self)
+            self._event_filters_installed.add(self._parent_widget)
+
+        try:
+            top_level = self._parent_widget.window()
+            if top_level and top_level not in self._event_filters_installed:
+                top_level.installEventFilter(self)
+                self._event_filters_installed.add(top_level)
+        except RuntimeError:
+            pass
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Intercepts parent widget resize events to reposition the toasts"""
@@ -38,7 +52,8 @@ class ToastManager(QObject):
         except RuntimeError:
             return False
 
-    def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO, duration_ms: int = 4000) -> None:
+    def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
+                   duration_ms: int = 4000) -> None:
         """
         Creates and displays a new toast notification.
 
@@ -47,8 +62,9 @@ class ToastManager(QObject):
         :param level: Severity level dictating the styling.
         :param duration_ms: How long the toast remains visible before auto-dismissing.
         """
+        self._install_filter_on_window()
         top_level_window: QWidget = self._parent_widget.window()
-        top_level_window.installEventFilter(self)
+
         toast = ToastNotification(
             parent=top_level_window,
             title=title,
@@ -59,7 +75,7 @@ class ToastManager(QObject):
         toast.setFixedWidth(self.TOAST_WIDTH)
         toast.adjustSize()
 
-        toast.closed.connect(self._handle_toast_closed)
+        toast.dismissing.connect(self._handle_toast_dismissing)
 
         self._active_toasts.append(toast)
 
@@ -67,20 +83,37 @@ class ToastManager(QObject):
 
         toast.start_entry_animation(target_pos, start_offset_x=toast.width() + self.MARGIN_X)
 
-    def _handle_toast_closed(self, toast: QWidget) -> None:
-        """Removes the closed toast from tracking and shifts remaining toasts up"""
-        if toast in self._active_toasts:
-            self._active_toasts.remove(toast)
-            self._reposition_toasts(animate=True)
+    def _handle_toast_dismissing(self, toast: QWidget) -> None:
+        """Removes the toast from active layout tracking when its being dismissed"""
+        try:
+            if toast in self._active_toasts:
+                self._active_toasts.remove(toast)
+        except RuntimeError:
+            pass
+        self._reposition_toasts(animate=True)
+
+    def _clean_dead_toasts(self) -> None:
+        valid_toasts: List[ToastNotification] = []
+        for toast in self._active_toasts:
+            try:
+                _ = toast.isEnabled()
+                valid_toasts.append(toast)
+            except RuntimeError:
+                pass
+        self._active_toasts = valid_toasts
 
     def _reposition_toasts(self, animate: bool = True) -> None:
         """Recalculates the positions for all active toasts and translate their positon"""
+        self._clean_dead_toasts()
         for toast in self._active_toasts:
-            target_pos = self._calculate_toast_position(toast)
-            if animate:
-                toast.animate_to_position(target_pos)
-            else:
-                toast.move(target_pos)
+            try:
+                target_pos = self._calculate_toast_position(toast)
+                if animate:
+                    toast.animate_to_position(target_pos)
+                else:
+                    toast.move(target_pos)
+            except RuntimeError:
+                pass
 
     def _calculate_toast_position(self, target_toast: ToastNotification) -> QPoint:
         """
@@ -95,9 +128,14 @@ class ToastManager(QObject):
         target_x = window_rect.width() - self.TOAST_WIDTH - self.MARGIN_X
         target_y = self.MARGIN_Y
 
+        self._clean_dead_toasts()
+
         for active_toast in self._active_toasts:
             if active_toast is target_toast:
                 break
-            target_y += active_toast.height() + self.SPACING_Y
+            try:
+                target_y += active_toast.height() + self.SPACING_Y
+            except RuntimeError:
+                continue
 
         return QPoint(target_x, target_y)

@@ -41,6 +41,12 @@ class CanvasInteractionManager:
         if not self.plot_tab.plot_engine.current_ax:
             return
 
+        supported_plots = {"Histogram", "Scatter", "Line", "Stem", "Stairs"}
+        if self.plot_tab.current_plot_type_name not in supported_plots:
+            self.clear()
+            self.span_selector = None
+            return
+
         if self.span_selector is not None:
             if self.span_selector.ax == self.plot_tab.plot_engine.current_ax:
                 return
@@ -52,11 +58,6 @@ class CanvasInteractionManager:
     def setup_brush_and_link(self) -> None:
         """Sets up the Matplotlib SpanSelector for supported plot types"""
         if not self.plot_tab.plot_engine.current_ax:
-            return
-
-        supported_plots = ["Histogram", "Scatter", "Line", "Stem", "Stairs"]
-        if self.plot_tab.current_plot_type_name not in supported_plots:
-            self.span_selector = None
             return
 
         def on_select(xmin: float, xmax: float) -> None:
@@ -98,6 +99,12 @@ class CanvasInteractionManager:
         cur_xlim = ax.get_xlim()
         cur_ylim = ax.get_ylim()
 
+        x_range = cur_xlim[1] - cur_xlim[0]
+        y_range = cur_ylim[1] - cur_ylim[0]
+
+        if x_range == 0 or y_range == 0:
+            return
+
         if event.button == "up":
             scale_factor = 1 / base_scale
         elif event.button == "down":
@@ -105,8 +112,8 @@ class CanvasInteractionManager:
         else:
             scale_factor = 1
 
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
+        new_width = x_range * scale_factor
+        new_height = y_range * scale_factor
 
         relx = (cur_xlim[1] - event.xdata) / (cur_xlim[1] - cur_xlim[0])
         rely = (cur_ylim[1] - event.ydata) / (cur_ylim[1] - cur_ylim[0])
@@ -195,8 +202,9 @@ class CanvasInteractionManager:
         if event.button == right_mouse_click:
             if event.inaxes in self.plot_tab.plot_engine.axes_flat:
                 idx = self.plot_tab.plot_engine.axes_flat.index(event.inaxes)
-                self.plot_tab.view.active_subplot_combo.setCurrentIndex(idx)
-                self.plot_tab.status_bar.log(f"Active subplot changed to Plot {idx + 1}.", LogLevel.INFO)
+                if self.plot_tab.view.active_subplot_combo.currentIndex() != idx:
+                    self.plot_tab.view.active_subplot_combo.setCurrentIndex(idx)
+                    self.plot_tab.status_bar.log(f"Active subplot changed to Plot {idx + 1}.", LogLevel.INFO)
             return
 
         if event.button == middle_mouse_click:
@@ -234,7 +242,8 @@ class CanvasInteractionManager:
     def on_mouse_move(self, event) -> None:
         """Handles middle-click mouse panning and tooltips"""
         if not event.inaxes:
-            QToolTip.hideText()
+            if QToolTip.isVisible():
+                QToolTip.hideText()
             return
 
         if self._pan_axes and self._pan_start and event.inaxes == self._pan_axes:
@@ -248,6 +257,7 @@ class CanvasInteractionManager:
             self._pan_axes.set_xlim(self._pan_start_xlim[0] - dx_data, self._pan_start_xlim[1] - dx_data)
             self._pan_axes.set_ylim(self._pan_start_ylim[0] - dy_data, self._pan_start_ylim[1] - dy_data)
             self.plot_tab.canvas.draw_idle()
+            return
 
         if self.plot_tab.annotation_manager.handle_mouse_move(event):
             return
@@ -257,6 +267,7 @@ class CanvasInteractionManager:
     def _show_data_tooltip(self, event) -> None:
         """Shows coordinate tooltips when hovering over data points"""
         found_point = False
+        tooltip_text = ""
 
         # Check lines
         for line in event.inaxes.get_lines():
@@ -265,12 +276,8 @@ class CanvasInteractionManager:
                 idx = ind["ind"][0]
                 x_val = line.get_xdata()[idx]
                 y_val = line.get_ydata()[idx]
-                text = f"X: {x_val:.4g}\nY: {y_val:.4g}" if isinstance(x_val,
-                                                                       (int, float)) else f"X: {x_val}\nY: {y_val:.4g}"
-                QToolTip.showText(QCursor.pos(), text, self.plot_tab.canvas)
-                found_point = True
-                break
-
+                tooltip_text = f"X: {x_val:.4g}\nY: {y_val:.4g}" if isinstance(x_val, (
+                int, float)) else f"X: {x_val}\nY: {y_val:.4g}"
         # Check collections
         if not found_point:
             for collection in event.inaxes.collections:
@@ -279,13 +286,16 @@ class CanvasInteractionManager:
                     idx = ind["ind"][0]
                     offsets = collection.get_offsets()[idx]
                     x_val, y_val = offsets[0], offsets[1]
-                    text = f"X: {x_val:.4g}\nY: {y_val:.4g}"
-                    QToolTip.showText(QCursor.pos(), text, self.plot_tab.canvas)
+                    tooltip_text = f"X: {x_val:.4g}\nY: {y_val:.4g}"
                     found_point = True
                     break
 
-        if not found_point:
-            QToolTip.hideText()
+        if found_point:
+            if QToolTip.text() != tooltip_text:
+                QToolTip.showText(QCursor.pos(), tooltip_text, self.plot_tab.canvas)
+        else:
+            if QToolTip.isVisible():
+                QToolTip.hideText()
 
     def on_mouse_release(self, event) -> None:
         """Handles mouse release event to stop panning or dragging"""
@@ -297,11 +307,13 @@ class CanvasInteractionManager:
             self._pan_start_ylim = None
             return
 
-        self.plot_tab.annotation_manager.handle_mouse_relase(event)
+        self.plot_tab.annotation_manager.handle_mouse_release(event)
 
     def clear(self) -> None:
         """Clears the canvas interaction state"""
         if self.span_selector is not None:
+            if hasattr(self.span_selector, "disconnect_events"):
+                self.span_selector.disconnect_events()
             if hasattr(self.span_selector, "clear"):
                 self.span_selector.clear()
             elif hasattr(self.span_selector, "set_visible"):

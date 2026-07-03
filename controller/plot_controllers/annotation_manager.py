@@ -189,7 +189,8 @@ class AnnotationManager:
 
         # Cleanup existing annotations
         texts_to_remove = [text for text in self.plot_engine.current_ax.texts if
-                           text.get_gid() and (str(text.get_gid()).startswith("annotation_"))]
+                           text.get_gid() and (str(text.get_gid()).startswith("annotation_") or str(
+                               text.get_gid()) == "auto_annotation")]
         for text in texts_to_remove:
             try:
                 text.remove()
@@ -231,14 +232,19 @@ class AnnotationManager:
                 y_offset = self.view.auto_annotate_y_offset_spin.value()
                 rotation = self.view.auto_annotate_rotation_spin.value()
 
-                for idx, row in df_to_annotate.iterrows():
-                    x_val = row[x_col]
-                    y_val = row[y_col_target]
+                x_arr = df_to_annotate[x_col].values
+                y_arr = df_to_annotate[y_col_target].values
 
+                if label_choice == "Default (Y-value)":
+                    labels_arr = y_arr
+                else:
+                    labels_arr = df_to_annotate[label_choice].values
+
+                for x_val, y_val, raw_label in zip(x_arr, y_arr, labels_arr):
                     if label_choice == "Default (Y-value)":
-                        text = f"{y_val:.2f}" if isinstance(y_val, (int, float)) else str(y_val)
+                        text = f"{raw_label:.2f}" if isinstance(raw_label, (int, float)) else str(raw_label)
                     else:
-                        text = str(row[label_choice])
+                        text = str(raw_label)
 
                     # apply
                     if is_flipped:
@@ -335,7 +341,7 @@ class AnnotationManager:
             return True
         return False
 
-    def handle_mouse_relase(self, event) -> bool:
+    def handle_mouse_release(self, event) -> bool:
         """Handles the drop position of an annotation when mouse-click is released"""
         if self.dragged_annotation:
             gid = self.dragged_annotation.get_gid()
