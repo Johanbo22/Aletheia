@@ -1,10 +1,7 @@
-from email.charset import QP
+from PyQt6.QtCore import QEvent, QPoint, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QGuiApplication, QHideEvent, QKeySequence, QMouseEvent, QShortcut
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QWidget
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QLabel, QSpinBox, QPushButton
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPoint
-from PyQt6.QtGui import QColor, QShortcut, QKeySequence, QGuiApplication, QMouseEvent
-
-from ui.theme import ThemeColors
 from controller.plot_controllers.color_manager import ColorManager
 
 class ContextualAnnotationToolbar(QWidget):
@@ -19,13 +16,15 @@ class ContextualAnnotationToolbar(QWidget):
     deleteRequested = pyqtSignal(int)
     
     def __init__(self, parent=None) -> None:
-        super().__init__(parent, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
+        super().__init__(parent,
+                         Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
         self.setObjectName("ContextualToolbar")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         
         self.current_index: int = -1
         self.current_color: str = "black"
         self.current_bg_color: str = "wheat"
+        self._dialog_open: bool = False
 
         # Debounce timer
         debounce_interval_ms: int = 300
@@ -119,7 +118,12 @@ class ContextualAnnotationToolbar(QWidget):
     
     def _choose_color(self) -> None:
         from PyQt6.QtWidgets import QColorDialog
-        color = QColorDialog.getColor(QColor(self.current_color), self, options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        self._dialog_open = True
+        try:
+            color = QColorDialog.getColor(QColor(self.current_color), self,
+                                          options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        finally:
+            self._dialog_open = False
         if color.isValid():
             self.current_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             ColorManager.update_button_color_swatch(self.color_btn, QColor(self.current_color))
@@ -129,7 +133,12 @@ class ContextualAnnotationToolbar(QWidget):
     
     def _choose_bg_color(self) -> None:
         from PyQt6.QtWidgets import QColorDialog
-        color = QColorDialog.getColor(QColor(self.current_bg_color), self, options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        self._dialog_open = True
+        try:
+            color = QColorDialog.getColor(QColor(self.current_bg_color), self,
+                                          options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
+        finally:
+            self._dialog_open = False
         if color.isValid():
             self.current_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.current_bg_color))
@@ -178,6 +187,11 @@ class ContextualAnnotationToolbar(QWidget):
         if y + toolbar_rect.height() > screen_rect.bottom():
             y = screen_rect.bottom() - toolbar_rect.height() - 10
 
+        if x < screen_rect.left():
+            x = screen_rect.left() + 10
+        if y < screen_rect.top():
+            y = screen_rect.top() + 10
+
         self.move(QPoint(x, y))
         self.show()
         self.raise_()
@@ -196,3 +210,25 @@ class ContextualAnnotationToolbar(QWidget):
             self._drag_pos = event.globalPosition().toPoint()
             event.accept()
         super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = None
+            event.accept()
+        super().mouseReleaseEvent(event)
+
+    def hideEvent(self, event: QHideEvent) -> None:
+        if self._update_timer.isActive():
+            self._update_timer.stop()
+        super().hideEvent(event)
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.ActivationChange:
+            if not self.isActiveWindow():
+                QTimer.singleShot(0, self._check_focus_loss)
+
+    def _check_focus_loss(self) -> None:
+        """Evaluates if the toolbar should auto-dismiss based on dialog state"""
+        if not self.isActiveWindow() and not self._dialog_open:
+            self.close()

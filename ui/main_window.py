@@ -949,6 +949,7 @@ class MainWindow(QWidget):
         if self.data_handler.undo():
             self.data_tab.refresh_data_view()
             self.plot_tab.update_column_combo()
+            self.plot_tab.on_data_changed()
             self.status_bar.update_data_stats(self.data_handler.df)
             self.unsaved_changes = True
             self.status_bar.log("Undo: Previous state restored")
@@ -961,6 +962,7 @@ class MainWindow(QWidget):
         if self.data_handler.redo():
             self.data_tab.refresh_data_view()
             self.plot_tab.update_column_combo()
+            self.plot_tab.on_data_changed()
             self.status_bar.update_data_stats(self.data_handler.df)
             self.unsaved_changes = True
             self.status_bar.log("Redo: Action restored")
@@ -977,7 +979,7 @@ class MainWindow(QWidget):
         w, h = fig.get_size_inches()
         fig.set_size_inches(min(w * 1.1, 20), min(h * 1.1, 20))
         self.plot_tab.canvas.draw()
-        self.show_toast("Zoom", "Canvas Zoomed In", ToastLevel.INFO, duration_ms=1500)
+        self.status_bar.log("Canvas Zoomed In", LogLevel.INFO)
 
     def zoom_out(self) -> None:
         """Zooms out of the canvas"""
@@ -988,7 +990,7 @@ class MainWindow(QWidget):
         w, h = fig.get_size_inches()
         fig.set_size_inches(max(w * 0.9, 4), max(h * 0.9, 3))
         self.plot_tab.canvas.draw()
-        self.show_toast("Zoom", "Canvas Zoomed Out", ToastLevel.INFO, duration_ms=1500)
+        self.status_bar.log("Canvas Zoomed Out", LogLevel.INFO)
 
     def zoom_reset(self) -> None:
         """
@@ -1003,4 +1005,4 @@ class MainWindow(QWidget):
         fig = self.plot_tab.plot_engine.current_figure
         fig.set_size_inches(DEFAULT_WIDTH_INCHES, DEFAULT_HEIGHT_INCHES)
         self.plot_tab.canvas.draw()
-        self.show_toast("Zoom", "Zoom Reset to Default", ToastLevel.INFO, duration_ms=1500)
+        self.status_bar.log("Zoom Reset to Default", LogLevel.INFO)

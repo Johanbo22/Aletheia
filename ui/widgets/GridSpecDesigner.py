@@ -51,7 +51,7 @@ class GridSpecDesignerWidget(QWidget):
 
         self._init_ui()
         self._connect_signals()
-        self._update_grid_data()
+        self._reset_grid_data()
 
     def _init_ui(self) -> None:
         self.main_layout = QVBoxLayout()
@@ -123,8 +123,8 @@ class GridSpecDesignerWidget(QWidget):
         self.setLayout(self.main_layout)
 
     def _connect_signals(self) -> None:
-        self.rows_spin.valueChanged.connect(self._update_grid_data)
-        self.cols_spin.valueChanged.connect(self._update_grid_data)
+        self.rows_spin.valueChanged.connect(self._resize_grid_data)
+        self.cols_spin.valueChanged.connect(self._resize_grid_data)
         self.merge_cells_btn.clicked.connect(self._merge_selected)
         self.remove_cells_btn.clicked.connect(self._remove_selected)
         self.reset_grid_btn.clicked.connect(self._confirm_reset_grid)
@@ -187,13 +187,48 @@ class GridSpecDesignerWidget(QWidget):
 
         merge_action.triggered.connect(self._merge_selected)
         remove_action.triggered.connect(self._remove_selected)
-        reset_action.triggered.connect(self._update_grid_data)
+        reset_action.triggered.connect(self._confirm_reset_grid)
 
         menu.exec(self.grid_table.mapToGlobal(position))
 
-    def _update_grid_data(self) -> None:
+    def _resize_grid_data(self) -> None:
         """
-        Rebuilds the table structure to reflect changes in rows/cols
+        Resizes the grid while preserving defined blocks
+        Fills newly created grid spaces with default 1x1 blocks
+        """
+        rows = self.rows_spin.value()
+        cols = self.cols_spin.value()
+
+        valid_spans: List[GridSpan] = []
+        for span in self._defined_spans:
+            if span.row_start >= rows or span.col_start >= cols:
+                continue
+
+            clipped_span = GridSpan(
+                row_start=span.row_start,
+                row_end=min(span.row_end, rows),
+                col_start=span.col_start,
+                col_end=min(span.col_end, cols)
+            )
+            valid_spans.append(clipped_span)
+
+        self._defined_spans = valid_spans
+
+        for r in range(rows):
+            for c in range(cols):
+                is_covered = any(
+                    span.row_start <= r < span.row_end and
+                    span.col_start <= c < span.col_end for span in self._defined_spans
+                )
+                if not is_covered:
+                    self._defined_spans.append(
+                        GridSpan(row_start=r, row_end=r + 1, col_start=c, col_end=c + 1)
+                    )
+        self._redraw_table()
+
+    def _reset_grid_data(self) -> None:
+        """
+        Clears the current layout and rebuilds a default 1x1 plots
         """
         rows = self.rows_spin.value()
         cols = self.cols_spin.value()
@@ -220,7 +255,7 @@ class GridSpecDesignerWidget(QWidget):
             )
             if reply == QMessageBox.StandardButton.No:
                 return
-        self._update_grid_data()
+        self._reset_grid_data()
 
     def set_shared_axes(self, sharex: bool, sharey: bool) -> None:
         self._sharex = sharex
@@ -235,7 +270,7 @@ class GridSpecDesignerWidget(QWidget):
 
     def _generate_plot_tooltip(self, index: int, row_span: int, col_span: int, has_x: bool, has_y: bool) -> str:
         """Generates a tooltip for a plot cell indicating its span and active axes"""
-        span_description = f"{row_span}x{col_span} block" if (row_span > 1 or col_span > 1) else "1x1 blcok"
+        span_description = f"{row_span}x{col_span} block" if (row_span > 1 or col_span > 1) else "1x1 block"
 
         axes_status: List[str] = []
         if has_x:
@@ -250,13 +285,14 @@ class GridSpecDesignerWidget(QWidget):
         """
         Repaints the table using span state and numerical order
         """
+        self.grid_table.clearSpans()
+        self.grid_table.clearContents()
+
         rows = self.rows_spin.value()
         cols = self.cols_spin.value()
 
         self.grid_table.setRowCount(rows)
         self.grid_table.setColumnCount(cols)
-        self.grid_table.clearSpans()
-        self.grid_table.clearContents()
 
         for r in range(rows):
             for c in range(cols):
@@ -308,6 +344,8 @@ class GridSpecDesignerWidget(QWidget):
 
             if row_span > 1 or col_span > 1:
                 self.grid_table.setSpan(span.row_start, span.col_start, row_span, col_span)
+
+        self.grid_table.clearSelection()
 
     def _get_selected_span(self) -> Optional[GridSpan]:
         """Extracts the currently selected range as GridSpan"""

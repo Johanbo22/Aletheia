@@ -4,6 +4,41 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.4.1 [Patch]
+
+### Added
+
+- The "Read more" button in the HelpExplorerDialog now displays the URL that the buttons sends to
+- A "More details" button in the HelpDialog to send a request to view the page in HelpExplorerDialog
+- Updated help database
+
+### Changed
+
+- Updated the layout in HelpExplorerDialog to better accommodate animation frame and text frames
+- Updated the button layout in HelpDialog to separate the buttons more evenly.
+
+### Fixed
+
+- Fixed a layout issue in the HelpExplorerDialog where the "Read more" button was stretched too far
+- Resolved an issue where viewing the Changelog pop repeatedly would result in a memory leak over time
+- Fixed an unintended behavior where having more than 4 recent projects would permanently delete older projects instead
+  of just hiding them
+- Fixed settings parser to handle corrupted recent project files without causing a crash.
+- Fixed memory leak in the Status Bar caused by `LogHistoryPopup` uncollected widget instances.
+- Fixed a bug where indeterminate progress indicators auto-hid instantly.
+- Fixed a UX glitch where the source data string permanently changed to 'Copied!'.
+- Fixed overlapping styling behaviors when logging successive terminal messages rapidly.
+- Resolved a rendering artifact that caused Qt bounds errors when grid layouts were made smaller
+- Fixed a spelling mistake in grid tooltips for Subplot Config
+- Fixed an issue where Toast notifications would behave erratically or cancel their animations
+- Fixed a issue where toasts would auto-dismiss while cursor was hovering on toast
+- Resolved a memory leak and visual artifact where auto-annotations duplicated on canvas redrawing
+- Resolved significant GUI blocking on auto-annotation rendering
+- Fixed a bug where opening the ColorDialog on the ContextualAnnotationToolbar would close the toolbar instantly
+- Fixed issue where annotation toolbar could be left off-screen
+- Added a `mouseReleaseEvent` to property handle the finish of dragging an annotation, fixing bug where dragging
+  annotation would not release upon mouse button release.
+
 ## v.0.4.0 [Prerelease]
 ### Added
 - Added a ReferenceSpanManager to configure axhspan and axvspans to the canvas

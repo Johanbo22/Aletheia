@@ -2,19 +2,20 @@
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QSettings, QEvent, QObject
-from PyQt6.QtGui import QCloseEvent, QFont, QIcon, QShortcut, QKeySequence, QAction, QKeyEvent
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QDockWidget, QPushButton, QTabBar, QDialog
+from PyQt6.QtCore import QEvent, QObject, QSettings, Qt
+from PyQt6.QtGui import QAction, QCloseEvent, QFont, QIcon, QKeyEvent, QKeySequence, QShortcut
+from PyQt6.QtWidgets import QApplication, QDialog, QDockWidget, QMainWindow, QMessageBox, QPushButton, QTabBar
 
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
+from core.global_signals import global_signals
 from core.logger import Logger
 from core.project_manager import ProjectManager
 from core.resource_loader import get_resource_path
 from core.style_reloader import StyleReloader
-from resources.version import APPLICATION_NAME, APPLICATION_VERSION
-from ui.dialogs import SettingsDialog, AboutDialog, HelpExplorerDialog
 from icons.icon_registry import IconBuilder, IconType
+from resources.version import APPLICATION_NAME, APPLICATION_VERSION
+from ui.dialogs import AboutDialog, HelpExplorerDialog, SettingsDialog
 from ui.main_window import MainWindow
 from ui.menu_bar import MenuBar
 from ui.status_bar import StatusBar
@@ -22,10 +23,12 @@ from ui.status_bar import StatusBar
 # Simple Monkeypatch for now. Needs fixing.
 # TODO fix this. Must be removed at some point.
 _original_qdialog_exec = QDialog.exec
+
 def _non_blocking_exec(self, *args, **kwargs) -> int:
     if self.parent() is not None:
         self.setWindowModality(Qt.WindowModality.WindowModal)
     return _original_qdialog_exec(self, *args, **kwargs)
+
 QDialog.exec = _non_blocking_exec
 
 class DataPlotStudio(QMainWindow):
@@ -37,7 +40,7 @@ class DataPlotStudio(QMainWindow):
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
         self.resize(1280, 720)
-        
+
         # !FOR DEBUGGING ONLY
         self._current_settings: dict = {}
         self._style_reloader: Optional[StyleReloader] = None
@@ -60,9 +63,9 @@ class DataPlotStudio(QMainWindow):
         # Load settings
         app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
         self.settings = {
-            "dark_mode": app_settings.value("dark_mode", False, type=bool),
+            "dark_mode"  : app_settings.value("dark_mode", False, type=bool),
             "font_family": app_settings.value("font_family", "Consolas", type=str),
-            "font_size": app_settings.value("font_size", 10, type=int),
+            "font_size"  : app_settings.value("font_size", 10, type=int),
             "enable_autosave"  : app_settings.value("enable_autosave", True, type=bool),
             "autosave_interval": app_settings.value("autosave_interval", 5, type=int),
         }
@@ -85,7 +88,7 @@ class DataPlotStudio(QMainWindow):
 
         self._connect_signals()
         self._restore_window_state()
-        
+
         self.main_widget._update_window_title()
 
         if QApplication.instance() is not None:
@@ -100,7 +103,7 @@ class DataPlotStudio(QMainWindow):
                 self.show_help_explorer()
                 return True
         return super().eventFilter(obj, event)
-    
+
     def _restore_window_state(self) -> None:
         """
         Recovers the user's previous window size, monitor placement, and dock layout.
@@ -110,13 +113,13 @@ class DataPlotStudio(QMainWindow):
         if settings.contains("geometry") and settings.contains("windowState"):
             self.restoreGeometry(settings.value("geometry"))
             self.restoreState(settings.value("windowState"))
-            
+
             if self.plot_dock.isVisible():
                 current_index = self.main_widget.tabs.indexOf(self.main_widget.plot_tab)
                 if current_index != -1:
                     self.main_widget.tabs.removeTab(current_index)
                     self.plot_dock.setWidget(self.main_widget.plot_tab)
-    
+
     def _setup_dock_widgets(self) -> None:
         """Setup of the docking panels"""
         self.plot_dock: QDockWidget = QDockWidget("Plot Studio", self)
@@ -126,25 +129,26 @@ class DataPlotStudio(QMainWindow):
         self.plot_dock.setWindowIcon(IconBuilder.build(IconType.Undocked))
         self.plot_dock.hide()
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
-        
+
         # Have to save location data so tab can be remade
         self.plot_tab_index: int = self.main_widget.tabs.indexOf(self.main_widget.plot_tab)
         self.plot_tab_icon: QIcon = self.main_widget.tabs.tabIcon(self.plot_tab_index)
         self.plot_tab_text: str = self.main_widget.tabs.tabText(self.plot_tab_index)
-        
-        self.main_widget.tabs.tabBar().setTabButton(self.plot_tab_index, QTabBar.ButtonPosition.RightSide, self._create_undock_button())
-        
+
+        self.main_widget.tabs.tabBar().setTabButton(self.plot_tab_index, QTabBar.ButtonPosition.RightSide,
+                                                    self._create_undock_button())
+
         self.plot_dock.visibilityChanged.connect(self._on_dock_visibility_changed)
-        
+
         self.toggle_dock_shortcut = QShortcut(QKeySequence("Ctrl+D"), self)
         self.toggle_dock_shortcut.activated.connect(self._toggle_plot_dock_state)
-    
+
     def _toggle_plot_dock_state(self) -> None:
         if self.plot_dock.isVisible():
             self.plot_dock.close()
         else:
             self._undock_plot_tab()
-    
+
     def _create_undock_button(self) -> QPushButton:
         # Need to create button again because pointer is destroyed when tab is self.main_widget.tabs.removeTab(current_index)
         btn = QPushButton()
@@ -156,7 +160,7 @@ class DataPlotStudio(QMainWindow):
         btn.setFixedSize(24, 24)
         btn.clicked.connect(self._undock_plot_tab)
         return btn
-        
+
     def _undock_plot_tab(self) -> None:
         """Removes the plot tab from the QTabWidget and places it into the QDockWidget."""
         current_index = self.main_widget.tabs.indexOf(self.main_widget.plot_tab)
@@ -164,18 +168,19 @@ class DataPlotStudio(QMainWindow):
             self.main_widget.tabs.removeTab(current_index)
             self.plot_dock.setWidget(self.main_widget.plot_tab)
             self.plot_dock.show()
-            
+
             self.plot_dock.raise_()
             self.plot_dock.activateWindow()
             self.main_widget.plot_tab.setFocus()
-    
+
     def _on_dock_visibility_changed(self, visible: bool) -> None:
         """Restores the plot widget back to a standard tab when the dock is closed."""
         if not visible and self.plot_dock.widget() == self.main_widget.plot_tab:
             self.plot_dock.setWidget(None)
-            
+
             new_index = self.main_widget.tabs.addTab(self.main_widget.plot_tab, self.plot_tab_icon, self.plot_tab_text)
-            self.main_widget.tabs.tabBar().setTabButton(new_index, QTabBar.ButtonPosition.RightSide, self._create_undock_button())
+            self.main_widget.tabs.tabBar().setTabButton(new_index, QTabBar.ButtonPosition.RightSide,
+                                                        self._create_undock_button())
             self.main_widget.tabs.setCurrentIndex(new_index)
 
     def _update_view_menu_visibility(self, *args) -> None:
@@ -187,7 +192,7 @@ class DataPlotStudio(QMainWindow):
             is_plot_active = True
 
         self.menu_bar.view_menu.menuAction().setVisible(is_plot_active)
-    
+
     def _connect_signals(self) -> None:
         """Routing signals to the main widget"""
         self.main_widget.window_title_changed.connect(self.setWindowTitle)
@@ -195,7 +200,8 @@ class DataPlotStudio(QMainWindow):
         self.main_widget.data_tab.request_open_settings.connect(self.open_settings)
 
         self.main_widget.tabs.currentChanged.connect(self._update_view_menu_visibility)
-        
+        global_signals.help_explorer_requested.connect(self.show_help_explorer_for_topic)
+
         # Window state signals
         window_menu = self.menuBar().addMenu("&Window")
         reset_layout_action = QAction("Reset Window Layout", self)
@@ -203,8 +209,8 @@ class DataPlotStudio(QMainWindow):
         reset_layout_action.setToolTip("Restores all docks and tabs to their default position")
         reset_layout_action.triggered.connect(self._reset_window_layout)
         window_menu.addAction(reset_layout_action)
-        
-        #File menu
+
+        # File menu
         self.menu_bar.file_new.triggered.connect(self.main_widget.new_project)
         self.menu_bar.file_open.triggered.connect(self.main_widget.open_project)
         self.menu_bar.file_save.triggered.connect(self.main_widget.save_project)
@@ -235,23 +241,23 @@ class DataPlotStudio(QMainWindow):
         self.menu_bar.explore_help_action.triggered.connect(self.show_help_explorer)
 
         self._update_view_menu_visibility()
-    
+
     def _reset_window_layout(self) -> None:
         """Panic button for lost docks: returns the UI to a tabbed starting state."""
         self.plot_dock.close()
         self.plot_dock.setFloating(False)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
         self.status_bar_widget.log("Window layout reset to default", "INFO")
-    
+
     def closeEvent(self, event: QCloseEvent) -> None:
         """Checks for unsaved changes before exiting"""
-        
+
         def save_layout():
             """Helper to save UI state before the application teardown."""
             settings = QSettings(f"{APPLICATION_NAME}", "AppLayout")
             settings.setValue("geometry", self.saveGeometry())
             settings.setValue("windowState", self.saveState())
-        
+
         if hasattr(self.main_widget, "unsaved_changes") and self.main_widget.unsaved_changes:
             reply = QMessageBox.question(
                 self,
@@ -274,7 +280,7 @@ class DataPlotStudio(QMainWindow):
         else:
             save_layout()
             event.accept()
-    
+
     def open_settings(self) -> None:
         """Opens the settings dialog"""
         dialog = SettingsDialog(self.settings, self)
@@ -288,13 +294,13 @@ class DataPlotStudio(QMainWindow):
                 QApplication.processEvents()
 
             self.settings.update(new_settings)
-            
+
             app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
             for key, value in self.settings.items():
                 app_settings.setValue(key, value)
             self.apply_settings(self.settings)
             self.status_bar_widget.log("Settings updated", "INFO")
-    
+
     def show_about(self) -> None:
         """Shows the About dialog box"""
         AboutDialog.show_about_dialog(
@@ -313,7 +319,17 @@ class DataPlotStudio(QMainWindow):
         self._help_explorer.show()
         self._help_explorer.raise_()
         self._help_explorer.activateWindow()
-    
+
+    def show_help_explorer_for_topic(self, topic_id: str) -> None:
+        """
+        Shows the Help Explorer dialog and navigates to a specific topic ID
+
+        :param topic_id: The specific topic ID to display
+        """
+        self.show_help_explorer()
+        if self._help_explorer is not None:
+            self._help_explorer.navigate_to_topic(topic_id)
+
     def apply_settings(self, settings: dict) -> None:
         """Apply the settings to main app loop"""
         self._current_settings = settings
@@ -322,7 +338,7 @@ class DataPlotStudio(QMainWindow):
 
         base_css: str = ""
         styles_root: Path = Path(get_resource_path("ui/styles"))
-        
+
         theme_folder: str = "dark_theme" if settings["dark_mode"] else "light_theme"
         active_theme_dir: Path = styles_root / theme_folder
 
@@ -331,10 +347,10 @@ class DataPlotStudio(QMainWindow):
             stylesheet_paths = list(active_theme_dir.rglob("*.css"))
 
         base_css = self.load_stylesheets(stylesheet_paths)
-        
+
         if QApplication.instance() is not None:
             QApplication.instance().setStyleSheet(base_css)
-    
+
     def enable_live_reloader(self) -> None:
         styles_dir: Path = Path(get_resource_path("ui/styles"))
         self._style_reloader = StyleReloader(
@@ -342,7 +358,7 @@ class DataPlotStudio(QMainWindow):
             reload_callback=self.reload_styles,
             parent=self
         )
-    
+
     def reload_styles(self) -> None:
         if not self._current_settings:
             return
@@ -359,5 +375,5 @@ class DataPlotStudio(QMainWindow):
                     combined_css += path.read_text(encoding="utf-8") + "\n"
                 except Exception as err:
                     print(f"Failed to read stylesheet {path.name}: {err}")
-        
+
         return combined_css

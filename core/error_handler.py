@@ -126,7 +126,7 @@ class GlobalErrorHandler:
         msg_box.setWindowTitle(f"{APPLICATION_NAME} - Critical Error")
         msg_box.setText("An unexpected critical error has occurred and the application must close")
         msg_box.setInformativeText(
-            "Don't panic! Your work is likely save. Aletheia's autosave system will attempt to recover your session on next launch.\n\n"
+            "Don't panic! Your work is likely safe. Aletheia's autosave system will attempt to recover your session on next launch.\n\n"
             f"A detailed crash report has been saved to:\n{report_path}")
         msg_box.setDetailedText(traceback_str)
 

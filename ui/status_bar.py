@@ -11,15 +11,9 @@ from PyQt6.QtGui import QAction, QMouseEvent
 from PyQt6.QtWidgets import QApplication, QFrame, QGraphicsOpacityEffect, QLabel, QLineEdit, QMenu, QProgressBar, \
     QPushButton, QStatusBar, QWidget
 
+from core.global_signals import LogLevel
 from core.logger import Logger
 from ui.dialogs.LogHistoryPopup import LogHistoryPopup
-
-class LogLevel(Enum):
-    """Defines the logging levels"""
-    SUCCESS = "SUCCESS"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
 
 class LogColor(Enum):
     """Logging level color maps"""
@@ -71,6 +65,12 @@ class StatusBar(QStatusBar):
         self.clear_timer.setInterval(StatusBarConstants.CLEAR_TIMER_MS)
         self.clear_timer.setSingleShot(True)
         self.clear_timer.timeout.connect(self._reset_to_idle_state)
+
+        # Dedicated timer for error flashing to prevent overlap
+        self._error_flash_timer: QTimer = QTimer()
+        self._error_flash_timer.setSingleShot(True)
+        self._error_flash_timer.setInterval(400)
+        self._error_flash_timer.timeout.connect(self._clear_error_flash)
 
         self.setObjectName("main_status_bar")
 
@@ -186,8 +186,8 @@ class StatusBar(QStatusBar):
 
         anim.stop()
         try:
-            anim.finished.disconnect()
-        except TypeError as e:
+            anim.finished.disconnect(widget.hide)
+        except (TypeError, RuntimeError) as e:
             if self.logger:
                 self.logger.info(f"Fade animation disconnect skipped: {e}")
 
@@ -289,9 +289,10 @@ class StatusBar(QStatusBar):
 
         if level_name == "ERROR":
             self.terminal.setProperty("errorFlash", True)
-            QTimer.singleShot(400, self._clear_error_flash)
+            self._error_flash_timer.start()
         else:
             self.terminal.setProperty("errorFlash", False)
+            self._error_flash_timer.stop()
 
         self.terminal.style().unpolish(self.terminal)
         self.terminal.style().polish(self.terminal)
@@ -380,22 +381,27 @@ class StatusBar(QStatusBar):
                 self.show_log_history()
                 return True
             if source is self.source_label and self._full_source_path:
-                clipboard = QApplication.clipboard()
-                if clipboard:
-                    clipboard.setText(self._full_source_path)
-
-                    original_text = self.source_label.text()
-                    self.source_label.setText("Copied!")
-                    QTimer.singleShot(1500, lambda: self.source_label.setText(original_text))
+                if self.source_label.text() != "Copied!":
+                    clipboard = QApplication.clipboard()
+                    if clipboard:
+                        clipboard.setText(self._full_source_path)
+                        self.source_label.setText("Copied!")
+                        QTimer.singleShot(1500, self._restore_source_label)
+                return True
 
         return super().eventFilter(source, event)
+
+    def _restore_source_label(self) -> None:
+        """Restores the source label to the full source path after copying"""
+        if self.source_label.text() == "Copied!":
+            self.set_data_source(self._full_source_path)
 
     def update_data_stats(self, df: Any) -> None:
         """Update the status bar widget to show dataframe dimensions"""
         if df is not None and hasattr(df, "shape") and len(df.shape) == 2:
             rows: int = df.shape[0]
             cols: int = df.shape[1]
-            self.stats_label.setText(f"Rows: {rows:,} | Columns: {cols}")
+            self.stats_label.setText(f"Rows: {rows:,} | Columns: {cols:,}")
             self.memory_bar.show()
         else:
             self.stats_label.setText("No data")
@@ -479,7 +485,8 @@ class StatusBar(QStatusBar):
         """Set the progress bar value and trigger auto-hide at 100%."""
         self.progress_bar.setValue(value)
 
-        if value >= self.progress_bar.maximum():
+        is_determinate: bool = self.progress_bar.minimum() > 0
+        if is_determinate and value >= self.progress_bar.maximum():
             self.progress_hide_timer.start()
         else:
             self.progress_hide_timer.stop()
@@ -488,9 +495,13 @@ class StatusBar(QStatusBar):
 
     def show_log_history(self) -> None:
         """Open a popup window showing all session logs"""
-        if self.popup is not None and self.popup.isVisible():
-            self.popup.close()
-            return
+        if self.popup is not None:
+            if self.popup.isVisible():
+                self.popup.close()
+                return
+            else:
+                self.popup.deleteLater()
+                self.popup = None
 
         self.popup = LogHistoryPopup(list(self.log_history), self)
 

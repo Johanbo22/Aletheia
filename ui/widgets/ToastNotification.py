@@ -7,20 +7,12 @@ require user interaction, for messages that do require user interaction assign Q
 The widget consists of the following properties:
 TODO
 """
-from enum import StrEnum
-
-from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QEnterEvent, QIcon
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy, QStyle, QVBoxLayout, QWidget
 
+from core.global_signals import ToastLevel
 from icons import IconBuilder, IconType
-
-class ToastLevel(StrEnum):
-    """Enumeration of available severity levels for the Toast Notification"""
-    INFO = "info"
-    SUCCESS = "success"
-    WARNING = "warning"
-    ERROR = "error"
 
 class ToastNotification(QWidget):
     """
@@ -29,6 +21,9 @@ class ToastNotification(QWidget):
     This widget is responsible for its own visual representation, progress tracking
     and entry/exit sliding animation. It communicates via the ToastManager via the closed signal
     """
+    # Dismissing is emitted the moment the toast begins the exit animation
+    dismissing = pyqtSignal(QWidget)
+
     # A closed emit signal that is emitted when
     # the toast has finished its exit animation and is
     # ready to be destroyed
@@ -37,13 +32,15 @@ class ToastNotification(QWidget):
     ANIMATION_DURATION_MS: int = 300
     PROGRESS_UPDATE_INTERVAL_MS: int = 10
 
-    def __init__(self, parent: QWidget, title: str, message: str, level: ToastLevel = ToastLevel.INFO, duration_ms: int = 3000) -> None:
+    def __init__(self, parent: QWidget, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
+                 duration_ms: int = 3000) -> None:
         super().__init__(parent)
-        self._title = title
-        self._message = message
-        self._level = level
-        self._duration_ms = duration_ms
-        self._time_left_ms = duration_ms
+        self._title: str = title
+        self._message: str = message
+        self._level: ToastLevel = level
+        self._duration_ms: int = duration_ms
+        self._time_left_ms: int = duration_ms
+        self._is_dismissing: bool = False
 
         self._setup_ui()
         self._setup_logic()
@@ -155,6 +152,18 @@ class ToastNotification(QWidget):
             self._timer.stop()
             self.dismiss()
 
+    def enterEvent(self, event: QEnterEvent) -> None:
+        """Pauses the auto-dismiss timer when the hover enter event is triggered"""
+        if not self._is_dismissing:
+            self._timer.stop()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        """Resumes to the auto-dismiss timer when the cursor leaves the widget and triggers the leaveEvent"""
+        if not self._is_dismissing and self._time_left_ms > 0:
+            self._timer.start()
+        super().leaveEvent(event)
+
     def start_entry_animation(self, target_pos: QPoint, start_offset_x: int) -> None:
         """
         Animates the toast sliding into view
@@ -196,6 +205,12 @@ class ToastNotification(QWidget):
         target_pos = QPoint(current_pos.x() + self.width() + 20, current_pos.y())
 
         self._slide_animation.stop()
+
+        try:
+            self._slide_animation.finished.disconnect()
+        except TypeError:
+            pass
+
         self._slide_animation.setStartValue(current_pos)
         self._slide_animation.setEndValue(target_pos)
         self._slide_animation.setEasingCurve(QEasingCurve.Type.InBack)
