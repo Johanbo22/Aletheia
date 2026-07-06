@@ -347,6 +347,8 @@ class CodeEditor(QPlainTextEdit):
             return
 
         try:
+            self._folded_cursors = [cursor for cursor in self._folded_cursors if cursor.block().isValid()]
+
             block: QTextBlock = self.document().firstBlock()
             hide_until_indent: int = -1
 
@@ -440,6 +442,9 @@ class CodeEditor(QPlainTextEdit):
         text_cursor = self.textCursor()
         # calculate how many characters we must ignore that has already been typed
         extra = len(completion) - len(self.completer.completionPrefix())
+
+        if extra <= 0:
+            return
 
         # Do not replace the whole word if typing in the middle complete at end
         # and then move cursor to end position and insert suffix
@@ -945,6 +950,10 @@ class CodeEditor(QPlainTextEdit):
         :return: None
         """
         text: str = self.toPlainText()
+        if self._active_lint_worker is not None:
+            self._active_lint_worker.lint_complete.disconnect()
+            self._active_lint_worker.finished.connect(self._active_lint_worker.deleteLater)
+
         self._active_lint_worker = LintWorker(text)
         self._active_lint_worker.lint_complete.connect(self._applyLintErrors)
         self._active_lint_worker.start()
