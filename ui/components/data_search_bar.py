@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect, QLineEdit, QPushButton
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPropertyAnimation, QEasingCurve, QPoint
+from PyQt6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, QTimer, Qt, pyqtSignal
+from PyQt6.QtWidgets import QGraphicsOpacityEffect, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
 from core.data_handler import DataHandler
 from icons import IconBuilder, IconType
@@ -93,14 +93,24 @@ class DataSearchBar(QWidget):
         """
         Displays the search bar with a slide down animation and focus the input
         """
+        if self.isVisible() and self.opacity_animation.state() != QPropertyAnimation.State.Running:
+            self.search_input.setFocus()
+            self.search_input.selectAll()
+            return
+
         self.setVisible(True)
 
         current_pos: QPoint = self.pos()
         start_pos: QPoint = QPoint(current_pos.x(), current_pos.y() - 50)
+
+        if self.slide_animation.state() == QPropertyAnimation.State.Running:
+            start_pos = self.slide_animation.startValue()
+            current_pos = self.slide_animation.endValue()
+
         self.move(start_pos)
 
         self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(0.0)
+        self.opacity_animation.setStartValue(self.opacity_effect.opacity())
         self.opacity_animation.setEndValue(1.0)
 
         self.slide_animation.stop()
@@ -117,20 +127,31 @@ class DataSearchBar(QWidget):
         """
         Hides the search bar with a slide up animation, clears inputs and requests selection clear
         """
+        if not self.isVisible():
+            return
+
         current_pos: QPoint = self.pos()
         end_pos = QPoint(current_pos.x(), current_pos.y() - 50)
 
         self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(1.0)
+        self.opacity_animation.setStartValue(self.opacity_effect.opacity())
         self.opacity_animation.setEndValue(0.0)
 
         self.slide_animation.stop()
         self.slide_animation.setStartValue(current_pos)
         self.slide_animation.setEndValue(end_pos)
+
+        try:
+            self.slide_animation.finished.disconnect(self._on_close_animation_finished)
+        except TypeError:
+            pass
+
         self.slide_animation.finished.connect(self._on_close_animation_finished)
 
         self.opacity_animation.start()
         self.slide_animation.start()
+
+        self.close_requested.emit()
 
     def _on_close_animation_finished(self) -> None:
         """Called when the close animation finishes to hide the widget"""
@@ -148,9 +169,7 @@ class DataSearchBar(QWidget):
         text = self.pending_search_text
 
         if self.last_searched_text == text:
-            if self.search_worker is not None and self.search_worker.isRunning():
-                return
-        self.last_searched_text = text
+            return
 
         self.search_token += 1
         current_token = self.search_token
@@ -159,9 +178,27 @@ class DataSearchBar(QWidget):
             self._handle_search_results([], current_token)
             return
 
+        if self.search_worker is not None:
+            try:
+                self.search_worker.finished_search.disconnect()
+            except TypeError:
+                pass
+
+            self.search_worker = None
+
         self.search_worker = SearchWorker(self.data_handler.df, text, current_token, parent=self)
         self.search_worker.finished_search.connect(self._handle_search_results)
+        self.search_worker.finished.connect(self._cleanup_search_worker)
         self.search_worker.start()
+
+    def _cleanup_search_worker(self) -> None:
+        """Deletes the finished workers and removes old references to that worker object"""
+        worker = self.sender()
+        if worker is not None:
+            worker.deleteLater()
+
+            if self.search_worker is worker:
+                self.search_worker = None
 
     def _handle_search_results(self, matches: list[tuple[int, int]], token: int) -> None:
         if token != self.search_token:
@@ -189,6 +226,7 @@ class DataSearchBar(QWidget):
         if not self.current_search_matches:
             return
         self.current_search_index = (self.current_search_index - 1) % len(self.current_search_matches)
+        self._highlight_current_match()
 
     def _highlight_current_match(self) -> None:
         if 0 <= self.current_search_index < len(self.current_search_matches):
