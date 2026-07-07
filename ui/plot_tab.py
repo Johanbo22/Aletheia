@@ -167,9 +167,9 @@ class PlotTab(PlotTabUI):
     def _connect_main_controls(self) -> None:
         """Connect the main action buttons and canvas events"""
         #  Main Buttons 
-        self.plot_button.clicked.connect(self.generation_manager.generate_plot)
+        self.plot_button.clicked.connect(lambda _: self.generation_manager.generate_plot(animate=True))
         self.editor_button.clicked.connect(self.script_manager.open_script_editor)
-        self.clear_button.clicked.connect(self.clear_plot)
+        self.clear_button.clicked.connect(self.clear)
         self.save_plot_button.clicked.connect(self.export_manager.save_plot_image)
 
         # editor sync
@@ -436,15 +436,15 @@ class PlotTab(PlotTabUI):
             if hasattr(self, "canvas") and self.canvas is not None:
                 self.canvas.draw_idle()
 
-    def toggle_individual_spines(self):
+    def toggle_individual_spines(self) -> None:
         """Toggles the customization of spines for each"""
         self.appearance_settings_manager.toggle_individual_spines()
 
-    def use_subset(self):
+    def use_subset(self) -> None:
         """Active subset on change"""
         subset_enabled = self.view.use_subset_check.isChecked()
 
-    def on_canvas_resize(self, event):
+    def on_canvas_resize(self, event: Any) -> None:
         self.subplot_manager.update_overlay(is_resize=True)
         self.formatting_manager.setup_plot_figure(clear=False)
         self.canvas.draw_idle()
@@ -608,7 +608,7 @@ class PlotTab(PlotTabUI):
         """Update column ComboBoxes with available columns"""
         self.data_selection_manager.update_column_combo()
 
-    def toggle_table_controls(self):
+    def toggle_table_controls(self) -> None:
         """Enable and disable table controls for the user"""
         enabled = self.view.table_enable_check.isChecked()
         self.view.table_type_combo.setEnabled(enabled)
@@ -623,11 +623,11 @@ class PlotTab(PlotTabUI):
         self.view.table_font_size_spin.setEnabled(enabled and not self.view.table_auto_font_size_check.isChecked())
         self.view.table_font_size_spin.setVisible(enabled and not self.view.table_auto_font_size_check.isChecked())
 
-    def toggle_table_font_controls(self):
+    def toggle_table_font_controls(self) -> None:
         self.view.table_font_size_spin.setEnabled(not self.view.table_auto_font_size_check.isChecked())
         self.view.table_font_size_spin.setVisible(not self.view.table_auto_font_size_check.isChecked())
 
-    def on_data_changed(self):
+    def on_data_changed(self) -> None:
         """Handle data column selection change"""
         if self._is_clearing:
             return
@@ -677,7 +677,7 @@ class PlotTab(PlotTabUI):
             self._is_data_dirty = True
             return
         if getattr(self, '_is_data_dirty', False):
-            self.generation_manager.generate_plot()
+            self.generation_manager.generate_plot(animate=False)
             return
 
         cached_df = getattr(self, '_cached_active_df', None)
@@ -778,7 +778,7 @@ class PlotTab(PlotTabUI):
         self._is_data_dirty = False
 
         self.view.active_subplot_combo.blockSignals(True)
-        self.view.quick_filter_input.clear()
+        self.view.quick_filter_input.blockSignals(True)
 
         self.view.active_subplot_combo.clear()
         self.view.active_subplot_combo.addItem("Plot 1")
