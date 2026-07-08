@@ -15,7 +15,7 @@ from core.project_manager import ProjectManager
 from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION, LOG_FILE_NAME, SCRIPT_FILE_NAME
-from ui.animations import (DatabaseImportAnimation, FailedAnimation, FileImportAnimation, GoogleSheetsImportAnimation,
+from ui.animations import (DatabaseImportAnimation, FailedAnimation, GoogleSheetsImportAnimation,
                            ScriptLogExportAnimation)
 from ui.data_tab import DataTab
 from ui.dialogs import (ConsoleDialog, DatabaseConnectionDialog, GoogleSheetsDialog, GoogleSheetsExportDialog,
@@ -212,7 +212,7 @@ class MainWindow(QWidget):
                     )
                     self.status_bar.log(f"Session data could not be recovered: {str(err)}", LogLevel.ERROR)
                     self.project_manager.cleanup_autosave()
-            else:
+            elif reply_box.clickedButton() == discard_btn:
                 self.project_manager.cleanup_autosave()
 
     def _mark_as_unsaved(self) -> None:
@@ -285,7 +285,7 @@ class MainWindow(QWidget):
         if self._confirm_discard_changes():
             self.project_manager.new_project()
             self.project_manager.cleanup_autosave()
-            self.clear_all()
+            self.clear_all(force_clear=True)
 
             # Create an empty dataframe (0x0) to start the table view
             # Forces an update of the UI to switch from the welcome screen to project screen
@@ -318,6 +318,25 @@ class MainWindow(QWidget):
                 self.show_toast(
                     "File Not Found", "The project file could not be found", ToastLevel.WARNING
                 )
+                self._remove_recent_project(filepath)
+
+    def _remove_recent_project(self, filepath: str) -> None:
+        """Removes a specific file path from the recent projects list"""
+        settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
+        recent_files = settings.value("recent_files", [])
+
+        if isinstance(recent_files, str):
+            recent_files = [recent_files]
+        elif isinstance(recent_files, tuple):
+            recent_files = list(recent_files)
+        elif isinstance(recent_files, list):
+            recent_files = list(recent_files) if recent_files else []
+
+        standardized_path = str(Path(filepath).absolute())
+
+        if standardized_path in recent_files:
+            recent_files.remove(standardized_path)
+            settings.setValue("recent_files", recent_files)
 
     def _load_project_from_path(self, filepath: str) -> None:
         """Helper method to load project data and handle animations."""
@@ -460,13 +479,13 @@ class MainWindow(QWidget):
         finally:
             QApplication.restoreOverrideCursor()
 
-    def clear_all(self) -> None:
+    def clear_all(self, force_clear: bool = False) -> None:
         """Clear all data"""
         if self.data_handler.df is not None:
             if self._unsaved_changes:
                 if not self._confirm_discard_changes():
                     return
-            else:
+            elif not force_clear:
                 reply_box = QMessageBox(self)
                 reply_box.setWindowTitle("Confirm Clear Workspace")
                 reply_box.setText("Are you sure you want to clear all data, subsets, and plot configurations?")
@@ -476,7 +495,7 @@ class MainWindow(QWidget):
                 reply_box.setDefaultButton(QMessageBox.StandardButton.No)
                 reply = reply_box.exec()
 
-                if reply == QMessageBox.StandardButton.No:
+                if reply != QMessageBox.StandardButton.Yes:
                     return
 
         self.data_handler.df = None
@@ -504,7 +523,9 @@ class MainWindow(QWidget):
             )
             if reply == QMessageBox.StandardButton.Save:
                 return self.save_project()
-            elif reply == QMessageBox.StandardButton.Cancel:
+            elif reply == QMessageBox.StandardButton.Discard:
+                return True
+            else:
                 return False
 
         return True
@@ -534,7 +555,7 @@ class MainWindow(QWidget):
                 project_ext = self.project_manager.PROJECT_EXTENSION.lower()
                 valid_extensions.add(project_ext)
 
-                if filepath.suffix.lower() in valid_extensions:
+                if filepath.is_file() and filepath.suffix.lower() in valid_extensions:
                     self.activateWindow()
                     event.setDropAction(Qt.DropAction.CopyAction)
                     event.accept()
@@ -548,6 +569,15 @@ class MainWindow(QWidget):
             return
 
         urls = event.mimeData().urls()
+        event.accept()
+
+        QTimer.singleShot(0, lambda: self._process_dropped_urls(urls))
+
+    def _process_dropped_urls(self, urls: list) -> None:
+        """Processes the deferred drop event urls"""
+        if not self._confirm_discard_changes():
+            return
+
         if urls:
             if len(urls) > 1:
                 self.show_toast(
@@ -593,8 +623,6 @@ class MainWindow(QWidget):
         worker.signals.error.connect(self._on_import_error)
         worker.signals.progress.connect(self._on_import_progress)
 
-        self.import_file_animation = FileImportAnimation(parent=None, message="Imported File")
-        self.import_file_animation.start(target_widget=self)
         self.threadpool.start(worker)
 
     def import_file(self) -> None:
@@ -797,7 +825,7 @@ class MainWindow(QWidget):
                 "No local data source file was found. The exported script may lack a direct file-loading step. Continue anyway?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
             )
-            if reply == QMessageBox.StandardButton.Cancel:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
 
         if is_temp:
@@ -808,7 +836,7 @@ class MainWindow(QWidget):
                 "The exported Python Script will lack a direct file-loading step and will require you to manually insert the path to your local data.\n\n"
                 "Do you wish to continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
-            if reply == QMessageBox.StandardButton.Cancel:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
 
         dialog = QMessageBox(self)
@@ -870,13 +898,17 @@ class MainWindow(QWidget):
                                                   "Log Files (*.log);;Text Files (*.txt)")
         if filepath:
             try:
-                detailed = QMessageBox.question(
-                    self,
-                    "Export Log",
+                reply = QMessageBox.question(
+                    self, "Export Log",
                     "Include detailed timestamps?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
                     QMessageBox.StandardButton.Yes
-                ) == QMessageBox.StandardButton.Yes
+                )
+                if reply == QMessageBox.StandardButton.Cancel or reply not in [QMessageBox.StandardButton.Yes,
+                                                                               QMessageBox.StandardButton.No]:
+                    return
+
+                detailed = reply == QMessageBox.StandardButton.Yes
                 self.logger.export_logs(filepath, detailed)
 
                 self.show_toast(
@@ -936,7 +968,7 @@ class MainWindow(QWidget):
                     self.progress_dialog.accept()
                     self.progress_dialog = None
                 self.show_toast(
-                    "Export Error", "An error occurted while exporting data to Google Sheets", ToastLevel.ERROR
+                    "Export Error", "An error occurred while exporting data to Google Sheets", ToastLevel.ERROR
                 )
                 self.status_bar.log(f"Failed to export to Google Sheets: {str(ExportSheetsError)}", LogLevel.ERROR)
             finally:
@@ -972,7 +1004,7 @@ class MainWindow(QWidget):
 
     def zoom_in(self) -> None:
         """Zooms into the canvas"""
-        if not self.plot_tab.isVisible():
+        if not self.plot_tab.isVisible() or self.plot_tab.plot_engine.current_figure is None:
             return
 
         fig = self.plot_tab.plot_engine.current_figure
@@ -983,7 +1015,7 @@ class MainWindow(QWidget):
 
     def zoom_out(self) -> None:
         """Zooms out of the canvas"""
-        if not self.plot_tab.isVisible():
+        if not self.plot_tab.isVisible() or self.plot_tab.plot_engine.current_figure is None:
             return
 
         fig = self.plot_tab.plot_engine.current_figure
@@ -996,7 +1028,7 @@ class MainWindow(QWidget):
         """
         Resets the plot zoom to default starting dimensions
         """
-        if not self.plot_tab.isVisible():
+        if not self.plot_tab.isVisible() or self.plot_tab.plot_engine.current_figure is None:
             return
 
         DEFAULT_WIDTH_INCHES: float = 12.0

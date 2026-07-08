@@ -231,7 +231,7 @@ class DataTab(QWidget):
 
         return right_widget
 
-    def _on_table_double_clicked(self) -> None:
+    def _on_table_double_clicked(self, *args) -> None:
         """
         Guidance if trying to edit without edit mode enabled
         DataTable.EditTrigger is set to NoEditTriggers to avoid unintentional data changes
@@ -690,6 +690,8 @@ class DataTab(QWidget):
             case "drop_column":
                 cols = operation.get("columns", operation.get("column", ""))
                 if isinstance(cols, list):
+                    if len(cols) > 3:
+                        return f"Drop Columns: {', '.join(cols[:3])} and {len(cols) - 3} more"
                     return f"Drop Columns: {', '.join(cols)}"
                 return f"Drop Column: {cols}"
             case "rename_column":
@@ -823,10 +825,9 @@ class DataTab(QWidget):
         if settings.get("show_grid"):
             grid_qcolor: QColor = QColor(self.table_settings.grid_color)
             if not grid_qcolor.isValid():
-                return
-            palette = self.data_table.palette()
-            palette.setColor(QPalette.ColorRole.Mid, grid_qcolor)
-            self.data_table.setPalette(palette)
+                palette = self.data_table.palette()
+                palette.setColor(QPalette.ColorRole.Mid, grid_qcolor)
+                self.data_table.setPalette(palette)
 
         self.data_table.horizontalHeader().setVisible(settings["show_h_headers"])
         self.data_table.verticalHeader().setVisible(settings["show_v_headers"])
