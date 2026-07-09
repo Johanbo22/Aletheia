@@ -32,7 +32,15 @@ class DatetimeTab(BaseDataTab):
         self.dt_component_combo = QComboBox()
         self.dt_component_combo.addItems(["Year", "Month", "Month Name", "Day", "Day of Week", "Quarter", "Hour"])
         extract_layout.addWidget(self.dt_component_combo)
-        
+
+        self.extraction_preview_label = QLabel("Preview: Select a column and component")
+        self.extraction_preview_label.setProperty("styleClass", "muted_text")
+        self.extraction_preview_label.setWordWrap(True)
+        extract_layout.addWidget(self.extraction_preview_label)
+
+        self.dt_source_combo.currentTextChanged.connect(self._update_extraction_preview)
+        self.dt_component_combo.currentTextChanged.connect(self._update_extraction_preview)
+
         extract_layout.addLayout(self._create_operation_row(
             title="Extract Component",
             tooltip="Create a new column containing the selected time component",
@@ -72,6 +80,16 @@ class DatetimeTab(BaseDataTab):
         duration_group.setLayout(duration_layout)
         layout.addWidget(duration_group)
         layout.addStretch()
+
+    def _update_extraction_preview(self) -> None:
+        """Updates the preview label to show the user the expected output column name"""
+        source = self.dt_source_combo.currentText()
+        component = self.dt_component_combo.currentText()
+        if source and component:
+            component_formatted = component.replace(" ", "")
+            self.extraction_preview_label.setText(f"Output will be named: <b>{source}_{component_formatted}</b>")
+        else:
+            self.extraction_preview_label.setText("Preview: Select a column and component")
         
     def get_date_extraction_parameters(self) -> tuple[str, str]:
         return self.dt_source_combo.currentText(), self.dt_component_combo.currentText()

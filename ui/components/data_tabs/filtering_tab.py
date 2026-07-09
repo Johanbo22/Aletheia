@@ -1,8 +1,9 @@
-from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QLabel, QFormLayout, QLineEdit, QGroupBox, QComboBox
 from typing import Optional, TYPE_CHECKING
 
-from ui.components.data_tabs.base_data_tab import BaseDataTab
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel, QLineEdit, QVBoxLayout
+
 from icons import IconType
+from ui.components.data_tabs.base_data_tab import BaseDataTab
 
 if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController
@@ -44,6 +45,7 @@ class FilteringTab(BaseDataTab):
         
         self.filter_value = QLineEdit()
         self.filter_value.setPlaceholderText("Enter evaluation value...")
+        self.filter_value.setClearButtonEnabled(True)
         self.filter_value.setToolTip("Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
         form_layout.addRow(QLabel("Value:"), self.filter_value)
         

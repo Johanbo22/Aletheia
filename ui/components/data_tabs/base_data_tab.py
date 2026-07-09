@@ -53,6 +53,9 @@ class BaseDataTab(QWidget):
         button = QPushButton(title, parent=self)
         button.setToolTip(tooltip)
 
+        if help_id:
+            button.setObjectName(f"op_btn_{help_id}")
+
         button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         if icon_type is not None:

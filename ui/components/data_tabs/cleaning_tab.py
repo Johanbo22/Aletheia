@@ -1,8 +1,9 @@
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QGroupBox
 from typing import Optional, TYPE_CHECKING
 
-from ui.components.data_tabs.base_data_tab import BaseDataTab
+from PyQt6.QtWidgets import QGroupBox, QLabel, QVBoxLayout
+
 from icons import IconType
+from ui.components.data_tabs.base_data_tab import BaseDataTab
 
 if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController
@@ -44,14 +45,6 @@ class CleaningTab(BaseDataTab):
             button_stretch=1
         ))
         basic_layout.addLayout(self._create_operation_row(
-            title="Fill Missing Values",
-            tooltip="Use this to fill in 'NaN' values in your dataset with something else",
-            callback=self.controller.fill_missing,
-            help_id="fill_missing",
-            icon_type=IconType.FillMissingValues,
-            button_stretch=1
-        ))
-        basic_layout.addLayout(self._create_operation_row(
             title="Drop Empty Columns",
             tooltip="Removes columns where all rows have missing values (NaN/NaT)",
             callback=self.controller.drop_empty_columns,
@@ -59,6 +52,15 @@ class CleaningTab(BaseDataTab):
             icon_type=IconType.DropColumn,
             button_stretch=1
         ))
+        basic_layout.addLayout(self._create_operation_row(
+            title="Fill Missing Values",
+            tooltip="Use this to fill in 'NaN' values in your dataset with something else",
+            callback=self.controller.fill_missing,
+            help_id="fill_missing",
+            icon_type=IconType.FillMissingValues,
+            button_stretch=1
+        ))
+
         basic_group.setLayout(basic_layout)
         layout.addWidget(basic_group)
 
@@ -92,3 +94,19 @@ class CleaningTab(BaseDataTab):
         outlier_group.setLayout(outlier_layout)
         layout.addWidget(outlier_group)
         layout.addStretch()
+
+        self._apply_destructive_styling_tags()
+
+    def _apply_destructive_styling_tags(self) -> None:
+        """
+        Tags destructive buttons with a severity property
+        """
+        from PyQt6.QtWidgets import QPushButton
+        destructive_ids = ["drop_missing", "drop_empty_columns", "remove_duplicates"]
+
+        for btn_id in destructive_ids:
+            btn: QPushButton = self.findChild(QPushButton, f"op_btn_{btn_id}")
+            if btn:
+                btn.setProperty("actionSeverity", "destructive")
+                btn.style().unpolish(btn)
+                btn.style().polish(btn)

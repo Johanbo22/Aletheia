@@ -1,7 +1,8 @@
 from typing import Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout
+from PyQt6.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, \
+    QVBoxLayout
 
 from icons import IconBuilder, IconType
 from ui.components.data_tabs.base_data_tab import BaseDataTab
@@ -132,6 +133,7 @@ class TransformTab(BaseDataTab):
         self.saved_agg_list = QListWidget()
         self.saved_agg_list.setMaximumHeight(150)
         self.saved_agg_list.itemClicked.connect(self.controller.on_saved_agg_selected)
+        self.saved_agg_list.itemSelectionChanged.connect(self._on_saved_agg_selection_changed)
         saved_agg_layout.addWidget(self.saved_agg_list)
 
         saved_agg_buttons = QHBoxLayout()
@@ -172,7 +174,6 @@ class TransformTab(BaseDataTab):
         return item.data(Qt.ItemDataRole.UserRole) if item else None
     
     def update_saved_aggregation_list(self, aggregations: list[tuple[str, int]]) -> None:
-        from PyQt6.QtWidgets import QListWidgetItem
         self.saved_agg_list.clear()
         if not aggregations:
             placeholder = QListWidgetItem("No saved aggregations")
@@ -184,6 +185,12 @@ class TransformTab(BaseDataTab):
             item = QListWidgetItem(f"{name} ({row_count}) rows")
             item.setData(Qt.ItemDataRole.UserRole, name)
             self.saved_agg_list.addItem(item)
+
+    def _on_saved_agg_selection_changed(self) -> None:
+        """Manage button states based on valid list selection"""
+        item: QListWidgetItem = self.saved_agg_list.currentItem()
+        is_valid_selection: bool = item is not None and bool(item.flags() & Qt.ItemFlag.ItemIsSelectable)
+        self.set_aggregations_buttons_enabled(is_valid_selection)
     
     def set_aggregations_buttons_enabled(self, enabled: bool) -> None:
         self.view_agg_btn.setEnabled(enabled)
