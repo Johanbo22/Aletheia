@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import QGroupBox, QSlider, QSpinBox, QDoubleSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QLayout, QTabWidget, QComboBox, QPushButton
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QGroupBox, QHBoxLayout, QLabel, QLayout, QPushButton, \
+    QScrollArea, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 
-from ui.theme import ThemeColors
-from ui.widgets import AutoResizingStackedWidget, ToggleSwitch
+from ui.widgets import ToggleSwitch
 
 class CustomizationSettingsTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -15,7 +15,7 @@ class CustomizationSettingsTab(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        
+
         scroll_widget = QWidget()
         scroll_widget.setObjectName("ScrollContent")
         scroll_layout = QVBoxLayout(scroll_widget)
@@ -98,7 +98,7 @@ class CustomizationSettingsTab(QWidget):
         group.setLayout(group_layout)
         layout.addWidget(group)
         layout.addStretch()
-        
+
         self.advanced_stack_layout.addWidget(self.page_line)
 
     def _setup_bar_hist_page(self) -> None:
@@ -173,7 +173,7 @@ class CustomizationSettingsTab(QWidget):
         self.histogram_show_kde_check = ToggleSwitch("Overlay Kernel Density Estimate")
         self.histogram_show_kde_check.setChecked(False)
         hist_layout.addWidget(self.histogram_show_kde_check)
-        
+
         hist_layout.addStretch()
         tab_widget.addTab(hist_tab, "Histogram Properties")
 
@@ -193,25 +193,25 @@ class CustomizationSettingsTab(QWidget):
 
         self.regression_line_check = ToggleSwitch("Show Linear Regresssion Line")
         scatter_layout.addWidget(self.regression_line_check)
-        
+
         scatter_layout.addWidget(QLabel("Regression Type:"))
         self.regression_type_combo = QComboBox()
         self.regression_type_combo.addItems(["Linear", "Polynomial", "Exponential", "Logarithmic"])
         scatter_layout.addWidget(self.regression_type_combo)
-        
+
         self.poly_degree_label = QLabel("Polynomial Degree:")
         scatter_layout.addWidget(self.poly_degree_label)
         self.poly_degree_spin = QSpinBox()
         self.poly_degree_spin.setRange(2, 10)
         self.poly_degree_spin.setValue(2)
         scatter_layout.addWidget(self.poly_degree_spin)
-        
+
         # Internal callback to toggle visibility of polynomial degree components cleanly
         def toggle_poly_degree() -> None:
             is_poly = self.regression_type_combo.currentText() == "Polynomial"
             self.poly_degree_label.setVisible(is_poly)
             self.poly_degree_spin.setVisible(is_poly)
-        
+
         self.regression_type_combo.currentTextChanged.connect(toggle_poly_degree)
         toggle_poly_degree()
 
@@ -273,25 +273,29 @@ class CustomizationSettingsTab(QWidget):
         self.pie_shadow_check = ToggleSwitch("Add Shadow")
         self.pie_shadow_check.setChecked(False)
         pie_layout.addWidget(self.pie_shadow_check)
-        
+
         self.pie_donut_check = ToggleSwitch("Donut Chart")
         self.pie_donut_check.setChecked(False)
         pie_layout.addWidget(self.pie_donut_check)
-        
+
+        self.pie_donut_container = QWidget()
+        donut_layout = QHBoxLayout(self.pie_donut_container)
+        donut_layout.setContentsMargins(0, 0, 0, 0)
+
         self.pie_donut_width_label = QLabel("Donut Ring Width:")
-        pie_layout.addWidget(self.pie_donut_width_label)
-        
+        donut_layout.addWidget(self.pie_donut_width_label)
+
         self.pie_donut_width_spin = QDoubleSpinBox()
         self.pie_donut_width_spin.setRange(0.1, 0.9)
         self.pie_donut_width_spin.setValue(0.3)
         self.pie_donut_width_spin.setSingleStep(0.05)
-        pie_layout.addWidget(self.pie_donut_width_spin)
-        
+        donut_layout.addWidget(self.pie_donut_width_spin)
+
+        pie_layout.addWidget(self.pie_donut_container)
+
         def toggle_donut_width() -> None:
-            is_donut = self.pie_donut_check.isChecked()
-            self.pie_donut_width_label.setVisible(is_donut)
-            self.pie_donut_width_spin.setVisible(is_donut)
-        
+            self.pie_donut_container.setVisible(self.pie_donut_check.isChecked())
+
         self.pie_donut_check.stateChanged.connect(toggle_donut_width)
         toggle_donut_width()
 
@@ -353,12 +357,12 @@ class CustomizationSettingsTab(QWidget):
     def _setup_error_bars_group(self, parent_layout: QVBoxLayout) -> None:
         self.error_bars_group = QGroupBox("Error Bars")
         layout = QVBoxLayout()
-        
+
         layout.addWidget(QLabel("Error Bar Type:"))
         self.error_bars_combo = QComboBox()
         self.error_bars_combo.addItems(["None", "Standard Deviation", "Standard Error", "Custom"])
         layout.addWidget(self.error_bars_combo)
-        
+
         layout.addWidget(QLabel("Color:"))
         color_layout = QHBoxLayout()
         self.error_bar_color_button = QPushButton("Choose", parent=self)
@@ -366,7 +370,7 @@ class CustomizationSettingsTab(QWidget):
         color_layout.addWidget(self.error_bar_color_button)
         color_layout.addWidget(self.error_bar_color_label)
         layout.addLayout(color_layout)
-        
+
         layout.addWidget(QLabel("Line Width:"))
         self.error_bar_linewidth_spin = QDoubleSpinBox()
         self.error_bar_linewidth_spin.setRange(0.1, 5.0)
@@ -395,7 +399,7 @@ class CustomizationSettingsTab(QWidget):
         self.error_bar_zorder_spin.setRange(-10, 100)
         self.error_bar_zorder_spin.setValue(10)
         layout.addWidget(self.error_bar_zorder_spin)
-        
+
         self.error_bars_group.setLayout(layout)
         parent_layout.addWidget(self.error_bars_group)
 
