@@ -16,7 +16,6 @@ from core.global_signals import ToastLevel, global_signals
 from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
 from ui.LandingPage import LandingPage
-from ui.animations import EditModeToggleAnimation
 from ui.components.data_operations_panel import DataOperationsPanel
 from ui.components.data_search_bar import DataSearchBar
 from ui.components.data_table_delegate import DataTableDelegate
@@ -249,12 +248,9 @@ class DataTab(QWidget):
         if self.is_editing:
             self.data_table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.AnyKeyPressed)
             self.status_bar.log("Edit Mode Enabled. You are now able to edit cells in the data table", LogLevel.INFO)
-
-            EditModeToggleAnimation(parent=self, is_on=True).start(target_widget=self)
         else:
             self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
             self.status_bar.log("Edit Mode Disabled", LogLevel.INFO)
-            EditModeToggleAnimation(parent=self, is_on=False).start(target_widget=self)
 
         # Update the flags
         if self.data_table.model() is not None and isinstance(self.data_table.model(), DataTableModel):

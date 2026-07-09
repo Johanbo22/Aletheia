@@ -15,8 +15,6 @@ from core.project_manager import ProjectManager
 from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION, LOG_FILE_NAME, SCRIPT_FILE_NAME
-from ui.animations import (DatabaseImportAnimation, FailedAnimation, GoogleSheetsImportAnimation,
-                           ScriptLogExportAnimation)
 from ui.data_tab import DataTab
 from ui.dialogs import (ConsoleDialog, DatabaseConnectionDialog, GoogleSheetsDialog, GoogleSheetsExportDialog,
                         ProgressDialog)
@@ -429,7 +427,6 @@ class MainWindow(QWidget):
         except Exception as SaveProjectError:
             if "cancelled" in str(SaveProjectError).lower():
                 return False
-            FailedAnimation("Save failed", parent=None).start(target_widget=self)
             self.show_toast(
                 "Save Project Error", "Failed to save project", ToastLevel.ERROR
             )
@@ -748,7 +745,6 @@ class MainWindow(QWidget):
             }
         )
         self.show_toast("Google Sheet Import", "Data imported from Google Sheets", ToastLevel.SUCCESS)
-        GoogleSheetsImportAnimation(parent=None, message="Google Sheet Import").start(target_widget=self)
 
     def import_from_database(self) -> None:
         """Import data from a database connection"""
@@ -793,8 +789,6 @@ class MainWindow(QWidget):
                 self.show_toast(
                     "Import from Database", f"Imported data from {db_type} database", ToastLevel.SUCCESS
                 )
-                DatabaseImportAnimation(parent=None, message="Database Import", db_type=db_type).start(
-                    target_widget=self)
 
         except Exception as ImportDatabaseError:
             if self.progress_dialog:
@@ -884,8 +878,6 @@ class MainWindow(QWidget):
                 self.show_toast(
                     "Export success", f"Exported script to {filepath}", ToastLevel.SUCCESS
                 )
-                ScriptLogExportAnimation(parent=self, message="Script Exported", operation_type="python").start(
-                    target_widget=self)
             except Exception as ExportPythonScriptError:
                 self.show_toast(
                     "Export Error", "Failed to export code to file", ToastLevel.ERROR
@@ -915,8 +907,6 @@ class MainWindow(QWidget):
                     "Log Export Successful", f"Log exported to {filepath}", ToastLevel.SUCCESS
                 )
                 self.status_bar.log(f"Log exported to {filepath}", LogLevel.SUCCESS)
-                ScriptLogExportAnimation(parent=self, message="Logs Exported", operation_type="log").start(
-                    target_widget=self)
 
             except Exception as ExportLogError:
                 self.show_toast(

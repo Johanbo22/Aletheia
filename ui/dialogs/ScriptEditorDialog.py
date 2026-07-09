@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QHBoxLa
 from core.global_signals import ToastLevel, global_signals
 from resources.version import APPLICATION_NAME
 from ui.PythonHighlighter import PythonHighlighter
-from ui.animations.PlotGeneratedAnimation import PlotGeneratedAnimation
 from ui.widgets.CodeEditor import CodeEditor
 
 class StreamRedirector:
@@ -871,9 +870,6 @@ class ScriptEditorDialog(QDialog):
         # Reset the modified flag since current code is now executed
         self.is_code_modified = False
         self.setWindowTitle("Python Console")
-
-        self.run_script_animation = PlotGeneratedAnimation(parent=self, message="Run Script")
-        self.run_script_animation.start(target_widget=self)
 
     def save_to_history(self, code: str) -> None:
         """Save the current code to a list, cannot go more than 5, """

@@ -17,7 +17,6 @@ from core.data_handler import DataHandler
 from core.global_signals import ToastLevel, global_signals
 from core.plot_config_manager import PlotConfigManager
 from core.plot_engine import PlotEngine
-from ui.animations import PlotClearedAnimation
 from ui.plot_tab_ui import PlotTabUI
 from ui.status_bar import LogLevel, StatusBar
 from ui.widgets.SubplotOverlay import SubplotOverlay
@@ -798,9 +797,6 @@ class PlotTab(PlotTabUI):
         self.annotation_manager.clear_annotations()
         self.reference_line_manager.clear_all_reference_lines()
         self.subplot_manager.clear_configs()
-
-        self.plot_clear_animation = PlotClearedAnimation(parent=None, message="Plot Cleared")
-        self.plot_clear_animation.start(target_widget=self)
 
         self.status_bar.log_action(
             "Plot cleared",
