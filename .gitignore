@@ -34,3 +34,9 @@ dump_ui.md
 /crash_reports
 MVC_rules.md
 refactor_plan.md
+output.txt
+qodana.yaml
+
+# PyInstaller build artifacts
+build/
+dist/

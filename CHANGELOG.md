@@ -4,21 +4,100 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
-## v.0.4.1 [Patch]
+## v.0.4.2 [Patch]
 
 ### Added
 
+- Context menu options "Select All" and "Clear Selection" within the data table
+- Auto-truncation logic for the History Tab list items. Multi-column operations (like dropping >3 columns) now
+  truncate (e.g., `Drop Columns: A, B, C and 4 more`) to prevent UI overflow.
+- Silent cache cleanup method (`_remove_recent_project`) that triggers when a user attempts to open a moved or deleted
+  file from the Welcome Page.
+- Native clear buttons added to `QLineEdit` components in Appearance and Geospatial tabs for resets.
+
+### Changed
+
+- Removed hardcoded shortcuts for Windows to the QKeySequence.StandardKey enum
+- Refactored `MainWindow.clear_all` to accept a `force_clear` param, to prevent unnecessary discard data prompts.
+- Changed the icon for "Reset to Original" in the Data Operations Panel from `IconType.Redo` to `IconType.RefreshItem`
+  to accurately reflect a "reset/restart" action.
+- Clicking the Error/Warning issue counter badge in the Status Bar now automatically clears the counters (acknowledging
+  the alert) prior to opening the log history modal.
+- Refactored the string memory processing in `MainDataTableView.copy_selection` from a `+=` iterative loop into a
+  hash-mapping architecture.
+- Enabled `setAccelerated(True)` and Adaptive Decimal Steps for SpinBoxes with large ranges (e.g. ±1e9) in
+  `annotations_settings_tab.py` to improve scrolling speed.
+- Disabled `setKeyboardTracking` on high-range SpinBoxes to prevent stuttering/UI lockups during typing.
+- Containerized conditional elements in `customization_settings_tab.py` (Donut Width) into wrapper `QWidget`s to ensure
+  layout margins collapse when elements are hidden.
+
+### Fixed
+
+- Fixed an issue where the "Previous match" button in the data search bar failed to highlight the match
+- Fixed a bug where closing the search bar did not emit the close_requested signal properly
+- Fixed a visual bug causing the search bar to go off-screen if opened or closed in quick succession
+- Resolved a memory leak by the SearchWorker instance.
+- **CodeEditor**:
+  - Fixed a crash caused by the QThread garbage collection while triggering the AST linting worker. Old threads are now
+    properly disconnected and scheduled for deletion.
+  - Fixed a bug that caused fully-typed autocomplete suggestions to duplicate text (for example, typing 'print' resulted
+    in 'printprint').
+  - Fixed a memory leak and potential rendering failure when folded blocks were deleted, leaving QTextCursor references
+    in memory.
+- Fixed a regex boundary bug that caused multiline strings (""" or ''') to continue downward if the closing quotes were
+  placed at index 0 of a newline.
+- Fixed bug where flipping axes did not work due to incorrect method call on the widget current_plot_type_name
+- Fixed a bug where Subplot Configuration group would not change when Add subplot check was toggled.
+- Fixed layout issues with the Variables group in the GeneralSettingsTab where depending on toggled MultiYColumnCheck
+  would cause layout sizing glitches.
+- Fixed animation layout bugs with the `AutoResizingStackedWidget`.
+- Fixed resizing bugs with the `AutoSaveIndicator`
+- Fixed bug where AutoSaveIndicator vanished during saving.
+- Enhanced AutoSaveIndicator alignments for cross-platform and scaling values
+- Addressed an issue where updating plot settings triggered repeated "Plot Generated" toasts.
+- Fixed a typo "retrieved" in the `PlotGenerationManager._restore_frozen_data` method.
+- Fixed a spelling error in `DataTableModel` which inadvertently enforced the wrong alignment on numerical cells
+- Missing newline escape in the table tooltip header string.
+- A syntax error with the LogLevel when exporting data to clipboard
+- Fixed a bug where drag-dropping a file would trigger a QMessageBox dialog prompt.
+- Fixed an incorrect logic bug in `StatusBar.set_progress` where .minimum() was used instead of .maximum()
+- Clipped `StatusBar.update_memory_usage`'s percentage to a hard maximum of 100.0, resolving unhandled state behaviors
+  internally observed by QProgressBar objects accepting overflowing percentages prior to garbage cleanup.
+- Fixed clipboard formatting error in `_copy_latest_log` that incorrectly persisted `HTML.escape()` characters (e.g.,
+  `&lt;`) via regex stripping. Strings are now properly `html.unescape()`'d before insertion to the system clipboard.
+- Corrected the `_on_table_double_clicked` slot signature in `DataTab` to accept wildcard args (`*args`), solving a
+  silent potential structural TypeError when PyQt automatically pushes `QModelIndex` signals onto 0-argument slots.
+- Typographical error (`occurted` -> `occurred`) in Google Sheet export failure prompts.
+- Fixed an architectural vulnerability in `DataTab.apply_table_settings` where an invalid grid hex color would `return`
+  early, completely skipping and breaking all remaining user customizations.
+- Fixed the "Recent Projects" dead-link persistence bug. Failing to load a missing project now successfully removes it
+  from the `QSettings` configurations rather than permanently leaving it as a dead shortcut.
+- Addressed a severe data-loss bug during the boot sequence recovery check. If a user escaped or closed the dialog
+  window without responding, it fell to a default case that deleted their autosaved files.
+- Prevented unhandled `AttributeError` instances from destroying the system thread if a user accidentally invoked
+  standard plot zooming combinations (`Ctrl++` / `Ctrl+-`) before any `current_figure` was actually generated by the
+  system backend.
+- Upgraded the Drag and Drop event validation block. Passing checks now mandate verification that an incoming drop is
+  structurally a `filepath.is_file()` to reject directories craftily named with a file suffix
+- Restored the data model's rendering stability for DataFrames storing nested arrays or lists (common with
+  ML/embeddings) by capturing and parsing the `pd.isna` logic without triggering pandas’ Truth Value ambiguity
+  exceptions.
+
+### Removed
+
+- Old animation module for UI contextual animations related to operations.
+
+## v.0.4.1 [Patch]
+### Added
 - The "Read more" button in the HelpExplorerDialog now displays the URL that the buttons sends to
 - A "More details" button in the HelpDialog to send a request to view the page in HelpExplorerDialog
 - Updated help database
 
 ### Changed
-
 - Updated the layout in HelpExplorerDialog to better accommodate animation frame and text frames
 - Updated the button layout in HelpDialog to separate the buttons more evenly.
 
 ### Fixed
-
 - Fixed a layout issue in the HelpExplorerDialog where the "Read more" button was stretched too far
 - Resolved an issue where viewing the Changelog pop repeatedly would result in a memory leak over time
 - Fixed an unintended behavior where having more than 4 recent projects would permanently delete older projects instead
