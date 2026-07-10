@@ -24,60 +24,110 @@ class AggregationController(BaseDataController):
             self.no_data_loaded_toast()
             return
 
+        if getattr(self.data_handler, "viewing_aggregation_name", None):
+            global_signals.request_toast(
+                "Action Blocked",
+                "Please restore the data view before creating a new aggregation",
+                ToastLevel.WARNING
+            )
+
+        is_already_viewing_agg = bool(getattr(self.data_handler, "view_aggregation_name", None))
+        if not is_already_viewing_agg:
+            if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
+                self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
+
         dialog = AggregationDialog(self.data_handler, self.view)
         if dialog.exec():
-            config = dialog.get_aggregation_config()
-            try:
-                self.data_handler.reset_data()
-
-                group_cols = config["group_by"]
-                agg_config = config["agg_config"]
-                date_grouping = config.get("date_grouping")
-                agg_name = config.get("aggregation_name", "")
-                rename_mapping = config.get("rename_mapping")
-
-                self.data_handler.aggregate_data(group_cols, agg_config, date_grouping, rename_mapping)
-                result_df = self.data_handler.df.copy()
-
-                # Prompt the user to save this aggregation to the persistent list if named
-                if agg_name:
-                    try:
-                        desc_parts = [f"{func}({col})" for col, func in agg_config.items()]
-                        description = f"Aggregated: {', '.join(desc_parts)} by {', '.join(group_cols)}"
-
-                        self.aggregation_manager.save_aggregation(
-                            name=agg_name,
-                            description=description,
-                            group_by=group_cols,
-                            agg_config=agg_config,
-                            date_grouping=date_grouping,
-                            result_df=result_df,
-                            rename_mapping=rename_mapping
-                        )
-                        self.refresh_saved_agg_list()
-                        self.status_bar.log(f"Saved aggregation: {agg_name}", LogLevel.SUCCESS)
-                    except ValueError as e:
-                        global_signals.request_toast("Error", "Aggregation data not found", ToastLevel.ERROR)
-                        self.status_bar.log(f"Failed to save aggregation: {str(e)}", LogLevel.ERROR)
-
+            self._apply_and_save_aggregation(dialog.get_aggregation_config())
+        else:
+            if not is_already_viewing_agg and hasattr(self.data_handler,
+                                                      "pre_agg_view_df") and self.data_handler.pre_agg_view_df is not None:
+                self.data_handler.df = self.data_handler.pre_agg_view_df.copy()
+                self.data_handler.pre_agg_view_df = None
                 self.view.refresh_data_view()
 
-                group_by_str = ", ".join(group_cols)
-                self.status_bar.log_action(
-                    f"Aggregated data by [{group_by_str}]",
-                    details={
-                        "group_by_columns": group_cols,
-                        "agg_config"      : agg_config,
-                        "date_grouping"   : date_grouping,
-                        "result_rows"     : len(self.data_handler.df),
-                        "operation"       : "aggregate",
-                        "saved"           : bool(agg_name),
-                    },
-                    level=LogLevel.SUCCESS,
+    def _apply_and_save_aggregation(self, config: dict) -> None:
+        """Applies the aggregation configuration and optionally saves it"""
+        try:
+
+            if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
+                self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
+
+            self.data_handler.reset_data()
+
+            group_cols = config.get("group_by", [])
+            agg_config = config.get("agg_config", {})
+            date_grouping = config.get("date_grouping")
+            agg_name = config.get("aggregation_name", "")
+            rename_mapping = config.get("rename_mapping")
+
+            self.data_handler.aggregate_data(
+                group_cols, agg_config, date_grouping, rename_mapping
+            )
+
+            self.data_handler.viewing_aggregation_name = agg_name if agg_name else "Unsaved Aggregation"
+            self.data_handler.inserted_subset_name = None
+
+            if agg_name:
+                self._save_aggregation_configuration(
+                    agg_name, group_cols, agg_config, date_grouping, rename_mapping
                 )
-            except Exception as e:
-                global_signals.request_toast("Error", "Aggregating data failed", ToastLevel.ERROR)
-                self.status_bar.log(f"Aggregation failed: {str(e)}", LogLevel.ERROR)
+
+            self.view.refresh_data_view()
+            self._log_aggregation_success(group_cols, agg_config, date_grouping, agg_name)
+
+        except Exception as e:
+            if hasattr(self.data_handler, "pre_agg_view_df") and self.data_handler.pre_agg_view_df is not None:
+                self.data_handler.df = self.data_handler.pre_agg_view_df.copy()
+                self.data_handler.pre_agg_view_df = None
+                self.data_handler.viewing_aggregation_name = None
+
+            global_signals.request_toast("Error", "Aggregating data failed", ToastLevel.ERROR)
+            self.status_bar.log(f"Aggregation failed: {str(e)}", LogLevel.ERROR)
+            if self.data_handler.df is not None:
+                self.view.refresh_data_view()
+
+    def _save_aggregation_configuration(self, agg_name: str, group_cols: list, agg_config: dict, date_grouping: dict,
+                                        rename_mapping: dict) -> None:
+        """Saves the active aggregation configuration to the manager"""
+        try:
+            desc_parts = [f"{func}({col})" for col, func in agg_config.items()]
+            description = f"Aggregated: {', '.join(desc_parts)} by {', '.join(group_cols)}"
+            result_df = self.data_handler.df.copy()
+
+            self.aggregation_manager.save_aggregation(
+                name=agg_name,
+                description=description,
+                group_by=group_cols,
+                agg_config=agg_config,
+                date_grouping=date_grouping,
+                result_df=result_df,
+                rename_mapping=rename_mapping
+            )
+            self.refresh_saved_agg_list()
+            self.status_bar.log(f"Saved aggregation: {agg_name}", LogLevel.SUCCESS)
+        except ValueError as e:
+            global_signals.request_toast(
+                "Warning",
+                f"An aggregation named '{agg_name}' already exists", ToastLevel.WARNING
+            )
+            self.status_bar.log(f"Failed to save aggregation: {str(e)}", LogLevel.ERROR)
+
+    def _log_aggregation_success(self, group_cols: list, agg_config: dict, date_grouping: dict, agg_name: str) -> None:
+        """Logs the successful aggregation"""
+        group_by_str = ", ".join(group_cols)
+        self.status_bar.log_action(
+            f"Aggregated data by [{group_by_str}]",
+            details={
+                "group_by_columns": group_cols,
+                "agg_config"      : agg_config,
+                "date_grouping"   : date_grouping,
+                "result_rows"     : len(self.data_handler.df),
+                "operation"       : "aggregate",
+                "saved"           : bool(agg_name),
+            },
+            level=LogLevel.SUCCESS
+        )
 
     def refresh_saved_agg_list(self) -> None:
         """Refreshes the UI list of saved aggregations."""
@@ -118,7 +168,8 @@ class AggregationController(BaseDataController):
                 self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
 
             self.view.data_table.setModel(None)
-            if hasattr(self.view, "model"):
+            if hasattr(self.view, "model") and self.view.model is not None:
+                self.view.model.deleteLater()
                 del self.view.model
 
             self.data_handler.df = agg_df.copy()
@@ -128,7 +179,9 @@ class AggregationController(BaseDataController):
 
             self.status_bar.log_action(
                 f"Viewing saved aggregation: {agg_name}",
-                details={"aggregation_name": agg_name, "rows": len(agg_df), "columns": len(agg_df.columns),
+                details={"aggregation_name": agg_name,
+                         "rows"            : len(agg_df),
+                         "columns"         : len(agg_df.columns),
                          "operation"       : "view_saved_aggregation"},
                 level=LogLevel.INFO,
             )
@@ -151,7 +204,8 @@ class AggregationController(BaseDataController):
                 self.data_handler.inserted_subset_name = None
 
                 self.view.data_table.setModel(None)
-                if hasattr(self.view, "model"):
+                if hasattr(self.view, "model") and self.view.model is not None:
+                    self.view.model.deleteLater()
                     del self.view.model
 
                 self.view.refresh_data_view()
