@@ -1,6 +1,6 @@
 [project]
 name = "Aletheia"
-version = "0.2.0"
+dynamic = ["version"]
 description = "Aletheia is a GUI implementation of the Matplotlib and pandas data analytics and plotting capabilities written using the PyQt6 GUI framework"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,8 +21,24 @@ dependencies = [
     "pyqt6-webengine==6.10.0",
     "pyqt6-webengine-qt6==6.10.1",
     "requests==2.33.0",
-    "scikit-learn==1.6.1",
+    "scikit-learn==1.6.0",
     "scipy==1.14.1",
     "seaborn==0.13.2",
     "sqlalchemy==2.0.36",
 ]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pyinstaller",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "resources/version.py"
+pattern = "APPLICATION_VERSION\\s*=\\s*[\"'](?P<version>[^\"']+)[\"']"

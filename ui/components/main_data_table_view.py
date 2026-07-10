@@ -38,6 +38,10 @@ class MainDataTableView(QTableView):
         self.horizontalHeader().setObjectName("MainDataHeader")
         self.verticalHeader().setObjectName("MainDataHeader")
         self.verticalHeader().setDefaultSectionSize(32)
+
+        self.horizontalHeader().setResizeContentsPrecision(500)
+        self.verticalHeader().setResizeContentsPrecision(500)
+
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
 
@@ -80,7 +84,14 @@ class MainDataTableView(QTableView):
         highlight_missing_action: QAction | None = menu.addAction("Highlight Missing Values")
         menu.addSeparator()
 
+        select_all_action: QAction | None = menu.addAction("Select All")
+        select_all_action.setShortcut(QKeySequence.StandardKey.SelectAll)
+
+        clear_selection_action: QAction | None = menu.addAction("Clear Selection")
+
         copy_action: QAction | None = menu.addAction("Copy Selection")
+        copy_action.setShortcut(QKeySequence.StandardKey.Copy)
+
         settings_action: QAction | None = menu.addAction("Table Settings...")
         stats_test_action: QAction | None = menu.addAction("Run Statistical Test...")
 
@@ -92,6 +103,10 @@ class MainDataTableView(QTableView):
             self.resizeRowsToContents()
         elif action == highlight_missing_action:
             self.highlight_missing_values()
+        elif action == select_all_action:
+            self.selectAll()
+        elif action == clear_selection_action:
+            self.clearSelection()
         elif action == copy_action:
             self.copy_selection()
         elif action == settings_action:
@@ -112,22 +127,20 @@ class MainDataTableView(QTableView):
 
         sorted_indexes: list[QModelIndex | QModelIndex] = sorted(selected_indexes,
                                                                  key=lambda idx: (idx.row(), idx.column()))
-        copied_text: str = ""
-        previous_row: int = sorted_indexes[0].row()
-
+        rows_data: dict[int, list[str]] = {}
         for index in sorted_indexes:
-            current_row = index.row()
-            if current_row != previous_row:
-                copied_text += "\n"
-                previous_row = current_row
-            elif index != sorted_indexes[0]:
-                copied_text += "\t"
+            row = index.row()
+            if row not in rows_data:
+                rows_data[row] = []
 
             cell_data: Any | None = index.data(Qt.ItemDataRole.DisplayRole)
-            copied_text += str(cell_data) if cell_data is not None else ""
+            rows_data[row].append(str(cell_data) if cell_data is not None else "")
+
+        copied_lines = ["\t".join(rows_data[r]) for r in sorted(rows_data.keys())]
+        copied_text = "\n".join(copied_lines)
 
         QApplication.clipboard().setText(copied_text)
-        self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard".LogLevel.SUCCESS)
+        self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard", LogLevel.SUCCESS)
 
     def highlight_missing_values(self) -> None:
         """Finds and highlights all missing values"""

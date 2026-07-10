@@ -166,7 +166,7 @@ class DataTableModel(QAbstractTableModel):
 
             try:
                 if pd.api.types.is_numeric_dtype(dtype):
-                    self._col_alignments.append(alignr_right)
+                    self._col_alignments.append(align_right)
                 else:
                     self._col_alignments.append(align_left)
             except Exception:
@@ -180,7 +180,7 @@ class DataTableModel(QAbstractTableModel):
             try:
                 missing_count = int(missing_counts.iloc[i]) if missing_counts is not None else 0
                 self._header_tooltips.append(
-                    f"Column: {col_name}\nData type: {dtype}"
+                    f"Column: {col_name}\nData type: {dtype}\n"
                     f"Missing Values: {missing_count:,}"
                 )
             except Exception:
@@ -284,7 +284,14 @@ class DataTableModel(QAbstractTableModel):
         except Exception:
             return None
 
-        is_missing = bool(pd.isna(val))
+        try:
+            if isinstance(val, (list, dict, np.ndarray)):
+                is_missing = False
+            else:
+                is_miss = pd.isna(val)
+                is_missing = bool(is_miss) if isinstance(is_miss, (bool, np.bool_)) else False
+        except Exception:
+            is_missing = False
 
         if role == Qt.ItemDataRole.DisplayRole:
             return self._get_display_data(val, col, is_missing)
@@ -427,7 +434,8 @@ class DataTableModel(QAbstractTableModel):
 
         except Exception as UpdateDataModelError:
             logger.error(f"Error updating cell data: {UpdateDataModelError}", exc_info=True)
-            global_signals.request_toast("Update Error", "Failed to update cell", ToastLevel.ERROR)
+            global_signals.request_toast("Update Error", "Failed to update cell. Check data type compatibility",
+                                         ToastLevel.ERROR)
             return False
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:

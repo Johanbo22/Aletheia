@@ -16,7 +16,6 @@ from core.global_signals import ToastLevel, global_signals
 from core.subset_manager import SubsetManager
 from icons import IconBuilder, IconType
 from ui.LandingPage import LandingPage
-from ui.animations import EditModeToggleAnimation
 from ui.components.data_operations_panel import DataOperationsPanel
 from ui.components.data_search_bar import DataSearchBar
 from ui.components.data_table_delegate import DataTableDelegate
@@ -231,7 +230,7 @@ class DataTab(QWidget):
 
         return right_widget
 
-    def _on_table_double_clicked(self) -> None:
+    def _on_table_double_clicked(self, *args) -> None:
         """
         Guidance if trying to edit without edit mode enabled
         DataTable.EditTrigger is set to NoEditTriggers to avoid unintentional data changes
@@ -249,12 +248,9 @@ class DataTab(QWidget):
         if self.is_editing:
             self.data_table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.AnyKeyPressed)
             self.status_bar.log("Edit Mode Enabled. You are now able to edit cells in the data table", LogLevel.INFO)
-
-            EditModeToggleAnimation(parent=self, is_on=True).start(target_widget=self)
         else:
             self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
             self.status_bar.log("Edit Mode Disabled", LogLevel.INFO)
-            EditModeToggleAnimation(parent=self, is_on=False).start(target_widget=self)
 
         # Update the flags
         if self.data_table.model() is not None and isinstance(self.data_table.model(), DataTableModel):
@@ -690,6 +686,8 @@ class DataTab(QWidget):
             case "drop_column":
                 cols = operation.get("columns", operation.get("column", ""))
                 if isinstance(cols, list):
+                    if len(cols) > 3:
+                        return f"Drop Columns: {', '.join(cols[:3])} and {len(cols) - 3} more"
                     return f"Drop Columns: {', '.join(cols)}"
                 return f"Drop Column: {cols}"
             case "rename_column":
@@ -823,10 +821,9 @@ class DataTab(QWidget):
         if settings.get("show_grid"):
             grid_qcolor: QColor = QColor(self.table_settings.grid_color)
             if not grid_qcolor.isValid():
-                return
-            palette = self.data_table.palette()
-            palette.setColor(QPalette.ColorRole.Mid, grid_qcolor)
-            self.data_table.setPalette(palette)
+                palette = self.data_table.palette()
+                palette.setColor(QPalette.ColorRole.Mid, grid_qcolor)
+                self.data_table.setPalette(palette)
 
         self.data_table.horizontalHeader().setVisible(settings["show_h_headers"])
         self.data_table.verticalHeader().setVisible(settings["show_v_headers"])

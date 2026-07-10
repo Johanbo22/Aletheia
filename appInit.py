@@ -1,8 +1,11 @@
+import os
 import sys
 import threading
-from PyQt6.QtWidgets import QApplication, QSplashScreen, QPushButton, QComboBox
-from PyQt6.QtCore import QTranslator, QLocale, Qt, QSharedMemory, QCoreApplication, QObject, QEvent
+from pathlib import Path
+
+from PyQt6.QtCore import QCoreApplication, QEvent, QLocale, QObject, QSharedMemory, QTranslator, Qt
 from PyQt6.QtGui import QGuiApplication, QPixmap
+from PyQt6.QtWidgets import QApplication, QComboBox, QPushButton, QSplashScreen
 
 from core.resource_loader import get_resource_path
 from core.tempfilehandling.cleanup_temp_files import cleanup_forgotten_temp_files
@@ -28,6 +31,18 @@ class GlobalCursorFilter(QObject):
                 obj.setCursor(Qt.CursorShape.PointingHandCursor)
         return False
 
+def gdal_and_proj_pointers(directory: Path) -> None:
+    """
+    Sets the GDAL and PROJ.dll to the environment variables for the distribution
+    :param directory: The directory of the build.
+    """
+    fiona_data: Path = directory / "fiona" / "gdal_data"
+    if fiona_data.exists():
+        os.environ["GDAL_DATA"] = str(fiona_data)
+
+    proj_data: Path = directory / "pyproj" / "proj_dir" / "share" / "proj"
+    if proj_data.exists():
+        os.environ["PROJ_LIB"] = str(proj_data)
 
 def configure_runtime_environment() -> None:
     """Sets up HIGH DPI scaling"""

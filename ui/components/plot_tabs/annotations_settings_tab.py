@@ -1,7 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QStackedWidget, QGridLayout, QSpinBox, QDoubleSpinBox, QListWidget, QLineEdit, QGroupBox, QComboBox, QPushButton
+from PyQt6.QtWidgets import QAbstractSpinBox, QComboBox, QDoubleSpinBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, \
+    QLineEdit, QListWidget, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QTabWidget, QVBoxLayout, QWidget
 
-from icons import IconBuilder
-from ui.theme import ThemeColors
 from ui.widgets import ToggleSwitch
 
 class AnnotationsSettingsTab(QWidget):
@@ -15,7 +14,7 @@ class AnnotationsSettingsTab(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        
+
         scroll_widget = QWidget()
         scroll_widget.setObjectName("ScrollContent")
         scroll_layout = QVBoxLayout(scroll_widget)
@@ -81,6 +80,9 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_y_spin.setRange(-1e9, 1e9)
         self.ref_line_y_spin.setValue(0.0)
         self.ref_line_y_spin.setSingleStep(0.1)
+        self.ref_line_y_spin.setAccelerated(True)
+        self.ref_line_y_spin.setStepType(QAbstractSpinBox.StepType.AdaptiveDecimalStepType)
+        self.ref_line_y_spin.setKeyboardTracking(False)
         h_layout.addWidget(self.ref_line_y_spin)
         h_layout.addStretch()
         self.ref_line_params_stack.addWidget(h_page)
@@ -93,6 +95,9 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_x_spin.setRange(-1e9, 1e9)
         self.ref_line_x_spin.setValue(0.0)
         self.ref_line_x_spin.setSingleStep(0.1)
+        self.ref_line_x_spin.setAccelerated(True)
+        self.ref_line_x_spin.setStepType(QAbstractSpinBox.StepType.AdaptiveDecimalStepType)
+        self.ref_line_x_spin.setKeyboardTracking(False)
         v_layout.addWidget(self.ref_line_x_spin)
         v_layout.addStretch()
         self.ref_line_params_stack.addWidget(v_page)
@@ -104,11 +109,16 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_slope_spin = QDoubleSpinBox()
         self.ref_line_slope_spin.setRange(-1e6, 1e6)
         self.ref_line_slope_spin.setValue(1.0)
+        self.ref_line_slope_spin.setAccelerated(True)
+        self.ref_line_slope_spin.setKeyboardTracking(False)
         d_layout.addWidget(self.ref_line_slope_spin)
         d_layout.addWidget(QLabel("Intercept:"))
         self.ref_line_intercept_spin = QDoubleSpinBox()
         self.ref_line_intercept_spin.setRange(-1e9, 1e9)
         self.ref_line_intercept_spin.setValue(0.0)
+        self.ref_line_intercept_spin.setAccelerated(True)
+        self.ref_line_intercept_spin.setStepType(QAbstractSpinBox.StepType.AdaptiveDecimalStepType)
+        self.ref_line_intercept_spin.setKeyboardTracking(False)
         d_layout.addWidget(self.ref_line_intercept_spin)
         d_layout.addStretch()
         self.ref_line_params_stack.addWidget(d_page)
@@ -288,9 +298,9 @@ class AnnotationsSettingsTab(QWidget):
     def _setup_annotation_tools_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Annotation Tools")
         layout = QVBoxLayout()
-        
+
         tab_widget = QTabWidget()
-        
+
         # Auto Annotations Tab
         auto_tab = QWidget()
         auto_layout = QVBoxLayout(auto_tab)
@@ -306,10 +316,10 @@ class AnnotationsSettingsTab(QWidget):
         self.auto_annotate_col_combo.addItem("Default (Y-value)")
         self.auto_annotate_col_combo.setEnabled(False)
         auto_layout.addWidget(self.auto_annotate_col_combo)
-        
+
         # Font styling settigs
         font_layout = QHBoxLayout()
-        
+
         size_layout = QVBoxLayout()
         size_layout.addWidget(QLabel("Font-size:"))
         self.auto_annotate_fontsize_spin = QSpinBox()
@@ -317,18 +327,18 @@ class AnnotationsSettingsTab(QWidget):
         self.auto_annotate_fontsize_spin.setValue(10)
         self.auto_annotate_fontsize_spin.setEnabled(False)
         size_layout.addWidget(self.auto_annotate_fontsize_spin)
-        
+
         weight_layout = QVBoxLayout()
         weight_layout.addWidget(QLabel("Font Weight:"))
         self.auto_annotate_weight_combo = QComboBox()
         self.auto_annotate_weight_combo.addItems(["normal", "bold", "heavy", "light"])
         self.auto_annotate_weight_combo.setEnabled(False)
         weight_layout.addWidget(self.auto_annotate_weight_combo)
-        
+
         font_layout.addLayout(size_layout)
         font_layout.addLayout(weight_layout)
         auto_layout.addLayout(font_layout)
-        
+
         # Color options
         auto_layout.addWidget(QLabel("Font Color:"))
         color_layout = QHBoxLayout()
@@ -338,10 +348,10 @@ class AnnotationsSettingsTab(QWidget):
         color_layout.addWidget(self.auto_annotate_color_button)
         color_layout.addWidget(self.auto_annotate_color_label)
         auto_layout.addLayout(color_layout)
-        
+
         # Position
         offset_layout = QHBoxLayout()
-        
+
         x_offset_layout = QVBoxLayout()
         x_offset_layout.addWidget(QLabel("X Offset"))
         self.auto_annotate_x_offset_spin = QDoubleSpinBox()
@@ -349,7 +359,7 @@ class AnnotationsSettingsTab(QWidget):
         self.auto_annotate_x_offset_spin.setValue(0.0)
         self.auto_annotate_x_offset_spin.setEnabled(False)
         x_offset_layout.addWidget(self.auto_annotate_x_offset_spin)
-        
+
         y_offset_layout = QVBoxLayout()
         y_offset_layout.addWidget(QLabel("Y Offset:"))
         self.auto_annotate_y_offset_spin = QDoubleSpinBox()
@@ -365,12 +375,12 @@ class AnnotationsSettingsTab(QWidget):
         self.auto_annotate_rotation_spin.setValue(0)
         self.auto_annotate_rotation_spin.setEnabled(False)
         rotation_layout.addWidget(self.auto_annotate_rotation_spin)
-        
+
         offset_layout.addLayout(x_offset_layout)
         offset_layout.addLayout(y_offset_layout)
         offset_layout.addLayout(rotation_layout)
         auto_layout.addLayout(offset_layout)
-        
+
         auto_layout.addStretch()
         tab_widget.addTab(auto_tab, "Data Points")
 
@@ -388,7 +398,7 @@ class AnnotationsSettingsTab(QWidget):
         self.textbox_position_combo = QComboBox()
         self.textbox_position_combo.setMinimumHeight(20)
         self.textbox_position_combo.addItems([
-            'upper left', 'upper center', 'upper right', 'center left', 
+            'upper left', 'upper center', 'upper right', 'center left',
             'center', 'center right', 'lower left', 'lower center', 'lower right'
         ])
         textbox_layout.addWidget(self.textbox_position_combo)
@@ -455,7 +465,7 @@ class AnnotationsSettingsTab(QWidget):
         color_layout.addWidget(self.annotation_color_button)
         color_layout.addWidget(self.annotation_color_label)
         manual_layout.addLayout(color_layout)
-        
+
         manual_layout.addWidget(QLabel("Background Color:"))
         background_color_layout = QHBoxLayout()
         self.annotation_bg_color_button = QPushButton("Choose", parent=self)

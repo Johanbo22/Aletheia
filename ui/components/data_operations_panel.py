@@ -32,7 +32,7 @@ class DataOperationsPanel(QWidget):
 
         reset_button = QPushButton("Reset to Original")
         reset_button.setObjectName("DestructiveButton")
-        reset_button.setIcon(IconBuilder.build(IconType.Redo))
+        reset_button.setIcon(IconBuilder.build(IconType.RefreshItem))
         reset_button.setToolTip("Wipe all history and revert the dataset back to its original imported state")
         reset_button.clicked.connect(self.controller.reset_data)
         top_bar_layout.addWidget(reset_button)

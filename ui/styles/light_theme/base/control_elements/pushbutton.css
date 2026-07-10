@@ -112,6 +112,12 @@ QPushButton#DestructiveButton:disabled {
     color: rgba(255, 255, 255, 128);
 }
 
+/* This styling governs the property of a normal button that triggers a destructive styling signal on hover */
+QPushButton[actionSeverity="destructive"]:hover{
+    background-color: rgba(220, 53, 69, 0.15);
+    border-color: #dc3545;
+}
+
 /* Unique PushButton for the StatusBar ViewLogHistory Popup*/
 QPushButton#ViewLogHistory {
     background-color: #333;

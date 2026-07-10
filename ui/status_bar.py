@@ -378,6 +378,7 @@ class StatusBar(QStatusBar):
                 self.show_log_history()
                 return True
             if source is self.issue_counter_label:
+                self.clear_issue_counters()
                 self.show_log_history()
                 return True
             if source is self.source_label and self._full_source_path:
@@ -414,7 +415,7 @@ class StatusBar(QStatusBar):
         if max_bytes <= 0:
             return
 
-        percentage: float = (current_bytes / max_bytes) * 100
+        percentage: float = min((current_bytes / max_bytes) * 100, 100.0)
         self.memory_bar.setValue(int(percentage))
 
         current_mb: float = current_bytes / (1024 * 1024)
@@ -485,7 +486,7 @@ class StatusBar(QStatusBar):
         """Set the progress bar value and trigger auto-hide at 100%."""
         self.progress_bar.setValue(value)
 
-        is_determinate: bool = self.progress_bar.minimum() > 0
+        is_determinate: bool = self.progress_bar.maximum() > 0
         if is_determinate and value >= self.progress_bar.maximum():
             self.progress_hide_timer.start()
         else:
@@ -564,7 +565,7 @@ class StatusBar(QStatusBar):
             text_stripped_html = re.sub('<[^<]+>', '', latest_html)
             clipboard = QApplication.clipboard()
             if clipboard:
-                clipboard.setText(text_stripped_html)
+                clipboard.setText(html.unescape(text_stripped_html))
 
     def _clear_all_logs(self) -> None:
         """Clear the log history, issue counters and reset terminal"""

@@ -1,12 +1,14 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFontComboBox, QFrame, QTabWidget, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox, QComboBox, QPushButton
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtGui import QFont
 import shutil
-from ui.theme import ThemeColors
-from ui.widgets import ToggleSwitch, HelpIcon, ColormapButton
+
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QFontComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+    QPushButton, QScrollArea, QSpinBox, QTabWidget, QVBoxLayout, QWidget
+
+from ui.widgets import ColormapButton, HelpIcon, ToggleSwitch
 
 class AppearanceSettingsTab(QWidget):
     help_requested = pyqtSignal(str)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.has_latex: bool = shutil.which("latex") is not None
@@ -94,7 +96,7 @@ class AppearanceSettingsTab(QWidget):
         self.usetex_checkbox.setChecked(False)
         self.usetext_help = HelpIcon("latex_rendering")
         self.usetext_help.clicked.connect(lambda: self.help_requested.emit("latex_rendering"))
-        
+
         latex_layout.addWidget(self.usetex_checkbox)
         latex_layout.addWidget(self.usetext_help)
 
@@ -106,7 +108,7 @@ class AppearanceSettingsTab(QWidget):
         else:
             self.usetex_checkbox.setToolTip("Render text using LaTeX for mathematical formatting.\n"
                                             "Example: $\\alpha > \\beta$")
-            
+
         layout.addLayout(latex_layout)
         group.setLayout(layout)
         parent_layout.addWidget(group)
@@ -114,7 +116,7 @@ class AppearanceSettingsTab(QWidget):
     def _setup_title_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Title Options")
         layout = QVBoxLayout()
-        
+
         self.title_check = ToggleSwitch("Show Title")
         self.title_check.setChecked(True)
         layout.addWidget(self.title_check)
@@ -122,6 +124,7 @@ class AppearanceSettingsTab(QWidget):
         layout.addWidget(QLabel("Title:"))
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("Enter plot title")
+        self.title_input.setClearButtonEnabled(True)
         layout.addWidget(self.title_input)
 
         layout.addWidget(QLabel("Title Size:"))
@@ -148,40 +151,41 @@ class AppearanceSettingsTab(QWidget):
     def _setup_labels_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Axis Label Options")
         layout = QVBoxLayout()
-        
+
         tab_widget = QTabWidget()
-        
+
         # X axis tab
         x_tab = QWidget()
         x_layout = QVBoxLayout(x_tab)
-        
+
         self.xlabel_check = ToggleSwitch("Show X Label")
         self.xlabel_check.setChecked(True)
         x_layout.addWidget(self.xlabel_check)
-        
+
         x_layout.addWidget(QLabel("X Label:"))
         self.xlabel_input = QLineEdit()
         self.xlabel_input.setPlaceholderText("X axis label")
+        self.xlabel_input.setClearButtonEnabled(True)
         x_layout.addWidget(self.xlabel_input)
-        
+
         x_layout.addWidget(QLabel("X Label Font-size:"))
         self.xlabel_size_spin = QSpinBox()
         self.xlabel_size_spin.setRange(5, 32)
         self.xlabel_size_spin.setValue(12)
         x_layout.addWidget(self.xlabel_size_spin)
-        
+
         x_layout.addWidget(QLabel("X Label Font Weight"))
         self.xlabel_weight_combo = QComboBox()
         self.xlabel_weight_combo.addItems(["normal", "bold", "light", "heavy"])
         self.xlabel_weight_combo.setCurrentText("normal")
         x_layout.addWidget(self.xlabel_weight_combo)
-        
+
         x_layout.addStretch()
         tab_widget.addTab(x_tab, "X-Axis")
-        
+
         y_tab = QWidget()
         y_layout = QVBoxLayout(y_tab)
-        
+
         self.ylabel_check = ToggleSwitch("Show Y Label")
         self.ylabel_check.setChecked(True)
         y_layout.addWidget(self.ylabel_check)
@@ -189,6 +193,7 @@ class AppearanceSettingsTab(QWidget):
         y_layout.addWidget(QLabel("Y Label:"))
         self.ylabel_input = QLineEdit()
         self.ylabel_input.setPlaceholderText("Y axis label")
+        self.ylabel_input.setClearButtonEnabled(True)
         y_layout.addWidget(self.ylabel_input)
 
         y_layout.addWidget(QLabel("Y Label Font-size:"))
@@ -202,13 +207,13 @@ class AppearanceSettingsTab(QWidget):
         self.ylabel_weight_combo.addItems(["normal", "bold", "light", "heavy"])
         self.ylabel_weight_combo.setCurrentText("normal")
         y_layout.addWidget(self.ylabel_weight_combo)
-        
+
         y_layout.addStretch()
         tab_widget.addTab(y_tab, "Y-Axis")
-        
+
         self.z_label_widget = QWidget()
         z_layout = QVBoxLayout(self.z_label_widget)
-        
+
         self.zlabel_check = ToggleSwitch("Show Z Label")
         self.zlabel_check.setChecked(True)
         z_layout.addWidget(self.zlabel_check)
@@ -216,23 +221,24 @@ class AppearanceSettingsTab(QWidget):
         z_layout.addWidget(QLabel("Z Label:"))
         self.zlabel_input = QLineEdit()
         self.zlabel_input.setPlaceholderText("Z axis label")
+        self.zlabel_input.setClearButtonEnabled(True)
         z_layout.addWidget(self.zlabel_input)
-        
+
         z_layout.addWidget(QLabel("Z Label Font-size:"))
         self.zlabel_size_spin = QSpinBox()
         self.zlabel_size_spin.setRange(6, 30)
         self.zlabel_size_spin.setValue(12)
         z_layout.addWidget(self.zlabel_size_spin)
-        
+
         z_layout.addWidget(QLabel("Z Label Font Weight:"))
         self.zlabel_weight = QComboBox()
         self.zlabel_weight.addItems(["normal", "bold", "italic", "heavy", "light"])
         self.zlabel_weight.setCurrentText("normal")
         z_layout.addWidget(self.zlabel_weight)
         z_layout.addStretch()
-        
+
         tab_widget.addTab(self.z_label_widget, "Z-Axis")
-        
+
         layout.addWidget(tab_widget)
         group.setLayout(layout)
         parent_layout.addWidget(group)
@@ -285,7 +291,8 @@ class AppearanceSettingsTab(QWidget):
 
         self.individual_spines_check = ToggleSwitch("Customize spines individually")
         self.individual_spines_check.setChecked(False)
-        self.individual_spines_check.setToolTip("Enabled to set visibility, width and color of the four spines individually")
+        self.individual_spines_check.setToolTip(
+            "Enabled to set visibility, width and color of the four spines individually")
         layout.addWidget(self.individual_spines_check)
 
         self.individual_spines_container = QWidget()
@@ -294,38 +301,42 @@ class AppearanceSettingsTab(QWidget):
         indiv_layout.setContentsMargins(0, 0, 0, 0)
 
         spine_tabs = QTabWidget()
-        
+
         # Top Spine
         top_tab = QWidget()
         top_layout = QVBoxLayout(top_tab)
-        self.top_spine_visible_check, self.top_spine_width_spin, self.top_spine_color_button, self.top_spine_color_label = self._create_spine_ui("Top Spine", top_layout)
+        self.top_spine_visible_check, self.top_spine_width_spin, self.top_spine_color_button, self.top_spine_color_label = self._create_spine_ui(
+            "Top Spine", top_layout)
         top_layout.addStretch()
         spine_tabs.addTab(top_tab, "Top")
 
         # Bottom Spine
         bottom_tab = QWidget()
         bottom_layout = QVBoxLayout(bottom_tab)
-        self.bottom_spine_visible_check, self.bottom_spine_width_spin, self.bottom_spine_color_button, self.bottom_spine_color_label = self._create_spine_ui("Bottom Spine", bottom_layout)
+        self.bottom_spine_visible_check, self.bottom_spine_width_spin, self.bottom_spine_color_button, self.bottom_spine_color_label = self._create_spine_ui(
+            "Bottom Spine", bottom_layout)
         bottom_layout.addStretch()
         spine_tabs.addTab(bottom_tab, "Bottom")
 
         # Left Spine
         left_tab = QWidget()
         left_layout = QVBoxLayout(left_tab)
-        self.left_spine_visible_check, self.left_spine_width_spin, self.left_spine_color_button, self.left_spine_color_label = self._create_spine_ui("Left Spine", left_layout)
+        self.left_spine_visible_check, self.left_spine_width_spin, self.left_spine_color_button, self.left_spine_color_label = self._create_spine_ui(
+            "Left Spine", left_layout)
         left_layout.addStretch()
         spine_tabs.addTab(left_tab, "Left")
 
         # Right Spine
         right_tab = QWidget()
         right_layout = QVBoxLayout(right_tab)
-        self.right_spine_visible_check, self.right_spine_width_spin, self.right_spine_color_button, self.right_spine_color_label = self._create_spine_ui("Right Spine", right_layout)
+        self.right_spine_visible_check, self.right_spine_width_spin, self.right_spine_color_button, self.right_spine_color_label = self._create_spine_ui(
+            "Right Spine", right_layout)
         right_layout.addStretch()
         spine_tabs.addTab(right_tab, "Right")
 
         indiv_layout.addWidget(spine_tabs)
         layout.addWidget(self.individual_spines_container)
-        
+
         group.setLayout(layout)
         parent_layout.addWidget(group)
 
@@ -356,7 +367,7 @@ class AppearanceSettingsTab(QWidget):
     def _setup_figure_group(self, parent_layout: QVBoxLayout) -> None:
         self.figure_size_group = QGroupBox("Figure Settings")
         layout = QVBoxLayout()
-        
+
         layout.addWidget(QLabel("Figure Width:"))
         self.width_spin = QSpinBox()
         self.width_spin.setRange(4, 20)
@@ -397,23 +408,23 @@ class AppearanceSettingsTab(QWidget):
 
         self.figure_size_group.setLayout(layout)
         parent_layout.addWidget(self.figure_size_group)
-    
+
     def _setup_3d_camera_group(self, parent_layout: QVBoxLayout) -> None:
         self.camera_3d_group = QGroupBox("3D Viewing Angles")
         layout = QVBoxLayout()
-        
+
         layout.addWidget(QLabel("Elevation (degrees):"))
         self.camera_elevation_spin = QDoubleSpinBox()
         self.camera_elevation_spin.setRange(-360.0, 360.0)
         self.camera_elevation_spin.setValue(30.0)
         layout.addWidget(self.camera_elevation_spin)
-        
+
         layout.addWidget(QLabel("Azimuth (degrees):"))
         self.camera_azimuth_spin = QDoubleSpinBox()
         self.camera_azimuth_spin.setRange(-360.0, 360.0)
         self.camera_azimuth_spin.setValue(-60.0)
         layout.addWidget(self.camera_azimuth_spin)
-        
+
         self.camera_3d_group.setLayout(layout)
         self.camera_3d_group.setVisible(False)
         parent_layout.addWidget(self.camera_3d_group)
@@ -421,11 +432,11 @@ class AppearanceSettingsTab(QWidget):
     def _setup_accessibility_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Accessibility")
         layout = QVBoxLayout()
-        
+
         self.colorblind_check = ToggleSwitch("Enable Color Blindness Mode")
         self.colorblind_check.setToolTip("Applies an SVG filter to simulate color-blindness on the canvas")
         layout.addWidget(self.colorblind_check)
-        
+
         self.colorblind_type_combo = QComboBox()
         self.colorblind_type_combo.addItems([
             "Protanopia (No Red)",
@@ -434,7 +445,7 @@ class AppearanceSettingsTab(QWidget):
             "Achromatopsia (Monochromacy)"
         ])
         layout.addWidget(self.colorblind_type_combo)
-        
+
         group.setLayout(layout)
         parent_layout.addWidget(group)
 

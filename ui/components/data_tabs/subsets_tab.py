@@ -1,10 +1,11 @@
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QListWidgetItem, QListWidget, QGroupBox, QComboBox, QPushButton
-from PyQt6.QtCore import Qt
 from typing import Optional, TYPE_CHECKING
 
-from ui.components.data_tabs.base_data_tab import BaseDataTab
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, \
+    QVBoxLayout
+
 from icons import IconBuilder, IconType
-from ui.theme import ThemeColors
+from ui.components.data_tabs.base_data_tab import BaseDataTab
 
 if TYPE_CHECKING:
     from controller.data_tab_controller import DataTabController
@@ -39,6 +40,7 @@ class SubsetsTab(BaseDataTab):
         combo_layout.addWidget(combo_label)
 
         self.subset_column_combo = QComboBox()
+        self.subset_column_combo.currentTextChanged.connect(self._update_auto_create_subsets_button_state)
         combo_layout.addWidget(self.subset_column_combo)
 
         quick_subset_layout.addLayout(combo_layout)
@@ -108,20 +110,38 @@ class SubsetsTab(BaseDataTab):
         layout.addWidget(inject_group)
         layout.addStretch()
 
+    def _update_auto_create_subsets_button_state(self, text: str) -> None:
+        """
+        Prevents the user from clicking the Auto-Create button if no column is selected
+        :param text: The current text in the combobox.
+        """
+        btn: QPushButton = self.findChild(QPushButton, "op_btn_auto_create_subsets")
+        if btn:
+            btn.setEnabled(bool(text.strip()))
+
     def get_quick_subset_column(self) -> str:
         return self.subset_column_combo.currentText()
 
     def get_selected_active_subset(self) -> Optional[str]:
-        item = self.active_subsets_list.currentItem()
+        item: QListWidgetItem = self.active_subsets_list.currentItem()
+        if item and not (item.flags() & Qt.ItemFlag.ItemIsSelectable):
+            return None
         return item.data(Qt.ItemDataRole.UserRole) if item else None
 
     def update_active_subsets_list(self, subsets: list[tuple[str, str]]) -> None:
         self.active_subsets_list.clear()
+
+        if not subsets:
+            placeholder = QListWidgetItem("No active subsets available")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.active_subsets_list.addItem(placeholder)
+            return
+
         for name, row_text in subsets:
             item = QListWidgetItem(f"{name} ({row_text})")
             item.setData(Qt.ItemDataRole.UserRole, name)
             self.active_subsets_list.addItem(item)
-    
+
     def set_injection_status_ui(self, is_subset_active: bool, subset_name: str = "") -> None:
         if is_subset_active:
             self.injection_status_label.setText(f"Status: Working with a subset: '{subset_name}'")
@@ -135,6 +155,6 @@ class SubsetsTab(BaseDataTab):
             self.restore_original_btn.setEnabled(False)
             self.inject_subset_btn.setEnabled(True)
             self.refresh_subsets_btn.setEnabled(True)
-        
+
         self.injection_status_label.style().unpolish(self.injection_status_label)
         self.injection_status_label.style().polish(self.injection_status_label)

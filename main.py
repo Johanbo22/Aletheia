@@ -12,6 +12,12 @@ from core.error_handler import GlobalErrorHandler
 from ui.DataPlotStudioApp import DataPlotStudio
 
 def main():
+    if getattr(sys, "frozen", False):
+        bundle_dir: Path = Path(sys._MEIPASS)
+        os.chdir(bundle_dir)
+
+        appInit.gdal_and_proj_pointers(bundle_dir)
+
     appInit.configure_runtime_environment()
 
     error_handler = GlobalErrorHandler(crash_report_dir=Path("crash_reports"))

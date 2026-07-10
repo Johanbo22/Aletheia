@@ -52,6 +52,7 @@ class ColumnsTab(BaseDataTab):
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.column_list.setMaximumHeight(400)
         self.column_list.itemSelectionChanged.connect(self._update_selection_label)
+        self.column_list.itemDoubleClicked.connect(self._on_column_double_clicked)
         layout.addWidget(self.column_list)
 
         layout.addLayout(self._create_operation_row(
@@ -219,14 +220,25 @@ class ColumnsTab(BaseDataTab):
     def get_normalization_method(self) -> str:
         return self.norm_method_combo.currentText()
 
+    def _on_column_double_clicked(self) -> None:
+        """Maps the double-click event to the rename tool"""
+        if self.controller is not None:
+            self.controller.rename_column()
+
     def _update_selection_label(self) -> None:
         """
         Updates the sticky label at the top of the tab to reflect the currently selected column
-        :return: None
+        Includes truncation to prevent UI overflow on large selections
         """
         selected_cols = self.get_selected_columns()
         if not selected_cols:
             self.selected_columns_label.setText("Selected Column(s): None")
+            return
+
+        if len(selected_cols) > 4:
+            joined_cols = ", ".join(selected_cols[:4])
+            overflow_text = f" <i>...and {len(selected_cols) - 4} more</i>"
+            self.selected_columns_label.setText(f"Selected Column(s): <b>{joined_cols}</b>{overflow_text}")
         else:
             joined_cols = ", ".join(selected_cols)
             self.selected_columns_label.setText(f"Selected Column(s): <b>{joined_cols}</b>")

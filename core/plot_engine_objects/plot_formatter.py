@@ -2,12 +2,13 @@
 Handles axes formatting, labels, and datetime heuristics for the PlotEngine
 """
 
-import matplotlib.pyplot as plt
+from typing import Any, List, Optional, TYPE_CHECKING
+
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import pandas as pd
 import numpy as np
-from typing import TYPE_CHECKING, Any, List, Optional
+import pandas as pd
 
 from ui.status_bar import LogLevel
 
@@ -21,7 +22,8 @@ class PlotFormatter:
     def __init__(self, engine: "PlotEngine") -> None:
         self.engine = engine
 
-    def set_labels(self, title: Optional[str], xlabel: Optional[str], ylabel: Optional[str], legend: bool, **kwargs: Any) -> None:
+    def set_labels(self, title: Optional[str], xlabel: Optional[str], ylabel: Optional[str], legend: bool,
+                   **kwargs: Any) -> None:
         """Sets labels and handles LaTeX rendering if requested"""
         usetex = kwargs.get("usetext", False)
         plt.rcParams["text.usetex"] = usetex
@@ -277,7 +279,7 @@ class PlotFormatter:
             )
 
         if plot_tab.title_check.isChecked():
-            title_to_use = plot_tab.title_input.text() if plot_tab.title_input.text() else plot_tab.plot_type.currentText()
+            title_to_use = plot_tab.title_input.text() if plot_tab.title_input.text() else plot_tab.current_plot_type_name
             self.engine.current_ax.set_title(
                 title_to_use,
                 fontsize=plot_tab.title_size_spin.value(),

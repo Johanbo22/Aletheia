@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import QEasingCurve, QParallelAnimationGroup, QPoint, QPointF, QPropertyAnimation, QRectF, \
     QSequentialAnimationGroup, QTimer, QVariantAnimation, Qt, pyqtProperty, pyqtSignal
@@ -6,7 +6,7 @@ from PyQt6.QtGui import QBrush, QColor, QFont, QFontMetrics, QKeyEvent, QMouseEv
     QPixmap, QWheelEvent
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect, QGraphicsObject, QGraphicsPathItem, QGraphicsScene, \
     QGraphicsSceneContextMenuEvent, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent, QGraphicsView, \
-    QStyleOptionGraphicsItem, QWidget
+    QScrollBar, QStyleOptionGraphicsItem, QWidget
 
 OP_COLORS = {
     "origin"        : "#10b981",
@@ -16,7 +16,7 @@ OP_COLORS = {
     "subset"        : "#06b6d4",
     "aggregation"   : "#f97316",
     "datetime"      : "#ec4899",
-    "unknown"       : "#38b82f6"
+    "unknown": "#3b82f6"
 }
 
 class FlowEdgeItem(QGraphicsPathItem):
@@ -24,9 +24,9 @@ class FlowEdgeItem(QGraphicsPathItem):
 
     def __init__(self, path: QPainterPath, target_node_id: str, is_active_path: bool, parent=None) -> None:
         super().__init__(path, parent)
-        self.target_node_id = target_node_id
-        self.is_active_path = is_active_path
-        self.dash_offset = 0.0
+        self.target_node_id: str = target_node_id
+        self.is_active_path: bool = is_active_path
+        self.dash_offset: float = 0.0
         self.setZValue(-2)
 
         self._update_pens()
@@ -67,8 +67,8 @@ class FlowEdgeItem(QGraphicsPathItem):
 class FocusHighlightItem(QGraphicsObject):
     def __init__(self, width: float, height: float, parent=None):
         super().__init__(parent)
-        self.width = width
-        self.height = height
+        self.width: float = width
+        self.height: float = height
 
         self.shadow = QGraphicsDropShadowEffect()
         self.shadow.setColor(QColor(0, 0, 0, 30))
@@ -106,6 +106,11 @@ class FocusHighlightItem(QGraphicsObject):
         painter.drawPath(path)
 
 class GraphNode(QGraphicsObject):
+    """
+    Visual representation of a single operation in the data pipeline
+
+    Handles state styling and interaction events on the node of the graph.
+    """
     clicked = pyqtSignal(str)
     hover_entered = pyqtSignal(str)
     hover_left = pyqtSignal(str)
@@ -113,17 +118,17 @@ class GraphNode(QGraphicsObject):
 
     def __init__(self, node_id: str, label: str, operation: dict, is_active: bool, is_undone: bool, parent=None):
         super().__init__(parent)
-        self.node_id = node_id
-        self.label = label
-        self.operation = operation
-        self.is_active = is_active
-        self.is_undone = is_undone
-        self.is_hovered = False
+        self.node_id: str = node_id
+        self.label: str = label
+        self.operation: dict = operation
+        self.is_active: bool = is_active
+        self.is_undone: bool = is_undone
+        self.is_hovered: bool = False
 
-        self.op_type = self.operation.get("type", "unknown").lower() if self.operation else "origin"
+        self.op_type: str = self.operation.get("type", "unknown").lower() if self.operation else "origin"
 
-        self.width = 260.0
-        self.height = 48.0
+        self.width: float = 260.0
+        self.height: float = 48.0
 
         self.setAcceptHoverEvents(True)
         self.setAcceptedMouseButtons(Qt.MouseButton.LeftButton)
@@ -135,7 +140,7 @@ class GraphNode(QGraphicsObject):
         self.setTransformOriginPoint(self.width / 2.0, self.height / 2.0)
 
         if self.operation:
-            details = "".join(f"<li><b>{k}</b>: {v}</li>" for k, v in self.operation.items() if k != "type")
+            details: str = "".join(f"<li><b>{k}</b>: {v}</li>" for k, v in self.operation.items() if k != "type")
             self.setToolTip(
                 f"<div style='padding: 4px; color: #F8FAFC;'>"
                 f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
@@ -182,7 +187,7 @@ class GraphNode(QGraphicsObject):
 
     animated_opacity = pyqtProperty(float, fget=_get_opacity, fset=_set_opacity)
 
-    def _update_styling(self):
+    def _update_styling(self) -> None:
         """Updates colors and shadow elevation based on state and hover."""
         base_dot = QColor(OP_COLORS.get(self.op_type, OP_COLORS["unknown"]))
 
@@ -231,7 +236,7 @@ class GraphNode(QGraphicsObject):
         self.context_menu_requested.emit(self.node_id, event.screenPos())
         event.accept()
 
-    def mousePressEvent(self, event: QGraphicsSceneMouseEvent):
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.setScale(0.98)
             if self.shadow.isEnabled():
@@ -242,7 +247,7 @@ class GraphNode(QGraphicsObject):
         else:
             super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent):
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.setScale(1.0)
             self._update_styling()
@@ -255,7 +260,7 @@ class GraphNode(QGraphicsObject):
         else:
             super().mouseReleaseEvent(event)
 
-    def paint(self, painter: QPainter, option, widget):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         path = QPainterPath()
@@ -269,9 +274,9 @@ class GraphNode(QGraphicsObject):
         painter.setPen(pen)
         painter.drawPath(path)
 
-        dot_radius = 4.5
-        dot_x = 18.0
-        dot_y = self.height / 2
+        dot_radius: float = 4.5
+        dot_x: float = 18.0
+        dot_y: float = self.height / 2
 
         painter.setBrush(QBrush(self.dot_color))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -279,8 +284,8 @@ class GraphNode(QGraphicsObject):
 
         if self.is_active:
             badge_w, badge_h = 44, 18
-            badge_x = self.width - badge_w - 10
-            badge_y = (self.height - badge_h) / 2
+            badge_x: float = self.width - badge_w - 10
+            badge_y: float = (self.height - badge_h) / 2
 
             badge_path = QPainterPath()
             badge_path.addRoundedRect(QRectF(badge_x, badge_y, badge_w, badge_h), 6, 6)
@@ -297,12 +302,12 @@ class GraphNode(QGraphicsObject):
         painter.setPen(self.text_color)
 
         metrics = QFontMetrics(font)
-        text_width_limit = int(self.width - 95) if self.is_active else int(self.width - 45)
-        elided_text = metrics.elidedText(self.label, Qt.TextElideMode.ElideRight, text_width_limit)
+        text_width_limit: int = int(self.width - 95) if self.is_active else int(self.width - 45)
+        elided_text: str | None = metrics.elidedText(self.label, Qt.TextElideMode.ElideRight, text_width_limit)
 
         text_rect = metrics.boundingRect(elided_text)
-        x = 34.0
-        y = (self.height + text_rect.height()) / 2 - metrics.descent()
+        x: float = 34.0
+        y: float = (self.height + text_rect.height()) / 2 - metrics.descent()
 
         painter.drawText(QPointF(x, y), elided_text)
 
@@ -337,7 +342,7 @@ class PipelineGraphView(QGraphicsView):
         self.nodes: List[GraphNode] = []
         self.edges: List[FlowEdgeItem] = []
         self.focus_selector = None
-        self.current_id = ""
+        self.current_id: str = ""
         self._scroll_animation = None
         self._pill_animation = None
 
@@ -370,8 +375,8 @@ class PipelineGraphView(QGraphicsView):
     def _apply_focus_fade(self, factor: float) -> None:
         """Drives the opacity of non-focused elements to dimmer"""
         self._current_fade_factor = factor
-        dim_node_op = 1.0 - (0.7 * factor)
-        dim_edge_op = 1.0 - (0.85 * factor)
+        dim_node_op: float = 1.0 - (0.7 * factor)
+        dim_edge_op: float = 1.0 - (0.85 * factor)
 
         for node in self.nodes:
             if node.node_id not in self._focused_path:
@@ -409,13 +414,13 @@ class PipelineGraphView(QGraphicsView):
 
     def _create_background_brush(self) -> None:
         """Generates a reusable brush for background rendering"""
-        grid_size = 20
-        dot_radius = 1.0
+        grid_size: int = 20
+        dot_radius: float = 1.0
 
-        pixmap = QPixmap(grid_size, grid_size)
+        pixmap: QPixmap = QPixmap(grid_size, grid_size)
         pixmap.fill(Qt.GlobalColor.transparent)
 
-        painter = QPainter(pixmap)
+        painter: QPainter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor("#CBD5E1"))
@@ -430,7 +435,7 @@ class PipelineGraphView(QGraphicsView):
     def _get_view_center(self) -> QPointF:
         return self.mapToScene(self.viewport().rect().center())
 
-    viewCenter = pyqtProperty(QPointF, fget=_get_view_center, fset=_set_view_center)
+    viewCenter: pyqtProperty = pyqtProperty(QPointF, fget=_get_view_center, fset=_set_view_center)
 
     def center_on_animated(self, item: QGraphicsObject):
         if self._scroll_animation:
@@ -451,27 +456,27 @@ class PipelineGraphView(QGraphicsView):
 
     def _get_path_to_root(self, nodes_dict: Dict[str, Any], start_node_id: str) -> List[str]:
         """Helper to trace the path back to the root node."""
-        path = []
-        curr = start_node_id
+        path: list[str | None] = []
+        curr: str = start_node_id
         while curr:
             path.append(curr)
             node = nodes_dict.get(curr)
-            curr = node.parent_id if node else None
+            curr: str = node.parent_id if node else None
         return path
 
     def wheelEvent(self, event: QWheelEvent):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            zoom_in_factor = 1.15
-            zoom_out_factor = 1.0 / zoom_in_factor
+            zoom_in_factor: float = 1.15
+            zoom_out_factor: float = 1.0 / zoom_in_factor
 
-            is_zooming_in = event.angleDelta().y() > 0
+            is_zooming_in: bool = event.angleDelta().y() > 0
 
             if is_zooming_in and self._zoom_level >= self._zoom_max:
                 return
             if not is_zooming_in and self._zoom_level <= self._zoom_min:
                 return
 
-            old_scene_pos = self.mapToScene(event.position().toPoint())
+            old_scene_pos: QPointF = self.mapToScene(event.position().toPoint())
 
             if is_zooming_in:
                 self._zoom_level += 1
@@ -480,8 +485,8 @@ class PipelineGraphView(QGraphicsView):
                 self._zoom_level -= 1
                 self.scale(zoom_out_factor, zoom_out_factor)
 
-            new_scene_pos = self.mapToScene(event.position().toPoint())
-            delta = new_scene_pos - old_scene_pos
+            new_scene_pos: QPointF = self.mapToScene(event.position().toPoint())
+            delta: QPointF | None = new_scene_pos - old_scene_pos
             self.translate(delta.x(), delta.y())
 
             event.accept()
@@ -500,10 +505,10 @@ class PipelineGraphView(QGraphicsView):
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if self._is_middle_dragging and self._last_mouse_pos is not None:
-            delta = event.position() - self._last_mouse_pos
+            delta: QPointF | None = event.position() - self._last_mouse_pos
 
-            h_bar = self.horizontalScrollBar()
-            v_bar = self.verticalScrollBar()
+            h_bar: QScrollBar | None = self.horizontalScrollBar()
+            v_bar: QScrollBar | None = self.verticalScrollBar()
 
             h_bar.setValue(int(h_bar.value() - delta.x()))
             v_bar.setValue(int(v_bar.value() - delta.y()))
@@ -519,11 +524,12 @@ class PipelineGraphView(QGraphicsView):
             self.viewport().setCursor(Qt.CursorShape.ArrowCursor)
 
             if self._middle_click_pos is not None:
-                distance = (event.position() - self._middle_click_pos).manhattanLength()
+                distance: float = (event.position() - self._middle_click_pos).manhattanLength()
                 if distance < 5.0:
                     self.resetTransform()
-                    if self.nodes and 0 <= self.current_index < len(self.nodes):
-                        self.center_on_animated(self.nodes[self.current_index])
+                    active_node: GraphNode | None = next((n for n in self.nodes if n.node_id == self.current_id), None)
+                    if active_node:
+                        self.center_on_animated(active_node)
 
             self._last_mouse_pos = None
             self._middle_click_pos = None
@@ -533,18 +539,103 @@ class PipelineGraphView(QGraphicsView):
 
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_F:
-            scene_rect = self.graph_scene.itemsBoundingRect()
+            scene_rect: QRectF | None = self.graph_scene.itemsBoundingRect()
             scene_rect.adjust(-20, -20, 20, 20)
             self.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
             event.accept()
         else:
             super().keyPressEvent(event)
 
-    def build_graph(self, nodes_dict: Dict[str, Any], root_id: str, current_node_id: str, format_func: Callable):
-        """Constructs nodes and paths for the entire operation pipeline."""
-        if len(self.nodes) == len(nodes_dict):
+    def _calculate_tree_layout(self, nodes_dict: Dict[str, Any], root_id: str) -> Dict[str, Tuple[float, float, int]]:
+        """
+        Calculates the 2D spatial layout and depth for the graph
+
+        :param nodes_dict: State dictionary mapping node IDs to node data
+        :param root_id: The ID_of the origin node
+        :return: A dictionary mapping the node IDs to a tuple of (x, y, depth)
+        """
+        positions: Dict[str, Tuple[float, float, int]] = {}
+        vertical_spacing: float = 75.0
+        horizontal_spacing: float = 300.0
+
+        def calculate_positions(node_id: str, depth: int, branch_index: int) -> None:
+            x_pos: float = 20.0 + (branch_index * horizontal_spacing)
+            y_pos: float = 20.0 + (depth * vertical_spacing)
+            positions[node_id] = (x_pos, y_pos, depth)
+
+            node_data: Any | None = nodes_dict.get(node_id)
+            if not node_data:
+                return
+
+            for i, child_id in enumerate(node_data.children_ids):
+                child_branch: int = branch_index if i == len(node_data.children_ids) - 1 else branch_index + (i + 1)
+                calculate_positions(child_id, depth + 1, child_branch)
+
+        calculate_positions(root_id, depth=0, branch_index=0)
+        return positions
+
+    def _setup_focus_selector(self, target_x: float, target_y: float, target_depth: int) -> None:
+        """
+        Initializes and sequences the entrance animation for the focus highlight pill
+
+        :param target_x: The target X coordinate for the pill animation
+        :param target_y: The target Y coordinate for the pill animation
+        :param target_depth: The depth of the node for animation sequencing
+        """
+        self.focus_selector = FocusHighlightItem(260.0, 48.0)
+
+        start_pos: QPointF = QPointF(target_x, target_y + 20)
+        end_pos: QPointF = QPointF(target_x, target_y)
+
+        self.focus_selector.setPos(start_pos)
+        self.focus_selector.setOpacity(0.0)
+        self.graph_scene.addItem(self.focus_selector)
+
+        anim_pill_pos = QPropertyAnimation(self.focus_selector, b"animated_pos")
+        anim_pill_pos.setStartValue(start_pos)
+        anim_pill_pos.setEndValue(end_pos)
+        anim_pill_pos.setDuration(450)
+        anim_pill_pos.setEasingCurve(QEasingCurve.Type.OutBack)
+
+        anim_pill_op = QPropertyAnimation(self.focus_selector, b"animated_opacity")
+        anim_pill_op.setStartValue(0.0)
+        anim_pill_op.setEndValue(1.0)
+        anim_pill_op.setDuration(350)
+
+        pill_group = QParallelAnimationGroup(self)
+        pill_group.addAnimation(anim_pill_pos)
+        pill_group.addAnimation(anim_pill_op)
+
+        delay: int = target_depth * 60
+        if delay > 0:
+            seq_group = QSequentialAnimationGroup(self)
+            seq_group.addPause(delay)
+            seq_group.addAnimation(pill_group)
+            self._entrance_group.addAnimation(seq_group)
+        else:
+            self._entrance_group.addAnimation(pill_group)
+
+    def build_graph(self, nodes_dict: Dict[str, Any], root_id: str, current_node_id: str,
+                    format_func: Callable) -> None:
+        """
+        Constructs nodes and paths for the entire operation graph view.
+
+        :param nodes_dict: State dictionary mapping node IDs to node objects
+        :param root_id: The ID of the origin node
+        :param current_node_id: The currently active step in the graph
+        :param format_func: Callable to format the node metadata for display
+        """
+        current_node_ids: set[str] = {node.node_id for node in self.nodes}
+        if current_node_ids and current_node_ids == set(nodes_dict.keys()):
             self._update_selection_in_place(nodes_dict, current_node_id)
             return
+
+        if self._entrance_group.state() == QPropertyAnimation.State.Running:
+            self._entrance_group.stop()
+        if self._pill_animation and self._pill_animation.state() == QPropertyAnimation.State.Running:
+            self._pill_animation.stop()
+        if self._focus_anim.state() == QVariantAnimation.State.Running:
+            self._focus_anim.stop()
 
         self._current_nodes_dict = nodes_dict
         self.graph_scene.clear()
@@ -555,37 +646,20 @@ class PipelineGraphView(QGraphicsView):
         self.current_id = current_node_id
         active_node_item = None
 
-        vertical_spacing = 75.0
-        horizontal_spacing = 300.0
-
-        positions = {}
-
-        def calculate_positions(node_id: str, depth: int, branch_index: int):
-            x_pos = 20.0 + (branch_index * horizontal_spacing)
-            y_pos = 20.0 + (depth * vertical_spacing)
-            positions[node_id] = (x_pos, y_pos, depth)
-
-            node_data = nodes_dict.get(node_id)
-            if not node_data:
-                return
-
-            for i, child_id in enumerate(node_data.children_ids):
-                child_branch = branch_index if i == len(node_data.children_ids) - 1 else branch_index + (i + 1)
-                calculate_positions(child_id, depth + 1, child_branch)
-
-        calculate_positions(root_id, depth=0, branch_index=0)
+        vertical_spacing: float = 75.0
+        positions: dict[str, tuple[float, float, int]] = self._calculate_tree_layout(nodes_dict, root_id)
 
         max_x, max_y = 0.0, 0.0
         self._entrance_group.clear()
 
         for node_id, (x_pos, y_pos, depth) in positions.items():
             node_data = nodes_dict[node_id]
-            is_active = (node_id == current_node_id)
-            is_undone = node_id not in self._get_path_to_root(nodes_dict,
-                                                              current_node_id) and node_id != current_node_id
+            is_active: bool = (node_id == current_node_id)
+            is_undone: bool = node_id not in self._get_path_to_root(nodes_dict,
+                                                                    current_node_id) and node_id != current_node_id
 
-            label = "Initial Data" if node_id == root_id else format_func(node_data.diff_record.metadata)
-            graph_node = GraphNode(node_id, label, getattr(node_data.diff_record, 'metadata', {}), is_active, is_undone)
+            label: str = "Initial Data" if node_id == root_id else format_func(node_data.diff_record.metadata)
+            graph_node = GraphNode(node_id, label, getattr(node_data.diff_record, "metadata", {}), is_active, is_undone)
 
             graph_node.hover_entered.connect(self._on_node_hover_entered)
             graph_node.hover_left.connect(self._on_node_hover_left)
@@ -601,8 +675,8 @@ class PipelineGraphView(QGraphicsView):
             if is_active:
                 active_node_item = graph_node
 
-            max_x = max(max_x, x_pos)
-            max_y = max(max_y, y_pos)
+            max_x: float = max(max_x, x_pos)
+            max_y: float = max(max_y, y_pos)
 
             if node_data.parent_id and node_data.parent_id in positions:
                 px, py, _ = positions[node_data.parent_id]
@@ -616,7 +690,7 @@ class PipelineGraphView(QGraphicsView):
                 ctrl2 = QPointF(end_pt.x(), end_pt.y() - (vertical_spacing / 2))
                 path.cubicTo(ctrl1, ctrl2, end_pt)
 
-                is_active_path = is_active or node_id in self._get_path_to_root(nodes_dict, current_node_id)
+                is_active_path: bool = is_active or node_id in self._get_path_to_root(nodes_dict, current_node_id)
                 edge = FlowEdgeItem(path, node_id, is_active_path)
 
                 self.graph_scene.addItem(edge)
@@ -637,7 +711,7 @@ class PipelineGraphView(QGraphicsView):
             node_anim_group.addAnimation(anim_pos)
             node_anim_group.addAnimation(anim_op)
 
-            delay = depth * 60
+            delay: int = depth * 60
             if delay > 0:
                 seq_group = QSequentialAnimationGroup(self)
                 seq_group.addPause(delay)
@@ -650,39 +724,7 @@ class PipelineGraphView(QGraphicsView):
 
         if active_node_item:
             target_x, target_y, target_depth = positions[current_node_id]
-            self.focus_selector = FocusHighlightItem(260.0, 48.0)
-
-            start_pos = QPointF(target_x, target_y + 20)
-            end_pos = QPointF(target_x, target_y)
-
-            self.focus_selector.setPos(start_pos)
-            self.focus_selector.setOpacity(0.0)
-            self.graph_scene.addItem(self.focus_selector)
-
-            anim_pill_pos = QPropertyAnimation(self.focus_selector, b"animated_pos")
-            anim_pill_pos.setStartValue(start_pos)
-            anim_pill_pos.setEndValue(end_pos)
-            anim_pill_pos.setDuration(450)
-            anim_pill_pos.setEasingCurve(QEasingCurve.Type.OutBack)
-
-            anim_pill_op = QPropertyAnimation(self.focus_selector, b"animated_opacity")
-            anim_pill_op.setStartValue(0.0)
-            anim_pill_op.setEndValue(1.0)
-            anim_pill_op.setDuration(350)
-
-            pill_group = QParallelAnimationGroup(self)
-            pill_group.addAnimation(anim_pill_pos)
-            pill_group.addAnimation(anim_pill_op)
-
-            delay = target_depth * 60
-            if delay > 0:
-                seq_group = QSequentialAnimationGroup(self)
-                seq_group.addPause(delay)
-                seq_group.addAnimation(pill_group)
-                self._entrance_group.addAnimation(seq_group)
-            else:
-                self._entrance_group.addAnimation(pill_group)
-
+            self._setup_focus_selector(target_x, target_y, target_depth)
             self.center_on_animated(active_node_item)
 
         self._entrance_group.start()
@@ -699,7 +741,7 @@ class PipelineGraphView(QGraphicsView):
         new_pos = None
         self.current_id = new_node_id
 
-        active_path = self._get_path_to_root(nodes_dict, new_node_id)
+        active_path: list[str] = self._get_path_to_root(nodes_dict, new_node_id)
 
         for node in self.nodes:
             node.is_active = (node.node_id == new_node_id)

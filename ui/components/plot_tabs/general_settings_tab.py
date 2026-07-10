@@ -1,28 +1,29 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QToolBox, QFrame, QTabWidget, QListWidget, QGroupBox, QComboBox, QPushButton
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QListWidget, QPushButton, QScrollArea, \
+    QTabWidget, QToolBox, QVBoxLayout, QWidget
 
-from ui.widgets import ToggleSwitch, QuickFilterEdit
+from ui.widgets import AutoResizingStackedWidget, QuickFilterEdit, ToggleSwitch
 
 class GeneralSettingsTab(QWidget):
     help_requested = pyqtSignal(str)
-    
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.init_ui()
-    
+
     def init_ui(self) -> None:
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0,0,0,0)
-        
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setProperty("styleClass", "transparent_scroll_area")
-        
+
         scroll_widget = QWidget()
         scroll_widget.setObjectName("TransparentScrollContent")
         scroll_layout = QVBoxLayout(scroll_widget)
-        
+
         self._setup_plot_type_group(scroll_layout)
         self._setup_subplot_group(scroll_layout)
         scroll_layout.addSpacing(10)
@@ -31,7 +32,7 @@ class GeneralSettingsTab(QWidget):
         scroll_layout.addStretch()
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
-    
+
     def _setup_plot_type_group(self, parent_layout: QVBoxLayout) -> None:
         self.plot_type_group = QGroupBox("Plot Type")
         layout = QVBoxLayout()
@@ -55,7 +56,7 @@ class GeneralSettingsTab(QWidget):
 
         self.plot_type_group.setLayout(layout)
         parent_layout.addWidget(self.plot_type_group)
-    
+
     def _setup_subplot_group(self, parent_layout: QVBoxLayout) -> None:
         self.subplot_group = QGroupBox("Subplot Configuration")
         self.subplot_group.setVisible(False)
@@ -80,7 +81,7 @@ class GeneralSettingsTab(QWidget):
         self.subplot_sharey_check = ToggleSwitch("Share Y-axis")
         share_layout.addWidget(self.subplot_sharey_check)
         layout.addLayout(share_layout)
-        
+
         self.subplot_sharex_check.toggled.connect(self._sync_grid_axes)
         self.subplot_sharey_check.toggled.connect(self._sync_grid_axes)
 
@@ -96,7 +97,9 @@ class GeneralSettingsTab(QWidget):
 
         self.subplot_group.setLayout(layout)
         parent_layout.addWidget(self.subplot_group)
-    
+
+        self.add_subplots_check.toggled.connect(self.subplot_group.setVisible)
+
     def _sync_grid_axes(self, *args) -> None:
         """Passes the active toggle states down to the visual designer widget."""
         if hasattr(self, 'grid_designer'):
@@ -113,7 +116,7 @@ class GeneralSettingsTab(QWidget):
 
         var_tab = QWidget()
         var_layout = QVBoxLayout(var_tab)
-        
+
         x_layout = QHBoxLayout()
         x_layout.addWidget(QLabel("X Column:"))
         self.x_column = QComboBox()
@@ -131,14 +134,18 @@ class GeneralSettingsTab(QWidget):
         y_toggles_layout.addStretch()
         var_layout.addLayout(y_toggles_layout)
 
+        self.y_stack = AutoResizingStackedWidget()
+
         self.y_column = QComboBox()
-        var_layout.addWidget(self.y_column)
+        self.y_stack.addWidget(self.y_column)
 
         self.y_columns_list = QListWidget()
         self.y_columns_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
         self.y_columns_list.setMinimumHeight(100)
         self.y_columns_list.setVisible(False)
-        var_layout.addWidget(self.y_columns_list)
+        self.y_stack.addWidget(self.y_columns_list)
+
+        var_layout.addWidget(self.y_stack)
 
         multi_btns = QHBoxLayout()
         multi_btns.setContentsMargins(0, 0, 0, 0)
@@ -159,6 +166,8 @@ class GeneralSettingsTab(QWidget):
         multi_btns.addWidget(self.clear_all_y_btn)
         var_layout.addLayout(multi_btns)
 
+        self.multi_y_check.toggled.connect(self._on_multi_y_toggled)
+
         self.z_column_widget = QWidget()
         z_layout = QHBoxLayout(self.z_column_widget)
         z_layout.setContentsMargins(0, 0, 0, 0)
@@ -172,16 +181,16 @@ class GeneralSettingsTab(QWidget):
         self.hue_column = QComboBox()
         self.hue_column.addItem("None")
         var_layout.addWidget(self.hue_column)
-        
+
         var_layout.addStretch()
         tab_widget.addTab(var_tab, "Variables")
 
         sec_tab = QWidget()
         sec_layout = QVBoxLayout(sec_tab)
-        
+
         self.secondary_y_check = ToggleSwitch("Enable Secondary Y-Axis")
         sec_layout.addWidget(self.secondary_y_check)
-        
+
         sec_layout.addWidget(QLabel("Secondary Y Column:"))
         self.secondary_y_column = QComboBox()
         self.secondary_y_column.setEnabled(False)
@@ -192,20 +201,23 @@ class GeneralSettingsTab(QWidget):
         self.secondary_plot_type_combo.setEnabled(False)
         self.secondary_plot_type_combo.addItems(["Line", "Scatter", "Bar", "Area"])
         sec_layout.addWidget(self.secondary_plot_type_combo)
-        
+
+        self.secondary_y_check.toggled.connect(self.secondary_y_column.setEnabled)
+        self.secondary_y_check.toggled.connect(self.secondary_plot_type_combo.setEnabled)
+
         sec_layout.addStretch()
         tab_widget.addTab(sec_tab, "Secondary Axis")
 
         filter_tab = QWidget()
         filter_layout = QVBoxLayout(filter_tab)
-        
+
         filter_layout.addWidget(QLabel("Quick Filter:"))
         self.quick_filter_input = QuickFilterEdit()
         self.quick_filter_input.setPlaceholderText("e.g. value > 100 or category == 'A'")
         filter_layout.addWidget(self.quick_filter_input)
-        
+
         filter_layout.addSpacing(10)
-        
+
         subset_info = QLabel("Plot a specific subset of your data. Enable 'Use Subset' in the Plot Type group above.")
         subset_info.setWordWrap(True)
         subset_info.setProperty("styleClass", "info_text")
@@ -216,16 +228,20 @@ class GeneralSettingsTab(QWidget):
         self.subset_combo.setEnabled(False)
         filter_layout.addWidget(self.subset_combo)
 
-        self.use_subset_check.stateChanged.connect(
-            lambda state: self.subset_combo.setEnabled(state == Qt.CheckState.Checked.value)
-        )
+        self.use_subset_check.stateChanged.connect(self.subset_combo.setEnabled)
 
         self.refresh_subsets_btn = QPushButton("Refresh Subset List", parent=self)
         filter_layout.addWidget(self.refresh_subsets_btn)
-        
+
         filter_layout.addStretch()
         tab_widget.addTab(filter_tab, "Filters and Subsets")
 
         layout.addWidget(tab_widget)
         group.setLayout(layout)
         parent_layout.addWidget(group)
+
+    def _on_multi_y_toggled(self, is_multi: bool) -> None:
+        self.y_stack.setCurrentIndex(1 if is_multi else 0)
+        self.select_all_y_btn.setVisible(is_multi)
+        self.clear_all_y_btn.setVisible(is_multi)
+        self.multi_y_info.setVisible(is_multi)

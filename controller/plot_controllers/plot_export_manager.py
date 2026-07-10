@@ -1,7 +1,6 @@
 from typing import Any, TYPE_CHECKING
 
 from core.global_signals import ToastLevel, global_signals
-from ui.animations import SavePlotAnimation
 from ui.dialogs.PlotExportDialog import PlotExportDialog
 from ui.status_bar import LogLevel
 
@@ -98,7 +97,6 @@ class PlotExportManager:
 
     def _handle_export_success(self, filepath: str) -> None:
         """Handles UI updates on successful export."""
-        SavePlotAnimation(self.plot_tab).start(self.plot_tab)
         self.status_bar.log_action(f"Plot saved to {filepath}", level=LogLevel.SUCCESS)
         global_signals.request_toast(
             "Plot Saved", f"Plot saved to:\n{filepath}", ToastLevel.SUCCESS

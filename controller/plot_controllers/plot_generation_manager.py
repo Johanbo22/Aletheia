@@ -1,5 +1,5 @@
-import traceback
 import hashlib
+import traceback
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 
 import pandas as pd
@@ -19,12 +19,18 @@ class PlotGenerationManager:
     including data validation, background processing and strategy execution
     """
 
+    PLOTS_NO_X: frozenset[str] = frozenset(
+        ["Box", "Histogram", "KDE", "Heatmap", "Pie", "ECDF", "Eventplot", "GeoSpatial"])
+    PLOTS_NO_Y: frozenset[str] = frozenset(["Count Plot", "Heatmap", "GeoSpatial"])
+    PLOTS_GRIDDED: frozenset[str] = frozenset(["Image Show (imshow)", "pcolormesh", "Contour", "Contourf"])
+    PLOTS_VECTOR: frozenset[str] = frozenset(["Barbs", "Quiver", "Streamplot"])
+
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
         self.view = plot_tab.view
         self.thread_pool = plot_tab.thread_pool
 
-    def generate_plot(self) -> None:
+    def generate_plot(self, animate: bool = True) -> None:
         """Trigger the plot execution based on current settings"""
         if self.plot_tab._is_clearing:
             return
@@ -41,10 +47,10 @@ class PlotGenerationManager:
             return
 
         config["plot_type"] = self.plot_tab.current_plot_type_name
-        self._execute_or_cache_plot(active_df, subplot_index, config)
+        self._execute_or_cache_plot(active_df, subplot_index, config, animate)
 
     def _execute_or_cache_plot(
-            self, active_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any]
+            self, active_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any], animate: bool = True
     ) -> None:
         """Checks cache before initiating the background thread"""
         data_sig = self._build_data_signature(active_df, config)
@@ -55,15 +61,15 @@ class PlotGenerationManager:
         if has_last_sig and has_cached_df:
             self.plot_tab.status_bar.log("Using cached data for plotting", LogLevel.INFO)
             self.generate_main_plot(
-                self.plot_tab._cached_active_df, subplot_index, config, keep_data=True
+                self.plot_tab._cached_active_df, subplot_index, config, keep_data=True, animate=animate
             )
             return
 
         self.plot_tab._last_data_signature = data_sig
-        self._start_prep_worker(active_df, subplot_index, config)
+        self._start_prep_worker(active_df, subplot_index, config, animate)
 
     def _start_prep_worker(
-            self, active_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any]) -> None:
+            self, active_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any], animate: bool = True) -> None:
         """Starts the background thread for data preparation"""
         self.plot_tab.status_bar.log("Preparing data in background...", LogLevel.INFO)
         self.plot_tab._prep_progress_dialog = ProgressDialog(
@@ -74,14 +80,14 @@ class PlotGenerationManager:
         self.plot_tab._prep_progress_dialog.show()
 
         worker = PlotDataPrepWorker(
-            active_df, config["plot_type"], config["x_col"],
+            active_df.copy(), config["plot_type"], config["x_col"],
             config["y_cols"], config["quick_filter"]
         )
         worker.signals.progress.connect(self.plot_tab._prep_progress_dialog.update_progress)
         worker.signals.log.connect(lambda msg: self.plot_tab.status_bar.log(msg, LogLevel.INFO))
         worker.signals.error.connect(self._on_prep_error)
         worker.signals.finished.connect(
-            lambda procesed_df: self._on_prep_finished(procesed_df, subplot_index, config)
+            lambda procesed_df: self._on_prep_finished(procesed_df, subplot_index, config, animate)
         )
         self.thread_pool.start(worker)
 
@@ -98,7 +104,7 @@ class PlotGenerationManager:
         y_dt_custom = view.y_custom_datetime_format_input.text() if y_dt_fmt == "Custom" else None
 
         signature_components = (
-            id(active_df),
+            id(self.plot_tab.data_handler.df),
             active_df.shape,
             config.get("plot_type"),
             config.get("x_col"),
@@ -127,14 +133,15 @@ class PlotGenerationManager:
             "Data Preparation Error", "An error occurred during data processing", ToastLevel.ERROR
         )
 
-    def _on_prep_finished(self, processed_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any]) -> None:
+    def _on_prep_finished(self, processed_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any],
+                          animate: bool = True) -> None:
         """Called when the background data preparation completes successfully"""
         dialog = getattr(self.plot_tab, "_prep_progress_dialog", None)
         if dialog:
             dialog.accept()
 
         self.plot_tab._cached_active_df = processed_df
-        self.generate_main_plot(processed_df, subplot_index, config, keep_data=False)
+        self.generate_main_plot(processed_df, subplot_index, config, keep_data=False, animate=animate)
 
     def _validate_data_loaded(self) -> bool:
         """Validates if data is present in DataHandler instance"""
@@ -196,7 +203,7 @@ class PlotGenerationManager:
             return self.plot_tab.data_handler.df
         except Exception as e:
             self.plot_tab.status_bar.log(f"Restore Error: {str(e)}", LogLevel.ERROR)
-            global_signals.request_toast("Configuration Error", "Failed to retrieved data subsets", ToastLevel.ERROR)
+            global_signals.request_toast("Configuration Error", "Failed to retrieve data subsets", ToastLevel.ERROR)
             return self.plot_tab.data_handler.df
 
     def _validate_active_dataframe(self, active_df: pd.DataFrame) -> bool:
@@ -360,21 +367,16 @@ class PlotGenerationManager:
                 raise InterruptedError("User cancelled")
 
     def _validate_plot_requirements(self, plot_type: str, x_col: str, y_cols: List[str]) -> bool:
-        plots_no_x = ["Box", "Histogram", "KDE", "Heatmap", "Pie", "ECDF", "Eventplot", "GeoSpatial"]
-        plots_no_y = ["Count Plot", "Heatmap", "GeoSpatial"]
-        plots_gridded = ["Image Show (imshow)", "pcolormesh", "Contour", "Contourf"]
-        plots_vector = ["Barbs", "Quiver", "Streamplot"]
-
-        if not x_col and plot_type not in plots_no_x:
+        if not x_col and plot_type not in self.PLOTS_NO_X:
             global_signals.request_toast("Warning", f"X column required for {plot_type}", ToastLevel.INFO)
             return False
-        if not y_cols and plot_type not in plots_no_y:
+        if not y_cols and plot_type not in self.PLOTS_NO_Y:
             global_signals.request_toast("Warning", f"Y column required for {plot_type}", ToastLevel.INFO)
             return False
-        if plot_type in plots_gridded and len(y_cols) < 2:
+        if plot_type in self.PLOTS_GRIDDED and len(y_cols) < 2:
             global_signals.request_toast("Warning", f"{plot_type} needs 2 Y columns (Y, Z)", ToastLevel.INFO)
             return False
-        if plot_type in plots_vector and len(y_cols) < 3:
+        if plot_type in self.PLOTS_VECTOR and len(y_cols) < 3:
             global_signals.request_toast("Warning", f"{plot_type} needs 3 Y columns (Y, U, V)", ToastLevel.INFO)
             return False
         return True

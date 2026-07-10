@@ -1,7 +1,8 @@
-from PyQt6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextDocument
-from typing import List, Tuple, Pattern, Dict
 import re
 from enum import Enum
+from typing import Dict, List, Pattern, Tuple
+
+from PyQt6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextDocument
 
 class SyntaxCategory(str, Enum):
     Keyword = "Keyword"
@@ -163,12 +164,15 @@ class PythonHighlighter(QSyntaxHighlighter):
     
     def _highlight_multiline(self, text: str, state_id: int, delimiter_pattern: re.Pattern) -> None:
         start_index: int = 0
+        search_offset: int = 0
         
         if self.previousBlockState() == state_id:
             start_index = 0
+            search_offset = 0
         else:
             match = delimiter_pattern.search(text)
             start_index = match.start() if match else -1
+            search_offset = 3
         
         while start_index >= 0:
             match = delimiter_pattern.search(text, start_index + 3)
@@ -179,6 +183,7 @@ class PythonHighlighter(QSyntaxHighlighter):
                 
                 next_match = delimiter_pattern.search(text, start_index + match_length)
                 start_index = next_match.start() if next_match else -1
+                search_offset = 3
             else:
                 self.setCurrentBlockState(state_id)
                 self.setFormat(start_index, len(text) - start_index, self.multi_string_format)

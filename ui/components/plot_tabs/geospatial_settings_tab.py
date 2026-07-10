@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QTabWidget, QLineEdit, QGroupBox, QDoubleSpinBox, QComboBox, QPushButton
+from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, \
+    QScrollArea, QSpinBox, QTabWidget, QVBoxLayout, QWidget
+
 from ui.widgets import ToggleSwitch
 
 class GeospatialSettingsTab(QWidget):
@@ -38,6 +40,7 @@ class GeospatialSettingsTab(QWidget):
         self.geo_target_crs_input = QLineEdit()
         self.geo_target_crs_input.setPlaceholderText("Leave empty to keep original coordinate system")
         self.geo_target_crs_input.setToolTip("Enter an EPSG code (e.g., EPSG:3857 for Web Mercator) to reproject map")
+        self.geo_target_crs_input.setClearButtonEnabled(True)
         proj_layout.addWidget(self.geo_target_crs_input)
         
         proj_layout.addSpacing(10)
