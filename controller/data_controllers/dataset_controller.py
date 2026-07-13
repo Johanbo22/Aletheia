@@ -118,6 +118,8 @@ class DatasetController(BaseDataController):
         if self.progress_dialog:
             self.progress_dialog.close()
 
+        self.data_handler.df = df
+
         rows_after = len(df)
         rows_diff = rows_after - self.rows_before_refresh
 
@@ -170,9 +172,12 @@ class DatasetController(BaseDataController):
                 self._export_to_file(df_to_export, config)
 
     def _prepare_export_dataframe(self, config: ExportConfig, selected_rows: list[int]) -> Optional[pd.DataFrame]:
-        df = self.data_handler.df.copy()
+        df = self.data_handler.df
 
-        if config.selected_rows_only and selected_rows:
+        if config.selected_rows_only:
+            if not selected_rows:
+                global_signals.request_toast("Warning", "No rows selected for export", ToastLevel.WARNING)
+                return None
             try:
                 df = df.iloc[selected_rows]
             except IndexError as e:

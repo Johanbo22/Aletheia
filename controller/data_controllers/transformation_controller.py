@@ -1,4 +1,3 @@
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox
 
 from controller.data_controllers.base_data_controller import BaseDataController
@@ -346,6 +345,7 @@ class TransformationController(BaseDataController):
                     self.view.refresh_data_view()
                 except Exception as e:
                     self.status_bar.log(f"Failed to reorder columns: {str(e)}", LogLevel.ERROR)
+                    global_signals.request_toast("Error", "Failed to reorder columns", ToastLevel.ERROR)
 
     def apply_sort(self) -> None:
         """Applies permanent (DataHandler level) sorting to the current data view."""
@@ -360,11 +360,11 @@ class TransformationController(BaseDataController):
         ascending = (order_text == "Ascending")
 
         try:
-            col_index = -1 if column == "[Index]" else list(self.data_handler.df.columns).index(column)
-            order = Qt.SortOrder.AscendingOrder if ascending else Qt.SortOrder.DescendingOrder
-
-            self.view.data_table.sortByColumn(col_index, order)
-            self.view.refresh_data_view(reload_model=False)
+            self.data_handler.sort_data(
+                column=column,
+                ascending=ascending
+            )
+            self.view.refresh_data_view()
 
             direction = "ascending" if ascending else "descending"
             self.status_bar.log_action(

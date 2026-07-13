@@ -20,6 +20,8 @@ class SubsetController(BaseDataController):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.progress_dialog: Optional[ProgressDialog] = None
+        self._current_subset_col: str = ""
+        self._current_subset_count: int = 0
 
     def quick_create_subsets(self) -> None:
         """Quick create subsets grouped by unique values in a specific column."""
@@ -37,12 +39,14 @@ class SubsetController(BaseDataController):
         reply = QMessageBox.question(
             self.view,
             "Confirm",
-            f"Create {unique_count} subsets (one per unique value in '{column}')?\n\n"
-            f"This is useful for analyzing data by groups (e.g., by location, category, etc.)",
+            f"Create {unique_count} subsets (one per unique value in '{column}')?\n\n",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
+            self._current_subset_col = column
+            self._current_subset_count = unique_count
+
             self.progress_dialog = ProgressDialog(
                 title="Auto-Creating subsets", message=f"Creating subsets from '{column}'...", parent=self.view
             )
@@ -51,16 +55,19 @@ class SubsetController(BaseDataController):
 
             worker = AutoCreateSubsetsWorker(self.subset_manager, self.data_handler.df, column)
             worker.signals.progress.connect(self.progress_dialog.update_progress)
-            worker.signals.finished.connect(
-                lambda created: self._on_quick_create_subsets_finished(created, column, unique_count)
-            )
+            worker.signals.finished.connect(self._on_quick_create_subsets_finished)
             worker.signals.error.connect(self._on_quick_create_subsets_error)
 
             QThreadPool.globalInstance().start(worker)
 
-    def _on_quick_create_subsets_finished(self, created: list, column: str, unique_count: int) -> None:
+    def _on_quick_create_subsets_finished(self, created: list) -> None:
         if self.progress_dialog:
             self.progress_dialog.close()
+            self.progress_dialog.deleteLater()
+            self.progress_dialog = None
+
+        column = self._current_subset_col
+        unique_count = self._current_subset_count
 
         self.refresh_active_subsets()
 
@@ -79,6 +86,8 @@ class SubsetController(BaseDataController):
         """Callback for when subset auto-creation fails in the background."""
         if self.progress_dialog:
             self.progress_dialog.close()
+            self.progress_dialog.deleteLater()
+            self.progress_dialog = None
 
         self.status_bar.log(f"Failed to create subsets: {str(error)}", LogLevel.ERROR)
         global_signals.request_toast("Error", "Failed to create subsets", ToastLevel.ERROR)
@@ -88,13 +97,6 @@ class SubsetController(BaseDataController):
         try:
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             subset_data = []
-
-            if self.data_handler.df is not None:
-                for name in self.subset_manager.list_subsets():
-                    try:
-                        self.subset_manager.apply_subset(self.data_handler.df, name)
-                    except Exception as e:
-                        self.status_bar.log(f"Warning: Could not apply subset {name}: {str(e)}", LogLevel.WARNING)
 
             for name in self.subset_manager.list_subsets():
                 subset = self.subset_manager.get_subset(name)
@@ -165,24 +167,15 @@ class SubsetController(BaseDataController):
             )
             return
 
-        reply = QMessageBox.question(
-            self.view,
-            "Confirm",
-            f"Are you sure you want to insert the subset: '{subset_name}' into the active DataFrame\n\n"
-            f"This will temporarily replace the current data view.\n"
-            f"You can restore the original data view by pressing the 'Revert to Original Data View'",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
         try:
             if not hasattr(self.data_handler, "pre_insert_df") or self.data_handler.pre_insert_df is None:
                 self.data_handler.pre_insert_df = self.data_handler.df.copy()
                 self.data_handler.inserted_subset_name = None
+                base_df = self.data_handler.df
+            else:
+                base_df = self.data_handler.pre_insert_df
 
-            subset_df = self.subset_manager.apply_subset(self.data_handler.df, subset_name, use_cache=False)
+            subset_df = self.subset_manager.apply_subset(base_df, subset_name, use_cache=False)
 
             self.data_handler.df = subset_df.copy()
             self.data_handler.inserted_subset_name = subset_name
