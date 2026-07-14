@@ -255,6 +255,8 @@ class PlotGenerationManager:
             if dialog:
                 QTimer.singleShot(300, dialog.accept)
             self.plot_tab._is_data_dirty = False
+            if hasattr(self.plot_tab, "selection_overlay"):
+                self.plot_tab.selection_overlay.show_update_required(False)
 
             if animate:
                 global_signals.toast_requested.emit(

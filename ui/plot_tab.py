@@ -630,6 +630,11 @@ class PlotTab(PlotTabUI):
         """Handle data column selection change"""
         if self._is_clearing:
             return
+
+        df = self.get_active_dataframe()
+        if df is None or df.empty:
+            return
+
         self._is_data_dirty = True
 
         df = self.get_active_dataframe()
