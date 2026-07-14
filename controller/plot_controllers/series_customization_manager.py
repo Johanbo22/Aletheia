@@ -50,7 +50,8 @@ class SeriesCustomizationManager:
                 continue
             label = container.get_label()
             if not label or label.startswith("_"):
-                label = f"Bar Series {i + 1}"
+                handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
+                label = labels[i] if i < len(labels) else f"Bar Series {i + 1}"
 
             if label not in self.bar_customizations:
                 patch = container.patches[0]
@@ -72,7 +73,11 @@ class SeriesCustomizationManager:
                 label = container.get_label()
 
                 if not label or label.startswith("_"):
-                    label = f"Bar Series {i + 1}"
+                    handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
+                    if i < len(labels):
+                        label = labels[i]
+                    else:
+                        label = f"Bar series {i + 1}"
                 self.view.bar_selector_combo.addItem(label, userData=container)
 
         self.view.bar_selector_combo.blockSignals(False)
