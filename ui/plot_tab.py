@@ -186,6 +186,10 @@ class PlotTab(PlotTabUI):
         self.view.quick_filter_input.returnPressed.connect(self.on_data_changed)
         self.view.z_column.currentTextChanged.connect(self.on_data_changed)
 
+        self.view.secondary_y_check.stateChanged.connect(self.on_data_changed)
+        self.view.secondary_y_column.currentTextChanged.connect(self.on_data_changed)
+        self.view.secondary_plot_type_combo.currentTextChanged.connect(self.on_data_changed)
+
         self.subplot_manager.connect_signals()
 
         self.view.use_subset_check.stateChanged.connect(self.use_subset)
@@ -442,6 +446,7 @@ class PlotTab(PlotTabUI):
     def use_subset(self) -> None:
         """Active subset on change"""
         subset_enabled = self.view.use_subset_check.isChecked()
+        self.on_data_changed()
 
     def on_canvas_resize(self, event: Any) -> None:
         self.subplot_manager.update_overlay(is_resize=True)
