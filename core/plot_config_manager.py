@@ -44,9 +44,9 @@ class PlotConfigManager:
         try:
             if "plot_type" in config:
                 self.pt.plot_type.blockSignals(True)
-                self.pt.type_manager.select_plot_in_toolbox(config["plot_type"])
+                self.pt.type_manager.select_plot_in_toolbox(config["plot_type"], log=False)
                 self.pt.plot_type.blockSignals(False)
-                self.pt.type_manager._on_plot_type_changed(config["plot_type"])
+                self.pt.type_manager._on_plot_type_changed(config["plot_type"], log=False)
             if "basic" in config: self._load_basic_config(config["basic"])
             if "appearance" in config: self._load_appearance_config(config["appearance"])
             if "axes" in config: self._load_axes_config(config["axes"])

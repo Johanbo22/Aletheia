@@ -140,7 +140,7 @@ class PlotTab(PlotTabUI):
 
         # Load initial data
         self.update_column_combo()
-        self.type_manager.select_plot_in_toolbox("Line")
+        self.type_manager.select_plot_in_toolbox("Line", log=False)
         self.set_empty_state_greeting()
 
         # Caching

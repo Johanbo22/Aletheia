@@ -82,7 +82,7 @@ class PlotTypeManager:
         self.plot_tab.on_data_changed()
         self.plot_tab.script_manager.sync_script_if_open()
 
-    def select_plot_in_toolbox(self, plot_type_name: str) -> None:
+    def select_plot_in_toolbox(self, plot_type_name: str, log: bool = True) -> None:
         """Select a plot type in the toolbox"""
         self.plot_tab.current_plot_type_name = plot_type_name
         self.view.current_plot_label.setText(f"Selected Plot: {plot_type_name}")
@@ -98,7 +98,7 @@ class PlotTypeManager:
                     for list_w in self.category_lists:
                         if list_w != list_widget:
                             list_w.clearSelection()
-                    self._on_plot_type_changed(plot_type_name)
+                    self._on_plot_type_changed(plot_type_name, log=log)
                     self.plot_tab.on_data_changed()
                     self.plot_tab.script_manager.sync_script_if_open()
                 break
