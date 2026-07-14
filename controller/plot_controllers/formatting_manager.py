@@ -466,7 +466,7 @@ class PlotFormattingManager:
 
         custom_labels_str = self.plot_tab.view.legend_labels_input.text().strip()
         if custom_labels_str:
-            custom_labels = [label.strip() for label in custom_labels_str.split(",")]
+            custom_labels = [label.strip() for label in custom_labels_str.split(";")]
             for i in range(min(len(labels), len(custom_labels))):
                 if custom_labels[i]:
                     labels[i] = custom_labels[i]
@@ -612,11 +612,10 @@ class PlotFormattingManager:
             return
 
         try:
-            spines = self.plot_tab.plot_engine.current_ax.spines
             is_individual = self.plot_tab.view.individual_spines_check.isChecked()
 
             global_width = self.plot_tab.view.global_spine_width_spin.value()
-            global_color = self.plot_tab.global_spine_color
+            global_color = getattr(self.plot_tab, "global_spine_color", "black")
 
             spine_map = [
                 ("top", self.plot_tab.view.top_spine_visible_check, self.plot_tab.view.top_spine_width_spin,
@@ -629,15 +628,27 @@ class PlotFormattingManager:
                  "right_spine_color")
             ]
 
-            for key, vis_check, width_spin, color_attr in spine_map:
-                if key not in spines:
+            axes_to_style = [self.plot_tab.plot_engine.current_ax]
+            if getattr(self.plot_tab.plot_engine, "secondary_ax", None):
+                axes_to_style.append(self.plot_tab.plot_engine.secondary_ax)
+
+            for ax in axes_to_style:
+                if hasattr(ax, "zaxis"):
                     continue
-                if vis_check.isChecked():
-                    spines[key].set_visible(True)
-                    spines[key].set_linewidth(width_spin.value() if is_individual else global_width)
-                    spines[key].set_edgecolor(
-                        getattr(self.plot_tab, color_attr, "black") if is_individual else global_color)
-                else:
-                    spines[key].set_visible(False)
+
+                spines = ax.spines
+                for key, vis_check, width_spin, color_attr in spine_map:
+                    if key not in spines:
+                        continue
+
+                    if vis_check.isChecked():
+                        spines[key].set_visible(True)
+                        spines[key].set_linewidth(width_spin.value() if is_individual else global_width)
+                        spines[key].set_edgecolor(
+                            getattr(self.plot_tab, color_attr, "black") if is_individual else global_color)
+                    else:
+                        spines[key].set_visible(False)
+                        tick_kwargs = {key: False, f"label{key}": False}
+                        ax.tick_params(axis="both", which="both", **tick_kwargs)
         except (AttributeError, KeyError) as e:
             self.plot_tab.status_bar.log(f"Failed to apply spine customization: {str(e)}", LogLevel.ERROR)

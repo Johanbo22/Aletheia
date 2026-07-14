@@ -233,6 +233,10 @@ class PlotTab(PlotTabUI):
         self.view.bottom_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.left_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.right_spine_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.top_spine_visible_check.stateChanged.connect(self.on_style_changed)
+        self.view.bottom_spine_visible_check.stateChanged.connect(self.on_style_changed)
+        self.view.left_spine_visible_check.stateChanged.connect(self.on_style_changed)
+        self.view.right_spine_visible_check.stateChanged.connect(self.on_style_changed)
         self.view.palette_combo.currentTextChanged.connect(self._on_palette_changed)
 
         self.view.camera_elevation_spin.valueChanged.connect(self.on_style_changed)

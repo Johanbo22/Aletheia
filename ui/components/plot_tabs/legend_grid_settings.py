@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import QSlider, QSpinBox, QDoubleSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame, QTabWidget, QSizePolicy, QLineEdit, QGroupBox, QComboBox, QPushButton
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, \
+    QScrollArea, QSizePolicy, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 
-from ui.theme import ThemeColors
 from ui.widgets import ToggleSwitch
 
 class LegendGridSettingstab(QWidget):
@@ -77,7 +77,9 @@ class LegendGridSettingstab(QWidget):
         labels_input_layout = QVBoxLayout()
         labels_input_layout.addWidget(QLabel("Custom Labels:"))
         self.legend_labels_input = QLineEdit()
-        self.legend_labels_input.setPlaceholderText("E.g. Group A, Group B, Group C")
+        self.legend_labels_input.setToolTip(
+            "Add custom labels to the legend objects.\nUse semicolons to separate labels.")
+        self.legend_labels_input.setPlaceholderText("E.g. Group A; Group B; Group C")
         labels_input_layout.addWidget(self.legend_labels_input)
         
         label_size_layout = QVBoxLayout()
