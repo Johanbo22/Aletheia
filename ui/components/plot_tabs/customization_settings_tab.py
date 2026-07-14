@@ -35,6 +35,10 @@ class CustomizationSettingsTab(QWidget):
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
 
+        spinbox: QSpinBox | QDoubleSpinBox
+        for spinbox in self.findChildren(QSpinBox) + self.findChildren(QDoubleSpinBox):
+            spinbox.setKeyboardTracking(False)
+
     def _setup_dynamic_stack(self, parent_layout: QVBoxLayout) -> None:
         """Sets up the stacked widget that swaps UI parameters based on plot type."""
         self.advanced_stack = QWidget()

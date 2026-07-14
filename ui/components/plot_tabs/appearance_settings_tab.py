@@ -43,6 +43,10 @@ class AppearanceSettingsTab(QWidget):
         scroll.setWidget(scroll_widget)
         main_layout.addWidget(scroll)
 
+        spinbox: QSpinBox | QDoubleSpinBox
+        for spinbox in self.findChildren(QSpinBox) + self.findChildren(QDoubleSpinBox):
+            spinbox.setKeyboardTracking(False)
+
     def _setup_theme_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Theme Manager")
         layout = QVBoxLayout()
