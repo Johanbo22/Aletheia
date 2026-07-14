@@ -180,8 +180,8 @@ class PlotFormattingManager:
             target_z_scale = self.plot_tab.view.z_scale_combo.currentText()
             try:
                 self.plot_tab.plot_engine.current_ax.set_zscale(target_z_scale)
-            except Exception as error:
-                self.plot_tab.status_bar.log(f"Z-Scale update ignore: {error}", LogLevel.WARNING)
+            except ValueError as error:
+                self.plot_tab.status_bar.log(f"Unsupported Z-Scale '{target_z_scale}': {error}", LogLevel.WARNING)
 
     def apply_plot_formatting(self, progress_dialog: Any, x_col: str, y_cols: list[str],
                               general_kwargs: dict, active_df: 'pd.DataFrame') -> None:
@@ -495,7 +495,7 @@ class PlotFormattingManager:
                 text.set_fontfamily(font_family)
             if legend.get_title():
                 legend.get_title().set_fontfamily(font_family)
-        except Exception as e:
+        except (TypeError, ValueError) as e:
             self.plot_tab.status_bar.log(f"Failed to apply legend: {e}", LogLevel.WARNING)
 
     def apply_gridlines_customizations(self) -> None:
@@ -607,6 +607,10 @@ class PlotFormattingManager:
         """Apply spines customization."""
         if not self.plot_tab.plot_engine.current_ax:
             return
+
+        if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
+            return
+
         try:
             spines = self.plot_tab.plot_engine.current_ax.spines
             is_individual = self.plot_tab.view.individual_spines_check.isChecked()
@@ -635,5 +639,5 @@ class PlotFormattingManager:
                         getattr(self.plot_tab, color_attr, "black") if is_individual else global_color)
                 else:
                     spines[key].set_visible(False)
-        except Exception as e:
+        except (AttributeError, KeyError) as e:
             self.plot_tab.status_bar.log(f"Failed to apply spine customization: {str(e)}", LogLevel.ERROR)

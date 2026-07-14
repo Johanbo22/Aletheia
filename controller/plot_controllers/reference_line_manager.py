@@ -216,7 +216,7 @@ class ReferenceLineManager:
         del self.reference_lines[self.selected_ref_line_index]
         self.view.reference_lines_list.takeItem(self.selected_ref_line_index)
 
-        self.selected_ref_line_index = -1
+        self.deselect_reference_line()
         self.view.update_ref_line_button.setEnabled(False)
         self.view.delete_ref_line_button.setEnabled(False)
 
@@ -227,7 +227,8 @@ class ReferenceLineManager:
         """Clear all reference lines from the plot"""
         self.reference_lines.clear()
         self.view.reference_lines_list.clear()
-        self.selected_ref_line_index = -1
+
+        self.deselect_reference_line()
         self.view.update_ref_line_button.setEnabled(False)
         self.view.delete_ref_line_button.setEnabled(False)
         self.status_bar.log("Cleared all reference lines")

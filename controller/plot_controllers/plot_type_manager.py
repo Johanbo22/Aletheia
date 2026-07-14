@@ -99,6 +99,8 @@ class PlotTypeManager:
                         if list_w != list_widget:
                             list_w.clearSelection()
                     self._on_plot_type_changed(plot_type_name)
+                    self.plot_tab.on_data_changed()
+                    self.plot_tab.script_manager.sync_script_if_open()
                 break
 
     def _on_plot_type_changed(self, plot_type: str, log: bool = True) -> None:
@@ -106,7 +108,12 @@ class PlotTypeManager:
         if log:
             self.status_bar.log(f"Plot type changed to: {plot_type}")
 
-        self.view.custom_tabs.setTabVisible(6, plot_type == "GeoSpatial")
+        custom_tabs = self.view.custom_tabs
+        for i in range(custom_tabs.count()):
+            if "geo" in custom_tabs.tabText(i).lower():
+                custom_tabs.setTabVisible(i, plot_type == "GeoSpatial")
+                break
+
         if plot_type == "GeoSpatial":
             def _pre_import_geo_deps():
                 try:
@@ -152,7 +159,7 @@ class PlotTypeManager:
         ]
         self.view.hue_column.setEnabled(plot_type not in plots_without_hue)
         if plot_type in plots_without_hue:
-            self.view.hue_column.setCurrentText("None")
+            self.view.hue_column.setCurrentIndex(0)
 
         incompatible_plots = [
             "Histogram", "Pie", "Heatmap", "KDE", "Stackplot",

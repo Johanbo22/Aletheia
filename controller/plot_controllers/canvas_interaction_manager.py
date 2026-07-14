@@ -51,6 +51,7 @@ class CanvasInteractionManager:
             if self.span_selector.ax == self.plot_tab.plot_engine.current_ax:
                 return
             else:
+                self.clear()
                 self.span_selector = None
 
         self.setup_brush_and_link()
@@ -82,16 +83,19 @@ class CanvasInteractionManager:
         if not x_col or x_col not in df.columns:
             return
 
-        mask = (df[x_col] >= xmin) & (df[x_col] <= xmax)
-        selected_indices: Set[int] = set(df[mask].index)
+        try:
+            mask = (df[x_col] >= xmin) & (df[x_col] <= xmax)
+            selected_indices: Set[int] = set(df[mask].index)
 
-        if selected_indices:
-            self.plot_tab.brush_selection_made.emit(selected_indices)
-            self.plot_tab.status_bar.log(f"Selected {len(selected_indices)} points", LogLevel.INFO)
+            if selected_indices:
+                self.plot_tab.brush_selection_made.emit(selected_indices)
+                self.plot_tab.status_bar.log(f"Selected {len(selected_indices)} points", LogLevel.INFO)
+        except TypeError:
+            pass
 
     def on_scroll(self, event) -> None:
         """Handles zoom in/out events via mouse scroll"""
-        if not event.inaxes:
+        if not event.inaxes or event.xdata is None or event.ydata is None:
             return
 
         ax = event.inaxes
@@ -130,9 +134,12 @@ class CanvasInteractionManager:
         if self.plot_tab.annotation_manager.handle_pick_event(artist, event):
             return
 
+        ax = self.plot_tab.plot_engine.current_ax
+        if not ax:
+            return
+
         index_of_appearance_tab = 1
         self.plot_tab.custom_tabs.setCurrentIndex(index_of_appearance_tab)
-        ax = self.plot_tab.plot_engine.current_ax
 
         if artist == ax.get_title():
             self.plot_tab.view.title_input.setFocus()
@@ -269,6 +276,12 @@ class CanvasInteractionManager:
         found_point = False
         tooltip_text = ""
 
+        def format_coord(val) -> str:
+            try:
+                return f"{float(val):.4g}"
+            except (ValueError, TypeError):
+                return str(val)
+
         # Check lines
         for line in event.inaxes.get_lines():
             cont, ind = line.contains(event)
@@ -276,19 +289,25 @@ class CanvasInteractionManager:
                 idx = ind["ind"][0]
                 x_val = line.get_xdata()[idx]
                 y_val = line.get_ydata()[idx]
-                tooltip_text = f"X: {x_val:.4g}\nY: {y_val:.4g}" if isinstance(x_val, (
-                int, float)) else f"X: {x_val}\nY: {y_val:.4g}"
+                tooltip_text = f"X: {format_coord(x_val)}\nY: {format_coord(y_val)}"
+                found_point = True
+                break
+
         # Check collections
         if not found_point:
             for collection in event.inaxes.collections:
                 cont, ind = collection.contains(event)
                 if cont and len(ind.get("ind", [])) > 0:
                     idx = ind["ind"][0]
-                    offsets = collection.get_offsets()[idx]
-                    x_val, y_val = offsets[0], offsets[1]
-                    tooltip_text = f"X: {x_val:.4g}\nY: {y_val:.4g}"
-                    found_point = True
-                    break
+                    try:
+                        offsets = collection.get_offsets()
+                        offset_idx = idx if len(offsets) > idx else 0
+                        x_val, y_val = offsets[offset_idx][0], offsets[offset_idx][1]
+                        tooltip_text = f"X: {format_coord(x_val)}\nY: {format_coord(y_val)}"
+                        found_point = True
+                        break
+                    except (IndexError, TypeError):
+                        pass
 
         if found_point:
             if QToolTip.text() != tooltip_text:

@@ -29,6 +29,7 @@ class AnnotationManager:
         self.dragged_annotation = None
         self._bg_cache = None
         self.ignore_next_click: bool = False
+        self._is_updating_ui: bool = False
 
         self.annotation_color: str = "black"
         self.annotation_bg_color: str = "wheat"
@@ -47,6 +48,11 @@ class AnnotationManager:
         self.view.annotations_list.itemClicked.connect(self.on_annotation_selected)
         self.view.clear_annotations_button.clicked.connect(self.clear_annotations)
 
+        self.view.annotation_text.editingFinished.connect(self.update_active_annotation)
+        self.view.annotation_x_spin.valueChanged.connect(self.update_active_annotation)
+        self.view.annotation_y_spin.valueChanged.connect(self.update_active_annotation)
+        self.view.annotation_fontsize_spin.valueChanged.connect(self.update_active_annotation)
+
         for widget in [self.view.auto_annotate_fontsize_spin, self.view.auto_annotate_x_offset_spin,
                        self.view.auto_annotate_y_offset_spin, self.view.auto_annotate_rotation_spin]:
             widget.valueChanged.connect(self.plot_tab.on_style_changed)
@@ -63,6 +69,7 @@ class AnnotationManager:
             self.annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
             self.view.annotation_color_label.setText(self.annotation_color)
             ColorManager.update_button_color_swatch(self.view.annotation_color_button, QColor(self.annotation_color))
+            self.update_active_annotation()
             self.plot_tab.on_style_changed()
 
     def choose_annotation_bg_color(self) -> None:
@@ -77,6 +84,7 @@ class AnnotationManager:
             self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
             ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button,
                                                     QColor(self.annotation_bg_color))
+            self.update_active_annotation()
             self.plot_tab.on_style_changed()
 
     def choose_auto_annotate_color(self) -> None:
@@ -124,14 +132,48 @@ class AnnotationManager:
 
         self.annotations.append(annotation)
         self.view.annotations_list.addItem(f"{text} @ ({annotation["x"]:.2f}, {annotation["y"]:.2f})")
+
+        self._is_updating_ui = True
         self.view.annotation_text.clear()
-        self.status_bar.log(f"Added annotation: {text}")
+        self.view.annotations_list.clearSelection()
+        self._is_updating_ui = False
+
+        self.status_bar.log(f"Added an annotation: {text}")
         self.plot_tab.on_style_changed()
+
+    def update_active_annotation(self, *args: Any) -> None:
+        """Updates the selected annotation's properties when the UI parameters change"""
+        if self._is_updating_ui:
+            return
+
+        selected_items = self.view.annotations_list.selectedItems()
+        if not selected_items:
+            return
+
+        index: int = self.view.annotations_list.row(selected_items[0])
+        if 0 <= index < len(self.annotations):
+            ann = self.annotations[index]
+            new_text = self.view.annotation_text.text().strip()
+
+            if not new_text:
+                return
+
+            ann["text"] = new_text
+            ann["x"] = self.view.annotation_x_spin.value()
+            ann["y"] = self.view.annotation_y_spin.value()
+            ann["fontsize"] = self.view.annotation_fontsize_spin.value()
+            ann["color"] = self.annotation_color
+            ann["bg_color"] = self.annotation_bg_color
+
+            selected_items[0].setText(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")
+            self.plot_tab.on_style_changed()
 
     def on_annotation_selected(self, item: QListWidgetItem) -> None:
         """The selection of an annotation from the list"""
         index = self.view.annotations_list.row(item)
         if 0 <= index < len(self.annotations):
+            self._is_updating_ui = True
+
             ann = self.annotations[index]
             self.view.annotation_text.setText(ann["text"])
             self.view.annotation_x_spin.setValue(ann["x"])
@@ -146,13 +188,17 @@ class AnnotationManager:
             ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button,
                                                     QColor(self.annotation_bg_color))
 
+            self._is_updating_ui = False
             self.plot_tab.on_style_changed()
 
     def clear_annotations(self) -> None:
         """Deletes all annotations from the list"""
         self.annotations.clear()
+
+        self._is_updating_ui = True
         self.view.annotations_list.clear()
         self.view.annotation_text.clear()
+        self._is_updating_ui = False
         self.status_bar.log(f"Cleared all annotations")
         self.plot_tab.on_style_changed()
 
@@ -170,7 +216,8 @@ class AnnotationManager:
             if index < self.view.annotations_list.count():
                 item = self.view.annotations_list.item(index)
                 x, y = self.annotations[index]["x"], self.annotations[index]["y"]
-                item.setText(f"{new_data['text']} @ ({x:.2f}, {y:.2f})")
+                text = self.annotations[index]["text"]
+                item.setText(f"{text} @ ({x:.2f}, {y:.2f})")
             self.plot_tab.on_style_changed()
 
     def _delete_annotation_from_toolbar(self, index: int) -> None:
@@ -216,15 +263,22 @@ class AnnotationManager:
             try:
                 label_choice = self.view.auto_annotate_col_combo.currentText()
                 is_flipped = self.view.flip_axes_check.isChecked()
+                y_col_target = y_cols[0]
 
-                MAX_POINTS = 2000
+                # Filter missing values to prevent rendering invisible "nan" values
+                cols_to_check = [x_col, y_col_target]
+                if label_choice != "Default (Y-value)" and label_choice in df.columns:
+                    cols_to_check.append(label_choice)
+
+                df_clean = df.dropna(subset=cols_to_check)
+
+                MAX_POINTS = 500
                 if len(df) > MAX_POINTS:
                     self.status_bar.log(f"Auto-annotations is limited to first {MAX_POINTS} points for performance")
-                    df_to_annotate = df.iloc[:MAX_POINTS]
+                    df_to_annotate = df_clean.iloc[:MAX_POINTS]
                 else:
                     df_to_annotate = df
 
-                y_col_target = y_cols[0]
                 font_size = self.view.auto_annotate_fontsize_spin.value()
                 font_weight = self.view.auto_annotate_weight_combo.currentText()
                 font_color = getattr(self, "auto_annotation_color", "black")
@@ -247,30 +301,18 @@ class AnnotationManager:
                         text = str(raw_label)
 
                     # apply
-                    if is_flipped:
-                        self.plot_engine.current_ax.annotate(
-                            text,
-                            (y_val, x_val),
-                            xytext=(x_offset, y_offset),
-                            textcoords="offset points",
-                            fontsize=font_size,
-                            fontweight=font_weight,
-                            color=font_color,
-                            rotation=rotation,
-                            gid="auto_annotation"
-                        )
-                    else:
-                        self.plot_engine.current_ax.annotate(
-                            text,
-                            (x_val, y_val),
-                            xytext=(x_offset, y_offset),
-                            textcoords="offset points",
-                            fontsize=font_size,
-                            fontweight=font_weight,
-                            color=font_color,
-                            rotation=rotation,
-                            gid="auto_annotation"
-                        )
+                    coordinates = (y_val, x_val) if is_flipped else (x_val, y_val)
+                    self.plot_engine.current_ax.annotate(
+                        text,
+                        coordinates,
+                        xytext=(x_offset, y_offset),
+                        textcoords="offset points",
+                        fontsize=font_size,
+                        fontweight=font_weight,
+                        color=font_color,
+                        rotation=rotation,
+                        gid="auto_annotation"
+                    )
             except Exception as err:
                 self.status_bar.log(f"Error applying annotations: {str(err)}", LogLevel.ERROR)
 

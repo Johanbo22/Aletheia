@@ -50,8 +50,7 @@ class SeriesCustomizationManager:
                 continue
             label = container.get_label()
             if not label or label.startswith("_"):
-                handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                label = labels[i] if i < len(labels) else f"Bar Series {i + 1}"
+                label = f"Bar Series {i + 1}"
 
             if label not in self.bar_customizations:
                 patch = container.patches[0]
@@ -73,11 +72,7 @@ class SeriesCustomizationManager:
                 label = container.get_label()
 
                 if not label or label.startswith("_"):
-                    handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                    if i < len(labels):
-                        label = labels[i]
-                    else:
-                        label = f"Bar series {i + 1}"
+                    label = f"Bar Series {i + 1}"
                 self.view.bar_selector_combo.addItem(label, userData=container)
 
         self.view.bar_selector_combo.blockSignals(False)
@@ -104,31 +99,28 @@ class SeriesCustomizationManager:
         patch = container.patches[0]
 
         # Load facecolor
-        facecolor = to_hex(patch.get_facecolor())
-        if facecolor:
-            self.plot_tab.bar_color = facecolor
-            self.view.bar_color_label.setText(facecolor)
-            ColorManager.update_button_color_swatch(self.view.bar_color_button, QColor(self.plot_tab.bar_color))
+        facecolor = to_hex(patch.get_facecolor()) if patch.get_facecolor() else "#000000"
+        self.plot_tab.bar_color = facecolor
+        self.view.bar_color_label.setText(facecolor)
+        ColorManager.update_button_color_swatch(self.view.bar_color_button, QColor(self.plot_tab.bar_color))
 
         # Load edge
-        edgecolor = to_hex(patch.get_edgecolor())
-        if edgecolor:
-            self.plot_tab.bar_edge_color = edgecolor
-            self.view.bar_edge_label.setText(edgecolor)
-            ColorManager.update_button_color_swatch(self.view.bar_edge_button, QColor(self.plot_tab.bar_edge_color))
+        edgecolor = to_hex(patch.get_edgecolor()) if patch.get_edgecolor() else "#000000"
+        self.plot_tab.bar_edge_color = edgecolor
+        self.view.bar_edge_label.setText(edgecolor)
+        ColorManager.update_button_color_swatch(self.view.bar_edge_button, QColor(self.plot_tab.bar_edge_color))
 
         # Load the bar edge width
         self.view.bar_edge_width_spin.blockSignals(True)
-        self.view.bar_edge_width_spin.setValue(patch.get_linewidth())
+        self.view.bar_edge_width_spin.setValue(patch.get_linewidth() or 0.0)
         self.view.bar_edge_width_spin.blockSignals(False)
 
         # Load alpha
-        alpha = patch.get_alpha()
-        if alpha is not None:
-            self.view.alpha_slider.blockSignals(True)
-            self.view.alpha_slider.setValue(int(alpha * 100))
-            self.view.alpha_slider.blockSignals(False)
-            self.view.alpha_label.setText(f"{int(alpha * 100)}%")
+        alpha = patch.get_alpha() if patch.get_alpha() is not None else 1.0
+        self.view.alpha_slider.blockSignals(True)
+        self.view.alpha_slider.setValue(int(alpha * 100))
+        self.view.alpha_slider.blockSignals(False)
+        self.view.alpha_label.setText(f"{int(alpha * 100)}%")
 
     def update_bar_customization_live(self) -> None:
         """Saves the current temporary bar settings if a bar is selected"""
@@ -260,29 +252,28 @@ class SeriesCustomizationManager:
 
             # Load color
             color = line.get_color()
-            if color:
-                self.plot_tab.line_color = to_hex(color)
-                self.view.line_color_label.setText(self.plot_tab.line_color)
-                ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.plot_tab.line_color))
+            hex_color = to_hex(color) if color else "#000000"
+            self.plot_tab.line_color = hex_color
+            self.view.line_color_label.setText(self.plot_tab.line_color)
+            ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.plot_tab.line_color))
 
             # Load markers
             marker = line.get_marker()
-            if marker and marker != "None":
-                self.view.marker_combo.blockSignals(True)
-                self.view.marker_combo.setCurrentText(marker)
-                self.view.marker_combo.blockSignals(False)
+            marker_text = marker if marker not in ["None", " ", "", None] else "None"
+            self.view.marker_combo.blockSignals(True)
+            self.view.marker_combo.setCurrentText(marker_text)
+            self.view.marker_combo.blockSignals(False)
 
-                self.view.marker_size_spin.blockSignals(True)
-                self.view.marker_size_spin.setValue(int(line.get_markersize()))
-                self.view.marker_size_spin.blockSignals(False)
+            self.view.marker_size_spin.blockSignals(True)
+            self.view.marker_size_spin.setValue(int(line.get_markersize() or 0))
+            self.view.marker_size_spin.blockSignals(False)
 
             # Load alpha
-            alpha = line.get_alpha()
-            if alpha is not None:
-                self.view.alpha_slider.blockSignals(True)
-                self.view.alpha_slider.setValue(int(alpha * 100))
-                self.view.alpha_slider.blockSignals(False)
-                self.view.alpha_label.setText(f"{int(alpha * 100)}%")
+            alpha = line.get_alpha() if line.get_alpha() is not None else 1.0
+            self.view.alpha_slider.blockSignals(True)
+            self.view.alpha_slider.setValue(int(alpha * 100))
+            self.view.alpha_slider.blockSignals(False)
+            self.view.alpha_label.setText(f"{int(alpha * 100)}%")
 
     def clear_customizations(self) -> None:
         """Clears all stored series customizations"""

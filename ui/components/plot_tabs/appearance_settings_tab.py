@@ -340,7 +340,8 @@ class AppearanceSettingsTab(QWidget):
         group.setLayout(layout)
         parent_layout.addWidget(group)
 
-    def _create_spine_ui(self, title: str, parent_layout: QVBoxLayout) -> tuple:
+    def _create_spine_ui(self, title: str, parent_layout: QVBoxLayout) -> tuple[
+        ToggleSwitch, QDoubleSpinBox, QPushButton, QLabel]:
         """Helper to create repetitive spine configurations."""
         vis_check = ToggleSwitch(f"Show {title}")
         vis_check.setChecked(True)
