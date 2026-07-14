@@ -26,10 +26,10 @@ class PlotTypeManager:
             "Basic and Relational": ["Line", "Scatter", "Bar", "Area", "Pie", "Stem", "Stairs"],
             "Distribution"        : ["Histogram", "Box", "Violin", "KDE", "ECDF", "Count Plot", "Eventplot"],
             "2D, Gridded and 3D"  : ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)",
-                                     "pcolormesh", "Contour", "Contourf", "Stackplot", "3D Line", "3D Scatter",
-                                     "3D Surface"],
+                                     "pcolormesh", "Contour", "Contourf", "Stackplot"],
             "Vector Fields"       : ["Barbs", "Quiver", "Streamplot"],
             "Triangulation"       : ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"],
+            "3D"                  : ["3D Line", "3D Scatter", "3D Surface"],
             "Geospatial"          : ["GeoSpatial"]
         }
         self.category_lists: List[QListWidget] = []
