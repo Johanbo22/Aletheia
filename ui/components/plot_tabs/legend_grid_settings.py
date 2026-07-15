@@ -34,6 +34,7 @@ class LegendGridSettingstab(QWidget):
         layout = QVBoxLayout()
         
         self.legend_check = ToggleSwitch("Show Legend")
+        self.legend_check.setToolTip("Toggle the visibility of the legend")
         self.legend_check.setChecked(False)
         layout.addWidget(self.legend_check)
         
@@ -48,6 +49,8 @@ class LegendGridSettingstab(QWidget):
         
         layout_tab_layout.addWidget(QLabel("Legend Placement:"))
         self.legend_loc_combo = QComboBox()
+        self.legend_loc_combo.setToolTip(
+            "Determine the placement of the legend on the canvas.\n'Best' calculates the most optimal position based on what is drawn")
         self.legend_loc_combo.addItems(['best', 'upper right', 'upper left', 'lower left', 'lower right', 
             'right', 'center left', 'center right', 'lower center', 'upper center', 'center'])
         layout_tab_layout.addWidget(self.legend_loc_combo)
@@ -57,12 +60,14 @@ class LegendGridSettingstab(QWidget):
         title_col_layout = QVBoxLayout()
         title_col_layout.addWidget(QLabel("Legend Title:"))
         self.legend_title_input = QLineEdit()
+        self.legend_title_input.setToolTip("Enter the text for the legend title")
         self.legend_title_input.setPlaceholderText("Enter legend title")
         title_col_layout.addWidget(self.legend_title_input)
         
         size_col_layout = QVBoxLayout()
         size_col_layout.addWidget(QLabel("Title Font Size:"))
         self.legend_title_size_spin = QSpinBox()
+        self.legend_title_size_spin.setToolTip("Change the font size of the legend title")
         self.legend_title_size_spin.setRange(5, 50)
         self.legend_title_size_spin.setValue(12)
         size_col_layout.addWidget(self.legend_title_size_spin)
@@ -85,6 +90,7 @@ class LegendGridSettingstab(QWidget):
         label_size_layout = QVBoxLayout()
         label_size_layout.addWidget(QLabel("Labels Font Size:"))
         self.legend_size_spin = QSpinBox()
+        self.legend_size_spin.setToolTip("Change the font size of the legend labels")
         self.legend_size_spin.setRange(5, 50)
         self.legend_size_spin.setValue(10)
         label_size_layout.addWidget(self.legend_size_spin)
@@ -96,12 +102,14 @@ class LegendGridSettingstab(QWidget):
         
         layout_tab_layout.addWidget(QLabel("Number of Columns:"))
         self.legend_columns_spin = QSpinBox()
+        self.legend_columns_spin.setToolTip("Determine the amount of columns to use to order the legend entries")
         self.legend_columns_spin.setRange(1, 5)
         self.legend_columns_spin.setValue(1)
         layout_tab_layout.addWidget(self.legend_columns_spin)
         
         layout_tab_layout.addWidget(QLabel("Column Spacing"))
         self.legend_colspace_spin = QDoubleSpinBox()
+        self.legend_colspace_spin.setToolTip("Set the amount of space inbetween the columns of legend entries")
         self.legend_colspace_spin.setRange(0.5, 5.0)
         self.legend_colspace_spin.setValue(1.0)
         self.legend_colspace_spin.setSingleStep(0.1)
@@ -115,35 +123,41 @@ class LegendGridSettingstab(QWidget):
         box_layout = QVBoxLayout(box_tab)
         
         self.legend_frame_check = ToggleSwitch("Show Frame")
+        self.legend_frame_check.setToolTip("Toggle the visibility of the outer frame of the legend box")
         self.legend_frame_check.setChecked(True)
         box_layout.addWidget(self.legend_frame_check)
         
         self.legend_fancybox_check = ToggleSwitch("Fancy Box")
+        self.legend_fancybox_check.setToolTip("Toggle to set the corners of the legend to be rounded")
         self.legend_fancybox_check.setChecked(False)
         box_layout.addWidget(self.legend_fancybox_check)
         
         self.legend_shadow_check = ToggleSwitch("Show Shadow")
+        self.legend_shadow_check.setToolTip("Toggle the visibility of a drop shadow of the legend frame.")
         self.legend_shadow_check.setChecked(False)
         box_layout.addWidget(self.legend_shadow_check)
         
         box_layout.addWidget(QLabel("Background Color:"))
         bg_layout = QHBoxLayout()
         self.legend_bg_button = QPushButton("Choose Color", parent=self)
+        self.legend_bg_button.setToolTip("Select the color of the background of the legend box")
         self.legend_bg_label = QLabel("White")
         bg_layout.addWidget(self.legend_bg_button)
         bg_layout.addWidget(self.legend_bg_label)
         box_layout.addLayout(bg_layout)
-        
-        box_layout.addWidget(QLabel("Edge Color:"))
+
+        box_layout.addWidget(QLabel("Frame Color:"))
         edge_layout = QHBoxLayout()
         self.legend_edge_button = QPushButton("Choose Color", parent=self)
+        self.legend_edge_button.setToolTip("Select the color of the legend frame")
         self.legend_edge_label = QLabel("Black")
         edge_layout.addWidget(self.legend_edge_button)
         edge_layout.addWidget(self.legend_edge_label)
         box_layout.addLayout(edge_layout)
-        
-        box_layout.addWidget(QLabel("Edge Width:"))
+
+        box_layout.addWidget(QLabel("Frame Width:"))
         self.legend_edge_width_spin = QDoubleSpinBox()
+        self.legend_edge_width_spin.setToolTip("Set the thickness of the legend frame")
         self.legend_edge_width_spin.setRange(0.5, 3.0)
         self.legend_edge_width_spin.setValue(1.0)
         self.legend_edge_width_spin.setSingleStep(0.1)
@@ -151,6 +165,8 @@ class LegendGridSettingstab(QWidget):
         
         box_layout.addWidget(QLabel("Box Alpha:"))
         self.legend_alpha_slider = QSlider(Qt.Orientation.Horizontal)
+        self.legend_alpha_slider.setToolTip(
+            "Set the transparency of the entire legend box.\nN.B. Does not affect the legend entries")
         self.legend_alpha_slider.setRange(10, 100)
         self.legend_alpha_slider.setValue(100)
         box_layout.addWidget(self.legend_alpha_slider)
@@ -171,6 +187,7 @@ class LegendGridSettingstab(QWidget):
         layout = QVBoxLayout()
 
         self.grid_check = ToggleSwitch("Show Gridlines")
+        self.grid_check.setToolTip("Toggle the visibility of gridlines on the plot")
         layout.addWidget(self.grid_check)
         layout.addSpacing(10)
 
@@ -186,7 +203,7 @@ class LegendGridSettingstab(QWidget):
         self.grid_which_type_combo.setEnabled(False)
         global_layout.addWidget(self.grid_which_type_combo)
 
-        global_layout.addWidget(QLabel("Apply to which axis:"))
+        global_layout.addWidget(QLabel("Axis:"))
         self.grid_axis_combo = QComboBox()
         self.grid_axis_combo.addItems(["both", "x", "y"])
         self.grid_axis_combo.setToolTip("Choose which axis to show gridlines")
@@ -195,13 +212,15 @@ class LegendGridSettingstab(QWidget):
         global_layout.addWidget(QLabel("Grid Color:"))
         global_color_layout = QHBoxLayout()
         self.global_grid_color_button = QPushButton("Choose Color", parent=self)
+        self.global_grid_color_button.setToolTip("Select the color of the gridlines")
         self.global_grid_color_label = QLabel("Auto")
         global_color_layout.addWidget(self.global_grid_color_button)
         global_color_layout.addWidget(self.global_grid_color_label)
         global_layout.addLayout(global_color_layout)
 
-        global_layout.addWidget(QLabel("Grid Alpha (Transparency):"))
+        global_layout.addWidget(QLabel("Grid Alpha:"))
         self.global_grid_alpha_slider = QSlider(Qt.Orientation.Horizontal)
+        self.global_grid_alpha_slider.setToolTip("Set the transparency of all the gridlines")
         self.global_grid_alpha_slider.setRange(10, 100)
         self.global_grid_alpha_slider.setValue(100)
         global_layout.addWidget(self.global_grid_alpha_slider)
@@ -212,7 +231,8 @@ class LegendGridSettingstab(QWidget):
         layout.addWidget(self.global_grid_group)
 
         # Independent grids
-        self.independent_grid_check = ToggleSwitch("Enable Independent Gridline Customization")
+        self.independent_grid_check = ToggleSwitch("Individual Gridline Customization")
+        self.independent_grid_check.setToolTip("Toggle to customize each gridline type individually")
         self.independent_grid_check.setChecked(False)
         layout.addWidget(self.independent_grid_check)
 
@@ -277,6 +297,7 @@ class LegendGridSettingstab(QWidget):
 
         layout.addWidget(QLabel("Linestyle:"))
         style_combo = QComboBox()
+        style_combo.setToolTip("Change the line style for the gridline")
         style_combo.addItems(["-", "--", "-.", ":"])
         style_combo.setItemText(0, "Solid (-)")
         style_combo.setItemText(1, "Dashed (--)")
@@ -287,6 +308,7 @@ class LegendGridSettingstab(QWidget):
 
         layout.addWidget(QLabel("Linewidth:"))
         width_spin = QDoubleSpinBox()
+        width_spin.setToolTip("Set the width of the gridline")
         width_spin.setRange(0.1, 5.0)
         width_spin.setValue(default_width)
         width_spin.setSingleStep(0.1)
@@ -295,13 +317,15 @@ class LegendGridSettingstab(QWidget):
         layout.addWidget(QLabel("Color:"))
         color_layout = QHBoxLayout()
         color_btn = QPushButton("Choose Color", parent=self)
+        color_btn.setToolTip("Set the color of the gridlines")
         color_label = QLabel(default_color)
         color_layout.addWidget(color_btn)
         color_layout.addWidget(color_label)
         layout.addLayout(color_layout)
 
-        layout.addWidget(QLabel("Alpha (Transparency):"))
+        layout.addWidget(QLabel("Alpha:"))
         alpha_slider = QSlider(Qt.Orientation.Horizontal)
+        alpha_slider.setToolTip("Set the transparency of the gridline")
         alpha_slider.setRange(10, 100)
         alpha_slider.setValue(default_alpha)
         layout.addWidget(alpha_slider)

@@ -39,18 +39,21 @@ class GeospatialSettingsTab(QWidget):
         proj_layout.addWidget(QLabel("Target Coordinate System:"))
         self.geo_target_crs_input = QLineEdit()
         self.geo_target_crs_input.setPlaceholderText("Leave empty to keep original coordinate system")
-        self.geo_target_crs_input.setToolTip("Enter an EPSG code (e.g., EPSG:3857 for Web Mercator) to reproject map")
+        self.geo_target_crs_input.setToolTip(
+            "Enter an EPSG code (e.g., EPSG:3857 for Web Mercator) to reproject the map")
         self.geo_target_crs_input.setClearButtonEnabled(True)
         proj_layout.addWidget(self.geo_target_crs_input)
         
         proj_layout.addSpacing(10)
         
         self.geo_basemap_check = ToggleSwitch("Add background Basemap")
-        self.geo_basemap_check.setToolTip("Overlay data on top of a web map tile.\nRequires an internet connection")
+        self.geo_basemap_check.setToolTip(
+            "Overlay data on top of a web map tile.\nN.B. Requires an internet connection")
         proj_layout.addWidget(self.geo_basemap_check)
         
         proj_layout.addWidget(QLabel("Basemap Source:"))
         self.geo_basemap_style_combo = QComboBox()
+        self.geo_basemap_style_combo.setToolTip("Select the provider of the web map tile to overlay the map with")
         self.geo_basemap_style_combo.addItems([
             "OpenStreetMap",
             "CartoDB Positron",
@@ -58,7 +61,6 @@ class GeospatialSettingsTab(QWidget):
             "Esri Satellite",
             "Esri Street"
         ])
-        self.geo_basemap_style_combo.setToolTip("Select the provider for the basemap tile")
         proj_layout.addWidget(self.geo_basemap_style_combo)
         
         proj_layout.addStretch()
@@ -70,6 +72,7 @@ class GeospatialSettingsTab(QWidget):
         
         choro_layout.addWidget(QLabel("Classification Scheme:"))
         self.geo_scheme_combo = QComboBox()
+        self.geo_scheme_combo.setToolTip("Select the classification scheme to apply classification")
         self.geo_scheme_combo.addItems([
             "None", "quantiles", "equal_interval", "fisher_jenks", "natural_breaks", "box_plot", "breaks"
         ])
@@ -77,6 +80,7 @@ class GeospatialSettingsTab(QWidget):
         
         choro_layout.addWidget(QLabel("Number of classes:"))
         self.geo_k_spin = QSpinBox()
+        self.geo_k_spin.setToolTip("Set the number of classes to classify the data into")
         self.geo_k_spin.setRange(2, 20)
         self.geo_k_spin.setValue(5)
         choro_layout.addWidget(self.geo_k_spin)
@@ -84,12 +88,15 @@ class GeospatialSettingsTab(QWidget):
         choro_layout.addSpacing(10)
         choro_layout.addWidget(QLabel("Missing Data Label"))
         self.geo_missing_label_input = QLineEdit()
+        self.geo_missing_label_input.setToolTip("Enter the text used to render for missing data")
         self.geo_missing_label_input.setPlaceholderText("NaN")
         choro_layout.addWidget(self.geo_missing_label_input)
         
         choro_layout.addWidget(QLabel("Missing Data Color:"))
         color_layout = QHBoxLayout()
         self.geo_missing_color_btn = QPushButton("Choose Color", parent=self)
+        self.geo_missing_color_btn.setToolTip(
+            "Open a color menu to select the color used to differentiate missing data")
         self.geo_missing_color_label = QLabel("Light Gray")
         self.geo_missing_color: str = "lightgray"
         
@@ -99,6 +106,7 @@ class GeospatialSettingsTab(QWidget):
         
         choro_layout.addWidget(QLabel("Hatch Pattern:"))
         self.geo_hatch_combo = QComboBox()
+        self.geo_hatch_combo.setToolTip("Select a hatch pattern to apply to geometries without data")
         self.geo_hatch_combo.addItems(["None", "/", "\\", "|", "-", "+", "x", "o", "O", ".", "*"])
         choro_layout.addWidget(self.geo_hatch_combo)
         
@@ -110,6 +118,7 @@ class GeospatialSettingsTab(QWidget):
         style_layout = QVBoxLayout(style_tab)
 
         self.geo_legend_check = ToggleSwitch("Show Map Legend")
+        self.geo_legend_check.setToolTip("Toggle the visibility of the map legend")
         style_layout.addWidget(self.geo_legend_check)
         
         self.geo_legend_loc_combo = QComboBox()
@@ -117,7 +126,7 @@ class GeospatialSettingsTab(QWidget):
         style_layout.addWidget(self.geo_legend_loc_combo)
 
         self.geo_use_divider_check = ToggleSwitch("Use Divider")
-        self.geo_use_divider_check.setToolTip("Use mpl_toolkits divider to align legend")
+        self.geo_use_divider_check.setToolTip("Use a divider to align legend with the figure")
         style_layout.addWidget(self.geo_use_divider_check)
 
         self.geo_cax_check = ToggleSwitch("Plot on Separate CAX")
@@ -125,16 +134,20 @@ class GeospatialSettingsTab(QWidget):
         style_layout.addWidget(self.geo_cax_check)
 
         self.geo_axis_off_check = ToggleSwitch("Turn Off Axis")
+        self.geo_axis_off_check.setToolTip("Toggle to turn the visibility of the X and Y-axis off")
         self.geo_axis_off_check.setChecked(False)
         style_layout.addWidget(self.geo_axis_off_check)
         
         style_layout.addSpacing(10)
         self.geo_boundary_check = ToggleSwitch("Plot Boundary Only")
+        self.geo_boundary_check.setToolTip(
+            "Toggle to render the data using only the boundary of the geometry instead of filling in the data")
         style_layout.addWidget(self.geo_boundary_check)
 
         style_layout.addWidget(QLabel("Edge Color:"))
         bound_color_layout = QHBoxLayout()
         self.geo_edge_color_btn = QPushButton("Choose", parent=self)
+        self.geo_edge_color_btn.setToolTip("Open a color menu and select the color for the geometry boundary")
         self.geo_edge_color_label = QLabel("Black")
         self.geo_edge_color: str = "black"
         
@@ -144,6 +157,7 @@ class GeospatialSettingsTab(QWidget):
 
         style_layout.addWidget(QLabel("Line Width:"))
         self.geo_linewidth_spin = QDoubleSpinBox()
+        self.geo_linewidth_spin.setToolTip("Determine the thickness of the boundary lines")
         self.geo_linewidth_spin.setRange(0.1, 10.0)
         self.geo_linewidth_spin.setValue(1.0)
         style_layout.addWidget(self.geo_linewidth_spin)

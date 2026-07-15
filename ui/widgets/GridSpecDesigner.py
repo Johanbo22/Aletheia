@@ -60,11 +60,13 @@ class GridSpecDesignerWidget(QWidget):
 
         self.controls_layout = QHBoxLayout()
         self.rows_spin = QSpinBox()
+        self.rows_spin.setToolTip("The amount of rows included in the subplot layout")
         self.rows_spin.setObjectName("gridRowsSpinBox")
         self.rows_spin.setRange(1, 10)
         self.rows_spin.setValue(2)
 
         self.cols_spin = QSpinBox()
+        self.cols_spin.setToolTip("The amount of columns included in the subplot layout")
         self.cols_spin.setObjectName("gridColsSpinBox")
         self.cols_spin.setRange(1, 10)
         self.cols_spin.setValue(2)
@@ -105,9 +107,11 @@ class GridSpecDesignerWidget(QWidget):
 
         self.reset_grid_btn = QPushButton("Reset Grid")
         self.reset_grid_btn.setObjectName("resetGridBtn")
+        self.reset_grid_btn.setToolTip("Reset the grid to the default layout (2x2)")
 
         self.apply_layout_btn = QPushButton("Apply Layout")
         self.apply_layout_btn.setObjectName("MainActionButton")
+        self.apply_layout_btn.setToolTip("Apply the current configuration layout to the canvas")
         self.apply_layout_btn.setProperty("actionType", "primary")
 
         self.actions_layout.addWidget(self.merge_cells_btn)

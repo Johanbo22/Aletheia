@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, TYPE_CHECKING
 
+import numpy as np
+
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab

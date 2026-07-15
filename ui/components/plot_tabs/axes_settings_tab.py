@@ -1,7 +1,6 @@
-from PyQt6.QtWidgets import QDoubleSpinBox, QSpinBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame, QTabWidget, QLineEdit, QGroupBox, QComboBox
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QDoubleSpinBox, QFrame, QGroupBox, QLabel, QLineEdit, QScrollArea, QSpinBox, \
+    QTabWidget, QVBoxLayout, QWidget
 
-from ui.theme import ThemeColors
 from ui.widgets import ToggleSwitch
 
 class AxesSettingsTab(QWidget):
@@ -35,7 +34,7 @@ class AxesSettingsTab(QWidget):
     def _setup_axes_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Axis Options")
         layout = QVBoxLayout()
-        
+
         self.axis_tab_widget = QTabWidget()
 
         # X-Axi
@@ -44,6 +43,7 @@ class AxesSettingsTab(QWidget):
 
         x_layout.addWidget(QLabel("X-axis - Auto Limit:"))
         self.x_auto_check = ToggleSwitch("Auto")
+        self.x_auto_check.setToolTip("Toggle to let Aletheia determine the upper and lower bounds of the X-axis")
         self.x_auto_check.setChecked(True)
         x_layout.addWidget(self.x_auto_check)
 
@@ -59,24 +59,28 @@ class AxesSettingsTab(QWidget):
 
         x_layout.addWidget(QLabel("X Min:"))
         self.x_min_spin = QDoubleSpinBox()
+        self.x_min_spin.setToolTip("Set the minimum value of the X-axis")
         self.x_min_spin.setRange(-1000000, 1000000)
         self.x_min_spin.setEnabled(False)
         x_layout.addWidget(self.x_min_spin)
 
         x_layout.addWidget(QLabel("X Max:"))
         self.x_max_spin = QDoubleSpinBox()
+        self.x_max_spin.setToolTip("Set the maximum value of the X-axis")
         self.x_max_spin.setRange(-1000000, 1000000)
         self.x_max_spin.setEnabled(False)
         x_layout.addWidget(self.x_max_spin)
 
         x_layout.addWidget(QLabel("X-axis Tick Label Size:"))
         self.xtick_label_size_spin = QSpinBox()
+        self.xtick_label_size_spin.setToolTip("Set the font size of the tick labels on the X-axis")
         self.xtick_label_size_spin.setRange(6, 20)
         self.xtick_label_size_spin.setValue(10)
         x_layout.addWidget(self.xtick_label_size_spin)
 
-        x_layout.addWidget(QLabel("X-axis Tick Rotation:"))
+        x_layout.addWidget(QLabel("X-axis Tick Label Rotation:"))
         self.xtick_rotation_spin = QSpinBox()
+        self.xtick_rotation_spin.setToolTip("Set the rotation of the X-axis tick labels in degrees")
         self.xtick_rotation_spin.setRange(-90, 90)
         self.xtick_rotation_spin.setValue(0)
         x_layout.addWidget(self.xtick_rotation_spin)
@@ -89,7 +93,7 @@ class AxesSettingsTab(QWidget):
         x_layout.addWidget(self.x_max_ticks_spin)
 
         x_layout.addSpacing(5)
-        
+
         self.x_show_minor_ticks_check = ToggleSwitch("Show Minor X-axis Ticks")
         self.x_show_minor_ticks_check.setChecked(False)
         self.x_show_minor_ticks_check.setToolTip("Display the minor tick marks and labels on the x-axis")
@@ -100,7 +104,7 @@ class AxesSettingsTab(QWidget):
         x_layout.addWidget(QLabel("X-axis major Tick Direction:"))
         self.x_major_tick_direction_combo = QComboBox()
         self.x_major_tick_direction_combo.addItems(["out", "in", "inout"])
-        self.x_major_tick_direction_combo.setToolTip("Direction of the major tick marks")
+        self.x_major_tick_direction_combo.setToolTip("Direction of the major tick marks on the axis")
         x_layout.addWidget(self.x_major_tick_direction_combo)
 
         x_layout.addWidget(QLabel("X-axis Major Tick Width"))
@@ -108,7 +112,7 @@ class AxesSettingsTab(QWidget):
         self.x_major_tick_width_spin.setRange(0.1, 5.0)
         self.x_major_tick_width_spin.setValue(1.0)
         self.x_major_tick_width_spin.setSingleStep(0.1)
-        self.x_major_tick_width_spin.setToolTip("Width/thickness of the major tick marks")
+        self.x_major_tick_width_spin.setToolTip("Set the width/thickness of the major tick marks")
         x_layout.addWidget(self.x_major_tick_width_spin)
 
         x_layout.addWidget(QLabel("X-axis Minor Tick Direction"))
@@ -122,11 +126,12 @@ class AxesSettingsTab(QWidget):
         self.x_minor_tick_width_spin.setRange(0.1, 5.0)
         self.x_minor_tick_width_spin.setValue(0.5)
         self.x_minor_tick_width_spin.setSingleStep(0.1)
-        self.x_minor_tick_width_spin.setToolTip("Width/thickness of minor tick marks")
+        self.x_minor_tick_width_spin.setToolTip("Set the width/thickness of minor tick marks")
         x_layout.addWidget(self.x_minor_tick_width_spin)
 
         x_layout.addWidget(QLabel("X Scale:"))
         self.x_scale_combo = QComboBox()
+        self.x_scale_combo.setToolTip("Set the scaling properties of the X-axis")
         self.x_scale_combo.addItems(['linear', 'log', 'symlog'])
         x_layout.addWidget(self.x_scale_combo)
 
@@ -134,18 +139,19 @@ class AxesSettingsTab(QWidget):
         x_layout.addWidget(QLabel("X-axis Display Units:"))
         self.x_display_units_combo = QComboBox()
         self.x_display_units_combo.addItems(["None", "Hundreds (100s)", "Thousands", "Millions", "Billions"])
-        self.x_display_units_combo.setToolTip("Format axis labels to display in units")
+        self.x_display_units_combo.setToolTip("Format tick labels to display in units")
         x_layout.addWidget(self.x_display_units_combo)
-        
+
         x_layout.addStretch()
         self.axis_tab_widget.addTab(x_tab, "X-Axis")
 
         # Y-Axis
         y_tab = QWidget()
         y_layout = QVBoxLayout(y_tab)
-        
+
         y_layout.addWidget(QLabel("Y-axis - Auto Limit:"))
         self.y_auto_check = ToggleSwitch("Auto")
+        self.y_auto_check.setToolTip("Toggle to let Aletheia determine the upper and lower bounds of the Y-axis")
         self.y_auto_check.setChecked(True)
         y_layout.addWidget(self.y_auto_check)
 
@@ -156,24 +162,28 @@ class AxesSettingsTab(QWidget):
 
         y_layout.addWidget(QLabel("Y Min:"))
         self.y_min_spin = QDoubleSpinBox()
+        self.y_min_spin.setToolTip("Set the minimum value of the Y-axis")
         self.y_min_spin.setRange(-1000000, 1000000)
         self.y_min_spin.setEnabled(False)
         y_layout.addWidget(self.y_min_spin)
 
         y_layout.addWidget(QLabel("Y Max:"))
         self.y_max_spin = QDoubleSpinBox()
+        self.y_max_spin.setToolTip("Set the maximum value of the Y-axis")
         self.y_max_spin.setRange(-1000000, 1000000)
         self.y_max_spin.setEnabled(False)
         y_layout.addWidget(self.y_max_spin)
 
         y_layout.addWidget(QLabel("Y-axis Tick Label Size:"))
         self.ytick_label_size_spin = QSpinBox()
+        self.ytick_label_size_spin.setToolTip("Set the font size of the tick labels on the Y-axis")
         self.ytick_label_size_spin.setRange(6, 20)
         self.ytick_label_size_spin.setValue(10)
         y_layout.addWidget(self.ytick_label_size_spin)
 
         y_layout.addWidget(QLabel("Y-axis Tick Rotation:"))
         self.ytick_rotation_spin = QSpinBox()
+        self.ytick_rotation_spin.setToolTip("Set the rotation of the Y-axis tick labels in degrees")
         self.ytick_rotation_spin.setRange(-90, 90)
         self.ytick_rotation_spin.setValue(0)
         y_layout.addWidget(self.ytick_rotation_spin)
@@ -182,14 +192,14 @@ class AxesSettingsTab(QWidget):
         self.y_max_ticks_spin = QSpinBox()
         self.y_max_ticks_spin.setRange(3, 50)
         self.y_max_ticks_spin.setValue(10)
-        self.y_max_ticks_spin.setToolTip("Maximum number of tick labels on the y-axis")
+        self.y_max_ticks_spin.setToolTip("Maximum number of tick labels on the Y-axis")
         y_layout.addWidget(self.y_max_ticks_spin)
 
         y_layout.addSpacing(5)
-        
+
         self.y_show_minor_ticks_check = ToggleSwitch("Show Y-axis Minor Ticks")
         self.y_show_minor_ticks_check.setChecked(False)
-        self.y_show_minor_ticks_check.setToolTip("Display the minor tick marks and labels on yhe y-axis")
+        self.y_show_minor_ticks_check.setToolTip("Display the minor tick marks and labels on the Y-axis")
         y_layout.addWidget(self.y_show_minor_ticks_check)
 
         y_layout.addSpacing(5)
@@ -205,7 +215,7 @@ class AxesSettingsTab(QWidget):
         self.y_major_tick_width_spin.setRange(0.1, 5.0)
         self.y_major_tick_width_spin.setValue(1.0)
         self.y_major_tick_width_spin.setSingleStep(0.1)
-        self.y_major_tick_width_spin.setToolTip("Width/thickness of the major tick marks")
+        self.y_major_tick_width_spin.setToolTip("Set the width/thickness of the major tick marks")
         y_layout.addWidget(self.y_major_tick_width_spin)
 
         y_layout.addWidget(QLabel("Y-axis Minor Tick Direction"))
@@ -219,11 +229,12 @@ class AxesSettingsTab(QWidget):
         self.y_minor_tick_width_spin.setRange(0.1, 5.0)
         self.y_minor_tick_width_spin.setValue(0.5)
         self.y_minor_tick_width_spin.setSingleStep(0.1)
-        self.y_minor_tick_width_spin.setToolTip("Width/thickness of minor tick marks")
+        self.y_minor_tick_width_spin.setToolTip("Set the width/thickness of minor tick marks")
         y_layout.addWidget(self.y_minor_tick_width_spin)
 
         y_layout.addWidget(QLabel("Y Scale:"))
         self.y_scale_combo = QComboBox()
+        self.y_scale_combo.setToolTip("Set the scaling properties of the Y-axis")
         self.y_scale_combo.addItems(['linear', 'log', 'symlog'])
         y_layout.addWidget(self.y_scale_combo)
 
@@ -233,44 +244,49 @@ class AxesSettingsTab(QWidget):
         self.y_display_units_combo.addItems(["None", "Hundreds (100s)", "Thousands", "Millions", "Billions"])
         self.y_display_units_combo.setToolTip("Format axis labels to display in units")
         y_layout.addWidget(self.y_display_units_combo)
-        
+
         y_layout.addStretch()
         self.axis_tab_widget.addTab(y_tab, "Y-Axis")
-        
+
         # Z-Axis
         self.z_tab = QWidget()
         z_layout = QVBoxLayout(self.z_tab)
-        
+
         z_layout.addWidget(QLabel("Z-axis - Auto Limit:"))
         self.z_auto_check = ToggleSwitch("Auto")
+        self.z_auto_check.setToolTip("Toggle to let Aletheia determine the upper and lower bounds of the Z-axis")
         self.z_auto_check.setChecked(True)
         z_layout.addWidget(self.z_auto_check)
 
         self.z_invert_axis_check = ToggleSwitch("Invert Z-axis")
         self.z_invert_axis_check.setChecked(False)
-        self.z_invert_axis_check.setToolTip("Reverses the direction of data on the z-axis")
+        self.z_invert_axis_check.setToolTip("Reverses the direction of data on the Z-axis")
         z_layout.addWidget(self.z_invert_axis_check)
 
         z_layout.addWidget(QLabel("Z Min:"))
         self.z_min_spin = QDoubleSpinBox()
+        self.z_min_spin.setToolTip("Set the minimum value of the Z-axis")
         self.z_min_spin.setRange(-1000000, 1000000)
         self.z_min_spin.setEnabled(False)
         z_layout.addWidget(self.z_min_spin)
 
         z_layout.addWidget(QLabel("Z Max:"))
         self.z_max_spin = QDoubleSpinBox()
+        self.z_max_spin.setToolTip("Set the maximum value of the Z-axis")
         self.z_max_spin.setRange(-1000000, 1000000)
         self.z_max_spin.setEnabled(False)
         z_layout.addWidget(self.z_max_spin)
 
         z_layout.addWidget(QLabel("Z-axis Tick Label Size:"))
         self.ztick_label_size_spin = QSpinBox()
+        self.ztick_label_size_spin.setToolTip("Set the font size of the tick labels on the Z-axis")
         self.ztick_label_size_spin.setRange(6, 20)
         self.ztick_label_size_spin.setValue(10)
         z_layout.addWidget(self.ztick_label_size_spin)
 
         z_layout.addWidget(QLabel("Z-axis Tick Rotation:"))
         self.ztick_rotation_spin = QSpinBox()
+        self.ztick_rotation_spin.setToolTip("Set the rotation of the Z-axis tick labels in degrees")
         self.ztick_rotation_spin.setRange(-90, 90)
         self.ztick_rotation_spin.setValue(0)
         z_layout.addWidget(self.ztick_rotation_spin)
@@ -279,14 +295,14 @@ class AxesSettingsTab(QWidget):
         self.z_max_ticks_spin = QSpinBox()
         self.z_max_ticks_spin.setRange(3, 50)
         self.z_max_ticks_spin.setValue(10)
-        self.z_max_ticks_spin.setToolTip("Maximum number of tick labels on the z-axis")
+        self.z_max_ticks_spin.setToolTip("Maximum number of tick labels on the Z-axis")
         z_layout.addWidget(self.z_max_ticks_spin)
 
         z_layout.addSpacing(5)
-        
+
         self.z_show_minor_ticks_check = ToggleSwitch("Show Z-axis Minor Ticks")
         self.z_show_minor_ticks_check.setChecked(False)
-        self.z_show_minor_ticks_check.setToolTip("Display the minor tick marks and labels on the z-axis")
+        self.z_show_minor_ticks_check.setToolTip("Display the minor tick marks and labels on the Z-axis")
         z_layout.addWidget(self.z_show_minor_ticks_check)
 
         z_layout.addSpacing(5)
@@ -302,7 +318,7 @@ class AxesSettingsTab(QWidget):
         self.z_major_tick_width_spin.setRange(0.1, 5.0)
         self.z_major_tick_width_spin.setValue(1.0)
         self.z_major_tick_width_spin.setSingleStep(0.1)
-        self.z_major_tick_width_spin.setToolTip("Width/thickness of the major tick marks")
+        self.z_major_tick_width_spin.setToolTip("Set the width/thickness of the major tick marks")
         z_layout.addWidget(self.z_major_tick_width_spin)
 
         z_layout.addWidget(QLabel("Z-axis Minor Tick Direction"))
@@ -316,11 +332,12 @@ class AxesSettingsTab(QWidget):
         self.z_minor_tick_width_spin.setRange(0.1, 5.0)
         self.z_minor_tick_width_spin.setValue(0.5)
         self.z_minor_tick_width_spin.setSingleStep(0.1)
-        self.z_minor_tick_width_spin.setToolTip("Width/thickness of minor tick marks")
+        self.z_minor_tick_width_spin.setToolTip("Set the width/thickness of minor tick marks")
         z_layout.addWidget(self.z_minor_tick_width_spin)
 
         z_layout.addWidget(QLabel("Z Scale:"))
         self.z_scale_combo = QComboBox()
+        self.z_scale_combo.setToolTip("Set the scaling properties of the Z-axis")
         self.z_scale_combo.addItems(['linear', 'log', 'symlog'])
         z_layout.addWidget(self.z_scale_combo)
 
@@ -330,7 +347,7 @@ class AxesSettingsTab(QWidget):
         self.z_display_units_combo.addItems(["None", "Hundreds (100s)", "Thousands", "Millions", "Billions"])
         self.z_display_units_combo.setToolTip("Format axis labels to display in units")
         z_layout.addWidget(self.z_display_units_combo)
-        
+
         z_layout.addStretch()
 
         layout.addWidget(self.axis_tab_widget)
@@ -341,7 +358,8 @@ class AxesSettingsTab(QWidget):
         group = QGroupBox("Axis Orientation")
         layout = QVBoxLayout()
 
-        self.flip_axes_check = ToggleSwitch("Flip Axis (Swap X and Y axis)")
+        self.flip_axes_check = ToggleSwitch("Flip Axis")
+        self.flip_axes_check.setToolTip("Swap the placement of the X and Y-axis")
         self.flip_axes_check.setChecked(False)
         layout.addWidget(self.flip_axes_check)
 
@@ -352,65 +370,67 @@ class AxesSettingsTab(QWidget):
         group = QGroupBox("DateTime Formatting")
         layout = QVBoxLayout()
 
-        self.custom_datetime_check = ToggleSwitch("Enable Custom formatting of DateTime Axis")
+        self.custom_datetime_check = ToggleSwitch("Custom formatting of a DateTime Axis")
+        self.custom_datetime_check.setToolTip("Toggle to customize the formatting of an axis with a DateTime data type")
         self.custom_datetime_check.setChecked(False)
         layout.addWidget(self.custom_datetime_check)
 
         self.datetime_tab_widget = QTabWidget()
         self.datetime_tab_widget.setVisible(False)
         self.datetime_tab_widget.setMinimumHeight(160)
-        
+
         self.custom_datetime_check.toggled.connect(self.datetime_tab_widget.setVisible)
 
         # X-Axis DateTime 
         x_tab = QWidget()
         x_layout = QVBoxLayout(x_tab)
-        
+
         self.format_x_datetime_label = QLabel("Format:")
         x_layout.addWidget(self.format_x_datetime_label)
-        
+
         self.x_datetime_format_combo = QComboBox()
+        self.x_datetime_format_combo.setToolTip("Select the datetime format to be applied to the DateTime column")
         self.x_datetime_format_combo.setMinimumHeight(20)
         self._populate_datetime_combo(self.x_datetime_format_combo)
         x_layout.addWidget(self.x_datetime_format_combo)
-        
+
         x_layout.addSpacing(5)
 
         self.custom_x_axis_format_label = QLabel("Custom Format String:")
         x_layout.addWidget(self.custom_x_axis_format_label)
-        
+
         self.x_custom_datetime_input = QLineEdit()
         self.x_custom_datetime_input.setMinimumHeight(20)
         self.x_custom_datetime_input.setPlaceholderText("e.g. %d/%m/%Y %H:%M")
         self._apply_datetime_tooltip(self.x_custom_datetime_input)
         x_layout.addWidget(self.x_custom_datetime_input)
-        
+
         x_layout.addStretch()
         self.datetime_tab_widget.addTab(x_tab, "X-Axis")
 
-        #Y-Axis DateTime Tab
+        # Y-Axis DateTime Tab
         y_tab = QWidget()
         y_layout = QVBoxLayout(y_tab)
-        
+
         self.format_y_datetime_label = QLabel("Format:")
         y_layout.addWidget(self.format_y_datetime_label)
-        
+
         self.y_datetime_format_combo = QComboBox()
         self.y_datetime_format_combo.setMinimumHeight(20)
         self._populate_datetime_combo(self.y_datetime_format_combo)
         y_layout.addWidget(self.y_datetime_format_combo)
-        
+
         y_layout.addSpacing(5)
 
         self.custom_y_axis_format_label = QLabel("Custom Format String:")
         y_layout.addWidget(self.custom_y_axis_format_label)
-        
+
         self.y_custom_datetime_format_input = QLineEdit()
         self.y_custom_datetime_format_input.setMinimumHeight(20)
         self.y_custom_datetime_format_input.setPlaceholderText("e.g. %d/%m/%Y %H:%M")
         self._apply_datetime_tooltip(self.y_custom_datetime_format_input)
         y_layout.addWidget(self.y_custom_datetime_format_input)
-        
+
         y_layout.addStretch()
         self.datetime_tab_widget.addTab(y_tab, "Y-Axis")
 
@@ -471,14 +491,4 @@ class AxesSettingsTab(QWidget):
 
     def _apply_datetime_tooltip(self, widget: QLineEdit) -> None:
         """Helper to append standardized tooltip helper to text fields"""
-        widget.setToolTip(
-            "Use strftime format codes:\n"
-            "%Y = Year (4-digit), %y = Year (2-digit)\n"
-            "%m = Month (01-12), %B = Month name, %b = Short month\n"
-            "%d = Day (01-31)\n"
-            "%H = Hour (00-23), %I = Hour (01-12)\n"
-            "%M = Minute (00-59), %S = Second (00-59)\n"
-            "%p = AM/PM\n"
-            "%A = Weekday name, %a = Short weekday\n"
-            "%W = Week number"
-        )
+        widget.setToolTip("Select the datetime format to be applied to the DateTime column")
