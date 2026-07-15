@@ -137,7 +137,7 @@ class DataHandler:
     def import_file(self, filepath: str) -> pd.DataFrame:
         df = self._io.import_file(filepath)
         self.df = df
-        self.original_df = df.copy(deep=False)
+        self.original_df = df.copy(deep=True)
         self._reset_history()
         return self.df
 
@@ -152,14 +152,14 @@ class DataHandler:
             gid=gid
         )
         self.df = df
-        self.original_df = df.copy(deep=False)
+        self.original_df = df.copy(deep=True)
         self._reset_history()
         return self.df
 
     def import_from_database(self, connection_string: str, query: str) -> pd.DataFrame:
         df, _ = self._io.import_from_database(connection_string, query)
         self.df = df
-        self.original_df = df.copy(deep=False)
+        self.original_df = df.copy(deep=True)
         self._reset_history()
         return self.df
 
@@ -186,7 +186,7 @@ class DataHandler:
                 data = np.full((rows, len(column_names)), fill_value)
 
             self.df = pd.DataFrame(data, index=range(rows), columns=column_names)
-            self.original_df = self.df.copy(deep=False)
+            self.original_df = self.df.copy(deep=True)
 
             self._io.file_path = None
             self._io.is_temp_file = False
@@ -269,7 +269,7 @@ class DataHandler:
     def reset_data(self) -> None:
         if self.original_df is not None:
             self._reset_history()
-            self.df = self.original_df.copy(deep=False)
+            self.df = self.original_df.copy(deep=True)
 
     def jump_to_history_index(self, target: Union[int, str]) -> None:
         """Jump to a specific node in the history tree."""
@@ -278,7 +278,7 @@ class DataHandler:
             if success:
                 self.df = restored_df
         else:
-            print("Legacy integer index navigation is deprecated in tree mode.", "WARNING")
+            logger.warning("Legacy integer index navigation is deprecated in tree mode.")
 
     def get_history_info(self) -> Dict[str, Any]:
         return self._history.get_history_info()
@@ -429,7 +429,7 @@ class DataHandler:
     def update_cell(self, row_index: int, column_index: int, value: Any) -> None:
         if self.df is None:
             return
-        old_df = self.df.copy(deep=False)
+        old_df = self.df.copy(deep=True)
         changed_df = self._mutator.update_cell(self.df, row_index, column_index, value)
         self._apply_changes(
             changed_df,

@@ -32,6 +32,10 @@ class PlotGenerationManager:
 
     def generate_plot(self, animate: bool = True) -> None:
         """Trigger the plot execution based on current settings"""
+        if getattr(self, "_is_generating", False):
+            self.plot_tab.status_bar.log(f"Plot generation already in progress. Please wait", LogLevel.WARNING)
+            return
+
         if self.plot_tab._is_clearing:
             return
         if not self.plot_tab.isVisible():
@@ -40,14 +44,21 @@ class PlotGenerationManager:
         if not self._validate_data_loaded():
             return
 
-        subplot_index, frozen_config = self._get_subplot_config()
-        active_df, config = self._resolve_data_config(subplot_index, frozen_config)
+        self._is_generating = True
 
-        if not self._validate_active_dataframe(active_df):
-            return
+        try:
+            subplot_index, frozen_config = self._get_subplot_config()
+            active_df, config = self._resolve_data_config(subplot_index, frozen_config)
 
-        config["plot_type"] = self.plot_tab.current_plot_type_name
-        self._execute_or_cache_plot(active_df, subplot_index, config, animate)
+            if not self._validate_active_dataframe(active_df):
+                self._is_generating = False
+                return
+
+            config["plot_type"] = self.plot_tab.current_plot_type_name
+            self._execute_or_cache_plot(active_df, subplot_index, config, animate)
+        except Exception:
+            self._is_generating = False
+            raise
 
     def _execute_or_cache_plot(
             self, active_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any], animate: bool = True
@@ -152,6 +163,7 @@ class PlotGenerationManager:
 
     def _on_prep_error(self, error: Exception) -> None:
         """Handles errors from the background data preparation thread"""
+        self._is_generating = False
         dialog = getattr(self.plot_tab, "_prep_progress_dialog", None)
         if dialog:
             dialog.accept()
@@ -298,6 +310,8 @@ class PlotGenerationManager:
             if dialog:
                 dialog.accept()
             self._handle_generation_error(e)
+        finally:
+            self._is_generating = False
 
     def _prepare_kwargs(self, config: Dict[str, Any]) -> Tuple[dict, dict]:
         fmt_mgr = self.plot_tab.formatting_manager
