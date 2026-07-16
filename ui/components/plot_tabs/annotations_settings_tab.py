@@ -552,42 +552,54 @@ class AnnotationsSettingsTab(QWidget):
         self.table_enable_check.setChecked(False)
         layout.addWidget(self.table_enable_check)
 
-        controls_layout = QHBoxLayout()
-        controls_layout.addWidget(QLabel("Type:"))
+        controls_layout = QGridLayout()
+
+        self.table_type_label = QLabel("Type:")
+        self.table_type_label.setVisible(False)
+        controls_layout.addWidget(self.table_type_label, 0, 0)
+
         self.table_type_combo = QComboBox()
         self.table_type_combo.setToolTip("Select which type of data table to display")
         self.table_type_combo.addItems(["Summary Stats", "First 5 Rows", "Last 5 Rows", "Correlation Matrix"])
         self.table_type_combo.setEnabled(False)
         self.table_type_combo.setVisible(False)
-        controls_layout.addWidget(self.table_type_combo)
+        controls_layout.addWidget(self.table_type_combo, 0, 1)
 
-        controls_layout.addWidget(QLabel("Placement:"))
+        self.table_location_label = QLabel("Placement:")
+        self.table_location_label.setVisible(False)
+        controls_layout.addWidget(self.table_location_label, 1, 0)
+
         self.table_location_combo = QComboBox()
         self.table_location_combo.setToolTip("Determine the placement of the data table on the canvas")
         self.table_location_combo.addItems(["bottom", "top", "right", "left", "center"])
         self.table_location_combo.setEnabled(False)
         self.table_location_combo.setVisible(False)
-        controls_layout.addWidget(self.table_location_combo)
-        layout.addLayout(controls_layout)
+        controls_layout.addWidget(self.table_location_combo, 1, 1)
 
-        settings_layout = QHBoxLayout()
         self.table_auto_font_size_check = ToggleSwitch("Auto Font-Size")
         self.table_auto_font_size_check.setToolTip(
             "Toggle to apply the font size of other text elements to the data table")
         self.table_auto_font_size_check.setChecked(False)
         self.table_auto_font_size_check.setEnabled(False)
-        settings_layout.addWidget(self.table_auto_font_size_check)
+        self.table_auto_font_size_check.setVisible(False)
+        controls_layout.addWidget(self.table_auto_font_size_check, 2, 0, 1, 2)
 
-        settings_layout.addWidget(QLabel("Font Size:"))
+        self.table_font_size_label = QLabel("Font Size:")
+        self.table_font_size_label.setVisible(False)
+        controls_layout.addWidget(self.table_font_size_label, 3, 0)
+
         self.table_font_size_spin = QSpinBox()
         self.table_font_size_spin.setToolTip("Set the font size of the text in the data table")
         self.table_font_size_spin.setRange(4, 40)
         self.table_font_size_spin.setValue(10)
         self.table_font_size_spin.setEnabled(False)
         self.table_font_size_spin.setVisible(False)
-        settings_layout.addWidget(self.table_font_size_spin)
+        controls_layout.addWidget(self.table_font_size_spin, 3, 1)
 
-        settings_layout.addWidget(QLabel("Scale:"))
+        self.table_scale_label = QLabel("Scale:")
+        self.table_scale_label.setVisible(False)
+        controls_layout.addWidget(self.table_scale_label, 4, 0)
+
         self.table_scale_spin = QDoubleSpinBox()
         self.table_scale_spin.setToolTip(
             "Set the scaling property of the data table compared to the figure.\nHigher value will scale the table more; lower will scale it less.\n\n1.0 means equal scaling of the data table and the figure.")
@@ -596,9 +608,10 @@ class AnnotationsSettingsTab(QWidget):
         self.table_scale_spin.setSingleStep(0.1)
         self.table_scale_spin.setEnabled(False)
         self.table_scale_spin.setVisible(False)
-        settings_layout.addWidget(self.table_scale_spin)
+        self.table_scale_spin.setPrefix("x")
+        controls_layout.addWidget(self.table_scale_spin, 4, 1)
 
-        layout.addLayout(settings_layout)
+        layout.addLayout(controls_layout)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 

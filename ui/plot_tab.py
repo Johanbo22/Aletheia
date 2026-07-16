@@ -283,6 +283,10 @@ class PlotTab(PlotTabUI):
         self.view.y_major_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.x_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.y_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.x_minor_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.y_minor_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.x_minor_tick_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.y_minor_tick_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.x_scale_combo.currentTextChanged.connect(self.on_data_changed)
         self.view.y_scale_combo.currentTextChanged.connect(self.on_data_changed)
         self.view.z_scale_combo.currentTextChanged.connect(self.on_data_changed)
@@ -335,6 +339,10 @@ class PlotTab(PlotTabUI):
         self.view.grid_which_type_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.grid_axis_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.global_grid_alpha_slider.valueChanged.connect(self.on_style_changed)
+
+        self.view.legend_tab.global_grid_style_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.legend_tab.global_grid_linewidth_spin.valueChanged.connect(self.on_style_changed)
+
         self.view.x_major_grid_check.stateChanged.connect(self.on_style_changed)
         self.view.x_major_grid_style_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.x_major_grid_linewidth_spin.valueChanged.connect(self.on_style_changed)
@@ -618,22 +626,10 @@ class PlotTab(PlotTabUI):
 
     def toggle_table_controls(self) -> None:
         """Enable and disable table controls for the user"""
-        enabled = self.view.table_enable_check.isChecked()
-        self.view.table_type_combo.setEnabled(enabled)
-        self.view.table_type_combo.setVisible(enabled)
-        self.view.table_location_combo.setEnabled(enabled)
-        self.view.table_location_combo.setVisible(enabled)
-
-        self.view.table_auto_font_size_check.setEnabled(enabled)
-        self.view.table_scale_spin.setEnabled(enabled)
-        self.view.table_scale_spin.setVisible(enabled)
-
-        self.view.table_font_size_spin.setEnabled(enabled and not self.view.table_auto_font_size_check.isChecked())
-        self.view.table_font_size_spin.setVisible(enabled and not self.view.table_auto_font_size_check.isChecked())
+        self.table_manager.toggle_table_controls()
 
     def toggle_table_font_controls(self) -> None:
-        self.view.table_font_size_spin.setEnabled(not self.view.table_auto_font_size_check.isChecked())
-        self.view.table_font_size_spin.setVisible(not self.view.table_auto_font_size_check.isChecked())
+        self.table_manager.toggle_table_font_controls()
 
     def on_data_changed(self) -> None:
         """Handle data column selection change"""

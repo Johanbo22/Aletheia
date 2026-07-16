@@ -173,7 +173,7 @@ class PlotTypeManager:
 
     def update_customization_visibility(self, primary_plot_type: str) -> None:
         """Toggles visibility of customization tabs and input parameters."""
-        line_plots = ["Line", "Area", "Step", "Stairs", "3D Line"]
+        line_plots = ["Line", "Area", "Step", "Stairs", "3D Line", "KDE"]
         bar_plots = ["Bar", "Count Plot", "Stem"]
         hist_plots = ["Histogram", "Box", "Violin"]
         scatter_plots = ["Scatter", "3D Scatter"]
@@ -199,6 +199,8 @@ class PlotTypeManager:
                     show_error_bars = True
             elif p_type in hist_plots:
                 show_bar_hist = True
+                if p_type == "Histogram":
+                    show_line = True
                 if p_type in ["Box", "Violin"]:
                     show_error_bars = True
             elif p_type in bar_plots:
@@ -220,6 +222,15 @@ class PlotTypeManager:
 
         self.view.marker_group.setVisible(show_markers)
         self.view.error_bars_group.setVisible(show_error_bars)
+
+        bar_width_supported = any(p in bar_plots for p in active_plot_types)
+        if bar_width_supported:
+            self.view.bar_width_spin.setEnabled(True)
+            self.view.bar_width_spin.setToolTip(
+                "Set the width the bars.\nThis will also determine how close the bars are to each other")
+        else:
+            self.view.bar_width_spin.setEnabled(False)
+            self.view.bar_width_spin.setToolTip("Bar width customization is not supported for histograms")
 
         is_3d = primary_plot_type in ["3D Scatter", "3D Line", "3D Surface"]
         self.view.z_column_widget.setVisible(is_3d)

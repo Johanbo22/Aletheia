@@ -306,6 +306,31 @@ class PlotFormattingManager:
         self._apply_line_customizations(alpha)
         self._apply_collection_customizations(alpha)
         self._apply_bar_customizations(alpha)
+        self._apply_error_bar_customizations()
+
+    def _apply_error_bar_customizations(self) -> None:
+        """Applies styling to error bars in the current axes"""
+        if not self.plot_tab.plot_engine.current_ax:
+            return
+
+        error_bar_color = getattr(self.plot_tab, "error_bar_color", "black")
+        error_bar_linewidth = self.plot_tab.view.error_bar_linewidth_spin.value()
+        error_bar_alpha = self.plot_tab.view.error_bar_alpha_slider.value() / 100.0
+        error_bar_zorder = self.plot_tab.view.error_bar_zorder_spin.value()
+
+        for line in self.plot_tab.plot_engine.current_ax.get_lines():
+            if line.get_gid() == "error_bar":
+                line.set_color(error_bar_color)
+                line.set_linewidth(error_bar_linewidth)
+                line.set_alpha(error_bar_alpha)
+                line.set_zorder(error_bar_zorder)
+
+        for collection in self.plot_tab.plot_engine.current_ax.collections:
+            if collection.get_gid() == "error_bar":
+                collection.set_color(error_bar_color)
+                collection.set_linewidth(error_bar_linewidth)
+                collection.set_alpha(error_bar_alpha)
+                collection.set_zorder(error_bar_zorder)
 
     def _apply_line_customizations(self, alpha: float) -> None:
         """Applies style formatting to all line objects in the current axes"""
@@ -500,22 +525,27 @@ class PlotFormattingManager:
 
     def apply_gridlines_customizations(self) -> None:
         """Apply gridlines customizations."""
+        self.plot_tab.plot_engine.current_ax.grid(False, which="both", axis="both")
+
         if not self.plot_tab.view.grid_check.isChecked():
-            self.plot_tab.plot_engine.current_ax.grid(False)
             return
 
-        self.plot_tab.plot_engine.current_ax.grid(True)
+        grid_style_map = {"Solid (-)": "-", "Dashed (--)": "--", "Dash-dot (-.)": "-.", "Dotted (:)": ":"}
 
         if self.plot_tab.view.independent_grid_check.isChecked():
-            grid_style_map = {"Solid (-)": "-", "Dashed (--)": "--", "Dash-dot (-.)": "-.", "Dotted (:)": ":"}
+            if self.plot_tab.view.x_minor_grid_check.isChecked() or self.plot_tab.view.y_minor_grid_check.isChecked():
+                self.plot_tab.plot_engine.current_ax.minorticks_on()
+            else:
+                self.plot_tab.plot_engine.current_ax.minorticks_off()
 
-            style = grid_style_map.get(self.plot_tab.view.x_major_grid_style_combo.currentText(), "-")
-            self.plot_tab.plot_engine.current_ax.grid(
-                visible=self.plot_tab.view.x_major_grid_check.isChecked(), which="major", axis="x",
-                linestyle=style, linewidth=self.plot_tab.view.x_major_grid_linewidth_spin.value(),
-                color=self.plot_tab.x_major_grid_color,
-                alpha=self.plot_tab.view.x_major_grid_alpha_slider.value() / 100.0
-            )
+            if self.plot_tab.view.x_major_grid_check.isChecked():
+                style = grid_style_map.get(self.plot_tab.view.x_major_grid_style_combo.currentText(), "-")
+                self.plot_tab.plot_engine.current_ax.grid(
+                    visible=True, which="major", axis="x",
+                    linestyle=style, linewidth=self.plot_tab.view.x_major_grid_linewidth_spin.value(),
+                    color=self.plot_tab.x_major_grid_color,
+                    alpha=self.plot_tab.view.x_major_grid_alpha_slider.value() / 100.0
+                )
 
             if self.plot_tab.view.x_minor_grid_check.isChecked():
                 style = grid_style_map.get(self.plot_tab.view.x_minor_grid_style_combo.currentText(), ":")
@@ -525,16 +555,15 @@ class PlotFormattingManager:
                     color=self.plot_tab.x_minor_grid_color,
                     alpha=self.plot_tab.view.x_minor_grid_alpha_slider.value() / 100.0
                 )
-            else:
-                self.plot_tab.plot_engine.current_ax.grid(visible=False, which="minor", axis="x")
 
-            style = grid_style_map.get(self.plot_tab.view.y_major_grid_style_combo.currentText(), "-")
-            self.plot_tab.plot_engine.current_ax.grid(
-                visible=self.plot_tab.view.y_major_grid_check.isChecked(), which="major", axis="y",
-                linestyle=style, linewidth=self.plot_tab.view.y_major_grid_linewidth_spin.value(),
-                color=self.plot_tab.y_major_grid_color,
-                alpha=self.plot_tab.view.y_major_grid_alpha_slider.value() / 100.0
-            )
+            if self.plot_tab.view.y_major_grid_check.isChecked():
+                style = grid_style_map.get(self.plot_tab.view.y_major_grid_style_combo.currentText(), "-")
+                self.plot_tab.plot_engine.current_ax.grid(
+                    visible=True, which="major", axis="y",
+                    linestyle=style, linewidth=self.plot_tab.view.y_major_grid_linewidth_spin.value(),
+                    color=self.plot_tab.y_major_grid_color,
+                    alpha=self.plot_tab.view.y_major_grid_alpha_slider.value() / 100.0
+                )
 
             if self.plot_tab.view.y_minor_grid_check.isChecked():
                 style = grid_style_map.get(self.plot_tab.view.y_minor_grid_style_combo.currentText(), ":")
@@ -544,13 +573,21 @@ class PlotFormattingManager:
                     color=self.plot_tab.y_minor_grid_color,
                     alpha=self.plot_tab.view.y_minor_grid_alpha_slider.value() / 100.0
                 )
-            else:
-                self.plot_tab.plot_engine.current_ax.grid(visible=False, which="minor", axis="y")
         else:
             which_type = self.plot_tab.view.grid_which_type_combo.currentText()
             axis = self.plot_tab.view.grid_axis_combo.currentText()
+
+            if which_type in ["minor", "both"]:
+                self.plot_tab.plot_engine.current_ax.minorticks_on()
+            else:
+                self.plot_tab.plot_engine.current_ax.minorticks_off()
+
+            style = grid_style_map.get(self.plot_tab.view.legend_tab.global_grid_style_combo.currentText(), "-")
+            width = self.plot_tab.view.legend_tab.global_grid_linewidth_spin.value()
+
             self.plot_tab.plot_engine.current_ax.grid(
                 visible=True, which=which_type, axis=axis,
+                linestyle=style, linewidth=width,
                 color=self.plot_tab.global_grid_color, alpha=self.plot_tab.view.global_grid_alpha_slider.value() / 100.0
             )
 

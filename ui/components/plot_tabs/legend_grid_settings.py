@@ -136,7 +136,14 @@ class LegendGridSettingstab(QWidget):
         self.legend_shadow_check.setToolTip("Toggle the visibility of a drop shadow of the legend frame.")
         self.legend_shadow_check.setChecked(False)
         box_layout.addWidget(self.legend_shadow_check)
-        
+
+        initial_frame_state = self.legend_frame_check.isChecked()
+        self.legend_fancybox_check.setEnabled(initial_frame_state)
+        self.legend_shadow_check.setEnabled(initial_frame_state)
+
+        self.legend_frame_check.toggled.connect(self.legend_fancybox_check.setEnabled)
+        self.legend_frame_check.toggled.connect(self.legend_shadow_check.setEnabled)
+
         box_layout.addWidget(QLabel("Background Color:"))
         bg_layout = QHBoxLayout()
         self.legend_bg_button = QPushButton("Choose Color", parent=self)
@@ -191,9 +198,14 @@ class LegendGridSettingstab(QWidget):
         layout.addWidget(self.grid_check)
         layout.addSpacing(10)
 
+        self.grid_settings_container = QWidget()
+        grid_settings_layout = QVBoxLayout(self.grid_settings_container)
+        grid_settings_layout.setContentsMargins(0, 0, 0, 0)
+        self.grid_settings_container.setVisible(False)
+        self.grid_check.toggled.connect(self.grid_settings_container.setVisible)
+
         # Global grid
         self.global_grid_group = QGroupBox("Global Gridline Settings")
-        self.global_grid_group.setVisible(False)
         global_layout = QVBoxLayout()
 
         global_layout.addWidget(QLabel("Type:"))
@@ -208,6 +220,21 @@ class LegendGridSettingstab(QWidget):
         self.grid_axis_combo.addItems(["both", "x", "y"])
         self.grid_axis_combo.setToolTip("Choose which axis to show gridlines")
         global_layout.addWidget(self.grid_axis_combo)
+
+        global_layout.addWidget(QLabel("Linestyle:"))
+        self.global_grid_style_combo = QComboBox()
+        self.global_grid_style_combo.setToolTip("Change the line style for all gridlines")
+        self.global_grid_style_combo.addItems(["Solid (-)", "Dashed (--)", "Dash-dot (-.)", "Dotted (:)"])
+        self.global_grid_style_combo.setCurrentIndex(0)
+        global_layout.addWidget(self.global_grid_style_combo)
+
+        global_layout.addWidget(QLabel("Linewidth"))
+        self.global_grid_linewidth_spin = QDoubleSpinBox()
+        self.global_grid_linewidth_spin.setToolTip("Set the width of all gridlines")
+        self.global_grid_linewidth_spin.setRange(0.1, 5.0)
+        self.global_grid_linewidth_spin.setValue(0.8)
+        self.global_grid_linewidth_spin.setSingleStep(0.1)
+        global_layout.addWidget(self.global_grid_linewidth_spin)
         
         global_layout.addWidget(QLabel("Grid Color:"))
         global_color_layout = QHBoxLayout()
@@ -241,6 +268,9 @@ class LegendGridSettingstab(QWidget):
         self.grid_axis_tab.setVisible(False)
         
         self.independent_grid_check.toggled.connect(self.grid_axis_tab.setVisible)
+        self.independent_grid_check.toggled.connect(
+            lambda checked: self.global_grid_group.setVisible(not checked)
+        )
 
         # X-Axis Tab
         x_grid_tab = QWidget()
@@ -278,8 +308,10 @@ class LegendGridSettingstab(QWidget):
         y_grid_layout.addStretch()
         self.grid_axis_tab.addTab(y_grid_tab, "Y-Axis Gridlines")
 
-        layout.addWidget(self.grid_axis_tab)
-        layout.addStretch()
+        grid_settings_layout.addWidget(self.grid_axis_tab)
+        grid_settings_layout.addStretch()
+
+        layout.addWidget(self.grid_settings_container)
 
         group.setLayout(layout)
         parent_layout.addWidget(group)

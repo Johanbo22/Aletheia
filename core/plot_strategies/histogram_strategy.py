@@ -141,11 +141,43 @@ class HistogramPlotStrategy(BasePlotStrategy):
             if show_normal or show_kde:
                 engine.current_ax.legend()
 
+            am = plot_tab.annotation_manager
             if show_stats and (show_normal or show_kde):
                 stats_text = f"µ = {mu:.3f}\nσ = {sigma:.3f}\nmedian = {median:.3f}\nn = {len(data)}"
-                props = dict(boxstyle="round", facecolor="wheat", alpha=0.85, edgecolor="black", linewidth=1)
-                engine.current_ax.text(0.75, 0.95, stats_text, transform=engine.current_ax.transAxes, fontsize=10,
-                                       verticalalignment="top", bbox=props, fontfamily="monospace")
+
+                existing_idx = next((i for i, a in enumerate(am.annotations) if a.get("tag") == "hist_stats"), None)
+
+                if existing_idx is not None:
+                    ann = am.annotations[existing_idx]
+                    ann["text"] = stats_text
+
+                    if existing_idx < am.view.annotations_list.count():
+                        item = am.view.annotations_list.item(existing_idx)
+                        list_text = stats_text.replace('\n', ' | ')
+                        item.setText(f"{list_text} @ ({ann['x']:.2f}, {ann['y']:.2f})")
+                else:
+                    new_ann = {
+                        "text"      : stats_text,
+                        "x"         : 0.75,
+                        "y"         : 0.95,
+                        "fontsize"  : 10,
+                        "color"     : "black",
+                        "bg_color"  : "wheat",
+                        "tag"       : "hist_stats",
+                        "fontfamily": "monospace",
+                        "va"        : "top",
+                        "ha"        : "left"
+                    }
+                    am.annotations.append(new_ann)
+                    list_text = stats_text.replace('\n', ' | ')
+                    am.view.annotations_list.addItem(f"{list_text} @ (0.75, 0.95)")
+            else:
+                existing_idx = next((i for i, a in enumerate(am.annotations) if a.get("tag") == "hist_stats"), None)
+                if existing_idx is not None:
+                    del am.annotations[existing_idx]
+                    item = am.view.annotations_list.takeItem(existing_idx)
+                    if item:
+                        del item
 
         if axes_flipped:
             engine._set_labels(title, ylabel, xlabel, False, **general_kwargs)

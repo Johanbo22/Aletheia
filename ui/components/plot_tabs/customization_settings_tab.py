@@ -218,20 +218,24 @@ class CustomizationSettingsTab(QWidget):
             "Toggle to display a fitted least-squares regression line to visualize the trend")
         scatter_layout.addWidget(self.regression_line_check)
 
-        scatter_layout.addWidget(QLabel("Regression Type:"))
+        self.regression_settings_container = QWidget()
+        regression_settings_layout = QVBoxLayout(self.regression_settings_container)
+        regression_settings_layout.setContentsMargins(0, 0, 0, 0)
+
+        regression_settings_layout.addWidget(QLabel("Regression Type:"))
         self.regression_type_combo = QComboBox()
         self.regression_type_combo.setToolTip(
             "Select the type of regression analysis to calculate and visualize the regression line")
         self.regression_type_combo.addItems(["Linear", "Polynomial", "Exponential", "Logarithmic"])
-        scatter_layout.addWidget(self.regression_type_combo)
+        regression_settings_layout.addWidget(self.regression_type_combo)
 
         self.poly_degree_label = QLabel("Polynomial Degree:")
-        scatter_layout.addWidget(self.poly_degree_label)
+        regression_settings_layout.addWidget(self.poly_degree_label)
         self.poly_degree_spin = QSpinBox()
         self.poly_degree_spin.setToolTip("Set the degree of the polynomial used in the regression fit.")
         self.poly_degree_spin.setRange(2, 10)
         self.poly_degree_spin.setValue(2)
-        scatter_layout.addWidget(self.poly_degree_spin)
+        regression_settings_layout.addWidget(self.poly_degree_spin)
 
         # Internal callback to toggle visibility of polynomial degree components cleanly
         def toggle_poly_degree() -> None:
@@ -245,30 +249,49 @@ class CustomizationSettingsTab(QWidget):
         self.confidence_interval_check = ToggleSwitch("Show 95% confidence interval")
         self.confidence_interval_check.setToolTip(
             "Toggle to display the 95% confidence interval band around the regression line to indicate the uncertainty of the estimated fit.")
-        scatter_layout.addWidget(self.confidence_interval_check)
+        regression_settings_layout.addWidget(self.confidence_interval_check)
+
+        self.confidence_level_container = QWidget()
+        confidence_layout = QHBoxLayout(self.confidence_level_container)
+        confidence_layout.setContentsMargins(0, 0, 0, 0)
+        confidence_layout.addWidget(QLabel("Confidence Level (%):"))
+        self.confidence_level_spin = QSpinBox()
+        self.confidence_level_spin.setToolTip("Select the degree of confidence to display around the regression line")
+        self.confidence_level_spin.setRange(80, 99)
+        self.confidence_level_spin.setValue(95)
+        self.confidence_level_spin.setSuffix(" %")
+        confidence_layout.addWidget(self.confidence_level_spin)
+        regression_settings_layout.addWidget(self.confidence_level_container)
+
+        def toggle_confidence_level_combobox() -> None:
+            self.confidence_level_container.setVisible(self.confidence_interval_check.isChecked())
+
+        self.confidence_interval_check.stateChanged.connect(toggle_confidence_level_combobox)
+        toggle_confidence_level_combobox()
 
         self.show_r2_check = ToggleSwitch("Show R² score")
         self.show_r2_check.setToolTip(
             "Toggle to display the coefficient of determination (R²) to quantify how well the regression model explains the variance in the data")
         self.show_r2_check.setChecked(False)
-        scatter_layout.addWidget(self.show_r2_check)
+        regression_settings_layout.addWidget(self.show_r2_check)
 
         self.show_rmse_check = ToggleSwitch("Show Root Mean Square Error (RMSE)")
         self.show_rmse_check.setToolTip(
             "Toggle to display the RMSE value to quantify the average magnitude of the model's prediction errors")
-        scatter_layout.addWidget(self.show_rmse_check)
+        regression_settings_layout.addWidget(self.show_rmse_check)
 
         self.show_equation_check = ToggleSwitch("Show Regression Equation")
         self.show_equation_check.setToolTip(
             "Toggle to display the fitted regression equation to see the mathematical form the model used to describe the data.")
-        scatter_layout.addWidget(self.show_equation_check)
+        regression_settings_layout.addWidget(self.show_equation_check)
 
-        scatter_layout.addWidget(QLabel("Confidence Level (%):"))
-        self.confidence_level_spin = QSpinBox()
-        self.confidence_level_spin.setToolTip("Select the degree of confidence to display around the regression line")
-        self.confidence_level_spin.setRange(80, 99)
-        self.confidence_level_spin.setValue(95)
-        scatter_layout.addWidget(self.confidence_level_spin)
+        scatter_layout.addWidget(self.regression_settings_container)
+
+        def toggle_regression_settings() -> None:
+            self.regression_settings_container.setVisible(self.regression_line_check.isChecked())
+
+        self.regression_line_check.stateChanged.connect(toggle_regression_settings)
+        toggle_regression_settings()
 
         self.scatter_group.setLayout(scatter_layout)
         layout.addWidget(self.scatter_group)

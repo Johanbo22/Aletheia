@@ -28,6 +28,7 @@ class SeriesCustomizationManager:
         self.view.multibar_custom_check.stateChanged.connect(self.toggle_bar_selector)
         self.view.bar_selector_combo.currentTextChanged.connect(self.on_bar_selected)
         self.view.bar_edge_width_spin.valueChanged.connect(self.update_bar_customization_live)
+        self.view.bar_edge_width_spin.valueChanged.connect(self.plot_tab.on_style_changed)
 
     def toggle_bar_selector(self) -> None:
         """Show/hide bar selection to customize more than one bar series object"""
