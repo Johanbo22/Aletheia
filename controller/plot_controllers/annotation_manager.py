@@ -58,6 +58,11 @@ class AnnotationManager:
             widget.valueChanged.connect(self.plot_tab.on_style_changed)
         self.view.auto_annotate_weight_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
 
+        self.view.textbox_enable_check.stateChanged.connect(self.plot_tab.on_style_changed)
+        self.view.textbox_content.textChanged.connect(self.plot_tab.on_style_changed)
+        self.view.textbox_position_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
+        self.view.textbox_style_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
+
     def choose_annotation_color(self) -> None:
         color = QColorDialog.getColor(
             initial=QColor(self.annotation_color),
@@ -246,6 +251,10 @@ class AnnotationManager:
 
         # Manual annotations
         for i, ann in enumerate(self.annotations):
+            font_kwargs = {}
+            if "fontfamily" in ann:
+                font_kwargs["fontfamily"] = ann["fontfamily"]
+
             self.plot_engine.current_ax.text(
                 ann["x"], ann["y"], ann["text"],
                 transform=self.plot_engine.current_ax.transAxes,
@@ -253,9 +262,10 @@ class AnnotationManager:
                 color=ann["color"],
                 fontweight=ann.get("fontweight", "normal"),
                 fontstyle=ann.get("fontstyle", "normal"),
-                ha="center", va="center",
+                ha=ann.get("ha", "center"), va=ann.get("va", "center"),
                 bbox=dict(boxstyle="round", facecolor=ann.get("bg_color", "wheat")),
-                picker=True, gid=f"annotation_{i}"
+                picker=True, gid=f"annotation_{i}",
+                **font_kwargs
             )
 
         # Auto Annotations
