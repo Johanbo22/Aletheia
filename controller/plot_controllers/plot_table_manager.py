@@ -37,22 +37,33 @@ class PlotTableManager:
         enabled = self.view.table_enable_check.isChecked()
         self.view.table_type_combo.setEnabled(enabled)
         self.view.table_type_combo.setVisible(enabled)
+        self.view.table_type_label.setVisible(enabled)
+
         self.view.table_location_combo.setEnabled(enabled)
         self.view.table_location_combo.setVisible(enabled)
+        self.view.table_location_label.setVisible(enabled)
 
         self.view.table_auto_font_size_check.setEnabled(enabled)
+        self.view.table_auto_font_size_check.setVisible(enabled)
+
         self.view.table_scale_spin.setEnabled(enabled)
         self.view.table_scale_spin.setVisible(enabled)
+        self.view.table_scale_label.setVisible(enabled)
 
         use_auto = self.view.table_auto_font_size_check.isChecked()
-        self.view.table_font_size_spin.setEnabled(enabled and not use_auto)
-        self.view.table_font_size_spin.setVisible(enabled and not use_auto)
+        show_font = enabled and not use_auto
+        self.view.table_font_size_spin.setEnabled(show_font)
+        self.view.table_font_size_spin.setVisible(show_font)
+        self.view.table_font_size_label.setVisible(show_font)
 
     def toggle_table_font_controls(self) -> None:
         """Toggle manual font spinbox on and off"""
+        enabled = self.view.table_enable_check.isChecked()
         use_auto = self.view.table_auto_font_size_check.isChecked()
-        self.view.table_font_size_spin.setEnabled(not use_auto)
-        self.view.table_font_size_spin.setVisible(not use_auto)
+        show_font = enabled and not use_auto
+        self.view.table_font_size_spin.setEnabled(show_font)
+        self.view.table_font_size_spin.setVisible(show_font)
+        self.view.table_font_size_label.setVisible(show_font)
 
     def apply_table(self) -> None:
         """Generate the table and add it to the plot"""

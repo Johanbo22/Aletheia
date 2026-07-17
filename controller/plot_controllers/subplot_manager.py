@@ -32,6 +32,8 @@ class SubplotManager:
 
         if not subplots_enabled:
             self.plot_tab.clear_plot()
+            self.selection_overlay.hide()
+            self.clear_configs()
 
     def apply_custom_grid_layout(self, rows: int, cols: int, custom_grid: list) -> None:
         """Apply custom GridSpec layout to the current subplot context"""
@@ -73,6 +75,8 @@ class SubplotManager:
             self.plot_engine.set_active_subplot(index)
             self.update_overlay()
             self.status_bar.log(f"Active subplot set to: {index + 1}", LogLevel.INFO)
+        else:
+            self.selection_overlay.hide()
 
     def update_overlay(self, is_resize: bool = False) -> None:
         """Recalculates the geometry and overlay widgets"""
@@ -82,6 +86,8 @@ class SubplotManager:
             x, y, w, h = geometry
             current_text = self.view.active_subplot_combo.currentText()
             self.selection_overlay.update_info(current_text, (x, y, w, h), is_resize=is_resize)
+        else:
+            self.selection_overlay.hide()
 
     def save_config(self, index: int, config: Dict[str, Any]) -> None:
         """Saves the data state for a specific subplot"""

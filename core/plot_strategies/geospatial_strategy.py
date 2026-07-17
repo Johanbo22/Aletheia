@@ -68,16 +68,17 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
             elif kwargs.get("scheme", "None") != "None":
                 is_categorical = False
 
-        if not is_categorical:
+        uses_colorbar = not is_categorical and kwargs.get("scheme", "None") == "None"
+
+        if uses_colorbar:
             legend_kwds.pop("loc", None)
             kwargs.pop("loc", None)
 
             if isinstance(orientation, str):
                 orientation = orientation.lower()
                 legend_kwds["orientation"] = orientation
-
-        if legend and orientation and not is_categorical:
-            legend_kwds["orientation"] = orientation
+        else:
+            legend_kwds.pop("orientation", None)
 
         return legend, is_categorical, legend_kwds
 
@@ -167,6 +168,12 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
 
         kwargs = plot_kwargs.copy()
 
+        is_boundary_only = hasattr(plot_tab, "geo_boundary_check") and plot_tab.geo_boundary_check.isChecked()
+        if is_boundary_only:
+            plot_col = None
+            kwargs["facecolor"] = "none"
+            kwargs.pop("color", None)
+
         if plot_col:
             kwargs["column"] = plot_col
 
@@ -181,9 +188,6 @@ class GeoSpatialPlotStrategy(BasePlotStrategy):
             kwargs["edgecolor"] = plot_tab.geo_edge_color
         if hasattr(plot_tab, "geo_linewidth_spin"):
             kwargs["linewidth"] = plot_tab.geo_linewidth_spin.value()
-
-        if hasattr(plot_tab, "geo_boundary_check") and plot_tab.geo_boundary_check.isChecked():
-            kwargs["facecolor"] = "none"
 
         target_crs = general_kwargs.pop("target_crs", None)
         add_basemap = general_kwargs.pop("add_basemap", False)

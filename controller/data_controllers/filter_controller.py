@@ -16,16 +16,28 @@ class FilterController(BaseDataController):
 
     def apply_filter(self) -> None:
         """Apply a quick single-condition filter to the data."""
+        if self.data_handler.df is None:
+            self.no_data_loaded_toast()
+            return
+
         try:
             column, condition, value = self.view.operations_panel.get_filter_parameters()
 
-            try:
-                if "." in value:
-                    value = float(value)
-                else:
-                    value = int(value)
-            except ValueError:
-                pass
+            if not column or not condition:
+                global_signals.request_toast(
+                    "Validation Error", "Please specify both a column and a condition",
+                    ToastLevel.WARNING
+                )
+                return
+
+            if isinstance(value, str):
+                try:
+                    if "." in value:
+                        value = float(value)
+                    else:
+                        value = int(value)
+                except ValueError:
+                    pass
 
             before = len(self.data_handler.df)
             self.data_handler.filter_data(column, condition, value)
@@ -51,8 +63,9 @@ class FilterController(BaseDataController):
             self.view.operations_panel.filtering_tab.set_filter_active_state(
                 True, f"Active: {column} {condition} '{value}'"
             )
-        except Exception as e:
+        except (ValueError, TypeError, KeyError) as e:
             self.status_bar.log(f"Failed to execute 'Filter': {str(e)}", LogLevel.ERROR)
+            global_signals.request_toast("Filter Error", "Failed to apply filter", ToastLevel.ERROR)
 
     def clear_filters(self, reset_callback: Callable[[], None]) -> None:
         """Clear active filters by delegating back to the main reset data routine."""
@@ -103,6 +116,6 @@ class FilterController(BaseDataController):
                 self.view.operations_panel.filtering_tab.set_filter_active_state(
                     True, f"Active: {formatted_filters}"
                 )
-            except Exception as e:
+            except (ValueError, TypeError, KeyError) as e:
                 self.status_bar.log(f"Error applying filter: {str(e)}", LogLevel.ERROR)
                 global_signals.request_toast("Filter Error", "Error applying filter to data", ToastLevel.ERROR)

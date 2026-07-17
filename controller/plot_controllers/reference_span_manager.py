@@ -53,7 +53,6 @@ class ReferenceSpanManager:
             initial=QColor(self.ref_span_color),
             parent=self.plot_tab,
             title="Select Reference Span Color",
-            options=QColorDialog.ColorDialogOption.ShowAlphaChannel
         )
         if color.isValid():
             self.ref_span_color = color.name()
@@ -194,10 +193,7 @@ class ReferenceSpanManager:
         del self.reference_spans[self.selected_ref_span_index]
         self.view.annotations_tab.reference_spans_list.takeItem(self.selected_ref_span_index)
 
-        self.selected_ref_span_index = -1
-        self.view.annotations_tab.update_ref_span_button.setEnabled(False)
-        self.view.annotations_tab.delete_ref_span_button.setEnabled(False)
-
+        self.deselect_reference_span()
         self.status_bar.log("Deleted reference span")
         self.plot_tab.on_style_changed()
 
@@ -205,9 +201,8 @@ class ReferenceSpanManager:
         """Clears all the reference spans from the plot"""
         self.reference_spans.clear()
         self.view.annotations_tab.reference_spans_list.clear()
-        self.selected_ref_span_index = -1
-        self.view.annotations_tab.update_ref_span_button.setEnabled(False)
-        self.view.annotations_tab.delete_ref_span_button.setEnabled(False)
+
+        self.deselect_reference_span()
         self.status_bar.log("Cleared all reference spans")
         self.plot_tab.on_style_changed()
 
@@ -265,7 +260,7 @@ class ReferenceSpanManager:
 
     def get_config(self) -> List[Dict[str, Any]]:
         """Get the current reference span configuration for saving and exporting"""
-        return self.reference_spans.copy()
+        return [span.copy() for span in self.reference_spans]
 
     def load_config(self, config: List[Dict[str, Any]]) -> None:
         """Load reference spans configuration from saved data"""

@@ -26,10 +26,10 @@ class PlotTypeManager:
             "Basic and Relational": ["Line", "Scatter", "Bar", "Area", "Pie", "Stem", "Stairs"],
             "Distribution"        : ["Histogram", "Box", "Violin", "KDE", "ECDF", "Count Plot", "Eventplot"],
             "2D, Gridded and 3D"  : ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)",
-                                     "pcolormesh", "Contour", "Contourf", "Stackplot", "3D Line", "3D Scatter",
-                                     "3D Surface"],
+                                     "pcolormesh", "Contour", "Contourf", "Stackplot"],
             "Vector Fields"       : ["Barbs", "Quiver", "Streamplot"],
             "Triangulation"       : ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"],
+            "3D"                  : ["3D Line", "3D Scatter", "3D Surface"],
             "Geospatial"          : ["GeoSpatial"]
         }
         self.category_lists: List[QListWidget] = []
@@ -82,7 +82,7 @@ class PlotTypeManager:
         self.plot_tab.on_data_changed()
         self.plot_tab.script_manager.sync_script_if_open()
 
-    def select_plot_in_toolbox(self, plot_type_name: str) -> None:
+    def select_plot_in_toolbox(self, plot_type_name: str, log: bool = True) -> None:
         """Select a plot type in the toolbox"""
         self.plot_tab.current_plot_type_name = plot_type_name
         self.view.current_plot_label.setText(f"Selected Plot: {plot_type_name}")
@@ -98,7 +98,9 @@ class PlotTypeManager:
                     for list_w in self.category_lists:
                         if list_w != list_widget:
                             list_w.clearSelection()
-                    self._on_plot_type_changed(plot_type_name)
+                    self._on_plot_type_changed(plot_type_name, log=log)
+                    self.plot_tab.on_data_changed()
+                    self.plot_tab.script_manager.sync_script_if_open()
                 break
 
     def _on_plot_type_changed(self, plot_type: str, log: bool = True) -> None:
@@ -106,7 +108,12 @@ class PlotTypeManager:
         if log:
             self.status_bar.log(f"Plot type changed to: {plot_type}")
 
-        self.view.custom_tabs.setTabVisible(6, plot_type == "GeoSpatial")
+        custom_tabs = self.view.custom_tabs
+        for i in range(custom_tabs.count()):
+            if "geo" in custom_tabs.tabText(i).lower():
+                custom_tabs.setTabVisible(i, plot_type == "GeoSpatial")
+                break
+
         if plot_type == "GeoSpatial":
             def _pre_import_geo_deps():
                 try:
@@ -152,7 +159,7 @@ class PlotTypeManager:
         ]
         self.view.hue_column.setEnabled(plot_type not in plots_without_hue)
         if plot_type in plots_without_hue:
-            self.view.hue_column.setCurrentText("None")
+            self.view.hue_column.setCurrentIndex(0)
 
         incompatible_plots = [
             "Histogram", "Pie", "Heatmap", "KDE", "Stackplot",
@@ -166,7 +173,7 @@ class PlotTypeManager:
 
     def update_customization_visibility(self, primary_plot_type: str) -> None:
         """Toggles visibility of customization tabs and input parameters."""
-        line_plots = ["Line", "Area", "Step", "Stairs", "3D Line"]
+        line_plots = ["Line", "Area", "Step", "Stairs", "3D Line", "KDE"]
         bar_plots = ["Bar", "Count Plot", "Stem"]
         hist_plots = ["Histogram", "Box", "Violin"]
         scatter_plots = ["Scatter", "3D Scatter"]
@@ -192,6 +199,8 @@ class PlotTypeManager:
                     show_error_bars = True
             elif p_type in hist_plots:
                 show_bar_hist = True
+                if p_type == "Histogram":
+                    show_line = True
                 if p_type in ["Box", "Violin"]:
                     show_error_bars = True
             elif p_type in bar_plots:
@@ -213,6 +222,15 @@ class PlotTypeManager:
 
         self.view.marker_group.setVisible(show_markers)
         self.view.error_bars_group.setVisible(show_error_bars)
+
+        bar_width_supported = any(p in bar_plots for p in active_plot_types)
+        if bar_width_supported:
+            self.view.bar_width_spin.setEnabled(True)
+            self.view.bar_width_spin.setToolTip(
+                "Set the width the bars.\nThis will also determine how close the bars are to each other")
+        else:
+            self.view.bar_width_spin.setEnabled(False)
+            self.view.bar_width_spin.setToolTip("Bar width customization is not supported for histograms")
 
         is_3d = primary_plot_type in ["3D Scatter", "3D Line", "3D Surface"]
         self.view.z_column_widget.setVisible(is_3d)

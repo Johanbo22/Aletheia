@@ -140,7 +140,7 @@ class PlotTab(PlotTabUI):
 
         # Load initial data
         self.update_column_combo()
-        self.type_manager.select_plot_in_toolbox("Line")
+        self.type_manager.select_plot_in_toolbox("Line", log=False)
         self.set_empty_state_greeting()
 
         # Caching
@@ -186,6 +186,10 @@ class PlotTab(PlotTabUI):
         self.view.quick_filter_input.returnPressed.connect(self.on_data_changed)
         self.view.z_column.currentTextChanged.connect(self.on_data_changed)
 
+        self.view.secondary_y_check.stateChanged.connect(self.on_data_changed)
+        self.view.secondary_y_column.currentTextChanged.connect(self.on_data_changed)
+        self.view.secondary_plot_type_combo.currentTextChanged.connect(self.on_data_changed)
+
         self.subplot_manager.connect_signals()
 
         self.view.use_subset_check.stateChanged.connect(self.use_subset)
@@ -229,6 +233,10 @@ class PlotTab(PlotTabUI):
         self.view.bottom_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.left_spine_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.right_spine_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.top_spine_visible_check.stateChanged.connect(self.on_style_changed)
+        self.view.bottom_spine_visible_check.stateChanged.connect(self.on_style_changed)
+        self.view.left_spine_visible_check.stateChanged.connect(self.on_style_changed)
+        self.view.right_spine_visible_check.stateChanged.connect(self.on_style_changed)
         self.view.palette_combo.currentTextChanged.connect(self._on_palette_changed)
 
         self.view.camera_elevation_spin.valueChanged.connect(self.on_style_changed)
@@ -275,6 +283,10 @@ class PlotTab(PlotTabUI):
         self.view.y_major_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.x_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.y_major_tick_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.x_minor_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.y_minor_tick_direction_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.x_minor_tick_width_spin.valueChanged.connect(self.on_style_changed)
+        self.view.y_minor_tick_width_spin.valueChanged.connect(self.on_style_changed)
         self.view.x_scale_combo.currentTextChanged.connect(self.on_data_changed)
         self.view.y_scale_combo.currentTextChanged.connect(self.on_data_changed)
         self.view.z_scale_combo.currentTextChanged.connect(self.on_data_changed)
@@ -327,6 +339,10 @@ class PlotTab(PlotTabUI):
         self.view.grid_which_type_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.grid_axis_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.global_grid_alpha_slider.valueChanged.connect(self.on_style_changed)
+
+        self.view.legend_tab.global_grid_style_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.legend_tab.global_grid_linewidth_spin.valueChanged.connect(self.on_style_changed)
+
         self.view.x_major_grid_check.stateChanged.connect(self.on_style_changed)
         self.view.x_major_grid_style_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.x_major_grid_linewidth_spin.valueChanged.connect(self.on_style_changed)
@@ -442,6 +458,7 @@ class PlotTab(PlotTabUI):
     def use_subset(self) -> None:
         """Active subset on change"""
         subset_enabled = self.view.use_subset_check.isChecked()
+        self.on_data_changed()
 
     def on_canvas_resize(self, event: Any) -> None:
         self.subplot_manager.update_overlay(is_resize=True)
@@ -609,27 +626,20 @@ class PlotTab(PlotTabUI):
 
     def toggle_table_controls(self) -> None:
         """Enable and disable table controls for the user"""
-        enabled = self.view.table_enable_check.isChecked()
-        self.view.table_type_combo.setEnabled(enabled)
-        self.view.table_type_combo.setVisible(enabled)
-        self.view.table_location_combo.setEnabled(enabled)
-        self.view.table_location_combo.setVisible(enabled)
-
-        self.view.table_auto_font_size_check.setEnabled(enabled)
-        self.view.table_scale_spin.setEnabled(enabled)
-        self.view.table_scale_spin.setVisible(enabled)
-
-        self.view.table_font_size_spin.setEnabled(enabled and not self.view.table_auto_font_size_check.isChecked())
-        self.view.table_font_size_spin.setVisible(enabled and not self.view.table_auto_font_size_check.isChecked())
+        self.table_manager.toggle_table_controls()
 
     def toggle_table_font_controls(self) -> None:
-        self.view.table_font_size_spin.setEnabled(not self.view.table_auto_font_size_check.isChecked())
-        self.view.table_font_size_spin.setVisible(not self.view.table_auto_font_size_check.isChecked())
+        self.table_manager.toggle_table_font_controls()
 
     def on_data_changed(self) -> None:
         """Handle data column selection change"""
         if self._is_clearing:
             return
+
+        df = self.get_active_dataframe()
+        if df is None or df.empty:
+            return
+
         self._is_data_dirty = True
 
         df = self.get_active_dataframe()

@@ -64,14 +64,24 @@ class ColumnController(BaseDataController):
 
     def rename_column(self) -> None:
         """Rename the selected column."""
+        if self.data_handler.df is None:
+            self.no_data_loaded_toast()
+            return
+
         selected_columns = self.view.operations_panel.get_selected_columns()
 
         if not selected_columns:
             self.status_bar.log("No column selected", LogLevel.WARNING)
             return
 
+        if len(selected_columns) > 1:
+            global_signals.request_toast(
+                "Selection Warning", "Please select only one column to rename", ToastLevel.WARNING
+            )
+            return
+
         old_name = selected_columns[0]
-        existing_columns = self.data_handler.df.columns.tolist() if self.data_handler.df is not None else []
+        existing_columns = self.data_handler.df.columns.tolist()
 
         dialog = RenameColumnDialog(old_name, existing_columns=existing_columns, parent=self.view)
         if dialog.exec():
@@ -95,6 +105,10 @@ class ColumnController(BaseDataController):
 
     def duplicate_column(self) -> None:
         """Duplicate the selected column."""
+        if self.data_handler.df is None:
+            self.no_data_loaded_toast()
+            return
+
         selected_columns = self.view.operations_panel.get_selected_columns()
 
         if not selected_columns:
@@ -252,7 +266,7 @@ class ColumnController(BaseDataController):
         operation_map = {
             "Trim Whitespace"         : "strip",
             "Trim leading whitespace" : "lstrip",
-            "Trim trailing whitepsace": "rstrip",
+            "Trim trailing whitespace": "rstrip",
             "Convert to lowercase"    : "lower",
             "Convert to UPPERCASE"    : "upper",
             "Convert to Title Case"   : "title",
@@ -261,6 +275,7 @@ class ColumnController(BaseDataController):
 
         operation = operation_map.get(selected_operation)
         if not operation:
+            self.status_bar.log(f"Unknown text operation requested: '{selected_operation}'", LogLevel.ERROR)
             return
 
         try:

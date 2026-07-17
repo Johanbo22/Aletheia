@@ -50,9 +50,14 @@ class ColorManager:
         self.plot_tab.view.geo_missing_color_btn.clicked.connect(self.choose_geo_missing_color)
         self.plot_tab.view.geo_edge_color_btn.clicked.connect(self.choose_geo_edge_color)
 
-    def _get_color(self, current_color_hex: str, parent=None) -> Optional[str]:
+    def _get_color(self, current_color_hex: Optional[str], parent=None) -> Optional[str]:
         """Opens a color dialog and returns the selected color hex or None if the operation is cancelled"""
-        color = QColorDialog.getColor(QColor(current_color_hex), parent or self.plot_tab)
+        initial_color = QColor(current_color_hex) if current_color_hex else QColor("#000000")
+
+        if not initial_color.isValid():
+            initial_color = QColor("#000000")
+
+        color = QColorDialog.getColor(initial_color, parent or self.plot_tab)
         if color.isValid():
             return color.name()
         return None
@@ -282,7 +287,7 @@ class ColorManager:
                 self.plot_tab.view.error_bar_color_label,
                 color
             )
-            self.plot_tab.on_data_changed()
+            self.plot_tab.on_style_changed()
 
     def choose_bg_color(self) -> None:
         """Open color picker for background color."""
@@ -354,7 +359,7 @@ class ColorManager:
                 self.plot_tab.view.geo_missing_color_label,
                 color
             )
-            self.plot_tab._on_geospatial_projection_changed()
+            self.plot_tab.on_style_changed()
 
     def choose_geo_edge_color(self) -> None:
         """Open color picker for geospatial edge color."""
@@ -366,4 +371,4 @@ class ColorManager:
                 self.plot_tab.view.geo_edge_color_label,
                 color
             )
-            self.plot_tab._on_geospatial_projection_changed()
+            self.plot_tab.on_style_changed()

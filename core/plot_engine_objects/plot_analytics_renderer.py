@@ -2,13 +2,14 @@
 Handles rendering of regression lines, error bars, and analytics for the PlotEngine.
 """
 
-import pandas as pd
-import numpy as np
-from typing import TYPE_CHECKING, Any, List
+from typing import Any, List, TYPE_CHECKING
 
-from core.regression_analyser import RegressionMetrics, RegressionType, RegressionAnalyser, ErrorBarType
-from ui.status_bar import LogLevel
+import numpy as np
+import pandas as pd
+
 from core.logger import Logger
+from core.regression_analyser import ErrorBarType, RegressionAnalyser, RegressionMetrics, RegressionType
+from ui.status_bar import LogLevel
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -107,15 +108,44 @@ class PlotAnalyticsRenderer:
         if plot_tab.view.show_rmse_check.isChecked():
             stats_text.append(f"RMSE = {metrics.rmse:.4f}")
 
+        am = plot_tab.annotation_manager
+        existing_idx = next((i for i, a in enumerate(am.annotations) if a.get("tag") == "reg_stats"), None)
+
         if stats_text:
             textstr = "\n".join(stats_text)
-            props = dict(boxstyle="round", facecolor="wheat", alpha=0.85, edgecolor="black", linewidth=1)
-            font_family = plot_tab.view.font_family_combo.currentFont().family()
-            self.engine.current_ax.text(
-                0.05, 0.95, textstr, transform=self.engine.current_ax.transAxes,
-                fontsize=11, verticalalignment='top', bbox=props,
-                fontfamily=font_family, zorder=15
-            )
+
+            if existing_idx is not None:
+                ann = am.annotations[existing_idx]
+                ann["text"] = textstr
+
+                if existing_idx < am.view.annotations_list.count():
+                    item = am.view.annotations_list.item(existing_idx)
+                    list_text = textstr.replace('\n', ' | ')
+                    item.setText(f"{list_text} @ ({ann['x']:.2f}, {ann['y']:.2f})")
+            else:
+                font_family = plot_tab.view.font_family_combo.currentFont().family()
+                new_ann = {
+                    "text"      : textstr,
+                    "x"         : 0.05,
+                    "y"         : 0.95,
+                    "fontsize"  : 11,
+                    "color"     : "black",
+                    "bg_color"  : "wheat",
+                    "tag"       : "reg_stats",
+                    "fontfamily": font_family,
+                    "va"        : "top",
+                    "ha"        : "left",
+                    "zorder"    : 15
+                }
+                am.annotations.append(new_ann)
+                list_text = textstr.replace('\n', ' | ')
+                am.view.annotations_list.addItem(f"{list_text} @ (0.05, 0.95)")
+        else:
+            if existing_idx is not None:
+                del am.annotations[existing_idx]
+                item = am.view.annotations_list.takeItem(existing_idx)
+                if item:
+                    del item
 
     def add_error_bars(self, df: pd.DataFrame, x_col: str, y_cols: List[str], error_bar_type_str: str,
                        flipped: bool = False, plot_tab: "PlotTab" = None) -> None:

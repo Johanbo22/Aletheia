@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from ui.status_bar import LogLevel
-from ui.widgets import ColorBlindnessEffect
+from ui.widgets import ColorBlindnessEffect, ToggleSwitch
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
@@ -39,29 +39,34 @@ class AppearanceSettingsManager:
 
     def preset_all_spines(self) -> None:
         """Preset: Show all spines."""
-        self.view.top_spine_visible_check.setChecked(True)
-        self.view.bottom_spine_visible_check.setChecked(True)
-        self.view.left_spine_visible_check.setChecked(True)
-        self.view.right_spine_visible_check.setChecked(True)
-        self.status_bar.log("Applied preset: All Spines", LogLevel.INFO)
-        self.plot_tab.on_style_changed()
+        self._set_spine_preset(True, True, True, True, "Applied Preset: All Spines")
 
     def preset_box_only(self) -> None:
         """Preset: Show only left and bottom spines."""
-        self.view.top_spine_visible_check.setChecked(False)
-        self.view.bottom_spine_visible_check.setChecked(True)
-        self.view.left_spine_visible_check.setChecked(True)
-        self.view.right_spine_visible_check.setChecked(False)
-        self.status_bar.log("Applied preset: Box Only", LogLevel.INFO)
-        self.plot_tab.on_style_changed()
+        self._set_spine_preset(False, True, True, False, "Applied Preset: Box Only")
 
     def preset_no_spines(self) -> None:
         """Preset: Hide all spines."""
-        self.view.top_spine_visible_check.setChecked(False)
-        self.view.bottom_spine_visible_check.setChecked(False)
-        self.view.left_spine_visible_check.setChecked(False)
-        self.view.right_spine_visible_check.setChecked(False)
-        self.status_bar.log("Applied preset: No Spines", LogLevel.INFO)
+        self._set_spine_preset(False, False, False, False, "Applied Preset: No Spines")
+
+    def _set_spine_preset(
+            self, top: bool, bottom: bool, left: bool, right: bool, message: str
+    ) -> None:
+        """Applies spine visibilities without triggering redundant canvas redraws"""
+        checks: tuple[ToggleSwitch, ToggleSwitch, ToggleSwitch, ToggleSwitch] = (
+            self.view.top_spine_visible_check,
+            self.view.bottom_spine_visible_check,
+            self.view.left_spine_visible_check,
+            self.view.right_spine_visible_check
+        )
+        states = (top, bottom, left, right)
+
+        for check, state in zip(checks, states):
+            check.blockSignals(True)
+            check.setChecked(state)
+            check.blockSignals(False)
+
+        self.status_bar.log(message, LogLevel.INFO)
         self.plot_tab.on_style_changed()
 
     def on_grid_toggle(self) -> None:
@@ -74,7 +79,10 @@ class AppearanceSettingsManager:
 
         if not is_enabled:
             self.view.grid_axis_tab.setVisible(False)
+            self.view.independent_grid_check.blockSignals(True)
             self.view.independent_grid_check.setChecked(False)
+            self.view.independent_grid_check.blockSignals(False)
+
         self.plot_tab.on_style_changed()
 
     def on_independent_grid_toggle(self) -> None:
@@ -86,12 +94,14 @@ class AppearanceSettingsManager:
 
     def update_colorblind_simulation(self) -> None:
         """Applies or removes the SVG filter effect from canvas."""
-        if self.view.colorblind_check.isChecked():
+        is_enabled = self.view.colorblind_check.isChecked()
+        self.view.colorblind_type_combo.setEnabled(is_enabled)
+
+        if is_enabled:
             sim_type = self.view.colorblind_type_combo.currentText()
             effect = ColorBlindnessEffect(sim_type)
             self.canvas.setGraphicsEffect(effect)
             self.status_bar.log(f"Color blindness mode enabled: {sim_type}", LogLevel.INFO)
         else:
             self.canvas.setGraphicsEffect(None)
-            self.status_bar.log("Color blindness mode disabled", LogLevel.INFO)
-        self.plot_tab.on_style_changed()
+            self.status_bar.log("Color Blindness mode disabled", LogLevel.INFO)

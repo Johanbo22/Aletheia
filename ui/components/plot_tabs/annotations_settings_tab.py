@@ -46,13 +46,16 @@ class AnnotationsSettingsTab(QWidget):
 
         lines_toolbar = QHBoxLayout()
         self.add_ref_line_button = QPushButton("+ Add New Line")
+        self.add_ref_line_button.setToolTip("Added a new reference line to the plot")
         self.add_ref_line_button.setObjectName("MainActionButton")
 
         self.delete_ref_line_button = QPushButton("- Delete Selected")
+        self.delete_ref_line_button.setToolTip("Delete the selected reference line")
         self.delete_ref_line_button.setObjectName("DestructiveButton")
         self.delete_ref_line_button.setEnabled(False)
 
         self.clear_ref_lines_button = QPushButton("Clear All")
+        self.clear_ref_lines_button.setToolTip("Delete all reference lines")
         self.clear_ref_lines_button.setObjectName("DestructiveButton")
 
         lines_toolbar.addWidget(self.add_ref_line_button)
@@ -67,6 +70,7 @@ class AnnotationsSettingsTab(QWidget):
 
         lines_editor.addWidget(QLabel("Type:"), 0, 0)
         self.ref_line_type_combo = QComboBox()
+        self.ref_line_type_combo.setToolTip("Select the type of reference line to display")
         self.ref_line_type_combo.addItems(["Horizontal (axhline)", "Vertical (axvline)", "Diagonal (axline)"])
         lines_editor.addWidget(self.ref_line_type_combo, 0, 1, 1, 3)
 
@@ -77,6 +81,7 @@ class AnnotationsSettingsTab(QWidget):
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.addWidget(QLabel("Y Position:"))
         self.ref_line_y_spin = QDoubleSpinBox()
+        self.ref_line_y_spin.setToolTip("Set the position of the horizontal reference line on the Y-axis")
         self.ref_line_y_spin.setRange(-1e9, 1e9)
         self.ref_line_y_spin.setValue(0.0)
         self.ref_line_y_spin.setSingleStep(0.1)
@@ -92,6 +97,7 @@ class AnnotationsSettingsTab(QWidget):
         v_layout.setContentsMargins(0, 0, 0, 0)
         v_layout.addWidget(QLabel("X Position:"))
         self.ref_line_x_spin = QDoubleSpinBox()
+        self.ref_line_x_spin.setToolTip("Set the position of the vertical reference line on the X-axis")
         self.ref_line_x_spin.setRange(-1e9, 1e9)
         self.ref_line_x_spin.setValue(0.0)
         self.ref_line_x_spin.setSingleStep(0.1)
@@ -107,13 +113,17 @@ class AnnotationsSettingsTab(QWidget):
         d_layout.setContentsMargins(0, 0, 0, 0)
         d_layout.addWidget(QLabel("Slope:"))
         self.ref_line_slope_spin = QDoubleSpinBox()
+        self.ref_line_slope_spin.setToolTip(
+            "Set the slope of the diagonal reference line.\n\nThis number is the value of the hypotenuse of the right-angle triangle created of the step in the X-direction and a step in the Y-direction")
         self.ref_line_slope_spin.setRange(-1e6, 1e6)
+        self.ref_line_slope_spin.setSingleStep(0.1)
         self.ref_line_slope_spin.setValue(1.0)
         self.ref_line_slope_spin.setAccelerated(True)
         self.ref_line_slope_spin.setKeyboardTracking(False)
         d_layout.addWidget(self.ref_line_slope_spin)
         d_layout.addWidget(QLabel("Intercept:"))
         self.ref_line_intercept_spin = QDoubleSpinBox()
+        self.ref_line_intercept_spin.setToolTip("Set the value where the diagonal reference line intercepts the Y-axis")
         self.ref_line_intercept_spin.setRange(-1e9, 1e9)
         self.ref_line_intercept_spin.setValue(0.0)
         self.ref_line_intercept_spin.setAccelerated(True)
@@ -129,6 +139,7 @@ class AnnotationsSettingsTab(QWidget):
         color_box = QHBoxLayout()
         color_box.setContentsMargins(0, 0, 0, 0)
         self.ref_line_color_button = QPushButton("Choose", parent=self)
+        self.ref_line_color_button.setToolTip("Open a color menu to select the color of the reference line")
         self.ref_line_color_label = QLabel("Black")
         color_box.addWidget(self.ref_line_color_button)
         color_box.addWidget(self.ref_line_color_label)
@@ -136,11 +147,13 @@ class AnnotationsSettingsTab(QWidget):
 
         lines_editor.addWidget(QLabel("Style:"), 2, 2)
         self.ref_line_style_combo = QComboBox()
+        self.ref_line_style_combo.setToolTip("Select the line style used to display the reference line")
         self.ref_line_style_combo.addItems(["solid", "dashed", "dashdot", "dotted"])
         lines_editor.addWidget(self.ref_line_style_combo, 2, 3)
 
         lines_editor.addWidget(QLabel("Width:"), 3, 0)
         self.ref_line_width_spin = QDoubleSpinBox()
+        self.ref_line_width_spin.setToolTip("Set the thickness of the reference line")
         self.ref_line_width_spin.setRange(0.1, 20.0)
         self.ref_line_width_spin.setValue(1.5)
         self.ref_line_width_spin.setSingleStep(0.1)
@@ -148,6 +161,8 @@ class AnnotationsSettingsTab(QWidget):
 
         lines_editor.addWidget(QLabel("Alpha:"), 3, 2)
         self.ref_line_alpha_spin = QDoubleSpinBox()
+        self.ref_line_alpha_spin.setToolTip(
+            "Set the transparency of the reference line.\n\n1.0 is fully visible and 0.0 is fully transparent")
         self.ref_line_alpha_spin.setRange(0.0, 1.0)
         self.ref_line_alpha_spin.setValue(1.0)
         self.ref_line_alpha_spin.setSingleStep(0.1)
@@ -157,11 +172,13 @@ class AnnotationsSettingsTab(QWidget):
         self.ref_line_zorder_spin = QSpinBox()
         self.ref_line_zorder_spin.setRange(-100, 100)
         self.ref_line_zorder_spin.setValue(10)
-        self.ref_line_zorder_spin.setToolTip("Higher values draw on top of lower values.")
+        self.ref_line_zorder_spin.setToolTip(
+            "Set the Z-Order of the reference line.\nHigher Z-order value draws the reference line on top of the other elements, while a smaller Z-order pushes them back.")
         lines_editor.addWidget(self.ref_line_zorder_spin, 4, 1)
 
         lines_editor.addWidget(QLabel("Label:"), 5, 0)
         self.ref_line_label_input = QLineEdit()
+        self.ref_line_label_input.setToolTip("Enter the text used to designate this reference line in the legend")
         self.ref_line_label_input.setPlaceholderText("Optional label for legend")
         lines_editor.addWidget(self.ref_line_label_input, 5, 1, 1, 3)
 
@@ -169,8 +186,10 @@ class AnnotationsSettingsTab(QWidget):
 
         line_edit_actions = QHBoxLayout()
         self.deselect_ref_line_button = QPushButton("Cancel / Deselect")
+        self.deselect_ref_line_button.setToolTip("Cancel or deselect the editing of a reference line")
         self.deselect_ref_line_button.setEnabled(False)
         self.update_ref_line_button = QPushButton("Apply Changes")
+        self.update_ref_line_button.setToolTip("Apply the changes to the selected reference line")
         self.update_ref_line_button.setObjectName("MainActionButton")
         self.update_ref_line_button.setEnabled(False)
 
@@ -192,13 +211,16 @@ class AnnotationsSettingsTab(QWidget):
 
         spans_toolbar = QHBoxLayout()
         self.add_ref_span_button = QPushButton("+ Add New Span")
+        self.add_ref_span_button.setToolTip("Add a new reference span to the canvas")
         self.add_ref_span_button.setObjectName("MainActionButton")
 
         self.delete_ref_span_button = QPushButton("- Delete Selected")
+        self.delete_ref_span_button.setToolTip("Delete the selected reference span")
         self.delete_ref_span_button.setObjectName("DestructiveButton")
         self.delete_ref_span_button.setEnabled(False)
 
         self.clear_ref_spans_button = QPushButton("Clear All")
+        self.clear_ref_spans_button.setToolTip("Delete all active reference spans")
         self.clear_ref_spans_button.setObjectName("DestructiveButton")
 
         spans_toolbar.addWidget(self.add_ref_span_button)
@@ -213,6 +235,7 @@ class AnnotationsSettingsTab(QWidget):
 
         spans_editor.addWidget(QLabel("Type:"), 0, 0)
         self.ref_span_type_combo = QComboBox()
+        self.ref_span_type_combo.setToolTip("Select the type of reference span to draw")
         self.ref_span_type_combo.addItems(["Horizontal (axhspan)", "Vertical (axvspan)"])
         spans_editor.addWidget(self.ref_span_type_combo, 0, 1, 1, 3)
 
@@ -223,11 +246,13 @@ class AnnotationsSettingsTab(QWidget):
         span_h_layout.setContentsMargins(0, 0, 0, 0)
         span_h_layout.addWidget(QLabel("Y Min:"))
         self.ref_span_ymin_spin = QDoubleSpinBox()
+        self.ref_span_ymin_spin.setToolTip("Set the minimum Y-value of the horizontal span")
         self.ref_span_ymin_spin.setRange(-1e9, 1e9)
         self.ref_span_ymin_spin.setValue(0.0)
         span_h_layout.addWidget(self.ref_span_ymin_spin)
         span_h_layout.addWidget(QLabel("Y Max:"))
         self.ref_span_ymax_spin = QDoubleSpinBox()
+        self.ref_span_ymax_spin.setToolTip("Set the maximum Y-value of the horizontal span")
         self.ref_span_ymax_spin.setRange(-1e9, 1e9)
         self.ref_span_ymax_spin.setValue(1.0)
         span_h_layout.addWidget(self.ref_span_ymax_spin)
@@ -238,11 +263,13 @@ class AnnotationsSettingsTab(QWidget):
         span_v_layout.setContentsMargins(0, 0, 0, 0)
         span_v_layout.addWidget(QLabel("X Min:"))
         self.ref_span_xmin_spin = QDoubleSpinBox()
+        self.ref_span_xmin_spin.setToolTip("Set the minimum X-value for a vertical span")
         self.ref_span_xmin_spin.setRange(-1e9, 1e9)
         self.ref_span_xmin_spin.setValue(0.0)
         span_v_layout.addWidget(self.ref_span_xmin_spin)
         span_v_layout.addWidget(QLabel("X Max:"))
         self.ref_span_xmax_spin = QDoubleSpinBox()
+        self.ref_span_xmax_spin.setToolTip("Set the maximum X-value for a vertical span")
         self.ref_span_xmax_spin.setRange(-1e9, 1e9)
         self.ref_span_xmax_spin.setValue(1.0)
         span_v_layout.addWidget(self.ref_span_xmax_spin)
@@ -254,6 +281,7 @@ class AnnotationsSettingsTab(QWidget):
         span_color_box = QHBoxLayout()
         span_color_box.setContentsMargins(0, 0, 0, 0)
         self.ref_span_color_button = QPushButton("Choose", parent=self)
+        self.ref_span_color_button.setToolTip("Open a color menu to select the color of the reference span")
         self.ref_span_color_label = QLabel("blue")
         span_color_box.addWidget(self.ref_span_color_button)
         span_color_box.addWidget(self.ref_span_color_label)
@@ -261,20 +289,24 @@ class AnnotationsSettingsTab(QWidget):
 
         spans_editor.addWidget(QLabel("Alpha:"), 2, 2)
         self.ref_span_alpha_spin = QDoubleSpinBox()
+        self.ref_span_alpha_spin.setToolTip(
+            "Set the transparency of the reference span.\n1.0 indicates fully visible, while 0.0 is invisible")
         self.ref_span_alpha_spin.setRange(0.0, 1.0)
         self.ref_span_alpha_spin.setValue(0.3)
-        self.ref_span_alpha_spin.setSingleStep(0.1)
+        self.ref_span_alpha_spin.setSingleStep(0.05)
         spans_editor.addWidget(self.ref_span_alpha_spin, 2, 3)
 
         spans_editor.addWidget(QLabel("Z-Order:"), 3, 0)
         self.ref_span_zorder_spin = QSpinBox()
         self.ref_span_zorder_spin.setRange(-100, 100)
         self.ref_span_zorder_spin.setValue(-1)
-        self.ref_span_zorder_spin.setToolTip("Background spans should use negative Z-Order")
+        self.ref_span_zorder_spin.setToolTip(
+            "Set the drawing order of the reference spans.\nHigher value will draw reference span in front of other elements; lower value will push reference span behind")
         spans_editor.addWidget(self.ref_span_zorder_spin, 3, 1)
 
         spans_editor.addWidget(QLabel("Label:"), 4, 0)
         self.ref_span_label_input = QLineEdit()
+        self.ref_span_label_input.setToolTip("Enter the text for the reference span to labeled as in the legend")
         self.ref_span_label_input.setPlaceholderText("Optional label for legend")
         spans_editor.addWidget(self.ref_span_label_input, 4, 1, 1, 3)
 
@@ -282,8 +314,10 @@ class AnnotationsSettingsTab(QWidget):
 
         span_edit_actions = QHBoxLayout()
         self.deselect_ref_span_button = QPushButton("Cancel / Deselect")
+        self.deselect_ref_span_button.setToolTip("Cancel editing of a selected reference span")
         self.deselect_ref_span_button.setEnabled(False)
         self.update_ref_span_button = QPushButton("Apply Changes")
+        self.update_ref_span_button.setToolTip("Apply the changes to a reference span")
         self.update_ref_span_button.setObjectName("MainActionButton")
         self.update_ref_span_button.setEnabled(False)
 
@@ -323,6 +357,7 @@ class AnnotationsSettingsTab(QWidget):
         size_layout = QVBoxLayout()
         size_layout.addWidget(QLabel("Font-size:"))
         self.auto_annotate_fontsize_spin = QSpinBox()
+        self.auto_annotate_fontsize_spin.setToolTip("Set the font size of the annotated points")
         self.auto_annotate_fontsize_spin.setRange(6, 36)
         self.auto_annotate_fontsize_spin.setValue(10)
         self.auto_annotate_fontsize_spin.setEnabled(False)
@@ -331,6 +366,7 @@ class AnnotationsSettingsTab(QWidget):
         weight_layout = QVBoxLayout()
         weight_layout.addWidget(QLabel("Font Weight:"))
         self.auto_annotate_weight_combo = QComboBox()
+        self.auto_annotate_weight_combo.setToolTip("Set the font weight of the annotated points")
         self.auto_annotate_weight_combo.addItems(["normal", "bold", "heavy", "light"])
         self.auto_annotate_weight_combo.setEnabled(False)
         weight_layout.addWidget(self.auto_annotate_weight_combo)
@@ -343,6 +379,8 @@ class AnnotationsSettingsTab(QWidget):
         auto_layout.addWidget(QLabel("Font Color:"))
         color_layout = QHBoxLayout()
         self.auto_annotate_color_button = QPushButton("Choose", parent=self)
+        self.auto_annotate_color_button.setToolTip(
+            "Open a color menu to select the color of the font for the annotated points")
         self.auto_annotate_color_button.setEnabled(False)
         self.auto_annotate_color_label = QLabel("Black")
         color_layout.addWidget(self.auto_annotate_color_button)
@@ -355,6 +393,8 @@ class AnnotationsSettingsTab(QWidget):
         x_offset_layout = QVBoxLayout()
         x_offset_layout.addWidget(QLabel("X Offset"))
         self.auto_annotate_x_offset_spin = QDoubleSpinBox()
+        self.auto_annotate_x_offset_spin.setToolTip(
+            "Determine how far from the data point the annotated point will be placed, in the X-axis direction")
         self.auto_annotate_x_offset_spin.setRange(-200.0, 200.0)
         self.auto_annotate_x_offset_spin.setValue(0.0)
         self.auto_annotate_x_offset_spin.setEnabled(False)
@@ -363,6 +403,8 @@ class AnnotationsSettingsTab(QWidget):
         y_offset_layout = QVBoxLayout()
         y_offset_layout.addWidget(QLabel("Y Offset:"))
         self.auto_annotate_y_offset_spin = QDoubleSpinBox()
+        self.auto_annotate_y_offset_spin.setToolTip(
+            "Determine how far from the data point the annotated point will be placed in the Y-axis direction")
         self.auto_annotate_y_offset_spin.setRange(-200.0, 200.0)
         self.auto_annotate_y_offset_spin.setValue(5.0)
         self.auto_annotate_y_offset_spin.setEnabled(False)
@@ -371,6 +413,8 @@ class AnnotationsSettingsTab(QWidget):
         rotation_layout = QVBoxLayout()
         rotation_layout.addWidget(QLabel("Rotation (°):"))
         self.auto_annotate_rotation_spin = QSpinBox()
+        self.auto_annotate_rotation_spin.setToolTip(
+            "Determine the rotation, in degrees, of the annotated point around it's own axis")
         self.auto_annotate_rotation_spin.setRange(-360, 360)
         self.auto_annotate_rotation_spin.setValue(0)
         self.auto_annotate_rotation_spin.setEnabled(False)
@@ -388,14 +432,20 @@ class AnnotationsSettingsTab(QWidget):
         textbox_tab = QWidget()
         textbox_layout = QVBoxLayout(textbox_tab)
 
+        self.textbox_enable_check = ToggleSwitch("Text Box")
+        self.textbox_enable_check.setToolTip("Toggle to display the text box")
+        textbox_layout.addWidget(self.textbox_enable_check)
+
         textbox_layout.addWidget(QLabel("Text Box Content:"))
         self.textbox_content = QLineEdit()
+        self.textbox_content.setToolTip("Enter the text that will be displayed in the text box")
         self.textbox_content.setMinimumHeight(20)
         self.textbox_content.setPlaceholderText("Enter text for text box")
         textbox_layout.addWidget(self.textbox_content)
 
         textbox_layout.addWidget(QLabel("Text Box Position:"))
         self.textbox_position_combo = QComboBox()
+        self.textbox_position_combo.setToolTip("Determine the position of the text box on the canvas")
         self.textbox_position_combo.setMinimumHeight(20)
         self.textbox_position_combo.addItems([
             'upper left', 'upper center', 'upper right', 'center left',
@@ -405,6 +455,7 @@ class AnnotationsSettingsTab(QWidget):
 
         textbox_layout.addWidget(QLabel("Text Box Style:"))
         self.textbox_style_combo = QComboBox()
+        self.textbox_style_combo.setToolTip("Select a style to apply to the textbox feature")
         self.textbox_style_combo.setMinimumHeight(20)
         self.textbox_style_combo.addItems(['round', 'square', 'round,pad=1', 'round4,pad=0.5'])
         self.textbox_style_combo.setItemText(0, 'Rounded')
@@ -414,14 +465,12 @@ class AnnotationsSettingsTab(QWidget):
         textbox_layout.addWidget(QLabel("Background Color:"))
         bg_layout = QHBoxLayout()
         self.textbox_bg_button = QPushButton("Choose", parent=self)
+        self.textbox_bg_button.setToolTip("Open a color menu to select a color for the text box background")
         self.textbox_bg_button.setMinimumHeight(20)
         self.textbox_bg_label = QLabel("White")
         bg_layout.addWidget(self.textbox_bg_button)
         bg_layout.addWidget(self.textbox_bg_label)
         textbox_layout.addLayout(bg_layout)
-
-        self.textbox_enable_check = ToggleSwitch("Enable Text Box")
-        textbox_layout.addWidget(self.textbox_enable_check)
 
         textbox_layout.addStretch()
         tab_widget.addTab(textbox_tab, "Text Box")
@@ -432,11 +481,13 @@ class AnnotationsSettingsTab(QWidget):
 
         manual_layout.addWidget(QLabel("Annotation Text:"))
         self.annotation_text = QLineEdit()
+        self.annotation_text.setToolTip("Enter the text of the annotation")
         self.annotation_text.setPlaceholderText("Enter text to add to plot")
         manual_layout.addWidget(self.annotation_text)
 
         manual_layout.addWidget(QLabel("X Position (0-1):"))
         self.annotation_x_spin = QDoubleSpinBox()
+        self.annotation_x_spin.setToolTip("Set the X position of the annotation")
         self.annotation_x_spin.setMinimumHeight(20)
         self.annotation_x_spin.setRange(0, 1)
         self.annotation_x_spin.setValue(0.5)
@@ -445,6 +496,7 @@ class AnnotationsSettingsTab(QWidget):
 
         manual_layout.addWidget(QLabel("Y Position (0-1):"))
         self.annotation_y_spin = QDoubleSpinBox()
+        self.annotation_y_spin.setToolTip("Set the Y position of the annotation")
         self.annotation_y_spin.setMinimumHeight(20)
         self.annotation_y_spin.setRange(0, 1)
         self.annotation_y_spin.setValue(0.5)
@@ -453,6 +505,7 @@ class AnnotationsSettingsTab(QWidget):
 
         manual_layout.addWidget(QLabel("Font Size:"))
         self.annotation_fontsize_spin = QSpinBox()
+        self.annotation_fontsize_spin.setToolTip("Set the font size of the text elements in the annotation")
         self.annotation_fontsize_spin.setMinimumHeight(20)
         self.annotation_fontsize_spin.setRange(6, 36)
         self.annotation_fontsize_spin.setValue(12)
@@ -461,6 +514,7 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout.addWidget(QLabel("Font Color:"))
         color_layout = QHBoxLayout()
         self.annotation_color_button = QPushButton("Choose", parent=self)
+        self.annotation_color_button.setToolTip("Open a color menu to select the color of the text font")
         self.annotation_color_label = QLabel("Black")
         color_layout.addWidget(self.annotation_color_button)
         color_layout.addWidget(self.annotation_color_label)
@@ -469,14 +523,26 @@ class AnnotationsSettingsTab(QWidget):
         manual_layout.addWidget(QLabel("Background Color:"))
         background_color_layout = QHBoxLayout()
         self.annotation_bg_color_button = QPushButton("Choose", parent=self)
+        self.annotation_bg_color_button.setToolTip(
+            "Open a color menu to select the background color of the annotation text box.")
         self.annotation_bg_color_label = QLabel("wheat")
         background_color_layout.addWidget(self.annotation_bg_color_button)
         background_color_layout.addWidget(self.annotation_bg_color_label)
         manual_layout.addLayout(background_color_layout)
 
+        manual_actions_layout = QHBoxLayout()
+        self.deselect_annotation_button = QPushButton("Cancel / Deselect")
+        self.deselect_annotation_button.setToolTip("Deselect the current annotation to create a new one.")
+        self.deselect_annotation_button.setEnabled(False)
+
         self.add_annotation_button = QPushButton("Add Annotation")
+        self.add_annotation_button.setToolTip(
+            "Add the configured annotation to the list of annotations and display it on the canvas")
         self.add_annotation_button.setObjectName("MainActionButton")
-        manual_layout.addWidget(self.add_annotation_button)
+
+        manual_actions_layout.addWidget(self.deselect_annotation_button)
+        manual_actions_layout.addWidget(self.add_annotation_button)
+        manual_layout.addLayout(manual_actions_layout)
 
         manual_layout.addStretch()
         tab_widget.addTab(manual_tab, "Manual Label")
@@ -490,49 +556,70 @@ class AnnotationsSettingsTab(QWidget):
         layout = QVBoxLayout()
 
         self.table_enable_check = ToggleSwitch("Show Data Table on plot")
+        self.table_enable_check.setToolTip("Toggle to display the data table on the canvas")
         self.table_enable_check.setChecked(False)
         layout.addWidget(self.table_enable_check)
 
-        controls_layout = QHBoxLayout()
-        controls_layout.addWidget(QLabel("Type:"))
+        controls_layout = QGridLayout()
+
+        self.table_type_label = QLabel("Type:")
+        self.table_type_label.setVisible(False)
+        controls_layout.addWidget(self.table_type_label, 0, 0)
+
         self.table_type_combo = QComboBox()
+        self.table_type_combo.setToolTip("Select which type of data table to display")
         self.table_type_combo.addItems(["Summary Stats", "First 5 Rows", "Last 5 Rows", "Correlation Matrix"])
         self.table_type_combo.setEnabled(False)
         self.table_type_combo.setVisible(False)
-        controls_layout.addWidget(self.table_type_combo)
+        controls_layout.addWidget(self.table_type_combo, 0, 1)
 
-        controls_layout.addWidget(QLabel("Placement:"))
+        self.table_location_label = QLabel("Placement:")
+        self.table_location_label.setVisible(False)
+        controls_layout.addWidget(self.table_location_label, 1, 0)
+
         self.table_location_combo = QComboBox()
+        self.table_location_combo.setToolTip("Determine the placement of the data table on the canvas")
         self.table_location_combo.addItems(["bottom", "top", "right", "left", "center"])
         self.table_location_combo.setEnabled(False)
         self.table_location_combo.setVisible(False)
-        controls_layout.addWidget(self.table_location_combo)
-        layout.addLayout(controls_layout)
+        controls_layout.addWidget(self.table_location_combo, 1, 1)
 
-        settings_layout = QHBoxLayout()
         self.table_auto_font_size_check = ToggleSwitch("Auto Font-Size")
+        self.table_auto_font_size_check.setToolTip(
+            "Toggle to apply the font size of other text elements to the data table")
         self.table_auto_font_size_check.setChecked(False)
         self.table_auto_font_size_check.setEnabled(False)
-        settings_layout.addWidget(self.table_auto_font_size_check)
+        self.table_auto_font_size_check.setVisible(False)
+        controls_layout.addWidget(self.table_auto_font_size_check, 2, 0, 1, 2)
 
-        settings_layout.addWidget(QLabel("Font Size:"))
+        self.table_font_size_label = QLabel("Font Size:")
+        self.table_font_size_label.setVisible(False)
+        controls_layout.addWidget(self.table_font_size_label, 3, 0)
+
         self.table_font_size_spin = QSpinBox()
+        self.table_font_size_spin.setToolTip("Set the font size of the text in the data table")
         self.table_font_size_spin.setRange(4, 40)
         self.table_font_size_spin.setValue(10)
         self.table_font_size_spin.setEnabled(False)
         self.table_font_size_spin.setVisible(False)
-        settings_layout.addWidget(self.table_font_size_spin)
+        controls_layout.addWidget(self.table_font_size_spin, 3, 1)
 
-        settings_layout.addWidget(QLabel("Scale:"))
+        self.table_scale_label = QLabel("Scale:")
+        self.table_scale_label.setVisible(False)
+        controls_layout.addWidget(self.table_scale_label, 4, 0)
+
         self.table_scale_spin = QDoubleSpinBox()
+        self.table_scale_spin.setToolTip(
+            "Set the scaling property of the data table compared to the figure.\nHigher value will scale the table more; lower will scale it less.\n\n1.0 means equal scaling of the data table and the figure.")
         self.table_scale_spin.setRange(0.5, 5.0)
         self.table_scale_spin.setValue(1.2)
         self.table_scale_spin.setSingleStep(0.1)
         self.table_scale_spin.setEnabled(False)
         self.table_scale_spin.setVisible(False)
-        settings_layout.addWidget(self.table_scale_spin)
+        self.table_scale_spin.setPrefix("x")
+        controls_layout.addWidget(self.table_scale_spin, 4, 1)
 
-        layout.addLayout(settings_layout)
+        layout.addLayout(controls_layout)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 
@@ -541,9 +628,11 @@ class AnnotationsSettingsTab(QWidget):
         layout = QVBoxLayout()
 
         self.annotations_list = QListWidget()
+        self.annotations_list.setToolTip("List of all active annotations")
         layout.addWidget(self.annotations_list)
 
         self.clear_annotations_button = QPushButton("Clear All Annotations")
+        self.clear_annotations_button.setToolTip("Delete all active annotations")
         self.clear_annotations_button.setObjectName("DestructiveColor")
         layout.addWidget(self.clear_annotations_button)
 

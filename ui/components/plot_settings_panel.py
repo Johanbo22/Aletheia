@@ -1,10 +1,11 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QHBoxLayout, QLineEdit, QPushButton, QGroupBox, QLabel, QGraphicsOpacityEffect
-from PyQt6.QtGui import QIcon, QShortcut, QKeySequence
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation
+from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
+from PyQt6.QtWidgets import QGraphicsOpacityEffect, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QTabWidget, QVBoxLayout, \
+    QWidget
 
 from core.help_manager import HelpManager
-from ui.dialogs import HelpDialog
 from icons import IconBuilder, IconType
+from ui.dialogs import HelpDialog
 
 class PlotSettingsPanel(QWidget):
     """
@@ -551,10 +552,14 @@ class PlotSettingsPanel(QWidget):
         # Data Table
         self.table_enable_check = ann_tab.table_enable_check
         self.table_type_combo = ann_tab.table_type_combo
+        self.table_type_label = ann_tab.table_type_label
         self.table_location_combo = ann_tab.table_location_combo
+        self.table_location_label = ann_tab.table_location_label
         self.table_auto_font_size_check = ann_tab.table_auto_font_size_check
         self.table_font_size_spin = ann_tab.table_font_size_spin
+        self.table_font_size_label = ann_tab.table_font_size_label
         self.table_scale_spin = ann_tab.table_scale_spin
+        self.table_scale_label = ann_tab.table_scale_label
 
         # Annotations List
         self.annotations_list = ann_tab.annotations_list

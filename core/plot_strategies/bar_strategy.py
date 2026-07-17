@@ -1,5 +1,8 @@
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+from typing import Any, Dict, List, TYPE_CHECKING
+
 import numpy as np
+import pandas as pd
+
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab
@@ -10,6 +13,8 @@ if TYPE_CHECKING:
 
 class BarPlotStrategy(BasePlotStrategy):
     def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
+        x_col = str(x_col.name) if hasattr(x_col, 'name') else str(x_col)
+        y_cols = [str(y.name) if hasattr(y, 'name') else str(y) for y in y_cols]
         df = plot_tab.data_handler.df
         df = df[df[x_col].notna()]
         engine._clear_axes()
@@ -34,10 +39,18 @@ class BarPlotStrategy(BasePlotStrategy):
         if len(y_cols) == 1 and not hue:
             # Single Y column
             y_col_name = y_cols[0]
+
+            plot_df = df[[x_col, y_col_name]].copy()
+            plot_df[y_col_name] = pd.to_numeric(plot_df[y_col_name], errors='coerce').astype(float)
+            plot_df = plot_df.groupby(x_col, dropna=False, as_index=False).sum()
+
+            y_data = plot_df[y_col_name].to_numpy()
+            x_data = plot_df[x_col]
+
             if axes_flipped:
-                engine.current_ax.barh(df[x_col], df[y_col_name], height=width, picker=True, **kwargs)
+                engine.current_ax.barh(x_data, y_data, height=width, picker=True, **kwargs)
             else:
-                engine.current_ax.bar(df[x_col], df[y_col_name], width=width, picker=True, **kwargs)
+                engine.current_ax.bar(x_data, y_data, width=width, picker=True, **kwargs)
 
         elif len(y_cols) > 1:
             # Grouped or stacked bar chart natively in matplotlib
@@ -53,38 +66,50 @@ class BarPlotStrategy(BasePlotStrategy):
                 for i, col in enumerate(y_cols):
                     values = []
                     for label in x_labels:
-                        mask = df[x_col] == label
+                        mask = df[x_col].isna() if pd.isna(label) else (df[x_col] == label)
+                        mask = mask.fillna(False).astype(bool)
                         if mask.any():
-                            values.append(df.loc[mask, col].values[0])
+                            val = df.loc[mask, col].values[0]
+                            values.append(0.0 if pd.isna(val) else float(val))
                         else:
                             values.append(0)
 
                     if colors: kwargs["color"] = colors[i]
 
-                    if axes_flipped:
-                        engine.current_ax.barh(x_pos, values, height=bar_width, left=bottoms, label=col, picker=True, **kwargs)
-                    else:
-                        engine.current_ax.bar(x_pos, values, width=bar_width, bottom=bottoms, label=col, picker=True, **kwargs)
+                    values_arr = np.array(values, dtype=float)
 
-                    bottoms += np.nan_to_num(np.array(values, dtype=float))
+                    if axes_flipped:
+                        engine.current_ax.barh(x_pos, values_arr, height=bar_width, left=bottoms, label=col,
+                                               picker=True, **kwargs)
+                    else:
+                        engine.current_ax.bar(x_pos, values_arr, width=bar_width, bottom=bottoms, label=col,
+                                              picker=True, **kwargs)
+
+                    bottoms += np.nan_to_num(values_arr)
             else:
                 bar_width = width / len(y_cols)
                 for i, col in enumerate(y_cols):
                     offset = (i - len(y_cols) / 2) * bar_width + bar_width / 2
                     values = []
                     for label in x_labels:
-                        mask = df[x_col] == label
+                        mask = df[x_col].isna() if pd.isna(label) else (df[x_col] == label)
+                        mask = mask.fillna(False).astype(bool)
                         if mask.any():
-                            values.append(df.loc[mask, col].values[0])
+                            val = pd.to_numeric(df.loc[mask, col], errors='coerce').sum(skipna=True)
+                            values.append(0.0 if pd.isna(val) else float(val))
                         else:
-                            values.apend(0)
+                            values.append(0)
 
                     if colors: kwargs["color"] = colors[i]
 
+                    values_arr = np.array(values, dtype=float)
+
                     if axes_flipped:
-                        engine.current_ax.barh(x_pos + offset, values, height=bar_width, label=col, picker=True, **kwargs)
+                        engine.current_ax.barh(x_pos + offset, values_arr, height=bar_width, label=col, picker=True,
+                                               **kwargs)
                     else:
-                        engine.current_ax.bar(x_pos + offset, values, width=bar_width, label=col, picker=True, **kwargs)
+                        engine.current_ax.bar(x_pos + offset, values_arr, width=bar_width, label=col, picker=True,
+                                              **kwargs)
 
             if axes_flipped:
                 engine._helper_format_categorical_axis(engine.current_ax.yaxis, x_labels)
@@ -95,6 +120,8 @@ class BarPlotStrategy(BasePlotStrategy):
             # Single Y column with statistical hue using seaborn
             import seaborn as sns
             if cmap_name: kwargs["palette"] = cmap_name
+
+            hue = str(hue.name) if hasattr(hue, 'name') else hue
 
             if axes_flipped:
                 sns.barplot(data=df, y=x_col, x=y_cols[0], hue=hue, ax=engine.current_ax, orient="h", **kwargs)
