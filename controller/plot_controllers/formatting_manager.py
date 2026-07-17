@@ -216,6 +216,10 @@ class PlotFormattingManager:
             self.apply_plot_appearance(x_col, y_cols, font_family, general_kwargs)
 
         if progress_dialog:
+            self.plot_tab._update_progress(progress_dialog, 72, "Applying annotations...")
+        self.plot_tab._apply_annotations(active_df, x_col, y_cols)
+
+        if progress_dialog:
             self.plot_tab._update_progress(progress_dialog, 75, "Applying customizations")
         self.apply_plot_customizations()
 
@@ -224,10 +228,6 @@ class PlotFormattingManager:
         self.apply_legend_and_grid(general_kwargs, font_family)
         self.apply_spines_customization()
 
-        if progress_dialog:
-            self.plot_tab._update_progress(progress_dialog, 85, "Adding annotations")
-
-        self.plot_tab._apply_annotations(active_df, x_col, y_cols)
         self.tick_manager.apply_tick_customization()
         self.apply_textbox()
 
@@ -342,14 +342,21 @@ class PlotFormattingManager:
     def _apply_global_lines(self, alpha: float) -> None:
         """Applies default global line style to all non-special lines"""
         for line in self.plot_tab.plot_engine.current_ax.get_lines():
-            if line.get_gid() in ["regression_line", "confidence_interval", "error_bar"]:
+            gid = line.get_gid()
+            if gid and (gid in ["regression_line", "confidence_interval", "error_bar"] or str(gid).startswith(
+                    "ref_line") or str(gid).startswith("ref_span")):
                 continue
             self._apply_default_line_style(line, alpha)
 
     def _apply_individual_lines(self, alpha: float) -> None:
         """Applies custom line styles per line when multi-line is enabled"""
-        lines = [line for line in self.plot_tab.plot_engine.current_ax.get_lines()
-                 if line.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
+        lines = []
+        for line in self.plot_tab.plot_engine.current_ax.get_lines():
+            gid = line.get_gid()
+            if gid and (gid in ["regression_line", "confidence_interval", "error_bar"] or str(gid).startswith(
+                    "ref_line") or str(gid).startswith("ref_span")):
+                continue
+            lines.append(line)
 
         for i, line in enumerate(lines):
             line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i + 1}"
@@ -403,7 +410,9 @@ class PlotFormattingManager:
     def _apply_collection_customizations(self, alpha: float) -> None:
         """Applies styling to collection objects like scatter plots"""
         for collection in self.plot_tab.plot_engine.current_ax.collections:
-            if collection.get_gid() in ["confidence_interval", "error_bar"]:
+            gid = collection.get_gid()
+            if gid and (gid in ["confidence_interval", "error_bar"] or str(gid).startswith("ref_line") or str(
+                    gid).startswith("ref_span")):
                 continue
             collection.set_alpha(alpha)
             if self.plot_tab.marker_color:
@@ -421,6 +430,9 @@ class PlotFormattingManager:
     def _apply_global_bars(self, alpha: float) -> None:
         """Applies default bar styles globally to all patches"""
         for patch in self.plot_tab.plot_engine.current_ax.patches:
+            gid = patch.get_gid()
+            if gid and (str(gid).startswith("ref_line") or str(gid).startswith("ref_span")):
+                continue
             self._apply_default_bar_style(patch, alpha)
 
     def _apply_individual_bars(self, alpha: float) -> None:
