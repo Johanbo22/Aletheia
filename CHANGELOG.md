@@ -4,6 +4,105 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.4.3 [Patch]
+
+### Added
+
+- _set_spine_preset helper method to apply boolean state tuples to toggle switches for spine presets.
+- Spine formatting and visibility now iterates over all connected subplot axes (e.g., secondary Y axes) to prevent
+  background spines from persisting.
+- Added tooltips to tools in the plotting tab
+- Added the automatic annotation that gets added with a KDE overlay for histograms to the Annotations list so it can be
+  edited or removed. A similar change is also applied to the RMSE, R^2 and regression equation annotation for scatter
+  plots.
+- A "Cancel / Deselect" button to the manual annotations tab.
+
+### Changed
+
+- Removed the disruptive QMessageBox confirmation dialog in inject_subset_to_dataframe.
+- Moved 3D plots selection buttons into their own category instead of sitting in 2D and gridded
+- Updated custom legend label parsing to use a semicolon (;) delimiter instead of a comma (,), which resolves the issue
+  with locations or items containing commas (e.g., "London, United Kingdom").
+- Changed the layout and states of Scatter Plot analysis. The rest of the settings now depend on the check for a
+  regression line.
+- Changed the layout of the Data Table feature for plotting
+
+### Fixed
+
+- Resolved a state-tracking bug where newly created aggregations did not update the `viewing_aggregation_name` flag. The
+  Status Bar will now display the "Viewing Aggregation: {name}" label upon creation.
+- Fixed an issue where the "Restore View" button failed to revert newly created aggregations by getting the
+  `pre_agg_view_df` prior to applying the transformation.
+- Fixed an incorrect Toast where duplicate aggregation names mapped to a "Data not found" UI error. Now appropriately
+  gives an "Aggregation already exists" warning.
+- Eliminated PyQt6 C++ memory leak caused by leftover `QAbstractTableModel` instances by triggering `.deleteLater()`
+  when clearing table models in `view_saved_aggregations` and `restore_aggregation_view`.
+- Corrected a typographical error in `apply_text_manipulation` ("whitepsace" -> "whitespace") that caused the "Trim
+  trailing whitespace" action to fail.
+- Fixed an `AttributeError` crash in `duplicate_column` when triggering the action with an empty dataset.
+- Fixed a bug where refreshing Google Sheets failed to update the underlying dataset despite indicating success.
+- Fixed an issue where exporting "Selected Rows Only" with no active selection would inadvertently export the entire
+  dataset instead of alerting the user.
+- Eliminated significant UI freezes and memory spikes when attempting to export large datasets.
+- Fixed a `TypeError` crash caused by attempting string-to-numeric casting on empty or unformatted fields in
+  `apply_filter`.
+- UI blocking during refresh_active_subsets which synchronously re-applied large subsets.
+- Consecutive Subset Injection context bug: Sequential subset application previously operated against the most recently
+  injected data. It now correctly scopes the logic back to the master DataFrame.
+- Fixed critical state-desync in `apply_sort` where sorting was incorrectly delegated to the View (
+  `QTableView.sortByColumn`) instead of the Model (`DataHandler.sort_data`), causing sorting operations to bypass
+  history and pipeline tracking.
+- Added missing toast notification to `open_column_reorder_dialog` to ensure user feedback upon failure.
+- Blocked signals during resets of independent_grid_check within on_grid_toggle to prevent double-draw on disabling
+  grids.
+- Fixed a UI lock-out bug where deleting a reference line or clearing the lines list disabled the "Add Reference Line"
+  button.
+- Fixed an issue where loading a saved plot configuration disabled the reference line creation UI.
+- Resolved a UI soft-lock issue where the "Add Reference Span" button remained disabled after deleting a span or
+  clearing the list.
+- Removed ShowAlphaChannel from QColorDialog for ReferenceSpans to prevent conflicting transparency inputs between the
+  color picker and the dedicated alpha spinbox.
+- SeriesCustomizationManager.update_bar_selector mismatched list indexing causing incorrectly populated combo boxes.
+- SeriesCustomizationManager.on_bar_selected ghosting UI states; UI resets values when a selected bar has default (None)
+  properties.
+- SeriesCustomizationManager.on_line_selected ghosting UI states; ensuring colors, markers, and alpha sliders correctly
+  reflect missing or default states.
+- Proper fallback conditions in SubplotManager.on_active_subplot_changed and SubplotManager.update_overlay to hide the
+  subplot selection overlay when no plot is active or when the axis geometry is destroyed.
+- Fixed the erroneous "Plot type changed to: Line" log on application startup.
+- Prevented redundant method calls and double-logging of plot type changes when a saved plot configuration is loaded.
+- Prevented the "Data change detected" log message at application startup by ensuring the DataFrame exists before
+  marking the plot as changed.
+- Resolved the sticky canvas overlay by hiding the "Update required" message (show_update_required(False)) when a plot
+  finishes generating.
+- Fixed bug where legend labels could be renamed.
+- Fixed issue where certain configuration states would not update the plot upon change and required a full redraw.
+- Fixed bug where using keyboard to change values in Spinboxes could causes issue with desired values. Disabled
+  KeyboardTracking for spinboxes in Appearance and Customization tabs of Plotting tab.
+- Fixed issue where toggling independent spine visibility did not fully remove the spine from the canvas.
+- Introduced an _is_generating state lock across the plot generation lifecycle to prevent concurrent worker execution
+  and Matplotlib race condition crashes.
+- Fixed a bar chart rendering bug where stacked lines were rendered on non-stacked bar charts
+- Fixed a rendering bug with bar charts that caused them not to render
+- Fixed an issue where changing the minor tick direction and width on X and Y axis did not update the plot
+- Fixed an issue where "Fancy Box" and "Show Shadow" for legends remained active when the legend frame was hidden
+- Fixed issue where gridlines did not update the plot correctly and did not render at all in some cases
+- Fixed a layout issue where the gridline group did not resize correctly when untoggling gridlines
+- Fixed an issue where the bar width setting was enabled for histograms
+- Fixed an issue where changing the value for the bar edge width did not render the plot automatically.
+- Fixed an issue where overlaying a histogram with a normal distribution curve or a Kernel density estimate did not
+  trigger the UI to allow for customizations of these lines.
+- Fixed issue with error bars not updating when selecting a new color.
+- Fixed an issue with text box not being drawn when enabling or when changing properties
+- Fixed a bug where the label for Font Size for Data Table settings in the Annotation tab did not disappear when
+  checking the "Auto Font size" check.
+- Fixed a bug where reference line properties did not update correctly in the plot legend.
+- Fixed an issue where reference lines would inherit the appearance of other plotted lines when the "Per-Line
+  customization" toggle was active.
+- Fixed the issue where the "Add Annotation" button remained active while editing an existing annotation
+- Resolved an issue where toggling "Turn off Axis" during Geospatial plotting would cause a crash if a classification
+  scheme or categorical data was mapped in the legend.
+
 ## v.0.4.2 [Patch]
 
 ### Added
