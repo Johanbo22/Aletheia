@@ -530,11 +530,19 @@ class AnnotationsSettingsTab(QWidget):
         background_color_layout.addWidget(self.annotation_bg_color_label)
         manual_layout.addLayout(background_color_layout)
 
+        manual_actions_layout = QHBoxLayout()
+        self.deselect_annotation_button = QPushButton("Cancel / Deselect")
+        self.deselect_annotation_button.setToolTip("Deselect the current annotation to create a new one.")
+        self.deselect_annotation_button.setEnabled(False)
+
         self.add_annotation_button = QPushButton("Add Annotation")
         self.add_annotation_button.setToolTip(
             "Add the configured annotation to the list of annotations and display it on the canvas")
         self.add_annotation_button.setObjectName("MainActionButton")
-        manual_layout.addWidget(self.add_annotation_button)
+
+        manual_actions_layout.addWidget(self.deselect_annotation_button)
+        manual_actions_layout.addWidget(self.add_annotation_button)
+        manual_layout.addLayout(manual_actions_layout)
 
         manual_layout.addStretch()
         tab_widget.addTab(manual_tab, "Manual Label")

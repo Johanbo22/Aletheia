@@ -3,7 +3,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 import pandas as pd
 from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
+from PyQt6.QtWidgets import QColorDialog
 from matplotlib.text import Text
 
 from controller.plot_controllers.color_manager import ColorManager
@@ -45,7 +45,8 @@ class AnnotationManager:
         self.view.auto_annotate_check.clicked.connect(self.toggle_auto_annotate)
         self.view.auto_annotate_color_button.clicked.connect(self.choose_auto_annotate_color)
         self.view.add_annotation_button.clicked.connect(self.add_annotation)
-        self.view.annotations_list.itemClicked.connect(self.on_annotation_selected)
+        self.view.annotations_tab.deselect_annotation_button.clicked.connect(self.deselect_annotation)
+        self.view.annotations_list.itemSelectionChanged.connect(self.on_annotation_selection_changed)
         self.view.clear_annotations_button.clicked.connect(self.clear_annotations)
 
         self.view.annotation_text.editingFinished.connect(self.update_active_annotation)
@@ -173,8 +174,23 @@ class AnnotationManager:
             selected_items[0].setText(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")
             self.plot_tab.on_style_changed()
 
-    def on_annotation_selected(self, item: QListWidgetItem) -> None:
+    def deselect_annotation(self) -> None:
+        """Clears the current annotation selection to allow adding a new one"""
+        self.view.annotations_list.clearSelection()
+        self.view.annotation_text.clear()
+
+    def on_annotation_selection_changed(self) -> None:
         """The selection of an annotation from the list"""
+        selected_items = self.view.annotations_list.selectedItems()
+        if not selected_items:
+            self.view.add_annotation_button.setEnabled(True)
+            self.view.annotations_tab.deselect_annotation_button.setEnabled(False)
+            return
+
+        self.view.add_annotation_button.setEnabled(False)
+        self.view.annotations_tab.deselect_annotation_button.setEnabled(True)
+
+        item = selected_items[0]
         index = self.view.annotations_list.row(item)
         if 0 <= index < len(self.annotations):
             self._is_updating_ui = True
@@ -351,7 +367,6 @@ class AnnotationManager:
                     idx = int(gid.split("_")[1])
                     if idx < self.view.annotations_list.count():
                         self.view.annotations_list.setCurrentRow(idx)
-                        self.on_annotation_selected(self.view.annotations_list.item(idx))
                         self.status_bar.log(f"Selected annotation: {artist.get_text()}", LogLevel.INFO)
 
                         mouse_event = getattr(event, "mouseevent", None)
