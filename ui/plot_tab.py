@@ -77,34 +77,7 @@ class PlotTab(PlotTabUI):
         self.style_update_timer.setInterval(300)
         self.style_update_timer.timeout.connect(self._fast_render)
 
-        self.bg_color = "white"
-        self.face_color = "white"
-
-        self.global_spine_color = "black"
-        self.top_spine_color = "black"
-        self.bottom_spine_color = "black"
-        self.left_spine_color = "black"
-        self.right_spine_color = "black"
-
-        self.line_color = None
-        self.marker_color = None
-        self.marker_edge_color = None
-        self.bar_color = None
-        self.bar_edge_color = None
-        self.annotation_color = "black"
-        self.annotation_bg_color = "wheat"
-        self.auto_annotation_color = "black"
-        self.textbox_bg_color = "white"
-        self.legend_bg_color = "white"
-        self.legend_edge_color = "black"
-        self.global_grid_color = "gray"
-        self.x_major_grid_color = "gray"
-        self.x_minor_grid_color = "lightgray"
-        self.y_major_grid_color = "gray"
-        self.y_minor_grid_color = "lightgray"
-        self.geo_missing_color = "lightgray"
-        self.geo_edge_color = "black"
-        self.error_bar_color = "black"
+        self._initialize_default_variables()
 
         # Create canvas and toolbar
         self.plot_engine.create_figure()
@@ -170,6 +143,7 @@ class PlotTab(PlotTabUI):
         self.editor_button.clicked.connect(self.script_manager.open_script_editor)
         self.clear_button.clicked.connect(self.clear)
         self.save_plot_button.clicked.connect(self.export_manager.save_plot_image)
+        self.view.reset_button.clicked.connect(self.reset_settings_with_prompt)
 
         # editor sync
         self.view.x_column.currentTextChanged.connect(self.script_manager.sync_script_if_open)
@@ -831,9 +805,81 @@ class PlotTab(PlotTabUI):
         """Get current plot configuration"""
         return self.config_manager.get_config()
 
+    def _initialize_default_variables(self) -> None:
+        """Entry point most color variables default state"""
+        self.bg_color = "white"
+        self.face_color = "white"
+
+        self.global_spine_color = "black"
+        self.top_spine_color = "black"
+        self.bottom_spine_color = "black"
+        self.left_spine_color = "black"
+        self.right_spine_color = "black"
+
+        self.line_color = None
+        self.marker_color = None
+        self.marker_edge_color = None
+        self.bar_color = None
+        self.bar_edge_color = None
+        self.annotation_color = "black"
+        self.annotation_bg_color = "wheat"
+        self.auto_annotation_color = "black"
+        self.textbox_bg_color = "white"
+        self.legend_bg_color = "white"
+        self.legend_edge_color = "black"
+        self.global_grid_color = "gray"
+        self.x_major_grid_color = "gray"
+        self.x_minor_grid_color = "lightgray"
+        self.y_major_grid_color = "gray"
+        self.y_minor_grid_color = "lightgray"
+        self.geo_missing_color = "lightgray"
+        self.geo_edge_color = "black"
+        self.error_bar_color = "black"
+
+    def reset_settings_without_prompt(self) -> None:
+        """Resets all settings to their initial value without giving a prompt"""
+        self._is_clearing = True
+
+        try:
+            self.view.reset_to_defaults()
+
+            self._initialize_default_variables()
+
+            self.series_customization_manager.clear_customizations()
+            self.annotation_manager.clear_annotations()
+            self.reference_line_manager.clear_all_reference_lines()
+            self.reference_span_manager.clear_all_reference_spans()
+            self.subplot_manager.clear_configs()
+
+        except Exception as reset_err:
+            self.status_bar.log(f"Error resetting settings: {str(reset_err)}", LogLevel.ERROR)
+        finally:
+            self._is_clearing = False
+
+    def reset_settings_with_prompt(self) -> None:
+        """Resets the plot settings to default values and gives a prompt"""
+        reply_box = QMessageBox(self)
+        reply_box.setWindowTitle("Reset Defaults")
+        reply_box.setText("Are you sure you want to reset all plot settings to default?")
+        reply_box.setInformativeText("This will clear all formatting, annotations, stylings and more.")
+        reply_box.setIcon(QMessageBox.Icon.Warning)
+        reply_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply_box.setDefaultButton(QMessageBox.StandardButton.No)
+
+        if reply_box.exec() == QMessageBox.StandardButton.No:
+            return
+
+        self.reset_settings_without_prompt()
+        global_signals.request_toast("Settings Reset", "Plot settings restored to default", ToastLevel.INFO)
+        self.status_bar.log("Plot settings reset to defaults", LogLevel.INFO)
+
+        self.on_data_changed()
+
     def clear(self) -> None:
         """Clear all plot data"""
         self.clear_plot()
+        self.reset_settings_without_prompt()
+
         self.view.title_input.blockSignals(True)
         self.view.xlabel_input.blockSignals(True)
         self.view.ylabel_input.blockSignals(True)
