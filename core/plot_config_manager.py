@@ -374,7 +374,17 @@ class PlotConfigManager:
                 "explode_distance": self.pt.pie_explode_distance_spin.value(),
                 "shadow"          : self.pt.pie_shadow_check.isChecked(),
                 "donut_enabled"   : self.pt.pie_donut_check.isChecked(),
-                "donut_width"     : self.pt.pie_donut_width_spin.value()
+                "donut_width"   : self.pt.pie_donut_width_spin.value(),
+                "pct_decimals"  : getattr(self.pt, "pie_pct_decimals_spin",
+                                          None) and self.pt.pie_pct_decimals_spin.value(),
+                "pct_distance"  : getattr(self.pt, "pie_pct_distance_spin",
+                                          None) and self.pt.pie_pct_distance_spin.value(),
+                "pct_size"      : getattr(self.pt, "pie_pct_size_spin", None) and self.pt.pie_pct_size_spin.value(),
+                "pct_color"     : getattr(self.pt, "pie_pct_color", "white"),
+                "label_distance": getattr(self.pt, "pie_label_distance_spin",
+                                          None) and self.pt.pie_label_distance_spin.value(),
+                "label_size"    : getattr(self.pt, "pie_label_size_spin", None) and self.pt.pie_label_size_spin.value(),
+                "label_color"   : getattr(self.pt, "pie_label_color", "black")
             },
         }
 
@@ -794,6 +804,26 @@ class PlotConfigManager:
         self.pt.pie_shadow_check.setChecked(pie.get("shadow", False))
         self.pt.pie_donut_check.setChecked(pie.get("donut_enabled", False))
         self.pt.pie_donut_width_spin.setValue(float(pie.get("donut_width", 0.3)))
+
+        if hasattr(self.pt, "pie_pct_decimals_spin"):
+            self.pt.pie_pct_decimals_spin.setValue(int(pie.get("pct_decimals", 2)))
+            self.pt.pie_pct_distance_spin.setValue(float(pie.get("pct_distance", 0.6)))
+            self.pt.pie_pct_size_spin.setValue(int(pie.get("pct_size", 10)))
+
+            self.pt.pie_pct_color = pie.get("pct_color", "white")
+            if hasattr(self.pt, "pie_pct_color_label"):
+                self.pt.pie_pct_color_label.setText(self.pt.pie_pct_color)
+                ColorManager.update_button_color_swatch(button=self.pt.pie_pct_color_button,
+                                                        color=QColor(self.pt.pie_pct_color))
+
+            self.pt.pie_label_distance_spin.setValue(float(pie.get("label_distance", 1.1)))
+            self.pt.pie_label_size_spin.setValue(int(pie.get("label_size", 10)))
+
+            self.pt.pie_label_color = pie.get("label_color", "black")
+            if hasattr(self.pt, "pie_label_color_label"):
+                self.pt.pie_label_color_label.setText(self.pt.pie_label_color)
+                ColorManager.update_button_color_swatch(button=self.pt.pie_label_color_button,
+                                                        color=QColor(self.pt.pie_label_color))
 
         self.pt.series_customization_manager.toggle_line_selector()
         self.pt.series_customization_manager.toggle_bar_selector()

@@ -105,6 +105,8 @@ class PlotTab(PlotTabUI):
         self.geo_missing_color = "lightgray"
         self.geo_edge_color = "black"
         self.error_bar_color = "black"
+        self.pie_pct_color = "white"
+        self.pie_label_color = "black"
 
         # Create canvas and toolbar
         self.plot_engine.create_figure()
@@ -386,6 +388,7 @@ class PlotTab(PlotTabUI):
         self.view.show_rmse_check.stateChanged.connect(self.on_data_changed)
         self.view.show_equation_check.stateChanged.connect(self.on_data_changed)
         self.view.confidence_level_spin.valueChanged.connect(self.on_data_changed)
+
         self.view.pie_show_percentages_check.stateChanged.connect(self.on_data_changed)
         self.view.pie_start_angle_spin.valueChanged.connect(self.on_data_changed)
         self.view.pie_explode_check.stateChanged.connect(self.on_data_changed)
@@ -394,6 +397,11 @@ class PlotTab(PlotTabUI):
         self.view.pie_donut_check.stateChanged.connect(self.on_data_changed)
         self.view.pie_donut_width_spin.valueChanged.connect(self.on_data_changed)
         self.view.error_bars_combo.currentTextChanged.connect(self.on_data_changed)
+        self.view.pie_pct_decimals_spin.valueChanged.connect(self.on_style_changed)
+        self.view.pie_pct_distance_spin.valueChanged.connect(self.on_style_changed)
+        self.view.pie_pct_size_spin.valueChanged.connect(self.on_style_changed)
+        self.view.pie_label_distance_spin.valueChanged.connect(self.on_style_changed)
+        self.view.pie_label_size_spin.valueChanged.connect(self.on_style_changed)
 
         self.view.error_bar_linewidth_spin.valueChanged.connect(self.on_data_changed)
         self.view.error_bar_capsize_spin.valueChanged.connect(self.on_data_changed)

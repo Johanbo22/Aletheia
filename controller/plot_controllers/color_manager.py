@@ -50,6 +50,14 @@ class ColorManager:
         self.plot_tab.view.geo_missing_color_btn.clicked.connect(self.choose_geo_missing_color)
         self.plot_tab.view.geo_edge_color_btn.clicked.connect(self.choose_geo_edge_color)
 
+        # Pie chart colors
+        self.plot_tab.view.customization_tab.pie_percent_label_font_color_button.clicked.connect(
+            self.choose_pie_percent_label_color
+        )
+        self.plot_tab.view.customization_tab.pie_category_label_font_color_button.clicked.connect(
+            self.choose_pie_category_label_color
+        )
+
     def _get_color(self, current_color_hex: Optional[str], parent=None) -> Optional[str]:
         """Opens a color dialog and returns the selected color hex or None if the operation is cancelled"""
         initial_color = QColor(current_color_hex) if current_color_hex else QColor("#000000")
@@ -369,6 +377,30 @@ class ColorManager:
             self._update_color_button(
                 self.plot_tab.view.geo_edge_color_btn,
                 self.plot_tab.view.geo_edge_color_label,
+                color
+            )
+            self.plot_tab.on_style_changed()
+
+    def choose_pie_percent_label_color(self) -> None:
+        """Open color picker for pie percentage label fonts"""
+        color = self._get_color(self.plot_tab.pie_pct_color)
+        if color:
+            self.plot_tab.view.customization_tab.pie_percent_color_label = color
+            self._update_color_button(
+                self.plot_tab.view.customization_tab.pie_percent_label_font_color_button,
+                self.plot_tab.view.pie_pct_color,
+                color
+            )
+            self.plot_tab.on_style_changed()
+
+    def choose_pie_category_label_color(self) -> None:
+        """Open color picker for pie category label fonts"""
+        color = self._get_color(self.plot_tab.pie_label_color)
+        if color:
+            self.plot_tab.view.pie_label_color = color
+            self._update_color_button(
+                self.plot_tab.view.pie_label_color_button,
+                self.plot_tab.view.customization_tab.pie_category_font_color_label,
                 color
             )
             self.plot_tab.on_style_changed()

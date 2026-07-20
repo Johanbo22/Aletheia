@@ -768,27 +768,54 @@ class CodeExporter:
             "    try:",
             f"        data = df.groupby({ctx['x']})[{ctx['y']}].sum()"
         ])
-        
+
         explode_list = "None"
         if pie_cfg.get("explode_first"):
-             dist = pie_cfg.get("explode_distance", 0.1)
-             lines.append("        explode = [0.0] * len(data)")
-             lines.append(f"        if len(explode) > 0: explode[0] = {dist}")
-             explode_list = "explode"
-             
-        autopct = "'%1.2f%%'" if pie_cfg.get("show_percentages") else "None"
+            dist = pie_cfg.get("explode_distance", 0.1)
+            lines.append("        explode = [0.0] * len(data)")
+            lines.append(f"        if len(explode) > 0: explode[0] = {dist}")
+            explode_list = "explode"
+
+        pct_decimals = pie_cfg.get("pct_decimals", 2)
+        pct_distance = pie_cfg.get("pct_distance", 0.6)
+        pct_size = pie_cfg.get("pct_size", 10)
+        pct_color = self._clean_value(pie_cfg.get("pct_color", "white"))
+
+        label_distance = pie_cfg.get("label_distance", 1.1)
+        label_size = pie_cfg.get("label_size", 10)
+        label_color = self._clean_value(pie_cfg.get("label_color", "black"))
+
+        autopct = f"'%1.{pct_decimals}f%%'" if pie_cfg.get("show_percentages") else "None"
         start = pie_cfg.get("start_angle", 0)
         shadow = pie_cfg.get("shadow", False)
-        
+
         is_donut = pie_cfg.get("donut_enabled", False)
-        
+
+        wedgeprops_str = ""
         if is_donut:
             donut_width = pie_cfg.get("donut_width", 0.3)
-            wedgeprops_str = f"{{'width': {donut_width}}}"
-            lines.append(f"        ax.pie(data, labels=data.index, autopct={autopct}, startangle={start}, explode={explode_list}, shadow={shadow}, wedgeprops={wedgeprops_str})")
-        else:
-            lines.append(f"        ax.pie(data, labels=data.index, autopct={autopct}, startangle={start}, explode={explode_list}, shadow={shadow})")
-        
+            wedgeprops_str = f", wedgeprops={{'width': {donut_width}}}"
+
+        lines.append(
+            f"        pie_returns = ax.pie(data, labels=data.index, autopct={autopct}, pctdistance={pct_distance}, labeldistance={label_distance}, startangle={start}, explode={explode_list}, shadow={shadow}{wedgeprops_str})")
+
+        lines.extend([
+            "        texts = pie_returns[1]",
+            "        for text in texts:",
+        ])
+        if label_color not in ["'Auto'", "'auto'"]:
+            lines.append(f"            text.set_color({label_color})")
+        lines.append(f"            text.set_fontsize({label_size})")
+
+        lines.extend([
+            "        if len(pie_returns) == 3:",
+            "            autotexts = pie_returns[2]",
+            "            for autotext in autotexts:"
+        ])
+        if pct_color not in ["'Auto'", "'auto'"]:
+            lines.append(f"                autotext.set_color({pct_color})")
+        lines.append(f"                autotext.set_fontsize({pct_size})")
+
         lines.extend([
             "        ax.set_ylabel('')",
             "    except Exception as e: print(f'Pie chart error: {e}')"
