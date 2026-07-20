@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, TYPE_CHECKING
 
 import pandas as pd
-from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QColorDialog
+from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
 from matplotlib.text import Text
 
 from controller.plot_controllers.color_manager import ColorManager
@@ -47,6 +47,7 @@ class AnnotationManager:
         self.view.add_annotation_button.clicked.connect(self.add_annotation)
         self.view.annotations_tab.deselect_annotation_button.clicked.connect(self.deselect_annotation)
         self.view.annotations_list.itemSelectionChanged.connect(self.on_annotation_selection_changed)
+        self.view.annotations_list.itemChanged.connect(self.on_annotation_item_changed)
         self.view.clear_annotations_button.clicked.connect(self.clear_annotations)
 
         self.view.annotation_text.editingFinished.connect(self.update_active_annotation)
@@ -137,9 +138,13 @@ class AnnotationManager:
         }
 
         self.annotations.append(annotation)
-        self.view.annotations_list.addItem(f"{text} @ ({annotation["x"]:.2f}, {annotation["y"]:.2f})")
+
+        item = QListWidgetItem(f"{text} @ ({annotation['x']:.2f}, {annotation['y']:.2f})")
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        item.setCheckState(Qt.CheckState.Checked)
 
         self._is_updating_ui = True
+        self.view.annotations_list.addItem(item)
         self.view.annotation_text.clear()
         self.view.annotations_list.clearSelection()
         self._is_updating_ui = False
@@ -171,13 +176,27 @@ class AnnotationManager:
             ann["color"] = self.annotation_color
             ann["bg_color"] = self.annotation_bg_color
 
+            self._is_updating_ui = True
             selected_items[0].setText(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")
+            self._is_updating_ui = False
             self.plot_tab.on_style_changed()
 
     def deselect_annotation(self) -> None:
         """Clears the current annotation selection to allow adding a new one"""
         self.view.annotations_list.clearSelection()
         self.view.annotation_text.clear()
+
+    def on_annotation_item_changed(self, item: QListWidgetItem) -> None:
+        """Handles the toggling of annotation visibility via list checking"""
+        if self._is_updating_ui:
+            return
+
+        index = self.view.annotations_list.row(item)
+        if 0 <= index < len(self.annotations):
+            is_visible = (item.checkState() == Qt.CheckState.Checked)
+            if self.annotations[index].get("visible", True) != is_visible:
+                self.annotations[index]["visible"] = is_visible
+                self.plot_tab.on_style_changed()
 
     def on_annotation_selection_changed(self) -> None:
         """The selection of an annotation from the list"""
@@ -235,10 +254,12 @@ class AnnotationManager:
         if 0 <= index < len(self.annotations):
             self.annotations[index].update(new_data)
             if index < self.view.annotations_list.count():
+                self._is_updating_ui = True
                 item = self.view.annotations_list.item(index)
                 x, y = self.annotations[index]["x"], self.annotations[index]["y"]
                 text = self.annotations[index]["text"]
                 item.setText(f"{text} @ ({x:.2f}, {y:.2f})")
+                self._is_updating_ui = False
             self.plot_tab.on_style_changed()
 
     def _delete_annotation_from_toolbar(self, index: int) -> None:
@@ -267,6 +288,8 @@ class AnnotationManager:
 
         # Manual annotations
         for i, ann in enumerate(self.annotations):
+            if not ann.get("visible", True):
+                continue
             font_kwargs = {}
             if "fontfamily" in ann:
                 font_kwargs["fontfamily"] = ann["fontfamily"]
@@ -421,8 +444,10 @@ class AnnotationManager:
                         self.annotations[idx]["y"] = pos[1]
 
                         if idx < self.view.annotations_list.count():
+                            self._is_updating_ui = True
                             item = self.view.annotations_list.item(idx)
                             item.setText(f"{self.annotations[idx]['text']} @ ({pos[0]:.2f}, {pos[1]:.2f})")
+                            self._is_updating_ui = False
 
                         self.status_bar.log(f"Moved annotation to ({pos[0]:.2f}, {pos[1]:.2f})", LogLevel.INFO)
                 except ValueError:
