@@ -469,15 +469,6 @@ class PlotSettingsPanel(QWidget):
         self.pie_shadow_check = cust_tab.pie_shadow_check
         self.pie_donut_check = cust_tab.pie_donut_check
         self.pie_donut_width_spin = cust_tab.pie_donut_width_spin
-        self.pie_pct_decimals_spin = cust_tab.pie_percent_decimals_spin
-        self.pie_pct_distance_spin = cust_tab.pie_percent_label_distance_spin
-        self.pie_pct_size_spin = cust_tab.pie_percent_font_size_spin
-        self.pie_pct_color = cust_tab.pie_percent_color_label
-        self.pie_label_distance_spin = cust_tab.pie_category_label_distances_spin
-        self.pie_label_size_spin = cust_tab.pie_category_label_font_size_spin
-        self.pie_label_color = cust_tab.pie_category_font_color_label
-        self.pie_pct_color_button = cust_tab.pie_percent_label_font_color_button
-        self.pie_label_color_button = cust_tab.pie_category_label_font_color_button
 
         # Marker Properties
         self.marker_group = cust_tab.marker_group

@@ -156,11 +156,6 @@ class PlotGenerationManager:
             view.error_bar_capsize_spin.value(),
             view.error_bar_alpha_slider.value(),
             view.error_bar_zorder_spin.value(),
-            view.pie_pct_decimals_spin.value(),
-            view.pie_pct_distance_spin.value(),
-            view.pie_pct_size_spin.value(),
-            view.pie_label_distance_spin.value(),
-            view.pie_label_size_spin.value()
         )
 
         signature_string = f"{signature_components}".encode('utf-8')
