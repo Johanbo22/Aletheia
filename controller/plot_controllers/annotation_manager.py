@@ -3,7 +3,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 import pandas as pd
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
+from PyQt6.QtWidgets import QColorDialog
 from matplotlib.text import Text
 
 from controller.plot_controllers.color_manager import ColorManager
