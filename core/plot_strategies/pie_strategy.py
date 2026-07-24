@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+from typing import Any, Dict, List, TYPE_CHECKING
+
 from core.plot_engine import PlotEngine
 from core.plot_strategies.base_strategy import BasePlotStrategy
 from ui.plot_tab import PlotTab

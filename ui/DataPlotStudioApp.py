@@ -211,12 +211,16 @@ class DataPlotStudio(QMainWindow):
         window_menu.addAction(reset_layout_action)
 
         # File menu
+        self.menu_bar.file_new.triggered.connect(self.main_widget.plot_tab.reset_settings_without_prompt)
         self.menu_bar.file_new.triggered.connect(self.main_widget.new_project)
         self.menu_bar.file_open.triggered.connect(self.main_widget.open_project)
         self.menu_bar.file_save.triggered.connect(self.main_widget.save_project)
         self.menu_bar.file_save_as.triggered.connect(self.main_widget.save_project_as)
+        self.menu_bar.import_file.triggered.connect(self.main_widget.plot_tab.reset_settings_without_prompt)
         self.menu_bar.import_file.triggered.connect(self.main_widget.import_file)
+        self.menu_bar.import_sheets.triggered.connect(self.main_widget.plot_tab.reset_settings_without_prompt)
         self.menu_bar.import_sheets.triggered.connect(self.main_widget.import_google_sheets)
+        self.menu_bar.import_database.triggered.connect(self.main_widget.plot_tab.reset_settings_without_prompt)
         self.menu_bar.import_database.triggered.connect(self.main_widget.import_from_database)
 
         # Export menu

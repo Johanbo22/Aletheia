@@ -22,10 +22,9 @@ class AnnotationsSettingsTab(QWidget):
         self._setup_reference_lines_group(scroll_layout)
         scroll_layout.addSpacing(15)
         self._setup_annotation_tools_group(scroll_layout)
+        self._setup_annotations_list_group(scroll_layout)
         scroll_layout.addSpacing(15)
         self._setup_datatable_group(scroll_layout)
-        scroll_layout.addSpacing(15)
-        self._setup_annotations_list_group(scroll_layout)
 
         scroll_layout.addStretch()
         scroll.setWidget(scroll_widget)

@@ -4,6 +4,24 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.4.4 [Patch]
+
+### Added
+
+- Toggle the visibility of annotations using checkboxes in the list of annotations without the need to delete them.
+- Reset to Defaults button for the Plot Settings Panel to reset all settings to their default value.
+- More dark mode styling
+
+### Changed
+
+- Layout of the Annotations tab. Moved the Annotations list up to be below the annotations tools group.
+
+### Fixed
+
+- Fixed a text issue where "3D" was still written with "2D and Gridded" plot categories.
+- Fixed an issue where searching for tools in the plot settings panel did not return any results despite the tool
+  existing.
+
 ## v.0.4.3 [Patch]
 
 ### Added

@@ -768,27 +768,30 @@ class CodeExporter:
             "    try:",
             f"        data = df.groupby({ctx['x']})[{ctx['y']}].sum()"
         ])
-        
+
         explode_list = "None"
         if pie_cfg.get("explode_first"):
-             dist = pie_cfg.get("explode_distance", 0.1)
-             lines.append("        explode = [0.0] * len(data)")
-             lines.append(f"        if len(explode) > 0: explode[0] = {dist}")
-             explode_list = "explode"
-             
+            dist = pie_cfg.get("explode_distance", 0.1)
+            lines.append("        explode = [0.0] * len(data)")
+            lines.append(f"        if len(explode) > 0: explode[0] = {dist}")
+            explode_list = "explode"
+
         autopct = "'%1.2f%%'" if pie_cfg.get("show_percentages") else "None"
         start = pie_cfg.get("start_angle", 0)
         shadow = pie_cfg.get("shadow", False)
-        
+
         is_donut = pie_cfg.get("donut_enabled", False)
-        
+
+        wedgeprops_str = ""
         if is_donut:
             donut_width = pie_cfg.get("donut_width", 0.3)
             wedgeprops_str = f"{{'width': {donut_width}}}"
-            lines.append(f"        ax.pie(data, labels=data.index, autopct={autopct}, startangle={start}, explode={explode_list}, shadow={shadow}, wedgeprops={wedgeprops_str})")
+            lines.append(
+                f"        ax.pie(data, labels=data.index, autopct={autopct}, startangle={start}, explode={explode_list}, shadow={shadow}, wedgeprops={wedgeprops_str})")
         else:
-            lines.append(f"        ax.pie(data, labels=data.index, autopct={autopct}, startangle={start}, explode={explode_list}, shadow={shadow})")
-        
+            lines.append(
+                f"        ax.pie(data, labels=data.index, autopct={autopct}, startangle={start}, explode={explode_list}, shadow={shadow})")
+
         lines.extend([
             "        ax.set_ylabel('')",
             "    except Exception as e: print(f'Pie chart error: {e}')"

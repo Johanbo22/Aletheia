@@ -155,7 +155,7 @@ class PlotGenerationManager:
             view.error_bar_linewidth_spin.value(),
             view.error_bar_capsize_spin.value(),
             view.error_bar_alpha_slider.value(),
-            view.error_bar_zorder_spin.value()
+            view.error_bar_zorder_spin.value(),
         )
 
         signature_string = f"{signature_components}".encode('utf-8')

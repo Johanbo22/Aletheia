@@ -314,7 +314,7 @@ class CustomizationSettingsTab(QWidget):
         self.pie_show_percentages_check.setChecked(False)
         pie_layout.addWidget(self.pie_show_percentages_check)
 
-        pie_layout.addWidget(QLabel("Start Angle (degress):"))
+        pie_layout.addWidget(QLabel("Start Angle (degrees):"))
         self.pie_start_angle_spin = QSpinBox()
         self.pie_start_angle_spin.setToolTip(
             "Change the initial angle of the pie chart.\nThis will rotate the pie around its own axis")

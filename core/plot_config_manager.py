@@ -374,7 +374,7 @@ class PlotConfigManager:
                 "explode_distance": self.pt.pie_explode_distance_spin.value(),
                 "shadow"          : self.pt.pie_shadow_check.isChecked(),
                 "donut_enabled"   : self.pt.pie_donut_check.isChecked(),
-                "donut_width"     : self.pt.pie_donut_width_spin.value()
+                "donut_width"   : self.pt.pie_donut_width_spin.value(),
             },
         }
 

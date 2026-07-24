@@ -25,7 +25,7 @@ class PlotTypeManager:
         self.plot_categories: Dict[str, List[str]] = {
             "Basic and Relational": ["Line", "Scatter", "Bar", "Area", "Pie", "Stem", "Stairs"],
             "Distribution"        : ["Histogram", "Box", "Violin", "KDE", "ECDF", "Count Plot", "Eventplot"],
-            "2D, Gridded and 3D"  : ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)",
+            "2D and Gridded": ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)",
                                      "pcolormesh", "Contour", "Contourf", "Stackplot"],
             "Vector Fields"       : ["Barbs", "Quiver", "Streamplot"],
             "Triangulation"       : ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"],
