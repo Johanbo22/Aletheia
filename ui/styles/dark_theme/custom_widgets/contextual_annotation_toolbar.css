@@ -1,0 +1,96 @@
+#ContextualToolbar {
+    background-color: #252526;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    border-bottom: 2px solid #52525b;
+}
+
+#ContextualToolbar QLabel {
+    color: #e4e4e7;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+#ContextualToolbar QLineEdit {
+    background-color: #1e1e1e;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 4px 6px;
+    color: #e4e4e7;
+    selection-background-color: #3b82f6;
+}
+
+#ContextualToolbar QLineEdit:focus {
+    border: 1px solid #3b82f6;
+    background-color: #252526;
+}
+
+#ContextualToolbar QLineEdit:disabled {
+    background-color: #2d2d30;
+    color: #71717a;
+    border-color: #3f3f46;
+}
+
+#ContextualToolbar QSpinBox {
+    background-color: #1e1e1e;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 4px;
+    color: #e4e4e7;
+    min-height: 20px;
+    selection-background-color: #3b82f6;
+}
+
+#ContextualToolbar QSpinBox:focus {
+    border: 1px solid #3b82f6;
+    background-color: #252526;
+}
+
+#ContextualToolbar QSpinBox:disabled {
+    background-color: #2d2d30;
+    color: #71717a;
+    border-color: #3f3f46;
+}
+
+#ContextualToolbar QSpinBox::up-button,
+#ContextualToolbar QSpinBox::down-button {
+    width: 16px;
+    border: none;
+    background: transparent;
+}
+
+#ContextualToolbar QSpinBox::up-button:hover,
+#ContextualToolbar QSpinBox::down-button:hover {
+    background-color: #3f3f46;
+    border-radius: 2px;
+}
+
+#ContextualToolbar QPushButton {
+    background-color: #2d2d30;
+    border: 1px solid #3f3f46;
+    border-radius: 4px;
+    padding: 4px 10px;
+    color: #e4e4e7;
+    font-weight: 500;
+}
+
+#ContextualToolbar QPushButton:focus {
+    border: 1px dashed #3b82f6;
+    outline: none;
+}
+
+#ContextualToolbar QPushButton:hover {
+    background-color: #3f3f46;
+    border-color: #52525b;
+}
+
+#ContextualToolbar QPushButton:pressed {
+    background-color: #52525b;
+    border-color: #71717a;
+}
+
+#ContextualToolbar QPushButton:disabled {
+    background-color: #1e1e1e;
+    color: #71717a;
+    border-color: #3f3f46;
+}

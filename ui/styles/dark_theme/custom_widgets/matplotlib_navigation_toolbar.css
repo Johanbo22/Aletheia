@@ -1,0 +1,60 @@
+/* Matplotlib navigation toolbar styling, thingy on the top of plot canvas*/
+#MatplotlibToolbar {
+    background-color: #252526;
+    border: 1px solid #3f3f46;
+    border-bottom: 2px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 5px;
+    spacing: 6px;
+}
+
+#MatplotlibToolbar QToolButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    border-radius: 4px;
+    padding: 6px;
+    margin: 1px;
+    color: #e4e4e7;
+}
+
+#MatplotlibToolbar QToolButton:hover {
+    background: rgba(58, 134, 255, 0.15);
+    color: #ffffff;
+    border: 1px solid transparent;
+    border-bottom: 2px solid rgba(58, 134, 255, 0.5);
+}
+
+#MatplotlibToolbar QToolButton:pressed {
+    background-color: #3f3f46;
+}
+
+#MatplotlibToolbar QToolButton:checked {
+    background-color: rgba(58, 134, 255, 0.25);
+    border-bottom: 2px solid #3A86FF;
+}
+
+#MatplotlibToolbar QToolButton:focus {
+    border: 1px dashed #3A86FF;
+    border-bottom: 2px dashed #3A86FF;
+    outline: none;
+}
+
+#MatplotlibToolbar QToolButton:disabled {
+    background-color: transparent;
+    color: #71717a;
+    border-color: transparent;
+}
+
+#MatplotlibToolbar::separator {
+    width: 1px;
+    background-color: #3f3f46;
+    margin: 4px 6px;
+}
+
+#MatplotlibToolbar QLabel {
+    color: #a1a1aa;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10pt;
+    padding-left: 8px;
+}
