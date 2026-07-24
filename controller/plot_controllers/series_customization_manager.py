@@ -41,19 +41,36 @@ class SeriesCustomizationManager:
             self.update_bar_selector()
         self.plot_tab.on_style_changed()
 
+    def _get_all_bar_containers(self) -> list[tuple[str, Any]]:
+        """Gets all the bar containers and their labels across all axes"""
+        results = []
+        axes = [self.plot_engine.current_ax]
+        if getattr(self.plot_engine, "secondary_ax", None):
+            axes.append(self.plot_engine.secondary_ax)
+
+        global_idx = 0
+        for ax in axes:
+            if not ax or not ax.containers:
+                continue
+
+            handles, labels = ax.get_legend_handles_labels()
+
+            for i, container in enumerate(ax.containers):
+                if not hasattr(container, "patches") or not container.patches:
+                    continue
+
+                label = container.get_label()
+                if not label or label.startswith("_"):
+                    label = labels[i] if i < len(labels) else f"Bar Series {global_idx + 1}"
+
+                results.append((label, container))
+                global_idx += 1
+
+        return results
+
     def _initialize_all_bar_customizations(self) -> None:
         """Initialize customizations dictionary for all bars with their current visual state"""
-        if not self.plot_engine.current_ax or not self.plot_engine.current_ax.containers:
-            return
-
-        for i, container in enumerate(self.plot_engine.current_ax.containers):
-            if not hasattr(container, "patches") or not container.patches:
-                continue
-            label = container.get_label()
-            if not label or label.startswith("_"):
-                handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                label = labels[i] if i < len(labels) else f"Bar Series {i + 1}"
-
+        for label, container in self._get_all_bar_containers():
             if label not in self.bar_customizations:
                 patch = container.patches[0]
                 self.bar_customizations[label] = {
@@ -69,17 +86,8 @@ class SeriesCustomizationManager:
         self.view.bar_selector_combo.blockSignals(True)
         self.view.bar_selector_combo.clear()
 
-        if self.plot_engine.current_ax and self.plot_engine.current_ax.containers:
-            for i, container in enumerate(self.plot_engine.current_ax.containers):
-                label = container.get_label()
-
-                if not label or label.startswith("_"):
-                    handles, labels = self.plot_engine.current_ax.get_legend_handles_labels()
-                    if i < len(labels):
-                        label = labels[i]
-                    else:
-                        label = f"Bar series {i + 1}"
-                self.view.bar_selector_combo.addItem(label, userData=container)
+        for label, container in self._get_all_bar_containers():
+            self.view.bar_selector_combo.addItem(label, userData=container)
 
         self.view.bar_selector_combo.blockSignals(False)
 
@@ -156,16 +164,36 @@ class SeriesCustomizationManager:
             self.update_line_selector()
         self.plot_tab.on_style_changed()
 
+    def _get_all_lines(self) -> list[tuple[str, Any]]:
+        """Helper to get all valid lines and their labels across all axes."""
+        results = []
+        axes = [self.plot_engine.current_ax]
+        if getattr(self.plot_engine, 'secondary_ax', None):
+            axes.append(self.plot_engine.secondary_ax)
+
+        global_idx = 0
+        for ax in axes:
+            if not ax:
+                continue
+
+            lines = [l for l in ax.get_lines() if
+                     l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
+
+            for i, line in enumerate(lines):
+                label = line.get_label()
+                if not label or label.startswith("_"):
+                    label = f"Line {global_idx + 1}"
+
+                results.append((label, line))
+                global_idx += 1
+
+        return results
+
     def _initialize_all_line_customizations(self) -> None:
         """Initialize customizations dict for all lines with their current state."""
-        if not self.plot_engine.current_ax:
-            return
-        lines = [l for l in self.plot_engine.current_ax.get_lines() if
-                 l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-        for i, line in enumerate(lines):
-            line_name = line.get_label() if not line.get_label().startswith("_") else f"Line {i + 1}"
-            if line_name not in self.line_customizations:
-                self.line_customizations[line_name] = {
+        for label, line in self._get_all_lines():
+            if label not in self.line_customizations:
+                self.line_customizations[label] = {
                     "linewidth"      : line.get_linewidth(),
                     "linestyle"      : line.get_linestyle(),
                     "color"          : to_hex(line.get_color()) if line.get_color() else None,
@@ -207,14 +235,9 @@ class SeriesCustomizationManager:
         self.view.line_selector_combo.blockSignals(True)
         self.view.line_selector_combo.clear()
 
-        if self.plot_engine.current_ax:
-            lines = [l for l in self.plot_engine.current_ax.get_lines() if
-                     l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
-            for i, line in enumerate(lines):
-                label = line.get_label()
-                if label.startswith("_"):
-                    label = f"Line {i + 1}"
-                self.view.line_selector_combo.addItem(label, userData=i)
+        for label, line in self._get_all_lines():
+            self.view.line_selector_combo.addItem(label, userData=line)
+
         self.view.line_selector_combo.blockSignals(False)
 
         if preserve_selection and current_text:
@@ -231,55 +254,45 @@ class SeriesCustomizationManager:
         if not self.view.multiline_custom_check.isChecked():
             return
 
-        if not self.plot_engine.current_ax:
+        line = self.view.line_selector_combo.currentData()
+        if line is None:
             return
 
-        # Get line idx
-        line_idx = self.view.line_selector_combo.currentData()
-        if line_idx is None:
-            return
+        # Load current line properties
+        self.view.linewidth_spin.blockSignals(True)
+        self.view.linewidth_spin.setValue(line.get_linewidth())
+        self.view.linewidth_spin.blockSignals(False)
 
-        lines = [l for l in self.plot_engine.current_ax.get_lines() if
-                 l.get_gid() not in ["regression_line", "confidence_interval", "error_bar"]]
+        linestyle_map_reverse = {"-": "Solid", "--": "Dashed", "-.": "Dash-dot", ":": "Dotted"}
+        current_style = linestyle_map_reverse.get(line.get_linestyle(), "Solid")
+        self.view.linestyle_combo.blockSignals(True)
+        self.view.linestyle_combo.setCurrentText(current_style)
+        self.view.linestyle_combo.blockSignals(False)
 
-        if line_idx < len(lines):
-            line = lines[line_idx]
+        # Load color
+        color = line.get_color()
+        hex_color = to_hex(color) if color else "#000000"
+        self.plot_tab.line_color = hex_color
+        self.view.line_color_label.setText(self.plot_tab.line_color)
+        ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.plot_tab.line_color))
 
-            # Load current line properties
-            self.view.linewidth_spin.blockSignals(True)
-            self.view.linewidth_spin.setValue(line.get_linewidth())
-            self.view.linewidth_spin.blockSignals(False)
+        # Load markers
+        marker = line.get_marker()
+        marker_text = marker if marker not in ["None", " ", "", None] else "None"
+        self.view.marker_combo.blockSignals(True)
+        self.view.marker_combo.setCurrentText(marker_text)
+        self.view.marker_combo.blockSignals(False)
 
-            linestyle_map_reverse = {"-": "Solid", "--": "Dashed", "-.": "Dash-dot", ":": "Dotted"}
-            current_style = linestyle_map_reverse.get(line.get_linestyle(), "Solid")
-            self.view.linestyle_combo.blockSignals(True)
-            self.view.linestyle_combo.setCurrentText(current_style)
-            self.view.linestyle_combo.blockSignals(False)
+        self.view.marker_size_spin.blockSignals(True)
+        self.view.marker_size_spin.setValue(int(line.get_markersize() or 0))
+        self.view.marker_size_spin.blockSignals(False)
 
-            # Load color
-            color = line.get_color()
-            hex_color = to_hex(color) if color else "#000000"
-            self.plot_tab.line_color = hex_color
-            self.view.line_color_label.setText(self.plot_tab.line_color)
-            ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.plot_tab.line_color))
-
-            # Load markers
-            marker = line.get_marker()
-            marker_text = marker if marker not in ["None", " ", "", None] else "None"
-            self.view.marker_combo.blockSignals(True)
-            self.view.marker_combo.setCurrentText(marker_text)
-            self.view.marker_combo.blockSignals(False)
-
-            self.view.marker_size_spin.blockSignals(True)
-            self.view.marker_size_spin.setValue(int(line.get_markersize() or 0))
-            self.view.marker_size_spin.blockSignals(False)
-
-            # Load alpha
-            alpha = line.get_alpha() if line.get_alpha() is not None else 1.0
-            self.view.alpha_slider.blockSignals(True)
-            self.view.alpha_slider.setValue(int(alpha * 100))
-            self.view.alpha_slider.blockSignals(False)
-            self.view.alpha_label.setText(f"{int(alpha * 100)}%")
+        # Load alpha
+        alpha = line.get_alpha() if line.get_alpha() is not None else 1.0
+        self.view.alpha_slider.blockSignals(True)
+        self.view.alpha_slider.setValue(int(alpha * 100))
+        self.view.alpha_slider.blockSignals(False)
+        self.view.alpha_label.setText(f"{int(alpha * 100)}%")
 
     def clear_customizations(self) -> None:
         """Clears all stored series customizations"""

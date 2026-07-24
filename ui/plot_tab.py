@@ -163,6 +163,7 @@ class PlotTab(PlotTabUI):
         self.view.secondary_y_check.stateChanged.connect(self.on_data_changed)
         self.view.secondary_y_column.currentTextChanged.connect(self.on_data_changed)
         self.view.secondary_plot_type_combo.currentTextChanged.connect(self.on_data_changed)
+        self.view.secondary_y_check.stateChanged.connect(self._toggle_sec_y_appearance_tab)
 
         self.subplot_manager.connect_signals()
 
@@ -194,6 +195,11 @@ class PlotTab(PlotTabUI):
         self.view.ylabel_size_spin.valueChanged.connect(self.on_style_changed)
         self.view.ylabel_weight_combo.currentTextChanged.connect(self.on_style_changed)
         self.view.ylabel_check.stateChanged.connect(self.on_style_changed)
+
+        self.view.appearance_tab_widget.sec_ylabel_input.textChanged.connect(self.on_style_changed)
+        self.view.appearance_tab_widget.sec_ylabel_size_spin.valueChanged.connect(self.on_style_changed)
+        self.view.appearance_tab_widget.sec_ylabel_weight_combo.currentTextChanged.connect(self.on_style_changed)
+        self.view.appearance_tab_widget.sec_ylabel_check.stateChanged.connect(self.on_style_changed)
 
         self.view.zlabel_check.stateChanged.connect(self.on_style_changed)
         self.view.zlabel_input.textChanged.connect(self.on_style_changed)
@@ -793,6 +799,11 @@ class PlotTab(PlotTabUI):
     def _toggle_secondary_input(self, enabled: bool):
         self.data_selection_manager.toggle_secondary_input(enabled)
 
+    def _toggle_sec_y_appearance_tab(self) -> None:
+        is_enabled = self.view.secondary_y_check.isChecked()
+        self.view.appearance_tab_widget.tab_widget.setTabVisible(self.view.appearance_tab_widget.sec_y_tab_index,
+                                                                 is_enabled)
+
     def load_config(self, config: dict) -> None:
         """Load plot configuration"""
         try:
@@ -883,14 +894,17 @@ class PlotTab(PlotTabUI):
         self.view.title_input.blockSignals(True)
         self.view.xlabel_input.blockSignals(True)
         self.view.ylabel_input.blockSignals(True)
+        self.view.appearance_tab_widget.sec_ylabel_input.blockSignals(True)
 
         self.view.title_input.clear()
         self.view.xlabel_input.clear()
         self.view.ylabel_input.clear()
+        self.view.appearance_tab_widget.sec_ylabel_input.clear()
 
         self.view.title_input.blockSignals(False)
         self.view.xlabel_input.blockSignals(False)
         self.view.ylabel_input.blockSignals(False)
+        self.view.appearance_tab_widget.sec_ylabel_input.blockSignals(False)
 
     def set_empty_state_greeting(self) -> None:
         try:

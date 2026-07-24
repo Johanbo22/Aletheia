@@ -282,6 +282,23 @@ class PlotFormattingManager:
         else:
             self.plot_tab.plot_engine.current_ax.set_ylabel("")
 
+        sec_ax = getattr(self.plot_tab.plot_engine, "secondary_ax", None)
+        if sec_ax:
+            if self.plot_tab.view.appearance_tab_widget.sec_ylabel_check.isChecked():
+                sec_ylabel_text = self.plot_tab.view.appearance_tab_widget.sec_ylabel_input.text() or general_kwargs.get(
+                    "secondary_y", "")
+                sec_ax.set_ylabel(
+                    sec_ylabel_text,
+                    fontsize=self.plot_tab.view.appearance_tab_widget.sec_ylabel_size_spin.value(),
+                    fontweight=self.plot_tab.view.appearance_tab_widget.sec_ylabel_weight_combo.currentText(),
+                    fontfamily=font_family
+                )
+            else:
+                sec_ax.set_ylabel("")
+
+            for label in sec_ax.get_yticklabels():
+                label.set_fontfamily(font_family)
+
         if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
             if self.plot_tab.view.zlabel_check.isChecked():
                 zlabel_text = self.plot_tab.view.zlabel_input.text() or general_kwargs.get("zlabel", "")

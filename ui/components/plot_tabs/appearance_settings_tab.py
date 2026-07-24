@@ -164,7 +164,7 @@ class AppearanceSettingsTab(QWidget):
         group = QGroupBox("Axis Label Options")
         layout = QVBoxLayout()
 
-        tab_widget = QTabWidget()
+        self.tab_widget = QTabWidget()
 
         # X axis tab
         x_tab = QWidget()
@@ -197,7 +197,7 @@ class AppearanceSettingsTab(QWidget):
         x_layout.addWidget(self.xlabel_weight_combo)
 
         x_layout.addStretch()
-        tab_widget.addTab(x_tab, "X-Axis")
+        self.tab_widget.addTab(x_tab, "X-Axis")
 
         y_tab = QWidget()
         y_layout = QVBoxLayout(y_tab)
@@ -229,7 +229,41 @@ class AppearanceSettingsTab(QWidget):
         y_layout.addWidget(self.ylabel_weight_combo)
 
         y_layout.addStretch()
-        tab_widget.addTab(y_tab, "Y-Axis")
+        self.tab_widget.addTab(y_tab, "Y-Axis")
+
+        sec_y_tab = QWidget()
+        sec_y_layout = QVBoxLayout(sec_y_tab)
+
+        self.sec_ylabel_check = ToggleSwitch("Show Secondary Y Label")
+        self.sec_ylabel_check.setToolTip("Toggle the visibility of the secondary Y-axis label")
+        self.sec_ylabel_check.setChecked(True)
+        sec_y_layout.addWidget(self.sec_ylabel_check)
+
+        sec_y_layout.addWidget(QLabel("Secondary Y Label:"))
+        self.sec_ylabel_input = QLineEdit()
+        self.sec_ylabel_input.setToolTip("Enter the text to displayed as the secondary Y-axis label")
+        self.sec_ylabel_input.setPlaceholderText("Secondary Y axis label")
+        self.sec_ylabel_input.setClearButtonEnabled(True)
+        sec_y_layout.addWidget(self.sec_ylabel_input)
+
+        sec_y_layout.addWidget(QLabel("Secondary Y Label Font-size:"))
+        self.sec_ylabel_size_spin = QSpinBox()
+        self.sec_ylabel_size_spin.setToolTip("Change the size of the secondary Y-axis label font")
+        self.sec_ylabel_size_spin.setRange(5, 32)
+        self.sec_ylabel_size_spin.setValue(12)
+        sec_y_layout.addWidget(self.sec_ylabel_size_spin)
+
+        sec_y_layout.addWidget(QLabel("Secondary Y Label Font Weight:"))
+        self.sec_ylabel_weight_combo = QComboBox()
+        self.sec_ylabel_weight_combo.setToolTip("Change the weight of the secondary Y-axis label font")
+        self.sec_ylabel_weight_combo.addItems(["normal", "bold", "light", "heavy"])
+        self.sec_ylabel_weight_combo.setCurrentText("normal")
+        sec_y_layout.addWidget(self.sec_ylabel_weight_combo)
+
+        sec_y_layout.addStretch()
+        self.tab_widget.addTab(sec_y_tab, "Secondary Y-axis")
+        self.sec_y_tab_index = self.tab_widget.indexOf(sec_y_tab)
+        self.tab_widget.setTabVisible(self.sec_y_tab_index, False)
 
         self.z_label_widget = QWidget()
         z_layout = QVBoxLayout(self.z_label_widget)
@@ -261,9 +295,9 @@ class AppearanceSettingsTab(QWidget):
         z_layout.addWidget(self.zlabel_weight)
         z_layout.addStretch()
 
-        tab_widget.addTab(self.z_label_widget, "Z-Axis")
+        self.tab_widget.addTab(self.z_label_widget, "Z-Axis")
 
-        layout.addWidget(tab_widget)
+        layout.addWidget(self.tab_widget)
         group.setLayout(layout)
         parent_layout.addWidget(group)
 
