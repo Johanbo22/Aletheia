@@ -20,7 +20,7 @@ class PlotSettingsPanel(QWidget):
         self.help_manager = HelpManager()
         self._is_searching = False
         self._tab_visibility_snapshot = {}
-        self._groupbox_visibility_snapshot = {}
+        self._widget_visibility_snapshot = {}
         self.init_ui()
 
     def init_ui(self):
@@ -45,6 +45,8 @@ class PlotSettingsPanel(QWidget):
         self.reset_button.setToolTip("Reset all plot settings to their initial default values")
         self.reset_button.setFixedSize(QSize(28, 28))
         self.reset_button.setFlat(True)
+
+        layout.addLayout(header_layout)
 
         self.custom_tabs = QTabWidget()
 
@@ -222,9 +224,11 @@ class PlotSettingsPanel(QWidget):
     def setup_search_bar_shortcuts(self) -> None:
         """Sets up the keyboard shortcuts for activating and closing settings searching"""
         self.search_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self)
+        self.search_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.search_shortcut.activated.connect(self.open_search)
 
         self.close_shortcut = QShortcut(QKeySequence("Esc"), self.settings_search_input)
+        self.close_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.close_shortcut.activated.connect(self.close_search)
 
     def _expose_general_tab_widgets(self) -> None:
@@ -821,14 +825,17 @@ class PlotSettingsPanel(QWidget):
         based on their titles or the text of their enclosed children."""
         any_match_in_tab = False
 
-        for group_box in parent_widget.findChildren(QGroupBox):
-            if not self._groupbox_visibility_snapshot.get(id(group_box), True):
-                group_box.setVisible(False)
+        for container in self._get_searchable_containers(parent_widget):
+            if not self._widget_visibility_snapshot.get(id(container), True):
+                container.setVisible(False)
                 continue
-            has_match = search_text in group_box.title().lower()
+
+            has_match = False
+            if isinstance(container, QGroupBox):
+                has_match = search_text in container.title().lower()
 
             if not has_match:
-                for child in group_box.findChildren(QWidget):
+                for child in container.findChildren(QWidget):
                     if isinstance(child, QLabel) and search_text in child.text().lower():
                         has_match = True
                         break
@@ -839,25 +846,49 @@ class PlotSettingsPanel(QWidget):
                             has_match = True
                             break
 
-            group_box.setVisible(has_match)
+            container.setVisible(has_match)
             if has_match:
                 any_match_in_tab = True
+
         return any_match_in_tab
+
+    def _get_searchable_containers(self, parent_widget: QWidget) -> list[QWidget]:
+        """
+        Identifies container widgets for filtering.
+        Targets top-level QWidgets inside a ScrollContent, or falls back to known containers.
+        """
+        containers = []
+        scroll_content = parent_widget.findChild(QWidget, "ScrollContent")
+
+        if scroll_content and scroll_content.layout():
+            layout = scroll_content.layout()
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item and item.widget():
+                    containers.append(item.widget())
+        else:
+            for widget in parent_widget.findChildren(QWidget):
+                if isinstance(widget, (QGroupBox, QTabWidget)):
+                    containers.append(widget)
+        return containers
 
     def _snapshot_visibility(self) -> None:
         self._tab_visibility_snapshot.clear()
         for i in range(self.custom_tabs.count()):
             self._tab_visibility_snapshot[i] = self.custom_tabs.isTabVisible(i)
 
-        self._groupbox_visibility_snapshot.clear()
-        for group_box in self.findChildren(QGroupBox):
-            self._groupbox_visibility_snapshot[id(group_box)] = not group_box.isHidden()
+        self._widget_visibility_snapshot.clear()
+        for i in range(self.custom_tabs.count()):
+            tab_widget = self.custom_tabs.widget(i)
+            for container in self._get_searchable_containers(tab_widget):
+                self._widget_visibility_snapshot[id(container)] = not container.isHidden()
 
     def _restore_visibility(self) -> None:
         for i in range(self.custom_tabs.count()):
             is_visible = self._tab_visibility_snapshot.get(i, True)
             self.custom_tabs.setTabVisible(i, is_visible)
 
-        for group_box in self.findChildren(QGroupBox):
-            is_visible = self._groupbox_visibility_snapshot.get(id(group_box), True)
-            group_box.setVisible(is_visible)
+            tab_widget = self.custom_tabs.widget(i)
+            for container in self._get_searchable_containers(tab_widget):
+                is_visible = self._widget_visibility_snapshot.get(id(container), True)
+                container.setVisible(is_visible)
