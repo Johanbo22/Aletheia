@@ -21,9 +21,9 @@ class ViewCubeWidget(QWidget):
 
     view_angle_changed = pyqtSignal(float, float)
 
-    DEFAULT_FACE_X = QColor(200, 100, 100, 180)
-    DEFAULT_FACE_Y = QColor(100, 200, 100, 180)
-    DEFAULT_FACE_Z = QColor(100, 100, 200, 180)
+    DEFAULT_FACE_X = QColor(200, 100, 100, 255)
+    DEFAULT_FACE_Y = QColor(100, 200, 100, 255)
+    DEFAULT_FACE_Z = QColor(100, 100, 200, 255)
 
     CUBE_SIZE = 120
     FACE_PADDING = 4
@@ -44,13 +44,17 @@ class ViewCubeWidget(QWidget):
 
         self._is_draggin = False
         self._last_mouse_pos: Optional[Tuple[int, int]] = None
-
         self._clicked_face: Optional[str] = None
+
+        self._home_rect = QRectF()
+        self._hovered_home = False
 
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
-        self.setFixedSize(self.CUBE_SIZE + 20, self.CUBE_SIZE + 20)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(self.CUBE_SIZE + 50, self.CUBE_SIZE + 50)
+
+        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.OpenHandCursor)
         self.setObjectName("viewCube")
 
         self.setProperty("faceColorX", self._faceColorX)
@@ -150,8 +154,14 @@ class ViewCubeWidget(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             return
 
+        if self._home_rect.contains(event.position()):
+            self.set_angles(-60, 30, emit_signal=True)
+            event.accept()
+            return
+
         self._is_draggin = True
-        self._last_mouse_pos = (event.position().x(), event.pos().y())
+        self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        self._last_mouse_pos = (event.position().x(), event.position().y())
 
         clicked_face = self._hit_test(event.position().x(), event.position().y())
         if clicked_face:
@@ -163,6 +173,17 @@ class ViewCubeWidget(QWidget):
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Handle mouse drag to rotate the cube"""
+        is_hovering_home: bool = self._home_rect.contains(event.position())
+        if is_hovering_home != getattr(self, "_hovered_home", False):
+            self._hovered_home = is_hovering_home
+            if not self._is_draggin:
+                self.setCursor(
+                    Qt.CursorShape.PointingHandCursor
+                    if is_hovering_home
+                    else Qt.CursorShape.OpenHandCursor
+                )
+            self.update()
+
         if not self._is_draggin or self._last_mouse_pos is None:
             return
 
@@ -188,7 +209,16 @@ class ViewCubeWidget(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             return
 
+        if not self._is_draggin:
+            event.accept()
+            return
+
         self._is_draggin = False
+
+        if getattr(self, "_hovered_home", False):
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
 
         if self._clicked_face:
             self.snap_to_face(self._clicked_face)
@@ -208,7 +238,7 @@ class ViewCubeWidget(QWidget):
         event.accept()
 
     ###
-    ### Painting
+    ### Painting: Contains the methods for drawing the cube, support axes  and also the collision detection for faces
     ###
 
     def paintEvent(self, event: QPaintEvent) -> None:
@@ -220,6 +250,86 @@ class ViewCubeWidget(QWidget):
         cy = self.height() / 2
 
         self._draw_cube(painter, cx, cy)
+        self._draw_axes(painter, 35.0, float(self.height() - 35))
+        self._draw_home_icon(painter)
+
+    def _draw_home_icon(self, painter: QPainter) -> None:
+        """
+        Draws a Home icon in the top right of the widget to reset the view with a button reset instead of mouseDoubleClickEvent signal
+        """
+        self._home_rect = QRectF(self.width() - 30, 10, 20, 20)
+
+        is_hovered = getattr(self, "_hovered_home", False)
+        color = QColor(30, 144, 255) if is_hovered else QColor(150, 150, 150, 180)
+
+        painter.setPen(QPen(
+            color, 2.0,
+            Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin
+        ))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        cx = self._home_rect.center().x()
+        cy = self._home_rect.center().y()
+
+        painter.drawPolyline(QPolygonF([
+            QPointF(cx - 7, cy + 1),
+            QPointF(cx, cy - 6),
+            QPointF(cx + 7, cy + 1),
+        ]))
+        painter.drawPolyline(QPolygonF([
+            QPointF(cx - 5, cy),
+            QPointF(cx - 5, cy + 7),
+            QPointF(cx + 5, cy + 7),
+            QPointF(cx + 5, cy),
+        ]))
+
+    def _draw_axes(self, painter: QPainter, cx: float, cy: float) -> None:
+        """
+        Draws a 3D axes triad that rotates in sync with the camera
+        """
+        azimuth_radians = math.radians(self._azimuth)
+        elevation_radians = math.radians(self._elevation)
+
+        axis_length: float = 20.0
+
+        axes_3d = [
+            ("X", (axis_length, 0, 0), QColor(255, 80, 80)),
+            ("Y", (0, axis_length, 0), QColor(80, 255, 80)),
+            ("Z", (0, 0, axis_length), QColor(80, 150, 255)),
+        ]
+
+        def project(x: float, y: float, z: float) -> Tuple[float, float, float]:
+            x1 = x * math.cos(azimuth_radians) - y * math.sin(azimuth_radians)
+            y1 = x * math.sin(azimuth_radians) + y * math.cos(azimuth_radians)
+            y2 = y1 * math.cos(elevation_radians) - z * math.sin(elevation_radians)
+            z2 = y1 * math.sin(elevation_radians) + z * math.cos(elevation_radians)
+            return cx + x1, cy - y2, z2
+
+        origin_x, origin_y, origin_z = project(0, 0, 0)
+
+        projected = []
+        for label, (x, y, z), color in axes_3d:
+            px, py, pz = project(x, y, z)
+            projected.append((label, px, py, pz, color))
+
+        projected.sort(key=lambda item: item[3])
+
+        font = QFont("Consolas", 8, QFont.Weight.Bold)
+        painter.setFont(font)
+
+        for label, px, py, pz, color in projected:
+            painter.setPen(QPen(color, 2.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawLine(QPointF(origin_x, origin_y), QPointF(px, py))
+
+            painter.setPen(QPen(color))
+            offset_x = (px - origin_x) * 0.4
+            offset_y = (py - origin_y) * 0.4
+
+            painter.drawText(
+                QRectF(px + offset_x - 10, py + offset_y - 10, 20, 20),
+                Qt.AlignmentFlag.AlignCenter,
+                label
+            )
 
     def _draw_cube(self, painter: QPainter, cx: float, cy: float) -> None:
         """
@@ -256,22 +366,22 @@ class ViewCubeWidget(QWidget):
             vertices_2d.append((cx + px, cy - py, z2))
 
         faces = [
-            ([0, 1, 2, 3], 'Y-', self._faceColorY, (0, -1, 0)),
-            ([4, 5, 6, 7], 'Y+', self._faceColorY, (0, 1, 0)),
-            ([0, 4, 7, 3], 'X-', self._faceColorX, (-1, 0, 0)),
-            ([1, 5, 6, 2], 'X+', self._faceColorX, (1, 0, 0)),
-            ([3, 2, 6, 7], 'Z+', self._faceColorZ, (0, 0, 1)),
-            ([0, 1, 5, 4], 'Z-', self._faceColorZ, (0, 0, -1)),
+            ([0, 1, 2, 3], 'Y-', 'BACK', self._faceColorY, (0, -1, 0)),
+            ([4, 5, 6, 7], 'Y+', 'FRONT', self._faceColorY, (0, 1, 0)),
+            ([0, 4, 7, 3], 'X-', 'LEFT', self._faceColorX, (-1, 0, 0)),
+            ([1, 5, 6, 2], 'X+', 'RIGHT', self._faceColorX, (1, 0, 0)),
+            ([3, 2, 6, 7], 'Z+', 'TOP', self._faceColorZ, (0, 0, 1)),
+            ([0, 1, 5, 4], 'Z-', 'BTM', self._faceColorZ, (0, 0, -1)),
         ]
 
         def face_depth(face_data):
-            indices, _, _, _ = face_data
+            indices, _, _, _, _ = face_data
             avg_z = sum(vertices_2d[i][2] for i in indices) / 4
             return avg_z
 
         sorted_faces = sorted(faces, key=face_depth)
 
-        for indices, label, color_getter, normal in sorted_faces:
+        for indices, face_id, display_label, color_getter, normal in sorted_faces:
             if color_getter == self._faceColorX:
                 color = self.faceColorX
             elif color_getter == self._faceColorY:
@@ -292,9 +402,9 @@ class ViewCubeWidget(QWidget):
             font = QFont("Consolas", 10, QFont.Weight.Bold)
             painter.setFont(font)
             painter.drawText(
-                QRectF(center_x - 10, center_y - 10, 20, 20),
+                QRectF(center_x - 30, center_y - 15, 60, 30),
                 Qt.AlignmentFlag.AlignCenter,
-                label[0]
+                display_label
             )
 
     def _hit_test(self, x: float, y: float) -> Optional[str]:
