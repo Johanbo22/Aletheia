@@ -30,6 +30,81 @@ class SeriesCustomizationManager:
         self.view.bar_edge_width_spin.valueChanged.connect(self.update_bar_customization_live)
         self.view.bar_edge_width_spin.valueChanged.connect(self.plot_tab.on_style_changed)
 
+        self.view.linewidth_spin.valueChanged.connect(self.update_line_customization_live)
+        self.view.linewidth_spin.valueChanged.connect(self.plot_tab.on_style_changed)
+
+        self.view.linestyle_combo.currentTextChanged.connect(self.update_line_customization_live)
+        self.view.linestyle_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
+
+        self.view.marker_combo.currentTextChanged.connect(self.update_line_customization_live)
+        self.view.marker_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
+
+        self.view.marker_size_spin.valueChanged.connect(self.update_line_customization_live)
+        self.view.marker_size_spin.valueChanged.connect(self.plot_tab.on_style_changed)
+
+        self.view.marker_edge_width_spin.valueChanged.connect(self.update_line_customization_live)
+        self.view.marker_edge_width_spin.valueChanged.connect(self.plot_tab.on_style_changed)
+
+        self.view.alpha_slider.valueChanged.connect(self.update_line_customization_live)
+        self.view.alpha_slider.valueChanged.connect(self.update_bar_customization_live)
+        self.view.alpha_slider.valueChanged.connect(self.plot_tab.on_style_changed)
+
+        original_on_style_changed = self.plot_tab.on_style_changed
+
+        def wrapped_on_style_changed() -> None:
+            self.update_line_customization_live()
+            self.update_bar_customization_live()
+            original_on_style_changed()
+            self._force_apply_customizations()
+
+        self.plot_tab.on_style_changed = wrapped_on_style_changed
+
+    def _force_apply_customizations(self) -> None:
+        if self.view.multiline_custom_check.isChecked():
+            for label, line in self._get_all_lines():
+                if label in self.line_customizations:
+                    custom = self.line_customizations[label]
+                    if custom.get("linewidth") is not None:
+                        line.set_linewidth(custom["linewidth"])
+                    if custom.get("linestyle") is not None:
+                        line.set_linestyle(custom["linestyle"])
+                    if custom.get("color") is not None:
+                        line.set_color(custom["color"])
+                    if custom.get("marker") is not None:
+                        line.set_marker(custom["marker"])
+                    if custom.get("markersize") is not None:
+                        line.set_markersize(custom["markersize"])
+                    if custom.get("markerfacecolor") is not None:
+                        line.set_markerfacecolor(custom["markerfacecolor"])
+                    if custom.get("markeredgecolor") is not None:
+                        line.set_markeredgecolor(custom["markeredgecolor"])
+                    if custom.get("markeredgewidth") is not None:
+                        line.set_markeredgewidth(custom["markeredgewidth"])
+                    if custom.get("alpha") is not None:
+                        line.set_alpha(custom["alpha"])
+
+        if self.view.multibar_custom_check.isChecked():
+            for label, container in self._get_all_bar_containers():
+                if label in self.bar_customizations:
+                    custom = self.bar_customizations[label]
+                    if hasattr(container, "patches"):
+                        for patch in container.patches:
+                            if custom.get("facecolor") is not None:
+                                patch.set_facecolor(custom["facecolor"])
+                            if custom.get("edgecolor") is not None:
+                                patch.set_edgecolor(custom["edgecolor"])
+                            if custom.get("linewidth") is not None:
+                                patch.set_linewidth(custom["linewidth"])
+                            if custom.get("alpha") is not None:
+                                patch.set_alpha(custom["alpha"])
+
+        canvas = getattr(self.plot_engine, 'canvas', None)
+        if canvas is None and hasattr(self.plot_engine, 'figure'):
+            canvas = self.plot_engine.figure.canvas
+
+        if canvas:
+            canvas.draw_idle()
+
     def toggle_bar_selector(self) -> None:
         """Show/hide bar selection to customize more than one bar series object"""
         is_enabled = self.view.multibar_custom_check.isChecked()
@@ -111,26 +186,39 @@ class SeriesCustomizationManager:
             return
 
         patch = container.patches[0]
+        custom = self.bar_customizations.get(bar_name, {})
 
         # Load facecolor
-        facecolor = to_hex(patch.get_facecolor()) if patch.get_facecolor() else "#000000"
+        if "facecolor" in custom:
+            facecolor = custom["facecolor"]
+        else:
+            facecolor = to_hex(patch.get_facecolor()) if patch.get_facecolor() else "#000000"
+
         self.plot_tab.bar_color = facecolor
         self.view.bar_color_label.setText(facecolor)
         ColorManager.update_button_color_swatch(self.view.bar_color_button, QColor(self.plot_tab.bar_color))
 
         # Load edge
-        edgecolor = to_hex(patch.get_edgecolor()) if patch.get_edgecolor() else "#000000"
+        if "edgecolor" in custom:
+            edgecolor = custom["edgecolor"]
+        else:
+            edgecolor = to_hex(patch.get_edgecolor()) if patch.get_edgecolor() else "#000000"
+
         self.plot_tab.bar_edge_color = edgecolor
         self.view.bar_edge_label.setText(edgecolor)
         ColorManager.update_button_color_swatch(self.view.bar_edge_button, QColor(self.plot_tab.bar_edge_color))
 
         # Load the bar edge width
         self.view.bar_edge_width_spin.blockSignals(True)
-        self.view.bar_edge_width_spin.setValue(patch.get_linewidth() or 0.0)
+        self.view.bar_edge_width_spin.setValue(custom.get("linewidth", patch.get_linewidth() or 0.0))
         self.view.bar_edge_width_spin.blockSignals(False)
 
         # Load alpha
-        alpha = patch.get_alpha() if patch.get_alpha() is not None else 1.0
+        if "alpha" in custom:
+            alpha = custom["alpha"]
+        else:
+            alpha = patch.get_alpha() if patch.get_alpha() is not None else 1.0
+
         self.view.alpha_slider.blockSignals(True)
         self.view.alpha_slider.setValue(int(alpha * 100))
         self.view.alpha_slider.blockSignals(False)
@@ -258,37 +346,52 @@ class SeriesCustomizationManager:
         if line is None:
             return
 
-        # Load current line properties
+        custom = self.line_customizations.get(line_name, {})
+
+        # Load current line properties prioritizing saved custom attributes
         self.view.linewidth_spin.blockSignals(True)
-        self.view.linewidth_spin.setValue(line.get_linewidth())
+        self.view.linewidth_spin.setValue(custom.get("linewidth", line.get_linewidth()))
         self.view.linewidth_spin.blockSignals(False)
 
         linestyle_map_reverse = {"-": "Solid", "--": "Dashed", "-.": "Dash-dot", ":": "Dotted"}
-        current_style = linestyle_map_reverse.get(line.get_linestyle(), "Solid")
+        current_style = linestyle_map_reverse.get(custom.get("linestyle", line.get_linestyle()), "Solid")
+
         self.view.linestyle_combo.blockSignals(True)
         self.view.linestyle_combo.setCurrentText(current_style)
         self.view.linestyle_combo.blockSignals(False)
 
         # Load color
-        color = line.get_color()
-        hex_color = to_hex(color) if color else "#000000"
+        if "color" in custom:
+            hex_color = custom["color"]
+        else:
+            color = line.get_color()
+            hex_color = to_hex(color) if color else "#000000"
+
         self.plot_tab.line_color = hex_color
         self.view.line_color_label.setText(self.plot_tab.line_color)
         ColorManager.update_button_color_swatch(self.view.line_color_button, QColor(self.plot_tab.line_color))
 
         # Load markers
-        marker = line.get_marker()
-        marker_text = marker if marker not in ["None", " ", "", None] else "None"
+        if "marker" in custom:
+            marker_text = custom["marker"]
+        else:
+            marker = line.get_marker()
+            marker_text = marker if marker not in ["None", " ", "", None] else "None"
+
         self.view.marker_combo.blockSignals(True)
         self.view.marker_combo.setCurrentText(marker_text)
         self.view.marker_combo.blockSignals(False)
 
         self.view.marker_size_spin.blockSignals(True)
-        self.view.marker_size_spin.setValue(int(line.get_markersize() or 0))
+        self.view.marker_size_spin.setValue(int(custom.get("markersize", line.get_markersize() or 0)))
         self.view.marker_size_spin.blockSignals(False)
 
         # Load alpha
-        alpha = line.get_alpha() if line.get_alpha() is not None else 1.0
+        if "alpha" in custom:
+            alpha = custom["alpha"]
+        else:
+            alpha = line.get_alpha() if line.get_alpha() is not None else 1.0
+
         self.view.alpha_slider.blockSignals(True)
         self.view.alpha_slider.setValue(int(alpha * 100))
         self.view.alpha_slider.blockSignals(False)

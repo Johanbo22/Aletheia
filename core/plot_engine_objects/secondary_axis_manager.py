@@ -1,5 +1,6 @@
-import pandas as pd
 from typing import Any, TYPE_CHECKING
+
+import pandas as pd
 
 if TYPE_CHECKING:
     from core.plot_engine import PlotEngine
@@ -19,20 +20,22 @@ class SecondaryAxisManager:
             return None
 
         horizontal = kwargs.get("horizontal", False)
+        label_str = f"{secondary_y} (Secondary)"
+
         if horizontal:
             ax2 = self.engine.current_ax.twiny()
             self.engine.secondary_ax = ax2
 
             if secondary_plot_type == "Line":
-                ax2.plot(df[secondary_y], df[x], label=f"{secondary_y}")
+                ax2.plot(df[secondary_y], df[x], label=label_str)
             elif secondary_plot_type == "Bar":
-                ax2.barh(df[x], df[secondary_y], label=f"{secondary_y}")
+                ax2.barh(df[x], df[secondary_y], label=label_str)
             elif secondary_plot_type == "Scatter":
-                ax2.scatter(df[secondary_y], df[x], label=f"{secondary_y}")
+                ax2.scatter(df[secondary_y], df[x], label=label_str)
             elif secondary_plot_type == "Area":
-                ax2.fill_between(df[x], 0, df[secondary_y], label=f"{secondary_y}")
+                ax2.fill_between(df[x], 0, df[secondary_y], label=label_str)
             else:
-                ax2.plot(df[secondary_y], df[x], label=f"{secondary_y}")
+                ax2.plot(df[secondary_y], df[x], label=label_str)
 
             ax2.set_xlabel(secondary_y)
             ax2.tick_params(axis="x")
@@ -41,15 +44,15 @@ class SecondaryAxisManager:
             self.engine.secondary_ax = ax2
 
             if secondary_plot_type == "Line":
-                ax2.plot(df[x], df[secondary_y], label=f"{secondary_y}")
+                ax2.plot(df[x], df[secondary_y], label=label_str)
             elif secondary_plot_type == "Bar":
-                ax2.bar(df[x], df[secondary_y], label=f"{secondary_y}")
+                ax2.bar(df[x], df[secondary_y], label=label_str)
             elif secondary_plot_type == "Scatter":
-                ax2.scatter(df[x], df[secondary_y], label=f"{secondary_y}")
+                ax2.scatter(df[x], df[secondary_y], label=label_str)
             elif secondary_plot_type == "Area":
-                ax2.fill_between(df[x], 0, df[secondary_y], label=f"{secondary_y}")
+                ax2.fill_between(df[x], 0, df[secondary_y], label=label_str)
             else:
-                ax2.plot(df[x], df[secondary_y], label=f"{secondary_y}")
+                ax2.plot(df[x], df[secondary_y], label=label_str)
 
             ax2.set_ylabel(secondary_y)
             ax2.tick_params(axis="y")
