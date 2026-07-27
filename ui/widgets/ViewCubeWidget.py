@@ -172,6 +172,9 @@ class ViewCubeWidget(QWidget):
         dx = current_x - self._last_mouse_pos[0]
         dy = current_y - self._last_mouse_pos[1]
 
+        if abs(dx) > 2 or abs(dy) > 2:
+            self._clicked_face = None
+
         sensitivity = 0.5
         self._azimuth = (self._azimuth - dx * sensitivity) % 360
         self._elevation = max(-90, min(90, self._elevation + dy * sensitivity))
@@ -248,9 +251,9 @@ class ViewCubeWidget(QWidget):
             z2 = y1 * math.sin(elevation_radians) + z * math.cos(elevation_radians)
 
             px = x1
-            py = y2 * 0.05
+            py = y2
 
-            vertices_2d.append((cx + px, cy - py))
+            vertices_2d.append((cx + px, cy - py, z2))
 
         faces = [
             ([0, 1, 2, 3], 'Y-', self._faceColorY, (0, -1, 0)),
@@ -263,7 +266,7 @@ class ViewCubeWidget(QWidget):
 
         def face_depth(face_data):
             indices, _, _, _ = face_data
-            avg_z = sum(vertices_2d[i][1] for i in indices) / 4
+            avg_z = sum(vertices_2d[i][2] for i in indices) / 4
             return avg_z
 
         sorted_faces = sorted(faces, key=face_depth)

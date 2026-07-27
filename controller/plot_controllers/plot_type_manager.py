@@ -237,6 +237,8 @@ class PlotTypeManager:
         self.view.camera_3d_group.setVisible(is_3d)
         self.view.zlabel_widget.setVisible(is_3d)
 
+        self.plot_tab.view_cube.setVisible(is_3d)
+
         if is_3d:
             self.view.tight_layout_check.setChecked(False)
             self.view.tight_layout_check.setEnabled(False)
