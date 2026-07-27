@@ -96,6 +96,8 @@ class PlotTab(PlotTabUI):
         self.selection_overlay = SubplotOverlay(self.canvas)
         self.canvas.mpl_connect("resize_event", self.on_canvas_resize)
 
+        self.canvas.mpl_connect("button_release_event", self._on_3d_canvas_button_released)
+
         # Initialize the plot tab managers
         self.theme_manager = ThemeManager(self)
         self.subplot_manager = SubplotManager(self)
@@ -110,6 +112,7 @@ class PlotTab(PlotTabUI):
         self.data_selection_manager = DataSelectionManager(self)
         self.appearance_settings_manager = AppearanceSettingsManager(self)
         self.generation_manager = PlotGenerationManager(self)
+        self._setup_view_cube()
 
         # Load initial data
         self.update_column_combo()
@@ -444,7 +447,43 @@ class PlotTab(PlotTabUI):
     def on_canvas_resize(self, event: Any) -> None:
         self.subplot_manager.update_overlay(is_resize=True)
         self.formatting_manager.setup_plot_figure(clear=False)
+
+        if hasattr(self, "view_cube") and self.view_cube is not None:
+            self._position_view_cube()
+
         self.canvas.draw_idle()
+
+    def _setup_view_cube(self) -> None:
+        """Creates the ViewCube and positions it as an overlay"""
+        from ui.widgets.ViewCubeWidget import ViewCubeWidget
+        self.view_cube = ViewCubeWidget(parent=self.canvas)
+        self.view_cube.setObjectName("viewCube")
+
+        self._position_view_cube()
+        self.view_cube.show()
+
+        self.canvas_interaction_manager.setup_view_cube(self.view_cube)
+
+    def _position_view_cube(self) -> None:
+        """Positions the ViewCube in the top right corner of the canvas"""
+        if not hasattr(self, "view_cube") or self.view_cube is None:
+            return
+
+        canvas_width = self.canvas.width()
+        canvas_height = self.canvas.height()
+
+        padding = 10
+        x = canvas_width - self.view_cube.width() - padding
+        y = padding
+
+        self.view_cube.move(x, y)
+
+    def _on_3d_canvas_button_released(self, event) -> None:
+        ax = self.plot_engine.current_ax
+        if ax is None or not hasattr(ax, "azim"):
+            return
+
+        self.canvas_interaction_manager.on_canvas_button_release_3d(event)
 
     def activate_subset(self, subset_name: str):
         """Activates the 'Use Subset' checkbox and selects the selected subset"""

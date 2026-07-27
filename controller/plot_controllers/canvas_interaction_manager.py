@@ -1,6 +1,7 @@
 from typing import Optional, Set, TYPE_CHECKING, Tuple
 
 import pandas as pd
+from PyQt6.QtCore import QEasingCurve, QVariantAnimation
 from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QToolTip
 from matplotlib.collections import PathCollection
@@ -9,9 +10,11 @@ from matplotlib.patches import Rectangle
 from matplotlib.widgets import SpanSelector
 
 from ui.status_bar import LogLevel
+from ui.widgets.ViewCubeWidget import ViewCubeWidget
 
 if TYPE_CHECKING:
     from ui.plot_tab import PlotTab
+    from ui.widgets.ViewCubeWidget import ViewCubeWidget
 
 class CanvasInteractionManager:
     """Manages canvas mouse events."""
@@ -23,6 +26,12 @@ class CanvasInteractionManager:
         self._pan_start: Optional[Tuple[float, float]] = None
         self._pan_start_xlim: Optional[Tuple[float, float]] = None
         self._pan_start_ylim: Optional[Tuple[float, float]] = None
+
+        self.view_cube: Optional["ViewCubeWidget"] = None
+        self._angle_animation: Optional[QVariantAnimation] = None
+        self._animation_frame_count = 0
+        self._target_azimuth = 0.0
+        self._target_elevation = 0.0
 
         self._connect_canvas_events()
 
@@ -337,3 +346,135 @@ class CanvasInteractionManager:
                 self.span_selector.clear()
             elif hasattr(self.span_selector, "set_visible"):
                 self.span_selector.set_visible(False)
+
+    def setup_view_cube(self, view_cube: "ViewCubeWidget") -> None:
+
+        self.view_cube = view_cube
+        view_cube.view_angle_changed.connect(self._on_view_cube_angle_changed)
+
+        self._sync_view_cube_from_plot()
+
+    def _sync_view_cube_from_plot(self) -> None:
+        """Updates the ViewCube angles to match the plot orientaiton"""
+        if self.view_cube is None:
+            return
+
+        ax = self.plot_tab.plot_engine.current_ax
+        if ax is None or not hasattr(ax, "azim"):
+            return
+
+        azim = getattr(ax, "azim", -60)
+        elev = getattr(ax, "elev", 30)
+
+        self.view_cube.set_angles(azim, elev, emit_signal=False)
+
+    def _on_view_cube_angle_changed(self, azimuth: float, elevation: float) -> None:
+        """
+        Handle angle change from ViewCube
+
+        :param azimuth: Target azimuth angle
+        :param elevation: Target elevation angle
+        """
+        current_azimuth = self._target_azimuth
+        current_elevation = self._target_elevation
+
+        angle_diff = abs(azimuth - current_azimuth) + abs(elevation - current_elevation)
+
+        if angle_diff > 15:
+            self._animate_camera_transition(current_azimuth, current_elevation, azimuth, elevation)
+        else:
+            self._apply_camera_angles(azimuth, elevation)
+
+    def _animate_camera_transition(self, start_az: float, start_el: float, end_az: float, end_el: float) -> None:
+        """
+        Animate camera transition using QVariantAnimation.
+
+        :param start_az: Starting azimuth
+        :param start_el: Starting elevation
+        :param end_az: Ending azimuth
+        :param end_el: Ending elevation
+        """
+        self._target_azimuth = end_az
+        self._target_elevation = end_el
+        self._animation_frame_count = 0
+
+        self._angle_animation = QVariantAnimation(self.plot_tab)
+        self._angle_animation.setStartValue(0.0)
+        self._angle_animation.setEndValue(1.0)
+        self._angle_animation.setDuration(250)
+        self._angle_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._angle_animation.valueChanged.connect(
+            lambda t: self._on_animation_step(t, start_az, start_el, end_az, end_el)
+        )
+        self._angle_animation.finished.connect(self.on_animation_finished)
+
+        self._angle_animation.start()
+
+    def _on_animation_step(self, t: float, start_az: float, start_el: float, end_az: float, end_el: float) -> None:
+        """
+        Handle animation step
+        Interpolate angles and update plot.
+
+        :param t: Animation progress (0.0 to 1.0)
+        :param start_az: Starting azimuth
+        :param start_el: Starting elevation
+        :param end_az: Ending azimuth
+        :param end_el: Ending elevation
+        """
+        self._animation_frame_count += 1
+        if self._animation_frame_count % 3 != 0:
+            return
+
+        current_azimuth = start_az + (end_az - start_az) * t
+        current_elevation = start_el + (end_el - start_el) * t
+
+        self._apply_camera_angles(current_azimuth, current_elevation)
+
+    def _apply_camera_angles(self, azimuth: float, elevation: float) -> None:
+        """
+        Apply camera angles to 3D axes and update the UI
+
+        :param azimuth: Azimuth angle to apply
+        :param elevation: Elevation angle to apply
+        """
+        ax = self.plot_tab.plot_engine.current_ax
+        if ax is None or not hasattr(ax, "azim"):
+            return
+
+        azimuth %= 360
+        elevation = max(-90, min(90, elevation))
+
+        ax.view_init(elev=elevation, azim=azimuth)
+
+        self.plot_tab.view.camera_azimuth_spin.blockSignals(True)
+        self.plot_tab.view.camera_azimuth_spin.setValue(azimuth)
+        self.plot_tab.view.camera_azimuth_spin.blockSignals(False)
+
+        self.plot_tab.view.camera_elevation_spin.blockSignals(True)
+        self.plot_tab.view.camera_elevation_spin.setValue(elevation)
+        self.plot_tab.view.camera_elevation_spin.blockSignals(False)
+
+        self.plot_tab.canvas.draw_idle()
+
+    def on_animation_finished(self) -> None:
+        """Handle animation completeion"""
+        self._apply_camera_angles(self._target_azimuth, self._target_elevation)
+        self.plot_tab.canvas.draw()
+        self._angle_animation = None
+
+    def on_canvas_button_release_3d(self, event) -> None:
+        if self.view_cube is None:
+            return
+
+        ax = self.plot_tab.plot_engine.current_ax
+        if ax is None or not hasattr(ax, 'azim'):
+            return
+
+        azim = getattr(ax, 'azim', -60)
+        elev = getattr(ax, 'elev', 30)
+
+        self.view_cube.set_angles(azim, elev, emit_signal=False)
+
+        self._target_azimuth = azim
+        self._target_elevation = elev
