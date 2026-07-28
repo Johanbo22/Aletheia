@@ -60,15 +60,11 @@ class PlotExportManager:
 
     def _get_preview_pixmap(self) -> Any:
         """Grabs the canvas preview while hiding the selection overlay widget"""
-        overlay_was_visible: bool = False
-        if hasattr(self.plot_tab, "selection_overlay") and self.plot_tab.selection_overlay.isVisible():
-            overlay_was_visible = True
-            self.plot_tab.selection_overlay.hide()
+        hidden_overlays = self._hide_overlay_widgets()
 
         preview_pixmap = self.canvas.grab()
 
-        if overlay_was_visible:
-            self.plot_tab.selection_overlay.show()
+        self._restore_overlay_widgets(hidden_overlays)
 
         return preview_pixmap
 
@@ -88,12 +84,40 @@ class PlotExportManager:
         original_size = self.plot_engine.current_figure.get_size_inches()
         target_size = (config["width"], config["height"])
 
+        hidden_overlays = self._hide_overlay_widgets()
+
         try:
             self.plot_engine.current_figure.set_size_inches(*target_size)
             self.plot_engine.current_figure.savefig(filepath, **kwargs)
         finally:
             self.plot_engine.current_figure.set_size_inches(*original_size)
             self.canvas.draw_idle()
+            self._restore_overlay_widgets(hidden_overlays)
+
+    def _hide_overlay_widgets(self) -> list[Any]:
+        """
+        Hides UI overlay widgets to prevent them from being rendered
+        in the preview and in final export.
+        :return: A list of widgets that were hidden so they can be restored later
+        """
+        hidden_widgets: list[Any] = []
+        overlay_attributes: list[str] = ["selection_overlay", "view_cube", "view_cube_widget"]
+
+        for parent in (self.plot_tab, self.canvas):
+            for attribute in overlay_attributes:
+                if hasattr(parent, attribute):
+                    widget = getattr(parent, attribute)
+                    if hasattr(widget, "isVisible") and widget.isVisible():
+                        if widget not in hidden_widgets:
+                            widget.hide()
+                            hidden_widgets.append(widget)
+        return hidden_widgets
+
+    def _restore_overlay_widgets(self, widgets: list[Any]) -> None:
+        """Restores the visibility of previously hidden overlay widgets"""
+        for widget in widgets:
+            if hasattr(widget, "show"):
+                widget.show()
 
     def _handle_export_success(self, filepath: str) -> None:
         """Handles UI updates on successful export."""
