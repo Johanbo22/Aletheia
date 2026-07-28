@@ -42,9 +42,12 @@ class ViewCubeWidget(QWidget):
         self._target_azimuth = self._azimuth
         self._target_elevation = self._elevation
 
-        self._is_draggin = False
+        self.is_dragging = False
         self._last_mouse_pos: Optional[Tuple[int, int]] = None
         self._clicked_face: Optional[str] = None
+
+        self._hovered_face: Optional[str] = None
+        self._drawn_faces: list[Tuple[str, QPolygonF]] = []
 
         self._home_rect = QRectF()
         self._hovered_home = False
@@ -96,6 +99,19 @@ class ViewCubeWidget(QWidget):
     ###
     ### ViewCube API
     ###
+
+    def _project_3d_to_2d(self, x: float, y: float, z: float, cx: float, cy: float) -> Tuple[float, float, float]:
+        """Projects 3D coordinates to a 2D plane based on current azimuth and elevation"""
+        azimuth_radians = math.radians(self._azimuth)
+        elevation_radians = math.radians(self._elevation)
+
+        x1 = x * math.cos(azimuth_radians) - y * math.sin(azimuth_radians)
+        y1 = x * math.sin(azimuth_radians) + y * math.cos(azimuth_radians)
+
+        y2 = y1 * math.cos(elevation_radians) - z * math.sin(elevation_radians)
+        z2 = y1 * math.sin(elevation_radians) + z * math.cos(elevation_radians)
+
+        return cx + x1, cy - y2, z2
 
     def set_angles(self, azimuth: float, elevation: float, emit_signal: bool = False) -> None:
         """
@@ -159,7 +175,7 @@ class ViewCubeWidget(QWidget):
             event.accept()
             return
 
-        self._is_draggin = True
+        self.is_dragging = True
         self.setCursor(Qt.CursorShape.ClosedHandCursor)
         self._last_mouse_pos = (event.position().x(), event.position().y())
 
@@ -174,9 +190,9 @@ class ViewCubeWidget(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Handle mouse drag to rotate the cube"""
         is_hovering_home: bool = self._home_rect.contains(event.position())
-        if is_hovering_home != getattr(self, "_hovered_home", False):
+        if is_hovering_home != self._hovered_home:
             self._hovered_home = is_hovering_home
-            if not self._is_draggin:
+            if not self.is_dragging:
                 self.setCursor(
                     Qt.CursorShape.PointingHandCursor
                     if is_hovering_home
@@ -184,7 +200,13 @@ class ViewCubeWidget(QWidget):
                 )
             self.update()
 
-        if not self._is_draggin or self._last_mouse_pos is None:
+        if not self.is_dragging:
+            current_hovered = self._hit_test(event.position().x(), event.position().y())
+            if current_hovered != self._hovered_face:
+                self._hovered_face = current_hovered
+                self.update()
+
+        if not self.is_dragging or self._last_mouse_pos is None:
             return
 
         current_x = event.position().x()
@@ -209,13 +231,13 @@ class ViewCubeWidget(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             return
 
-        if not self._is_draggin:
+        if not self.is_dragging:
             event.accept()
             return
 
-        self._is_draggin = False
+        self.is_dragging = False
 
-        if getattr(self, "_hovered_home", False):
+        if self._hovered_home:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
         else:
             self.setCursor(Qt.CursorShape.OpenHandCursor)
@@ -298,18 +320,11 @@ class ViewCubeWidget(QWidget):
             ("Z", (0, 0, axis_length), QColor(80, 150, 255)),
         ]
 
-        def project(x: float, y: float, z: float) -> Tuple[float, float, float]:
-            x1 = x * math.cos(azimuth_radians) - y * math.sin(azimuth_radians)
-            y1 = x * math.sin(azimuth_radians) + y * math.cos(azimuth_radians)
-            y2 = y1 * math.cos(elevation_radians) - z * math.sin(elevation_radians)
-            z2 = y1 * math.sin(elevation_radians) + z * math.cos(elevation_radians)
-            return cx + x1, cy - y2, z2
-
-        origin_x, origin_y, origin_z = project(0, 0, 0)
+        origin_x, origin_y, origin_z = self._project_3d_to_2d(0, 0, 0, cx, cy)
 
         projected = []
         for label, (x, y, z), color in axes_3d:
-            px, py, pz = project(x, y, z)
+            px, py, pz = self._project_3d_to_2d(x, y, z, cx, cy)
             projected.append((label, px, py, pz, color))
 
         projected.sort(key=lambda item: item[3])
@@ -335,9 +350,6 @@ class ViewCubeWidget(QWidget):
         """
         Draws the isometric cube projection
         """
-        azimuth_radians = math.radians(self._azimuth)
-        elevation_radians = math.radians(self._elevation)
-
         cube_half_size = self.CUBE_SIZE / 3
 
         # Define 8 cube vertices in 3D space (centered at origin)
@@ -354,16 +366,8 @@ class ViewCubeWidget(QWidget):
 
         vertices_2d = []
         for x, y, z in vertices_3d:
-            x1 = x * math.cos(azimuth_radians) - y * math.sin(azimuth_radians)
-            y1 = x * math.sin(azimuth_radians) + y * math.cos(azimuth_radians)
-
-            y2 = y1 * math.cos(elevation_radians) - z * math.sin(elevation_radians)
-            z2 = y1 * math.sin(elevation_radians) + z * math.cos(elevation_radians)
-
-            px = x1
-            py = y2
-
-            vertices_2d.append((cx + px, cy - py, z2))
+            px, py, pz = self._project_3d_to_2d(x, y, z, cx, cy)
+            vertices_2d.append((px, py, pz))
 
         faces = [
             ([0, 1, 2, 3], 'Y-', 'BACK', self._faceColorY, (0, -1, 0)),
@@ -381,6 +385,8 @@ class ViewCubeWidget(QWidget):
 
         sorted_faces = sorted(faces, key=face_depth)
 
+        self._drawn_faces.clear()
+
         for indices, face_id, display_label, color_getter, normal in sorted_faces:
             if color_getter == self._faceColorX:
                 color = self.faceColorX
@@ -389,7 +395,11 @@ class ViewCubeWidget(QWidget):
             else:
                 color = self._faceColorZ
 
+            if self._hovered_face == face_id:
+                color = color.lighter(115)
+
             poly = QPolygonF([QPointF(vertices_2d[i][0], vertices_2d[i][1]) for i in indices])
+            self._drawn_faces.append((face_id, poly))
 
             painter.setBrush(QBrush(color))
             painter.setPen(QPen(color.darker(120), 1.5))
@@ -409,32 +419,16 @@ class ViewCubeWidget(QWidget):
 
     def _hit_test(self, x: float, y: float) -> Optional[str]:
         """
-        Determine which face was clicked
+        Determine which face was clicked using geometric intersection
+        Iterates through the drawn faces in reverse Z-order
+
+        :param x: Mouse X position
+        :param y: Mouse Y position
         :return: Face identifier or None
         """
-        cx = self.width() / 2
-        cy = self.height() / 2
+        point = QPointF(x, y)
 
-        dx = x - cx
-        dy = y - cy
-
-        norm_x = dx / (self.CUBE_SIZE / 2)
-        norm_y = dy / (self.CUBE_SIZE / 2)
-
-        azimuth_radians = math.radians(self._azimuth)
-        elevation_radians = math.radians(self._elevation)
-
-        local_x = norm_x * math.cos(-azimuth_radians) - norm_y * math.sin(-azimuth_radians)
-        local_y = norm_x * math.sin(-azimuth_radians) + norm_y * math.cos(-azimuth_radians)
-
-        abs_x = abs(local_x)
-        abs_y = abs(local_y)
-
-        if abs(elevation_radians) > math.radians(45):
-            return "Z+" if self._elevation > 0 else "Z-"
-        elif abs_x > abs_y and abs_x > 0.3:
-            return "X+" if local_x > 0 else "X-"
-        elif abs_y > 0.3:
-            return "Y+" if local_y > 0 else "Y-"
-
+        for face_id, poly in reversed(self._drawn_faces):
+            if poly.containsPoint(point, Qt.FillRule.WindingFill):
+                return face_id
         return None
