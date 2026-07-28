@@ -1,7 +1,10 @@
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QAbstractSpinBox, QComboBox, QDoubleSpinBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, \
-    QLineEdit, QListWidget, QPushButton, QScrollArea, QSpinBox, QStackedWidget, QTabWidget, QVBoxLayout, QWidget
+    QLineEdit, QListWidget, QPlainTextEdit, QPushButton, QScrollArea, QSizePolicy, QSlider, QSpinBox, QStackedWidget, \
+    QTabWidget, QToolBox, QVBoxLayout, QWidget
 
-from ui.widgets import ToggleSwitch
+from ui.dialogs.PlotConfigEditorDialog import JSONHighlighter
+from ui.widgets import AnnotationLocatorWidget, ToggleSwitch
 
 class AnnotationsSettingsTab(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -330,6 +333,7 @@ class AnnotationsSettingsTab(QWidget):
 
     def _setup_annotation_tools_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Annotation Tools")
+        group.setMinimumHeight(500)
         layout = QVBoxLayout()
 
         tab_widget = QTabWidget()
@@ -376,15 +380,15 @@ class AnnotationsSettingsTab(QWidget):
 
         # Color options
         auto_layout.addWidget(QLabel("Font Color:"))
-        color_layout = QHBoxLayout()
+        facecolor_layout = QHBoxLayout()
         self.auto_annotate_color_button = QPushButton("Choose", parent=self)
         self.auto_annotate_color_button.setToolTip(
             "Open a color menu to select the color of the font for the annotated points")
         self.auto_annotate_color_button.setEnabled(False)
         self.auto_annotate_color_label = QLabel("Black")
-        color_layout.addWidget(self.auto_annotate_color_button)
-        color_layout.addWidget(self.auto_annotate_color_label)
-        auto_layout.addLayout(color_layout)
+        facecolor_layout.addWidget(self.auto_annotate_color_button)
+        facecolor_layout.addWidget(self.auto_annotate_color_label)
+        auto_layout.addLayout(facecolor_layout)
 
         # Position
         offset_layout = QHBoxLayout()
@@ -416,6 +420,7 @@ class AnnotationsSettingsTab(QWidget):
             "Determine the rotation, in degrees, of the annotated point around it's own axis")
         self.auto_annotate_rotation_spin.setRange(-360, 360)
         self.auto_annotate_rotation_spin.setValue(0)
+        self.auto_annotate_rotation_spin.setSuffix("°")
         self.auto_annotate_rotation_spin.setEnabled(False)
         rotation_layout.addWidget(self.auto_annotate_rotation_spin)
 
@@ -484,42 +489,67 @@ class AnnotationsSettingsTab(QWidget):
         self.annotation_text.setPlaceholderText("Enter text to add to plot")
         manual_layout.addWidget(self.annotation_text)
 
-        manual_layout.addWidget(QLabel("X Position (0-1):"))
+        self.annotation_locator = AnnotationLocatorWidget()
+        locator_layout = QHBoxLayout()
+        locator_layout.addStretch()
+        locator_layout.addWidget(self.annotation_locator)
+        locator_layout.addStretch()
+        manual_layout.addLayout(locator_layout)
+
+        coord_layout = QGridLayout()
+        coord_layout.addWidget(QLabel("X Position (0-1):"), 0, 0)
         self.annotation_x_spin = QDoubleSpinBox()
         self.annotation_x_spin.setToolTip("Set the X position of the annotation")
         self.annotation_x_spin.setMinimumHeight(20)
         self.annotation_x_spin.setRange(0, 1)
         self.annotation_x_spin.setValue(0.5)
         self.annotation_x_spin.setSingleStep(0.05)
-        manual_layout.addWidget(self.annotation_x_spin)
+        coord_layout.addWidget(self.annotation_x_spin, 0, 1)
 
-        manual_layout.addWidget(QLabel("Y Position (0-1):"))
+        coord_layout.addWidget(QLabel("Y Position (0-1):"), 0, 2)
         self.annotation_y_spin = QDoubleSpinBox()
         self.annotation_y_spin.setToolTip("Set the Y position of the annotation")
         self.annotation_y_spin.setMinimumHeight(20)
         self.annotation_y_spin.setRange(0, 1)
         self.annotation_y_spin.setValue(0.5)
         self.annotation_y_spin.setSingleStep(0.05)
-        manual_layout.addWidget(self.annotation_y_spin)
+        coord_layout.addWidget(self.annotation_y_spin, 0, 3)
+        manual_layout.addLayout(coord_layout)
 
-        manual_layout.addWidget(QLabel("Font Size:"))
+        self.manual_toolbox = QToolBox()
+        self.manual_toolbox.setObjectName("plot_type_toolbox")
+        self.manual_toolbox.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        # Page 1 consists of general styling for the box it self
+        box_page = QWidget()
+        box_page.setObjectName("AnnotationToolBoxPageWidgets")
+        box_layout = QVBoxLayout(box_page)
+
+        font_grid = QGridLayout()
+        font_grid.addWidget(QLabel("Font Size:"), 0, 0)
         self.annotation_fontsize_spin = QSpinBox()
         self.annotation_fontsize_spin.setToolTip("Set the font size of the text elements in the annotation")
         self.annotation_fontsize_spin.setMinimumHeight(20)
         self.annotation_fontsize_spin.setRange(6, 36)
         self.annotation_fontsize_spin.setValue(12)
-        manual_layout.addWidget(self.annotation_fontsize_spin)
+        font_grid.addWidget(self.annotation_fontsize_spin, 0, 1)
 
-        manual_layout.addWidget(QLabel("Font Color:"))
-        color_layout = QHBoxLayout()
+        font_grid.addWidget(QLabel("Font Color:"), 1, 0)
+        facecolor_layout = QHBoxLayout()
         self.annotation_color_button = QPushButton("Choose", parent=self)
         self.annotation_color_button.setToolTip("Open a color menu to select the color of the text font")
         self.annotation_color_label = QLabel("Black")
-        color_layout.addWidget(self.annotation_color_button)
-        color_layout.addWidget(self.annotation_color_label)
-        manual_layout.addLayout(color_layout)
+        facecolor_layout.addWidget(self.annotation_color_button)
+        facecolor_layout.addWidget(self.annotation_color_label)
+        font_grid.addLayout(facecolor_layout, 1, 1)
 
-        manual_layout.addWidget(QLabel("Background Color:"))
+        font_grid.addWidget(QLabel("Box Style:"), 2, 0)
+        self.annotation_boxstyle_combo = QComboBox()
+        self.annotation_boxstyle_combo.setToolTip("Select the style of the annotation bounding box")
+        self.annotation_boxstyle_combo.addItems(["round", "square", "circle", "larrow", "rarrow"])
+        font_grid.addWidget(self.annotation_boxstyle_combo, 2, 1)
+
+        font_grid.addWidget(QLabel("Background Color:"), 3, 0)
         background_color_layout = QHBoxLayout()
         self.annotation_bg_color_button = QPushButton("Choose", parent=self)
         self.annotation_bg_color_button.setToolTip(
@@ -527,9 +557,94 @@ class AnnotationsSettingsTab(QWidget):
         self.annotation_bg_color_label = QLabel("wheat")
         background_color_layout.addWidget(self.annotation_bg_color_button)
         background_color_layout.addWidget(self.annotation_bg_color_label)
-        manual_layout.addLayout(background_color_layout)
+        font_grid.addLayout(background_color_layout, 3, 1)
+
+        font_grid.addWidget(QLabel("Box Alpha:"), 4, 0)
+        self.annotation_bg_alpha_slider = QSlider(Qt.Orientation.Horizontal)
+        self.annotation_bg_alpha_slider.setToolTip("Set the opacity of the bounding box")
+        self.annotation_bg_alpha_slider.setRange(0, 100)
+        self.annotation_bg_alpha_slider.setValue(100)
+        font_grid.addWidget(self.annotation_bg_alpha_slider, 4, 1)
+
+        box_layout.addLayout(font_grid)
+        box_layout.addStretch()
+        self.manual_toolbox.addItem(box_page, "Text && Bounding Box Properties")
+
+        # Page 2 is for arrow props and styling
+        arrow_page = QWidget()
+        arrow_page.setObjectName("AnnotationToolBoxPageWidgets")
+        arrow_layout = QVBoxLayout(arrow_page)
+
+        self.arrow_enable_check = ToggleSwitch("Enable Pointer Arrow")
+        self.arrow_enable_check.setToolTip("Draw an arrow from the text to a specific coordinate")
+        arrow_layout.addWidget(self.arrow_enable_check)
+
+        arrow_grid = QGridLayout()
+        arrow_grid.addWidget(QLabel("Target X:"), 0, 0)
+        self.arrow_x_spin = QDoubleSpinBox()
+        self.arrow_x_spin.setToolTip("Set the target X coordinate for the arrow tip")
+        self.arrow_x_spin.setRange(-2.0, 2.0)
+        self.arrow_x_spin.setValue(0.5)
+        self.arrow_x_spin.setSingleStep(0.05)
+        self.arrow_x_spin.setEnabled(False)
+        arrow_grid.addWidget(self.arrow_x_spin, 0, 1)
+
+        arrow_grid.addWidget(QLabel("Target Y:"), 0, 2)
+        self.arrow_y_spin = QDoubleSpinBox()
+        self.arrow_y_spin.setToolTip("Set the target Y coordinate for the arrow tip")
+        self.arrow_y_spin.setRange(-2.0, 2.0)
+        self.arrow_y_spin.setValue(0.4)
+        self.arrow_y_spin.setSingleStep(0.05)
+        self.arrow_y_spin.setEnabled(False)
+        arrow_grid.addWidget(self.arrow_y_spin, 0, 3)
+
+        arrow_grid.addWidget(QLabel("Arrow Preset:"), 1, 0)
+        self.arrow_preset_combo = QComboBox()
+        self.arrow_preset_combo.setToolTip("Select a preset for the arrow")
+        self.arrow_preset_combo.addItems(
+            ["Subtle Pointer", "Aggressive Red Arrow", "Curved Highlight", "Straight Line", "Custom"])
+        self.arrow_preset_combo.setEnabled(False)
+        arrow_grid.addWidget(self.arrow_preset_combo, 1, 1, 1, 3)
+
+        arrow_layout.addLayout(arrow_grid)
+
+        # Custom Dictionary editor for Arrow Props
+        self.custom_arrow_container = QWidget()
+        custom_arrow_layout = QVBoxLayout(self.custom_arrow_container)
+        custom_arrow_layout.setContentsMargins(0, 0, 0, 0)
+
+        help_layout = QHBoxLayout()
+        help_label = QLabel("<b>Dictionary Editor</b>")
+        self.arrow_help_button = QPushButton("View Cheat Sheet")
+        self.arrow_help_button.setToolTip(
+            "Open the Matplotlib annotation cheat sheet to see valid values for the ArrowProp dictionary")
+        help_layout.addWidget(help_label)
+        help_layout.addStretch()
+        help_layout.addWidget(self.arrow_help_button)
+        custom_arrow_layout.addLayout(help_layout)
+
+        self.custom_arrow_edit = QPlainTextEdit()
+        self.custom_arrow_edit.setObjectName("PlotConfigEditor")
+        self.custom_arrow_edit.setToolTip(
+            "This editor allows you to enter a Python dictionary, to fill in the properties of the Arrow props."
+        )
+        self.custom_arrow_edit.setPlaceholderText(
+            '{"arrowstyle": "fancy", "color": "purple", "connectionstyle": "arc3,rad=0.3"}')
+        self.custom_arrow_edit.setMinimumHeight(110)
+        self.custom_arrow_edit.setMaximumHeight(160)
+        self.arrow_highlighter = JSONHighlighter(self.custom_arrow_edit.document())
+        custom_arrow_layout.addWidget(self.custom_arrow_edit)
+
+        self.custom_arrow_container.setVisible(False)
+        arrow_layout.addWidget(self.custom_arrow_container)
+
+        arrow_layout.addStretch()
+        self.manual_toolbox.addItem(arrow_page, "Arrow Properties")
+
+        manual_layout.addWidget(self.manual_toolbox)
 
         manual_actions_layout = QHBoxLayout()
+        manual_actions_layout.addStretch()
         self.deselect_annotation_button = QPushButton("Cancel / Deselect")
         self.deselect_annotation_button.setToolTip("Deselect the current annotation to create a new one.")
         self.deselect_annotation_button.setEnabled(False)
@@ -543,7 +658,6 @@ class AnnotationsSettingsTab(QWidget):
         manual_actions_layout.addWidget(self.add_annotation_button)
         manual_layout.addLayout(manual_actions_layout)
 
-        manual_layout.addStretch()
         tab_widget.addTab(manual_tab, "Manual Label")
 
         layout.addWidget(tab_widget)

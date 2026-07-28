@@ -1,11 +1,13 @@
+from .AnnotationLocatorWidget import AnnotationLocatorWidget
+from .AutoResizingStackedWidget import AutoResizingStackedWidget
+from .ColorBlindnessEffect import ColorBlindnessEffect
 from .ColormapButton import ColormapButton
 from .HelpIcon import HelpIcon
-from .ToggleSwitch import ToggleSwitch
-from .AutoResizingStackedWidget import AutoResizingStackedWidget
 from .QuickFilterEdit import QuickFilterEdit
-from .ColorBlindnessEffect import ColorBlindnessEffect
+from .ToggleSwitch import ToggleSwitch
 
 __all__ = [
+    "AnnotationLocatorWidget",
     "ColormapButton",
     "HelpIcon",
     "ToggleSwitch",

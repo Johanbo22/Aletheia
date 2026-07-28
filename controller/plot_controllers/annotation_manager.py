@@ -1,13 +1,16 @@
+import ast
+import json
 from typing import Any, Dict, List, TYPE_CHECKING
 
 import pandas as pd
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, QTimer, Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
 from matplotlib.text import Text
 
 from controller.plot_controllers.color_manager import ColorManager
 from core.global_signals import ToastLevel, global_signals
+from ui.dialogs.ArrowCheatSheetDialog import ArrowCheatSheetDialog
 from ui.status_bar import LogLevel
 from ui.widgets.ContextualAnnotationToolbar import ContextualAnnotationToolbar
 
@@ -30,6 +33,18 @@ class AnnotationManager:
         self._bg_cache = None
         self.ignore_next_click: bool = False
         self._is_updating_ui: bool = False
+
+        debounce_interval_milliseconds: int = 100
+        self._redraw_timer: QTimer = QTimer(self.plot_tab)
+        self._redraw_timer.setSingleShot(True)
+        self._redraw_timer.setInterval(debounce_interval_milliseconds)
+        self._redraw_timer.timeout.connect(self.plot_tab.on_style_changed)
+
+        text_typing_delay: int = 750
+        self._text_typing_timer: QTimer = QTimer(self.plot_tab)
+        self._text_typing_timer.setSingleShot(True)
+        self._text_typing_timer.setInterval(text_typing_delay)
+        self._text_typing_timer.timeout.connect(self.update_active_annotation)
 
         self.annotation_color: str = "black"
         self.annotation_bg_color: str = "wheat"
@@ -54,6 +69,21 @@ class AnnotationManager:
         self.view.annotation_x_spin.valueChanged.connect(self.update_active_annotation)
         self.view.annotation_y_spin.valueChanged.connect(self.update_active_annotation)
         self.view.annotation_fontsize_spin.valueChanged.connect(self.update_active_annotation)
+
+        self.view.annotations_tab.annotation_boxstyle_combo.currentTextChanged.connect(self.update_active_annotation)
+        self.view.annotations_tab.annotation_bg_alpha_slider.valueChanged.connect(self.update_active_annotation)
+
+        self.view.annotations_tab.arrow_enable_check.stateChanged.connect(self._toggle_arrow_inputs)
+        self.view.annotations_tab.arrow_enable_check.stateChanged.connect(self.update_active_annotation)
+        self.view.annotations_tab.arrow_x_spin.valueChanged.connect(self.update_active_annotation)
+        self.view.annotations_tab.arrow_y_spin.valueChanged.connect(self.update_active_annotation)
+        self.view.annotations_tab.arrow_preset_combo.currentTextChanged.connect(self._toggle_arrow_inputs)
+        self.view.annotations_tab.arrow_preset_combo.currentTextChanged.connect(self.update_active_annotation)
+        self.view.annotations_tab.custom_arrow_edit.textChanged.connect(self._text_typing_timer.start)
+        self.view.annotations_tab.arrow_help_button.clicked.connect(self.show_arrow_cheat_sheet)
+
+        self.view.annotations_tab.annotation_locator.textPositionChanged.connect(self._on_locator_text_changed)
+        self.view.annotations_tab.annotation_locator.targetPositionChanged.connect(self._on_locator_target_changed)
 
         for widget in [self.view.auto_annotate_fontsize_spin, self.view.auto_annotate_x_offset_spin,
                        self.view.auto_annotate_y_offset_spin, self.view.auto_annotate_rotation_spin]:
@@ -119,6 +149,56 @@ class AnnotationManager:
             widget.setEnabled(is_enabled)
         self.plot_tab.on_style_changed()
 
+    def _toggle_arrow_inputs(self, state: int) -> None:
+        """Toggles the enable state of arrow inputs based on the ToggleSwitch state id"""
+        is_enabled = self.view.annotations_tab.arrow_enable_check.isChecked()
+        self.view.annotations_tab.arrow_x_spin.setEnabled(is_enabled)
+        self.view.annotations_tab.arrow_y_spin.setEnabled(is_enabled)
+        self.view.annotations_tab.arrow_preset_combo.setEnabled(is_enabled)
+
+        preset = self.view.annotations_tab.arrow_preset_combo.currentText()
+        show_custom = is_enabled and (preset == "Custom")
+        self.view.annotations_tab.custom_arrow_container.setVisible(show_custom)
+
+        if show_custom and not self.view.annotations_tab.custom_arrow_edit.toPlainText():
+            seed_dict = {"arrowstyle": "->", "color": "gray", "connectionstyle": "arc3,rad=0.2"}
+            formatted_text = json.dumps(seed_dict, indent=4)
+
+            self.view.annotations_tab.custom_arrow_edit.blockSignals(True)
+            self.view.annotations_tab.custom_arrow_edit.setPlainText(formatted_text)
+            self.view.annotations_tab.custom_arrow_edit.blockSignals(False)
+
+    def _on_locator_text_changed(self, x: float, y: float) -> None:
+        """Triggered while a Text Node is dragged"""
+        if self._is_updating_ui:
+            return
+
+        self._is_updating_ui = True
+        self.view.annotation_x_spin.setValue(x)
+        self.view.annotation_y_spin.setValue(y)
+        self._is_updating_ui = False
+
+        self.update_active_annotation()
+
+    def _on_locator_target_changed(self, x: float, y: float) -> None:
+        """Triggered while a Text Node is dragged"""
+        if self._is_updating_ui:
+            return
+
+        self._is_updating_ui = True
+        self.view.annotations_tab.arrow_x_spin.setValue(x)
+        self.view.annotations_tab.arrow_y_spin.setValue(y)
+        self._is_updating_ui = False
+
+        self.update_active_annotation()
+
+    def show_arrow_cheat_sheet(self) -> None:
+        """Displays a modal dialog with a table of valid Matplotlib annotation values"""
+        self._cheat_sheet_dialog = ArrowCheatSheetDialog(self.view.annotations_tab)
+        self._cheat_sheet_dialog.show()
+        self._cheat_sheet_dialog.raise_()
+        self._cheat_sheet_dialog.activateWindow()
+
     def add_annotation(self) -> None:
         """Adds a new annotation to the list of active annotations"""
         text = self.view.annotation_text.text().strip()
@@ -129,12 +209,19 @@ class AnnotationManager:
             return
 
         annotation = {
-            "text"    : text,
-            "x"       : self.view.annotation_x_spin.value(),
-            "y"       : self.view.annotation_y_spin.value(),
-            "fontsize": self.view.annotation_fontsize_spin.value(),
-            "color"   : self.annotation_color,
-            "bg_color": self.annotation_bg_color
+            "text"           : text,
+            "x"              : self.view.annotation_x_spin.value(),
+            "y"              : self.view.annotation_y_spin.value(),
+            "fontsize"       : self.view.annotation_fontsize_spin.value(),
+            "color"          : self.annotation_color,
+            "bg_color"       : self.annotation_bg_color,
+            "boxstyle"       : self.view.annotations_tab.annotation_boxstyle_combo.currentText(),
+            "box_alpha"      : self.view.annotations_tab.annotation_bg_alpha_slider.value() / 100.0,
+            "has_arrow"      : self.view.annotations_tab.arrow_enable_check.isChecked(),
+            "arrow_x"        : self.view.annotations_tab.arrow_x_spin.value(),
+            "arrow_y"        : self.view.annotations_tab.arrow_y_spin.value(),
+            "arrow_preset"   : self.view.annotations_tab.arrow_preset_combo.currentText(),
+            "arrow_dict_text": self.view.annotations_tab.custom_arrow_edit.toPlainText()
         }
 
         self.annotations.append(annotation)
@@ -175,11 +262,25 @@ class AnnotationManager:
             ann["fontsize"] = self.view.annotation_fontsize_spin.value()
             ann["color"] = self.annotation_color
             ann["bg_color"] = self.annotation_bg_color
+            ann["boxstyle"] = self.view.annotations_tab.annotation_boxstyle_combo.currentText()
+            ann["box_alpha"] = self.view.annotations_tab.annotation_bg_alpha_slider.value() / 100.0
+            ann["has_arrow"] = self.view.annotations_tab.arrow_enable_check.isChecked()
+            ann["arrow_x"] = self.view.annotations_tab.arrow_x_spin.value()
+            ann["arrow_y"] = self.view.annotations_tab.arrow_y_spin.value()
+            ann["arrow_preset"] = self.view.annotations_tab.arrow_preset_combo.currentText()
+            ann["arrow_dict_text"] = self.view.annotations_tab.custom_arrow_edit.toPlainText()
+
+            self.view.annotations_tab.annotation_locator.set_arrow_enabled(ann["has_arrow"])
+            self.view.annotations_tab.annotation_locator.set_text_color(QColor(ann["color"]))
+            self.view.annotations_tab.annotation_locator.set_text_pos(ann["x"], ann["y"])
+            if ann["has_arrow"]:
+                self.view.annotations_tab.annotation_locator.set_target_pos(ann["arrow_x"], ann["arrow_y"])
 
             self._is_updating_ui = True
             selected_items[0].setText(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")
             self._is_updating_ui = False
-            self.plot_tab.on_style_changed()
+
+            self._redraw_timer.start()
 
     def deselect_annotation(self) -> None:
         """Clears the current annotation selection to allow adding a new one"""
@@ -228,8 +329,26 @@ class AnnotationManager:
             ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button,
                                                     QColor(self.annotation_bg_color))
 
+            self.view.annotations_tab.annotation_boxstyle_combo.setCurrentText(ann.get("boxstyle", "round"))
+            self.view.annotations_tab.annotation_bg_alpha_slider.setValue(int(ann.get("box_alpha", 1.0) * 100))
+
+            has_arrow = ann.get("has_arrow", False)
+            self.view.annotations_tab.arrow_enable_check.setChecked(has_arrow)
+            self.view.annotations_tab.arrow_x_spin.setValue(ann.get("arrow_x", 0.5))
+            self.view.annotations_tab.arrow_y_spin.setValue(ann.get("arrow_y", 0.4))
+            self.view.annotations_tab.arrow_preset_combo.setCurrentText(ann.get("arrow_preset", "Subtle Pointer"))
+            self.view.annotations_tab.custom_arrow_edit.setPlainText(ann.get("arrow_dict_text", ""))
+            self._toggle_arrow_inputs(has_arrow)
+
+            self.view.annotations_tab.annotation_locator.set_arrow_enabled(has_arrow)
+            self.view.annotations_tab.annotation_locator.set_text_color(QColor(self.annotation_color))
+            self.view.annotations_tab.annotation_locator.set_text_pos(ann.get("x", 0.5), ann.get("y", 0.5))
+            if has_arrow:
+                self.view.annotations_tab.annotation_locator.set_target_pos(ann.get("arrow_x", 0.5),
+                                                                            ann.get("arrow_y", 0.4))
+
             self._is_updating_ui = False
-            self.plot_tab.on_style_changed()
+            self._redraw_timer.start()
 
     def clear_annotations(self) -> None:
         """Deletes all annotations from the list"""
@@ -290,22 +409,67 @@ class AnnotationManager:
         for i, ann in enumerate(self.annotations):
             if not ann.get("visible", True):
                 continue
+
             font_kwargs = {}
             if "fontfamily" in ann:
                 font_kwargs["fontfamily"] = ann["fontfamily"]
 
-            self.plot_engine.current_ax.text(
-                ann["x"], ann["y"], ann["text"],
-                transform=self.plot_engine.current_ax.transAxes,
-                fontsize=ann["fontsize"],
-                color=ann["color"],
-                fontweight=ann.get("fontweight", "normal"),
-                fontstyle=ann.get("fontstyle", "normal"),
-                ha=ann.get("ha", "center"), va=ann.get("va", "center"),
-                bbox=dict(boxstyle="round", facecolor=ann.get("bg_color", "wheat")),
-                picker=True, gid=f"annotation_{i}",
-                **font_kwargs
+            box_style = ann.get("boxstyle", "round")
+            bbox_props = dict(
+                boxstyle=box_style,
+                facecolor=ann.get("bg_color", "wheat"),
+                alpha=ann.get("box_alpha", 1.0)
             )
+
+            has_arrow = ann.get("has_arrow", False)
+            if has_arrow:
+                preset = ann.get("arrow_preset", "Subtle Pointer")
+                if preset == "Aggressive Red Arrow":
+                    arrow_props = dict(arrowstyle="fancy", color="red", connectionstyle="arc3,rad=0.1")
+                elif preset == "Curved Highlight":
+                    arrow_props = dict(arrowstyle="-[", color="blue", connectionstyle="angle3,angleA=0,angleB=-90")
+                elif preset == "Straight Line":
+                    arrow_props = dict(arrowstyle="-", color="black", connectionstyle="arc3,rad=0.0")
+                elif preset == "Custom":
+                    dict_text = ann.get("arrow_dict_text", "").strip()
+                    try:
+                        arrow_props = ast.literal_eval(dict_text) if dict_text else {}
+                        if not isinstance(arrow_props, dict):
+                            arrow_props = dict(arrowstyle="->", color="gray")
+                    except Exception:
+                        arrow_props = dict(arrowstyle="->", color="gray")
+                else:
+                    arrow_props = dict(arrowstyle="->", color="gray", connectionstyle="arc3,rad=0.2")
+
+                self.plot_engine.current_ax.annotate(
+                    ann["text"],
+                    xy=(ann.get("arrow_x", 0.5), ann.get("arrow_y", 0.4)),
+                    xycoords='axes fraction',
+                    xytext=(ann["x"], ann["y"]),
+                    textcoords='axes fraction',
+                    fontsize=ann["fontsize"],
+                    color=ann["color"],
+                    fontweight=ann.get("fontweight", "normal"),
+                    fontstyle=ann.get("fontstyle", "normal"),
+                    ha=ann.get("ha", "center"), va=ann.get("va", "center"),
+                    bbox=bbox_props,
+                    arrowprops=arrow_props,
+                    picker=True, gid=f"annotation_{i}",
+                    **font_kwargs
+                )
+            else:
+                self.plot_engine.current_ax.text(
+                    ann["x"], ann["y"], ann["text"],
+                    transform=self.plot_engine.current_ax.transAxes,
+                    fontsize=ann["fontsize"],
+                    color=ann["color"],
+                    fontweight=ann.get("fontweight", "normal"),
+                    fontstyle=ann.get("fontstyle", "normal"),
+                    ha=ann.get("ha", "center"), va=ann.get("va", "center"),
+                    bbox=bbox_props,
+                    picker=True, gid=f"annotation_{i}",
+                    **font_kwargs
+                )
 
         # Auto Annotations
         if self.view.auto_annotate_check.isChecked() and df is not None and x_col and y_cols:
