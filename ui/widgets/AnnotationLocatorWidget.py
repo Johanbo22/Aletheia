@@ -2,7 +2,7 @@ import math
 
 from PyQt6.QtCore import QEasingCurve, QPointF, QRectF, QVariantAnimation, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QMouseEvent, QPaintEvent, QPainter, QPen
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 class AnnotationLocatorWidget(QWidget):
     """
@@ -17,8 +17,12 @@ class AnnotationLocatorWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("AnnotationLocatorWidget")
-        self.setFixedSize(200, 200)
+
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(200)
         self.setCursor(Qt.CursorShape.CrossCursor)
+
+        self._aspect_ratio: float = 1.0
 
         self.text_pos = QPointF(0.5, 0.5)
         self.target_pos = QPointF(0.5, 0.4)
@@ -46,6 +50,32 @@ class AnnotationLocatorWidget(QWidget):
         if self.text_color != color:
             self.text_color = color
             self.update()
+
+    def set_canvas_dimensions(self, width: float, height: float) -> None:
+        """
+        Updates the proxy canvas dimensions to match the target figure's aspect ratio
+        """
+        if width <= 0 or height <= 0:
+            return
+
+        self._aspect_ratio = width / height
+        self.update()
+
+    def _get_canvas_rect(self) -> QRectF:
+        """Calculates the centered active canvas area based on the current aspect ratio"""
+        widget_width, widget_height = self.width(), self.height()
+
+        target_height = widget_height
+        target_width = target_height * self._aspect_ratio
+
+        if target_width > widget_width:
+            target_width = widget_width
+            target_height = target_width / self._aspect_ratio
+
+        x = (widget_width - target_width) / 2.0
+        y = (widget_height - target_height) / 2.0
+
+        return QRectF(x, y, target_width, target_height)
 
     def set_text_pos(self, x: float, y: float) -> None:
         """Sets the text origin and animates to a new position if changed"""
@@ -152,7 +182,7 @@ class AnnotationLocatorWidget(QWidget):
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Releases the currently grabbed node"""
-        if event.button() != Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._dragged_node = None
 
     #####
@@ -162,36 +192,48 @@ class AnnotationLocatorWidget(QWidget):
 
     def _to_px(self, pos: QPointF) -> QPointF:
         """Maps 0-1 Matplotlib space to pixel space"""
-        width, height = self.width(), self.height()
-        return QPointF(pos.x() * width, height - (pos.y() * height))
+        rect = self._get_canvas_rect()
+        px_x = rect.x() + (pos.x() * rect.width())
+        px_y = rect.y() + (rect.height() - (pos.y() * rect.height()))
+        return QPointF(px_x, px_y)
 
     def _to_pos(self, px: QPointF) -> QPointF:
         """Maps pixel space to 0-1 Matplotlib space"""
-        width, height = self.width(), self.height()
-        if width == 0 or height == 0:
+        rect = self._get_canvas_rect()
+        if rect.width() == 0 or rect.height() == 0:
             return QPointF(0, 0)
-        return QPointF(px.x() / width, (height - px.y() / height))
+
+        x = (px.x() - rect.x()) / rect.width()
+        y = (rect.bottom() - px.y()) / rect.height()
+        return QPointF(x, y)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        width, height = self.width(), self.height()
+        rect = self._get_canvas_rect()
+
+        painter.fillRect(self.rect(), QColor(100, 100, 100, 15))
+        painter.fillRect(rect, QColor(128, 128, 128, 40))
+
+        border_pen = QPen(QColor(150, 150, 150), 1)
+        painter.setPen(border_pen)
+        painter.drawRect(rect)
 
         grid_pen = QPen(QColor(150, 150, 150, 80))
         grid_pen.setStyle(Qt.PenStyle.DashLine)
         painter.setPen(grid_pen)
 
         for i in [1, 2, 3]:
-            x = int(width * (i / 4.0))
-            painter.drawLine(x, 0, x, height)
-            y = int(height * (i / 4.0))
-            painter.drawLine(0, y, width, y)
+            vx = rect.x() + (rect.width() * (i / 4.0))
+            painter.drawLine(QPointF(vx, rect.y()), QPointF(vx, rect.bottom()))
+            vy = rect.y() + (rect.height() * (i / 4.0))
+            painter.drawLine(QPointF(rect.x(), vy), QPointF(rect.right(), vy))
 
         p_text = self._to_px(self.text_pos)
         p_target = self._to_px(self.target_pos)
 
         if self.has_arrow:
-            line_pen = QPen(QColor(150, 150, 150, 150), 2)
+            line_pen = QPen(QColor(150, 150, 150), 2)
             painter.setPen(line_pen)
             painter.drawLine(p_text, p_target)
 

@@ -244,6 +244,18 @@ class AnnotationManager:
         if self._is_updating_ui:
             return
 
+        has_arrow = self.view.annotations_tab.arrow_enable_check.isChecked()
+        x = self.view.annotation_x_spin.value()
+        y = self.view.annotation_y_spin.value()
+        arrow_x = self.view.annotations_tab.arrow_x_spin.value()
+        arrow_y = self.view.annotations_tab.arrow_y_spin.value()
+
+        self.view.annotations_tab.annotation_locator.set_arrow_enabled(has_arrow)
+        self.view.annotations_tab.annotation_locator.set_text_color(QColor(self.annotation_color))
+        self.view.annotations_tab.annotation_locator.set_text_pos(x, y)
+        if has_arrow:
+            self.view.annotations_tab.annotation_locator.set_target_pos(arrow_x, arrow_y)
+
         selected_items = self.view.annotations_list.selectedItems()
         if not selected_items:
             return
@@ -257,24 +269,18 @@ class AnnotationManager:
                 return
 
             ann["text"] = new_text
-            ann["x"] = self.view.annotation_x_spin.value()
-            ann["y"] = self.view.annotation_y_spin.value()
+            ann["x"] = x
+            ann["y"] = y
             ann["fontsize"] = self.view.annotation_fontsize_spin.value()
             ann["color"] = self.annotation_color
             ann["bg_color"] = self.annotation_bg_color
             ann["boxstyle"] = self.view.annotations_tab.annotation_boxstyle_combo.currentText()
             ann["box_alpha"] = self.view.annotations_tab.annotation_bg_alpha_slider.value() / 100.0
-            ann["has_arrow"] = self.view.annotations_tab.arrow_enable_check.isChecked()
-            ann["arrow_x"] = self.view.annotations_tab.arrow_x_spin.value()
-            ann["arrow_y"] = self.view.annotations_tab.arrow_y_spin.value()
+            ann["has_arrow"] = has_arrow
+            ann["arrow_x"] = arrow_x
+            ann["arrow_y"] = arrow_y
             ann["arrow_preset"] = self.view.annotations_tab.arrow_preset_combo.currentText()
             ann["arrow_dict_text"] = self.view.annotations_tab.custom_arrow_edit.toPlainText()
-
-            self.view.annotations_tab.annotation_locator.set_arrow_enabled(ann["has_arrow"])
-            self.view.annotations_tab.annotation_locator.set_text_color(QColor(ann["color"]))
-            self.view.annotations_tab.annotation_locator.set_text_pos(ann["x"], ann["y"])
-            if ann["has_arrow"]:
-                self.view.annotations_tab.annotation_locator.set_target_pos(ann["arrow_x"], ann["arrow_y"])
 
             self._is_updating_ui = True
             selected_items[0].setText(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")

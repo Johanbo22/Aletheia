@@ -445,11 +445,19 @@ class PlotTab(PlotTabUI):
         self.on_data_changed()
 
     def on_canvas_resize(self, event: Any) -> None:
+        """
+        Event listener for the a canvas resize event. Used to display the
+        correct geometry of the figure canvas upon a resize event.
+        """
         self.subplot_manager.update_overlay(is_resize=True)
         self.formatting_manager.setup_plot_figure(clear=False)
 
         if hasattr(self, "view_cube") and self.view_cube is not None:
             self._position_view_cube()
+
+        if self.plot_engine.current_figure and self.view:
+            figure_width, figure_height = self.plot_engine.current_figure.get_size_inches()
+            self.view.annotations_tab.annotation_locator.set_canvas_dimensions(figure_width, figure_height)
 
         self.canvas.draw_idle()
 

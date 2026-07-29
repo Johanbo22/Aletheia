@@ -333,7 +333,7 @@ class AnnotationsSettingsTab(QWidget):
 
     def _setup_annotation_tools_group(self, parent_layout: QVBoxLayout) -> None:
         group = QGroupBox("Annotation Tools")
-        group.setMinimumHeight(500)
+        group.setMinimumHeight(600)
         layout = QVBoxLayout()
 
         tab_widget = QTabWidget()
@@ -491,9 +491,7 @@ class AnnotationsSettingsTab(QWidget):
 
         self.annotation_locator = AnnotationLocatorWidget()
         locator_layout = QHBoxLayout()
-        locator_layout.addStretch()
         locator_layout.addWidget(self.annotation_locator)
-        locator_layout.addStretch()
         manual_layout.addLayout(locator_layout)
 
         coord_layout = QGridLayout()
