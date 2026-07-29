@@ -11,6 +11,7 @@ from controller.plot_controllers import (AnnotationManager, AppearanceSettingsMa
                                          ColorManager, DataSelectionManager, PlotExportManager, PlotFormattingManager,
                                          PlotTableManager, PlotTypeManager, ReferenceLineManager, ReferenceSpanManager,
                                          ScriptManager, SeriesCustomizationManager, SubplotManager, ThemeManager)
+from controller.plot_controllers.drawing_order_manager import DrawingOrderManager
 from controller.plot_controllers.plot_generation_manager import PlotGenerationManager
 from core.code_exporter import CodeExporter
 from core.data_handler import DataHandler
@@ -112,6 +113,7 @@ class PlotTab(PlotTabUI):
         self.data_selection_manager = DataSelectionManager(self)
         self.appearance_settings_manager = AppearanceSettingsManager(self)
         self.generation_manager = PlotGenerationManager(self)
+        self.drawing_order_manager = DrawingOrderManager()
         self._setup_view_cube()
 
         # Load initial data
@@ -138,6 +140,7 @@ class PlotTab(PlotTabUI):
         self._connect_annotation_tab_signals()
         self._connect_geospatial_tab_signals()
         self._connect_theme_controls()
+        self._connect_drawing_order_signals()
 
     def _connect_main_controls(self) -> None:
         """Connect the main action buttons and canvas events"""
@@ -409,6 +412,35 @@ class PlotTab(PlotTabUI):
         self.view.geo_target_crs_input.editingFinished.connect(self._on_geospatial_projection_changed)
         self.view.geo_basemap_check.stateChanged.connect(self._on_geospatial_projection_changed)
         self.view.geo_basemap_style_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
+
+    def _connect_drawing_order_signals(self) -> None:
+        self.drawing_order_fab.clicked.connect(self._toggle_drawing_order_popup)
+        self.drawing_order_popup.layerVisibilityToggled.connect(
+            self.drawing_order_manager.set_layer_visibility
+        )
+        self.drawing_order_popup.layerOrderChanged.connect(
+            self.drawing_order_manager.apply_new_order
+        )
+        self.drawing_order_manager.requestCanvasRedraw.connect(
+            self.canvas.draw_idle
+        )
+
+    def _toggle_drawing_order_popup(self) -> None:
+        popup = self.drawing_order_popup
+        if popup.isVisible():
+            popup.hide()
+        else:
+            self.refresh_drawing_order_list()
+            popup.show()
+            popup.raise_()
+
+    def refresh_drawing_order_list(self) -> None:
+        if not hasattr(self, "canvas") or not self.canvas.figure.axes:
+            return
+
+        ax = self.canvas.figure.axes[0]
+        layers = self.drawing_order_manager.extract_layers(ax)
+        self.drawing_order_popup.populate_layers(layers)
 
     def _connect_theme_controls(self) -> None:
         """Connect signals for Theme management"""

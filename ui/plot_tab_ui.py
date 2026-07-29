@@ -1,17 +1,16 @@
 # ui/plot_tab_ui.py
 
-from PyQt6.QtWidgets import (
-    QSplitter, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFontComboBox, QStackedWidget, QToolBox, QFrame, QGraphicsDropShadowEffect, QStackedLayout, QPushButton 
-)
+from PyQt6.QtCore import QEvent, QObject, Qt
+from PyQt6.QtGui import QColor, QKeySequence
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import Qt, QEvent, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon, QKeySequence, QColor
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from PyQt6.QtWidgets import (QFontComboBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QPushButton, QSplitter,
+                             QStackedLayout, QToolBox, QVBoxLayout, QWidget)
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
-from core.resource_loader import get_resource_path
-from ui.theme import ThemeColors
-from ui.components.plot_settings_panel import PlotSettingsPanel
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+
 from icons import IconBuilder, IconType
+from ui.components.plot_settings_panel import PlotSettingsPanel
+from ui.widgets.DrawingOrderWidgets import DrawingOrderFloatingActionButton, DrawingOrderPopup
 
 class PlotTabUI(QWidget):
     """"""
@@ -111,8 +110,43 @@ class PlotTabUI(QWidget):
         # Create splitter
         splitter: QSplitter = self._create_splitter(left_widget, right_widget)
         main_layout.addWidget(splitter)
+
+        self._setup_drawing_order_ui()
         
         self.setLayout(main_layout)
+
+    def _setup_drawing_order_ui(self) -> None:
+        self.drawing_order_fab = DrawingOrderFloatingActionButton(self.canvas_container)
+        self.drawing_order_popup = DrawingOrderPopup(self.canvas_container)
+
+        self.canvas_container.installEventFilter(self)
+        self.canvas_stack.currentChanged.connect(self._raise_floating_widgets)
+
+        self.drawing_order_fab.show()
+        self.drawing_order_popup.hide()
+        self._raise_floating_widgets()
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if obj is self.canvas_container and event.type() == QEvent.Type.Resize:
+            self._reposition_floating_widgets()
+        return super().eventFilter(obj, event)
+
+    def _raise_floating_widgets(self, *args) -> None:
+        self.drawing_order_fab.raise_()
+        self.drawing_order_popup.raise_()
+
+    def _reposition_floating_widgets(self) -> None:
+        margin = 20
+
+        fab_x = margin
+        fab_y = self.canvas_container.height() - self.drawing_order_fab.height() - margin
+        self.drawing_order_fab.move(fab_x, fab_y)
+
+        popup_x = margin
+        popup_y = fab_y - self.drawing_order_popup.height() - 10
+        self.drawing_order_popup.move(popup_x, popup_y)
+
+        self._raise_floating_widgets()
     
     def _create_splitter(self, left, right) -> QSplitter:
         """Create a splitter for resizable panels"""

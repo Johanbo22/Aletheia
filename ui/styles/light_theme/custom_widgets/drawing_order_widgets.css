@@ -1,0 +1,43 @@
+#drawingOrderFAB {
+    background-color: var(--panel-background, #252526);
+    border: 1px solid var(--border-color, #3E3E42);
+    border-radius: 22px;
+    color: var(--text-color, #E0E0E0);
+    padding: 5px;
+    text-align: left;
+}
+
+#drawingOrderFAB:hover {
+    background-color: var(--hover-background, #2D2D30);
+    border: 1px solid var(--accent-color, #007ACC);
+}
+
+#drawingOrderPopup {
+    background-color: var(--background-color, #1E1E1E);
+    border: 1px solid var(--border-color, #3E3E42);
+    border-radius: 8px;
+}
+
+#drawingOrderSearch {
+    background-color: var(--panel-background, #252526);
+    border: 1px solid var(--border-color, #3E3E42);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--text-color, #E0E0E0);
+}
+
+#drawingOrderList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+#drawingOrderList::item {
+    padding: 6px;
+    border-bottom: 1px solid var(--border-color, #2D2D30);
+}
+
+#drawingOrderList::item:selected {
+    background-color: var(--selection-background, #094771);
+    color: white;
+}
