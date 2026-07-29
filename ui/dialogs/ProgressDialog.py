@@ -1,11 +1,10 @@
 import time
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication, QDialog, QHBoxLayout, QLabel, QProgressBar, QVBoxLayout, QPushButton
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QDialog, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
 class ProgressDialog(QDialog):
-    """A dualog showing progress for long operations and datasets"""
+    """A dialog showing progress for long operations and datasets"""
 
     def __init__(self, title="Processing", message="Please wait...", parent=None) -> None:
         super().__init__(parent)
@@ -83,9 +82,9 @@ class ProgressDialog(QDialog):
         QApplication.processEvents()
 
     def update_progress(self, value: int, status: str = "") -> None:
-        """ipdate the progress bar value and msg"""
+        """Update the progress bar value and msg"""
         if self.progress_bar.maximum() > 0:
-            safe_value = max(self.progress_bar.maximum(), min(value, self.progress_bar.maximum()))
+            safe_value = max(self.progress_bar.minimum(), min(value, self.progress_bar.maximum()))
             self.progress_bar.setValue(safe_value)
         if status:
             self.status_label.setText(status)
