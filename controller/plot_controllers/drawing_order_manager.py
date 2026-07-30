@@ -124,7 +124,13 @@ class DrawingOrderManager(QObject):
         if not self._current_axes:
             return
 
-        base_zorder = 100.0
+        current_zorders: list[float] = []
+        for layer_id in self._tracked_artists:
+            artist = self._tracked_artists[layer_id]
+            current_zorders.append(artist.get_zorder())
+
+        current_zorders.sort(reverse=True)
+        epsilon_step = 1e-5
 
         for index, layer_id in enumerate(ordered_layer_ids):
             artist = self._tracked_artists.get(layer_id)
@@ -132,9 +138,12 @@ class DrawingOrderManager(QObject):
                 logger.warning(f"Cannot set order: Layer {layer_id} not found")
                 continue
 
-            new_zorder = base_zorder - index
-            if artist.get_zorder() != new_zorder:
-                artist.set_zorder(new_zorder)
+            if index < len(current_zorders):
+                base_z = round(current_zorders[index], 3)
+                strict_zorder = base_z - (index * epsilon_step)
+
+                if artist.get_zorder() != strict_zorder:
+                    artist.set_zorder(strict_zorder)
 
         self._redraw_timer.start()
 

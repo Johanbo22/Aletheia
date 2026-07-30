@@ -414,6 +414,11 @@ class PlotTab(PlotTabUI):
         self.view.geo_basemap_style_combo.currentTextChanged.connect(self._on_geospatial_projection_changed)
 
     def _connect_drawing_order_signals(self) -> None:
+        self._drawing_order_timer = QTimer(self)
+        self._drawing_order_timer.setSingleShot(True)
+        self._drawing_order_timer.setInterval(300)
+        self._drawing_order_timer.timeout.connect(self._refresh_drawing_order)
+
         self.drawing_order_fab.clicked.connect(self._toggle_drawing_order_popup)
         self.drawing_order_popup.layerVisibilityToggled.connect(
             self.drawing_order_manager.set_layer_visibility
@@ -424,6 +429,17 @@ class PlotTab(PlotTabUI):
         self.drawing_order_manager.requestCanvasRedraw.connect(
             self.canvas.draw_idle
         )
+        self.canvas.mpl_connect("draw_event", self._on_canvas_drawn)
+
+    def _on_canvas_drawn(self, event: Any) -> None:
+        """Syncs the drawing order list automatically"""
+        if hasattr(self, "drawing_order_popup") and self.drawing_order_popup.isVisible():
+            self._drawing_order_timer.start()
+
+    def _refresh_drawing_order(self) -> None:
+        """Called by the drawingorder timer to refresh the popup"""
+        if hasattr(self, "drawing_order_popup") and self.drawing_order_popup.isVisible():
+            self.refresh_drawing_order_list()
 
     def _toggle_drawing_order_popup(self) -> None:
         popup = self.drawing_order_popup

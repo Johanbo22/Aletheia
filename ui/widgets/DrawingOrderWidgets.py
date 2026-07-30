@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Custom ItemDataRole for the MPL artistID
 LAYER_ID_ROLE = Qt.ItemDataRole.UserRole + 1
+BASE_LABEL_ROLE = Qt.ItemDataRole.UserRole + 2
+ZORDER_ROLE = Qt.ItemDataRole.UserRole + 3
 
 class DrawingOrderFloatingActionButton(QPushButton):
     """
@@ -69,6 +71,9 @@ class DraggableLayerList(QListView):
         self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.setAlternatingRowColors(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        self.setTextElideMode(Qt.TextElideMode.ElideMiddle)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def dropEvent(self, event: QDropEvent) -> None:
         """Catch the completion of a drag and drop event"""
@@ -190,8 +195,39 @@ class DrawingOrderPopup(QFrame):
         Receives a PlotLayerItem data struct from the controller and renders them
         :param layers:  Sequence of PlotLayerItem sorted by their zorder
         """
-        try:
+        current_ids = []
+        for row in range(self._model.rowCount()):
+            item = self._model.item(row)
+            if item:
+                current_ids.append(item.data(LAYER_ID_ROLE))
+
+        new_ids = [layer.layer_id for layer in layers]
+
+        if current_ids and current_ids == new_ids:
+            try:
+                self._model.itemChanged.disconnect(self._on_item_changed)
+            except TypeError:
+                pass
+
+            for row, layer in enumerate(layers):
+                item = self._model.item(row)
+                if item:
+                    check_state = Qt.CheckState.Checked if layer.is_visible else Qt.CheckState.Unchecked
+                    if item.checkState() != check_state:
+                        item.setCheckState(check_state)
+
+                    item.setData(layer.zorder, ZORDER_ROLE)
+                    base_label = item.data(BASE_LABEL_ROLE) or layer.label
+                    display_text = (f"{base_label} (Z: {layer.zorder:.0f})")
+
+                    item.setText(display_text)
+                    item.setToolTip(display_text)
+
             self._model.itemChanged.connect(self._on_item_changed)
+            return
+
+        try:
+            self._model.itemChanged.disconnect(self._on_item_changed)
         except TypeError:
             pass
 
@@ -200,6 +236,7 @@ class DrawingOrderPopup(QFrame):
         for layer in layers:
             display_text = f"{layer.label} (Z: {layer.zorder:.0f})"
             item = QStandardItem(layer.icon, display_text)
+            item.setToolTip(display_text)
 
             item.setCheckable(True)
             check_state = Qt.CheckState.Checked if layer.is_visible else Qt.CheckState.Unchecked
@@ -208,7 +245,10 @@ class DrawingOrderPopup(QFrame):
             item.setEditable(False)
             item.setDragEnabled(True)
             item.setDropEnabled(False)
+
             item.setData(layer.layer_id, LAYER_ID_ROLE)
+            item.setData(layer.label, BASE_LABEL_ROLE)
+            item.setData(layer.zorder, ZORDER_ROLE)
 
             self._model.appendRow(item)
 
@@ -223,12 +263,41 @@ class DrawingOrderPopup(QFrame):
     def _on_user_dropped_item(self) -> None:
         """Extract the new top to bottom order and emit the update signal"""
         ordered_ids: list[str] = []
+        current_zorders: list[float] = []
+
+        for row in range(self._model.rowCount()):
+            item = self._model.item(row)
+            if item:
+                z_val = item.data(ZORDER_ROLE)
+                current_zorders.append(float(z_val) if z_val is not None else 0.0)
+
+        current_zorders.sort(reverse=True)
+
+        try:
+            self._model.itemChanged.disconnect(self._on_item_changed)
+        except TypeError:
+            pass
+
+        epsilon_step = 1e-5
 
         for row in range(self._model.rowCount()):
             item = self._model.item(row)
             if item:
                 layer_id = item.data(LAYER_ID_ROLE)
                 ordered_ids.append(layer_id)
+
+                if row < len(current_zorders):
+                    base_z = round(current_zorders[row], 3)
+                    strict_zorder = base_z - (row * epsilon_step)
+                    base_label = item.data(BASE_LABEL_ROLE) or "Layer"
+
+                    display_text = (f"{base_label} (Z: {strict_zorder:.0f})")
+
+                    item.setData(strict_zorder, ZORDER_ROLE)
+                    item.setText(display_text)
+                    item.setToolTip(display_text)
+
+        self._model.itemChanged.connect(self._on_item_changed)
 
         if ordered_ids:
             self.layerOrderChanged.emit(ordered_ids)
