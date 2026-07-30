@@ -66,7 +66,7 @@ class DrawingOrderManager(QObject):
 
         layers: list[PlotLayerItem] = []
 
-        artists = ax.lines + ax.collections + ax.patches + ax.texts
+        artists = ax.get_children()
 
         for artist in artists:
             if not self._is_user_facing_artist(artist):

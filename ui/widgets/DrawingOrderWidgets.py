@@ -28,7 +28,7 @@ class DrawingOrderFloatingActionButton(QPushButton):
         self.setIcon(QIcon("icons/data_operations/arrow-down-up.svg"))
 
         self._collapsed_width = 45
-        self._expanded_width = 140
+        self._expanded_width = 170
 
         self.setMinimumSize(self._collapsed_width, self._collapsed_width)
         self.setMaximumSize(self._collapsed_width, self._collapsed_width)
@@ -190,7 +190,11 @@ class DrawingOrderPopup(QFrame):
         Receives a PlotLayerItem data struct from the controller and renders them
         :param layers:  Sequence of PlotLayerItem sorted by their zorder
         """
-        self._model.blockSignals(True)
+        try:
+            self._model.itemChanged.connect(self._on_item_changed)
+        except TypeError:
+            pass
+
         self._model.clear()
 
         for layer in layers:
@@ -208,7 +212,7 @@ class DrawingOrderPopup(QFrame):
 
             self._model.appendRow(item)
 
-        self._model.blockSignals(False)
+        self._model.itemChanged.connect(self._on_item_changed)
 
     def _on_item_changed(self, item: QStandardItem) -> None:
         """Handle the visibility toggle triggering"""

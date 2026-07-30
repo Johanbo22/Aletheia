@@ -438,7 +438,10 @@ class PlotTab(PlotTabUI):
         if not hasattr(self, "canvas") or not self.canvas.figure.axes:
             return
 
-        ax = self.canvas.figure.axes[0]
+        ax = getattr(self.plot_engine, "current_ax", None)
+        if ax is None:
+            ax = self.canvas.figure.axes[0]
+
         layers = self.drawing_order_manager.extract_layers(ax)
         self.drawing_order_popup.populate_layers(layers)
 
