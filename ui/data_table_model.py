@@ -48,6 +48,10 @@ class DataTableModel(QAbstractTableModel):
         self._compiled_rules: list[tuple] = []
         self._compile_rules(self.conditional_rules)
 
+        self._last_index: tuple[int, int] | None = None
+        self._last_value: Any = None
+        self._last_is_missing: bool = False
+
         self._highlight_color = QColor("#ffcccc")
         self._nan_color = QColor("#a0a0a0")
         self._missing_cell_color = QColor(255, 215, 0, 60)
@@ -231,6 +235,7 @@ class DataTableModel(QAbstractTableModel):
         self._data = self.data_handler.df
         self.highlighted_rows.clear()
         self.highlighted_cells.clear()
+        self._last_index = None
         self._update_column_alignments()
         self.endResetModel()
 
@@ -269,29 +274,41 @@ class DataTableModel(QAbstractTableModel):
                 return self._highlight_color
             if (row, col) in self.highlighted_cells:
                 return self._missing_cell_color
+            shape = self._data.shape
+            is_insert_row: bool = self.editable and row >= shape[0]
+            is_insert_col: bool = self.editable and col >= shape[1]
+            if is_insert_row and is_insert_col:
+                return QColor("#f8f9fa")
+            return None
 
         shape = self._data.shape
         is_insert_row: bool = self.editable and row >= shape[0]
         is_insert_col: bool = self.editable and col >= shape[1]
 
         if is_insert_row or is_insert_col:
-            if is_insert_row and is_insert_col and role == Qt.ItemDataRole.BackgroundRole:
-                return QColor("#f8f9fa")
             return None
 
-        try:
-            val: Any = self._data.iat[row, col]
-        except Exception:
-            return None
+        if (row, col) == self._last_index:
+            val = self._last_val
+            is_missing = self._last_is_missing
+        else:
+            try:
+                val: Any = self._data.iat[row, col]
+            except Exception:
+                return None
 
-        try:
-            if isinstance(val, (list, dict, np.ndarray)):
+            try:
+                if isinstance(val, (list, dict, np.ndarray)):
+                    is_missing = False
+                else:
+                    is_miss = pd.isna(val)
+                    is_missing = bool(is_miss) if isinstance(is_miss, (bool, np.bool_)) else False
+            except Exception:
                 is_missing = False
-            else:
-                is_miss = pd.isna(val)
-                is_missing = bool(is_miss) if isinstance(is_miss, (bool, np.bool_)) else False
-        except Exception:
-            is_missing = False
+
+            self._last_index = (row, col)
+            self._last_val = val
+            self._last_is_missing = is_missing
 
         if role == Qt.ItemDataRole.DisplayRole:
             return self._get_display_data(val, col, is_missing)
@@ -427,6 +444,9 @@ class DataTableModel(QAbstractTableModel):
             column = index.column()
 
             self.data_handler.update_cell(row, column, value)
+
+            if self._last_index == (row, column):
+                self._last_index = None
 
             self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
                                                  Qt.ItemDataRole.CheckStateRole])
@@ -583,6 +603,7 @@ class DataTableModel(QAbstractTableModel):
             self._data = self.data_handler.df
             self.highlighted_rows.clear()
             self.highlighted_cells.clear()
+            self._last_index = None
             self._update_column_alignments()
         except Exception as SortError:
             logger.error(f"Error sorting data: {SortError}", exc_info=True)
