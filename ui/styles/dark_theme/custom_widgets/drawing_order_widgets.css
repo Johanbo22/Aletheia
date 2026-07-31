@@ -1,0 +1,29 @@
+#drawingOrderFAB {
+    background-color: #0f172a;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    border-radius: 22px; 
+    padding-left: 14px;  
+    padding-right: 14px;
+    text-align: left;    
+    font-weight: 600;
+}
+
+#drawingOrderFAB:hover {
+    background-color: rgba(59, 130, 246, 0.15);
+    border: 1px solid #64748b;
+}
+
+#drawingOrderFAB:pressed {
+    background-color: #1e3a8a;
+}
+
+#drawingOrderPopup {
+    background-color: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 8px;
+}
+
+#drawingOrderList {
+    alternate-background-color: #1e293b; 
+}

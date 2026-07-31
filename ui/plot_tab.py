@@ -18,6 +18,7 @@ from core.data_handler import DataHandler
 from core.global_signals import ToastLevel, global_signals
 from core.plot_config_manager import PlotConfigManager
 from core.plot_engine import PlotEngine
+from ui.dialogs.ShortcutViewerDialog import ShortcutViewerDialog
 from ui.plot_tab_ui import PlotTabUI
 from ui.status_bar import LogLevel, StatusBar
 from ui.widgets.SubplotOverlay import SubplotOverlay
@@ -69,6 +70,7 @@ class PlotTab(PlotTabUI):
         self._pan_start_ylim = None
         self.config_manager = PlotConfigManager(self)
         self.thread_pool = QThreadPool.globalInstance()
+        self.shortcut_dialog: ShortcutViewerDialog | None = None
 
         self._is_data_dirty = False
         self._is_clearing = False
@@ -150,6 +152,7 @@ class PlotTab(PlotTabUI):
         self.clear_button.clicked.connect(self.clear)
         self.save_plot_button.clicked.connect(self.export_manager.save_plot_image)
         self.view.reset_button.clicked.connect(self.reset_settings_with_prompt)
+        self.shortcut_button.clicked.connect(self._show_shortcut_dialog)
 
         # editor sync
         self.view.x_column.currentTextChanged.connect(self.script_manager.sync_script_if_open)
@@ -1019,3 +1022,11 @@ class PlotTab(PlotTabUI):
 
         if hasattr(self, "empty_state_view") and self.empty_state_view is not None:
             self.empty_state_view.setHtml(greeting_html)
+
+    def _show_shortcut_dialog(self) -> None:
+        """Show the keyboard and mouse shortcut view dialog"""
+        if self.shortcut_dialog is None:
+            self.shortcut_dialog = ShortcutViewerDialog(self)
+
+        self.shortcut_dialog.show()
+        self.shortcut_dialog.raise_()
