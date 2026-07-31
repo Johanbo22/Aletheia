@@ -35,3 +35,26 @@ QToolBox#plot_type_toolbox::tab:selected {
     border: 1px solid #dcdcdc;
     border-radius: 8px;
 }
+
+#quickFilterEdit {
+    border: 1px solid #a0a0a0;
+    border-radius: 3px;
+    padding: 4px;
+    padding-right: 25px;
+    background-color: white;
+    color: black;
+    font-family: Consolas, monospace;
+    font-size: 10pt;
+}
+#quickFilterEdit[hasText="true"]{
+    background-color: #fffde7;
+}
+
+#quickFilterEdit:focus{
+    border: 1.5px solid #0078d7;
+}
+
+#quickFilterClearButton{
+    border: none;
+    background: transparent;
+}

@@ -1,17 +1,27 @@
-from PyQt6.QtCore import Qt, QStringListModel, pyqtSignal
-from PyQt6.QtGui import QTextCursor, QIcon, QKeyEvent
-from PyQt6.QtWidgets import QPlainTextEdit, QCompleter, QToolButton, QStyle
+from typing import List
+
+from PyQt6.QtCore import QRect, QStringListModel, Qt, pyqtSignal
+from PyQt6.QtGui import QKeyEvent, QResizeEvent, QTextCursor
+from PyQt6.QtWidgets import QCompleter, QPlainTextEdit, QStyle, QToolButton
+
 from ui.FilterSyntaxHighlighter import FilterSyntaxHighlighter
 
 class QuickFilterEdit(QPlainTextEdit):
-    """A qplaintext edit that is a one line that supports the filter syntax highlighting found in FilterSyntaxhighliter. Used to highligh syntax witin the quickfilter option in the plotting canvas"""
-    
+    """
+    A QPlainTextEdit that is a one line widget to support a On-the-fly filter system for plotting
+
+    This system allows for a filtering process that does not alter the dataset. The system provides a filter mask that is then seen by the PlotEngine to render the plot based on that filter.
+
+    A FilterSyntaxHighlighter is attached to give more visual hints for the text being typed.
+    """
+
     returnPressed = pyqtSignal()
-    
-    def __init__(self, parent=None):
+
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("quickFilterEdit")
         self.highlighter = FilterSyntaxHighlighter(self.document())
-        
+
         # setyp to be one line
         self.setFixedHeight(34)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -19,7 +29,7 @@ class QuickFilterEdit(QPlainTextEdit):
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setTabChangesFocus(True)
         self.setPlaceholderText("Enter filter expression...")
-        
+
         # Autocompleter
         self.completer = QCompleter(self)
         self.completer.setWidget(self)
@@ -27,89 +37,69 @@ class QuickFilterEdit(QPlainTextEdit):
         self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.completer.activated.connect(self.insert_completion)
         # keywords
-        self.base_keywords = [
-            "mean", "sum", "min", "max", "count", "std", "var", "median", "and", "or", "not", "in", "is", "NaN", "None", "True", "False", "abs", "round", "len", "str", "int", "float"
+        self.base_keywords: List[str] = [
+            "mean", "sum", "min", "max", "count", "std", "var", "median", "and", "or", "not", "in", "is", "NaN", "None",
+            "True", "False", "abs", "round", "len", "str", "int", "float"
         ]
-        self.current_keywords = list(self.base_keywords)
+        self.current_keywords: List[str] = list(self.base_keywords)
         self.update_completer_model()
-        
+
         # Setyp for clear button
         self.clear_button = QToolButton(self)
+        self.clear_button.setObjectName("quickFilterClearButton")
         self.clear_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCloseButton))
-        self.clear_button.setCursor(Qt.CursorShape.ArrowCursor)
-        self.clear_button.setStyleSheet("QToolButton { border: none; background: transparent; }")
+        self.clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_button.setFixedSize(16, 16)
         self.clear_button.clicked.connect(self.clear)
         self.clear_button.hide()
 
-        self._base_border = "1.5px solid #a0a0a0"
-        self._focus_border = "1.5px solid #0078d7"
-        self._bg_empty = "white"
-        self._bg_active = "#fffde7"
-        
-        self.setStyleSheet(f"""
-            QPlainTextEdit {{
-                border: {self._base_border};
-                border-radius: 3px;
-                padding: 4px;
-                padding-right: 25px;
-                background-color: white; /* Default empty state */
-                color: black; 
-                font-family: Consolas, monospace;
-                font-size: 10pt;
-            }}
-            QPlainTextEdit[hasText="true"] {{
-                background-color: #fffde7;
-            }}
-            QPlainTextEdit:focus {{
-                border: {self._focus_border};
-            }}
-        """)
         self.setProperty("hasText", False)
         self.textChanged.connect(self._on_text_changed)
-    
-    def set_columns(self, columns):
+
+    def set_columns(self, columns: List[str]) -> None:
         self.highlighter.set_columns(columns)
         self.current_keywords = sorted(list(set(self.base_keywords + columns)))
         self.update_completer_model()
-    
-    def update_completer_model(self):
+
+    def update_completer_model(self) -> None:
         model = QStringListModel(self.current_keywords, self.completer)
         self.completer.setModel(model)
-    
-    def insert_completion(self, completion: str):
+
+    def insert_completion(self, completion: str) -> None:
         tc = self.textCursor()
         extra = len(completion) - len(self.completer.completionPrefix())
         tc.movePosition(QTextCursor.MoveOperation.Left)
         tc.movePosition(QTextCursor.MoveOperation.EndOfWord)
         tc.insertText(completion[-extra:])
         self.setTextCursor(tc)
-    
+
     def text_under_cursor(self) -> str:
         tc = self.textCursor()
         tc.select(QTextCursor.SelectionType.WordUnderCursor)
         return tc.selectedText()
-    
+
     def _on_text_changed(self):
         has_text = bool(self.toPlainText().strip())
         self.clear_button.setVisible(has_text)
-        
+
         if self.property("hasText") != has_text:
             self.setProperty("hasText", has_text)
             self.style().unpolish(self)
             self.style().polish(self)
-    
-    def resizeEvent(self, event):
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
-        sz = self.clear_button.sizeHint()
-        x = self.width() - sz.width() - 5
-        y = (self.height() - sz.height()) // 2
+        clear_button_size_hint = self.clear_button.sizeHint()
+        frame_width = self.frameWidth()
+        x = self.width() - clear_button_size_hint.width() - frame_width - 6
+        y = (self.height() - clear_button_size_hint.height()) // 2
         self.clear_button.move(x, y)
-    
-    def keyPressEvent(self, event: QKeyEvent):
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         if self.completer and self.completer.popup().isVisible():
-            if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, 
-                                Qt.Key.Key_Tab, Qt.Key.Key_Backtab, 
-                                Qt.Key.Key_Up, Qt.Key.Key_Down):
+            if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape,
+                               Qt.Key.Key_Tab, Qt.Key.Key_Backtab,
+                               Qt.Key.Key_Up, Qt.Key.Key_Down):
                 event.ignore()
                 return
 
@@ -117,7 +107,7 @@ class QuickFilterEdit(QPlainTextEdit):
             self.returnPressed.emit()
             event.ignore()
             return
-        
+
         is_shortcut = (event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
 
         if not self.completer or not self.completer.popup().isVisible():
@@ -139,16 +129,21 @@ class QuickFilterEdit(QPlainTextEdit):
             self.completer.setCompletionPrefix(completion_prefix)
             self.completer.popup().setCurrentIndex(self.completer.completionModel().index(0, 0))
 
-        cr = self.cursorRect()
-        cr.setWidth(self.completer.popup().sizeHintForColumn(0) + self.completer.popup().verticalScrollBar().sizeHint().width())
-        self.completer.complete(cr)
-    
-    def text(self):
+        cursor_rect = self.cursorRect()
+        x_pos = cursor_rect.x() + self.viewport().x()
+
+        scroll_width = self.completer.popup().verticalScrollBar().sizeHint().width()
+        popup_width = self.completer.popup().sizeHintForColumn(0) + scroll_width + 15
+
+        target_rect = QRect(x_pos, 0, max(popup_width, 120), self.height())
+        self.completer.complete(target_rect)
+
+    def text(self) -> None:
         return self.toPlainText()
 
-    def setText(self, text):
+    def setText(self, text) -> None:
         self.setPlainText(text)
-    
-    def clear(self):
+
+    def clear(self) -> None:
         self.setPlainText("")
         self.returnPressed.emit()
