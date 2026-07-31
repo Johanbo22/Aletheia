@@ -575,23 +575,33 @@ class MainWindow(QWidget):
         if not self._confirm_discard_changes():
             return
 
+        valid_urls = [url.toLocalFile() for url in urls if url.isLocalFile() and Path(url.toLocalFile()).is_file()]
+
+        if not valid_urls:
+            self.show_toast(
+                "Invalid Drop",
+                "No valid files were found in the dropped selection",
+                ToastLevel.WARNING
+            )
+            return
+
         if urls:
             if len(urls) > 1:
+                loaded_file_name = Path(valid_urls[0]).name
                 self.show_toast(
                     "Multiple Files Dropped",
-                    "Only the first file will be loaded",
+                    f"Loading '{loaded_file_name}'. Other files will be ignored.",
                     ToastLevel.INFO
                 )
 
-            if urls[0].isLocalFile():
-                filepath = urls[0].toLocalFile()
-                path_obj = Path(filepath)
-                project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+            filepath = valid_urls[0]
+            path_obj = Path(filepath)
+            project_ext = self.project_manager.PROJECT_EXTENSION.lower()
 
-                if path_obj.suffix.lower() == project_ext:
-                    self._load_project_from_path(filepath)
-                else:
-                    self.load_file_from_path(filepath)
+            if path_obj.suffix.lower() == project_ext:
+                self._load_project_from_path(filepath)
+            else:
+                self.load_file_from_path(filepath)
 
     def load_file_from_path(self, filepath: str) -> None:
         """Process and import file from a path string"""
@@ -660,7 +670,7 @@ class MainWindow(QWidget):
 
         if self.progress_dialog:
             self.progress_dialog.update_progress(100, "Complete")
-            QTimer.singleShot(300, self.progress_dialog.accept)
+            QTimer.singleShot(600, self.progress_dialog.accept)
             self.progress_dialog = None
 
         path = Path(self._temp_import_filepath)

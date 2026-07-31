@@ -29,6 +29,8 @@ class MainDataTableView(QTableView):
         self.status_bar = status_bar
         self.data_handler = data_handler
 
+        self._is_missing_highlighted: bool = False
+
         self.setObjectName("MainDataTable")
         self.setAlternatingRowColors(True)
         self.setSortingEnabled(True)
@@ -81,7 +83,10 @@ class MainDataTableView(QTableView):
         menu.addAction(alt_rows_action)
         menu.addSeparator()
 
-        highlight_missing_action: QAction | None = menu.addAction("Highlight Missing Values")
+        highlight_missing_action: QAction = QAction("Highlight Missing Values", menu)
+        highlight_missing_action.setCheckable(True)
+        highlight_missing_action.setChecked(self._is_missing_highlighted)
+        menu.addAction(highlight_missing_action)
         menu.addSeparator()
 
         select_all_action: QAction | None = menu.addAction("Select All")
@@ -102,7 +107,7 @@ class MainDataTableView(QTableView):
         elif action == resize_rows_action:
             self.resizeRowsToContents()
         elif action == highlight_missing_action:
-            self.highlight_missing_values()
+            self.toggle_missing_values_highlight(highlight_missing_action.isChecked())
         elif action == select_all_action:
             self.selectAll()
         elif action == clear_selection_action:
@@ -142,9 +147,20 @@ class MainDataTableView(QTableView):
         QApplication.clipboard().setText(copied_text)
         self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard", LogLevel.SUCCESS)
 
-    def highlight_missing_values(self) -> None:
-        """Finds and highlights all missing values"""
+    def toggle_missing_values_highlight(self, enable: bool) -> None:
+        """
+        Toggles the highlighting of missing values on or off
+        :param enable: True to highlight, False to clear
+        """
+        self._is_missing_highlighted = enable
+
         if self.data_handler.df is None or self.model() is None:
+            return
+
+        if not enable:
+            if isinstance(self.model(), DataTableModel):
+                self.model().set_highlighted_cells(set())
+            self.status_bar.log("Cleared missing values highlight", LogLevel.INFO)
             return
 
         df: DataFrame = self.data_handler.df
@@ -173,6 +189,7 @@ class MainDataTableView(QTableView):
                 ToastLevel.INFO
             )
             self.status_bar.log("No missing values found in the dataset", LogLevel.INFO)
+            self._is_missing_highlighted = False
         else:
             global_signals.request_toast(
                 "Found Missing Values",

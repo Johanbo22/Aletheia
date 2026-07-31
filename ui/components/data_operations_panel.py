@@ -27,19 +27,12 @@ class DataOperationsPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        top_bar_layout = QHBoxLayout()
-        top_bar_layout.setContentsMargins(0, 0, 0, 0)
 
-        reset_button = QPushButton("Reset to Original")
-        reset_button.setObjectName("DestructiveButton")
-        reset_button.setIcon(IconBuilder.build(IconType.RefreshItem))
-        reset_button.setToolTip("Wipe all history and revert the dataset back to its original imported state")
-        reset_button.clicked.connect(self.controller.reset_data)
-        top_bar_layout.addWidget(reset_button)
-        layout.addLayout(top_bar_layout)
 
         self.ops_tabs = QTabWidget()
         self.ops_tabs.setObjectName("ops_tabs")
+        self.ops_tabs.setUsesScrollButtons(True)
+        self.ops_tabs.setDocumentMode(True)
 
         self.cleaning_tab = CleaningTab(self, self.controller)
         self.filtering_tab = FilteringTab(self, self.controller)
@@ -59,6 +52,20 @@ class DataOperationsPanel(QWidget):
         self.ops_tabs.addTab(self.history_tab, IconBuilder.build(IconType.History), "History")
 
         layout.addWidget(self.ops_tabs)
+        layout.addSpacing(10)
+
+        bottom_bar_layout = QHBoxLayout()
+        bottom_bar_layout.setContentsMargins(0, 0, 0, 0)
+
+        reset_button = QPushButton("Reset to Original")
+        reset_button.setObjectName("DestructiveButton")
+        reset_button.setIcon(IconBuilder.build(IconType.RefreshItem))
+        reset_button.setToolTip("Wipe all history and revert the dataset back to its original imported state")
+        reset_button.clicked.connect(self.controller.reset_data)
+
+        bottom_bar_layout.addStretch()
+        bottom_bar_layout.addWidget(reset_button)
+        layout.addLayout(bottom_bar_layout)
 
     # Getters
     def get_filter_parameters(self) -> tuple[str, str, str]:
