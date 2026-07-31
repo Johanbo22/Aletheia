@@ -1,8 +1,8 @@
 import logging
 from typing import Sequence
 
-from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QPropertyAnimation, QSortFilterProxyModel, Qt, \
-    pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QPoint, QPropertyAnimation, QSortFilterProxyModel, \
+    Qt, pyqtSignal
 from PyQt6.QtGui import QDropEvent, QEnterEvent, QIcon, QKeyEvent, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QAbstractItemView, QFrame, QGraphicsDropShadowEffect, QLineEdit, QListView, QPushButton, \
     QVBoxLayout, QWidget
@@ -147,6 +147,10 @@ class DrawingOrderPopup(QFrame):
         super().__init__(parent)
         self.setObjectName("drawingOrderPopup")
         self.setVisible(False)
+
+        self._animation = QPropertyAnimation(self, b"pos")
+        self._animation_duration: int = 250
+
         self._setup_ui()
         self._setup_models()
 
@@ -189,6 +193,103 @@ class DrawingOrderPopup(QFrame):
         self._search_bar.textChanged.connect(self._proxy_model.setFilterRegularExpression)
         self._list_view.setModel(self._proxy_model)
         self._list_view.userDroppedItem.connect(self._on_user_dropped_item)
+
+    def toggle_popup(self, anchor_widget: QWidget) -> None:
+        """
+        Toggles the popup visibility with a slide animation relative to the anchor widget
+        :param anchor_widget: The widget to anchor the popup to
+        """
+        if self.isVisible():
+            self._animate_close(anchor_widget)
+        else:
+            self._animate_open(anchor_widget)
+
+    def _get_target_pos(self, anchor_widget: QWidget) -> QPoint:
+        """
+        Calculates the resting position of the popup anchored to the target widget
+        """
+        global_pos = anchor_widget.mapToGlobal(QPoint(0, 0))
+        if self.parentWidget():
+            local_pos = self.parentWidget().mapToGlobal(global_pos)
+            parent_rect = self.parentWidget().rect()
+        else:
+            local_pos = global_pos
+            parent_rect = None
+
+        width = self.width() if self.width() >= 250 else 250
+        height = self.height() if self.height() >= 300 else 300
+
+        x = local_pos.x() + anchor_widget.width() - width
+        y = local_pos.y() - height - 10
+
+        if parent_rect and y < 0:
+            y = local_pos.y() + anchor_widget.height() + 10
+
+        if parent_rect:
+            if x < 0:
+                x = 10
+            elif x + width > parent_rect.width():
+                x = parent_rect.width() - width - 10
+
+        return QPoint(x, y)
+
+    def _get_start_pos(self, anchor_widget: QWidget) -> QPoint:
+        """Calculate the starting position of the popup"""
+        global_pos = anchor_widget.mapToGlobal(QPoint(0, 0))
+        if self.parentWidget():
+            local_pos = self.parentWidget().mapFromGlobal(global_pos)
+        else:
+            local_pos = global_pos
+
+        width = self.width() if self.width() >= 250 else 250
+
+        x = local_pos.x() + (anchor_widget.width() // 2) - (width // 2)
+        y = local_pos.y() + (anchor_widget.height() // 2)
+
+        return QPoint(x, y)
+
+    def _animate_open(self, anchor_widget: QWidget) -> None:
+        """Play the slide in animation"""
+        self._animation.stop()
+
+        target_pos = self._get_target_pos(anchor_widget)
+        start_pos = self._get_start_pos(anchor_widget)
+
+        self.move(start_pos)
+        self.setVisible(True)
+        self.raise_()
+
+        self._animation.setDuration(self._animation_duration)
+        self._animation.setStartValue(start_pos)
+        self._animation.setEndValue(target_pos)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutBack)
+
+        try:
+            self._animation.finished.disconnect()
+        except TypeError:
+            pass
+
+        self._animation.start()
+
+    def _animate_close(self, anchor_widget: QWidget) -> None:
+        """Play the slide-out animation pulling back into the anchor and hide."""
+        self._animation.stop()
+
+        target_pos = self._get_start_pos(anchor_widget)
+        start_pos = self.pos()
+
+        self._animation.setDuration(self._animation_duration)
+        self._animation.setStartValue(start_pos)
+        self._animation.setEndValue(target_pos)
+        self._animation.setEasingCurve(QEasingCurve.Type.InBack)
+
+        try:
+            self._animation.finished.disconnect()
+        except TypeError:
+            pass
+
+        self._animation.finished.connect(self.hide)
+        self._animation.start()
 
     def populate_layers(self, layers: Sequence[PlotLayerItem]) -> None:
         """
