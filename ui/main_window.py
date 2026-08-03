@@ -22,7 +22,7 @@ from ui.plot_tab import PlotTab
 from ui.status_bar import LogLevel, StatusBar
 from ui.widgets.AutosaveIndicator import AutosaveIndicator
 from ui.widgets.ToastNotification import ToastLevel
-from ui.workers import FileImportWorker, GoogleSheetsImportWorker
+from ui.workers import AutosaveWorker, FileImportWorker, GoogleSheetsImportWorker
 
 class MainWindow(QWidget):
     """Main widget"""
@@ -51,6 +51,7 @@ class MainWindow(QWidget):
         self.setAcceptDrops(True)
 
         self._unsaved_changes: bool = False
+        self._is_autosaving: bool = False
         self.init_ui()
 
         self._connect_subset_managers()
@@ -165,17 +166,31 @@ class MainWindow(QWidget):
         """
         Executes the autosave if there are unsaved changes
         """
-        if not getattr(self, "autosave_enabled", True):
+        if not getattr(self, "autosave_enabled", True) or self._is_autosaving:
             return
         if self.unsaved_changes and self.data_handler.df is not None:
-            try:
-                self.autosave_indicator.show_indicator()
-                QApplication.processEvents()
-                self.project_manager.auto_save(self.get_project_data())
-            except Exception as e:
-                self.status_bar.log(f"Autosave failed: {str(e)}", LogLevel.ERROR)
-            finally:
-                QApplication.processEvents()
+            self._is_autosaving = True
+            self.autosave_indicator.show_indicator()
+            project_data: dict = self.get_project_data()
+            worker = AutosaveWorker(self.project_manager, project_data)
+            worker.signals.finished.connect(self._on_auto_save_finished)
+            worker.signals.error.connect(self._on_autosave_error)
+            self.threadpool.start(worker)
+
+    @pyqtSlot()
+    def _on_autosave_finished(self) -> None:
+        """Slot called when background autosave finishes successfully"""
+        self._is_autosaving = False
+
+    @pyqtSlot(Exception)
+    def _on_autosave_error(self, error: Exception) -> None:
+        """
+        Slot called when background autosave encounters an error
+        :param error: The exception raised during autosave execution
+        """
+        self._is_autosaving = False
+        self.status_bar.log(f"Autosave failed: {str(error)}", LogLevel.ERROR)
+
 
     @pyqtSlot()
     def _check_recovery(self) -> None:
@@ -438,8 +453,9 @@ class MainWindow(QWidget):
     def get_project_data(self) -> dict:
         """Get the project data for saving"""
         source_info = self.data_handler.get_data_source()
+        df_copy = self.data_handler.df.copy(deep=False) if self.data_handler.df is not None else None
         return {
-            "data"       : self.data_handler.df,
+            "data": df_copy,
             "plot_config": self.plot_tab.get_config(),
             "subsets"    : self.subset_manager.export_subsets(),
             "metadata"   : {

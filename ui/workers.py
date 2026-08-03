@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,31 @@ from sqlalchemy.exc import SQLAlchemyError
 from core.data_handler import DataHandler
 
 if TYPE_CHECKING:
+    from core.project_manager import ProjectManager
     from core.subset_manager import SubsetManager
+
+class AutosaveWorker(QRunnable):
+    """
+    Worker thread for background project autosaves
+
+    Executes the ProjectManager.auto_save operation async to prevent
+    block of main GUI thread.
+    This is mainly for large datasets, but will execute on all saves.
+    """
+
+    def __init__(self, project_manager: "ProjectManager", project_data: dict[str, Any]) -> None:
+        super().__init__()
+        self.project_manager = project_manager
+        self.project_data = project_data
+        self.signals = WorkerSignals()
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            self.project_manager.auto_save(self.project_data)
+            self.signals.finished.emit(None)
+        except Exception as err:
+            self.signals.error.emit(err)
 
 
 class WorkerSignals(QObject):
