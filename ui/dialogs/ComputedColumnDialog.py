@@ -1,22 +1,22 @@
 # ui/dialogs/ComputedColumnDialog.py
 import ast
+import json
 import keyword
 import re
-import json
 from enum import Enum
 from typing import NamedTuple
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox, QAbstractItemView, QGridLayout, \
-    QTreeWidget, QTreeWidgetItem, QSplitter, QWidget, QListWidgetItem, QSizePolicy, QMenu, QListWidget, QLineEdit, \
-    QGroupBox, QPushButton, QComboBox
-from PyQt6.QtCore import QModelIndex, QPoint, Qt, QTimer, QSettings, QEvent, QObject
-from PyQt6.QtGui import QAction, QTextCursor, QShortcut, QKeySequence, QCloseEvent, QFontDatabase
+from PyQt6.QtCore import QEvent, QModelIndex, QObject, QPoint, QSettings, QTimer, Qt
+from PyQt6.QtGui import QAction, QCloseEvent, QFontDatabase, QKeyEvent, QKeySequence, QShortcut, QTextCursor
+from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, \
+    QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton, QSizePolicy, QSplitter, QTreeWidget, \
+    QTreeWidgetItem, QVBoxLayout, QWidget
 
 from core.global_signals import ToastLevel, global_signals
 from resources.version import APPLICATION_NAME
-from ui.widgets.CodeEditor import CodeEditor
 from ui.PythonHighlighter import PythonHighlighter
 from ui.dialogs.AddCustomFunctionDialog import AddCustomFunctionDialog
+from ui.widgets.CodeEditor import CodeEditor
 from ui.widgets.CustomFunctionDelegate import CustomFunctionDelegate
 
 class ValidationStatus(str, Enum):
@@ -34,7 +34,7 @@ class ComputedColumnDialog(QDialog):
     """Dialog for computing and creating new columns"""
 
     DialogWidth: int = 900
-    DialogHeight: int = 700
+    DialogHeight: int = 900
 
     CustomFunctionsSettingsKey: str = "custom_functions"
 
@@ -76,6 +76,7 @@ class ComputedColumnDialog(QDialog):
 
         input_layout.addWidget(QLabel("New Column Name"))
         self.name_input = QLineEdit()
+        self.name_input.setMaximumWidth(350)
         self.name_input.setPlaceholderText("e.g., Total_Price")
         self.name_input.setToolTip("Enter a valid, unique Python identifier (no spaces or special characters) as name")
         self.name_input.setClearButtonEnabled(True)
@@ -95,6 +96,7 @@ class ComputedColumnDialog(QDialog):
         input_layout.addLayout(datatype_label_layout)
 
         self.datatype_combo = QComboBox()
+        self.datatype_combo.setMaximumWidth(350)
         self.datatype_combo.addItems(["Auto-infer", "string", "int", "float", "category", "datetime"])
         self.datatype_combo.setToolTip(
             "Select the desired data type for the new column.\nIf auto-infer is selected, the system will infer the type based on the computed values")
@@ -183,6 +185,7 @@ class ComputedColumnDialog(QDialog):
         self.column_search_timer.timeout.connect(self._apply_column_filter)
         self.column_filter_input.textChanged.connect(self.column_search_timer.start)
         self.column_filter_input.returnPressed.connect(self._insert_single_filtered_column)
+        self.column_filter_input.installEventFilter(self)
 
         column_layout.addWidget(self.column_filter_input)
 
@@ -220,6 +223,7 @@ class ComputedColumnDialog(QDialog):
         self.function_search_timer.setInterval(250)
         self.function_search_timer.timeout.connect(self._apply_function_filter)
         self.function_filter_input.textChanged.connect(self.function_search_timer.start)
+        self.function_filter_input.installEventFilter(self)
 
         function_search_layout = QHBoxLayout()
         function_search_layout.setContentsMargins(0, 0, 0, 0)
@@ -378,10 +382,43 @@ class ComputedColumnDialog(QDialog):
         self.write_settings()
         super().reject()
 
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        """Unset the cursor if the mouse leaves the function tree viewport to prevent a stuck cursor"""
-        if watched == self.function_tree.viewport() and event.type() == QEvent.Type.Leave:
+    def eventFilter(self, watched: QObject, event: QEvent | QKeyEvent) -> bool:
+        """Handle custom keyboard navigation and unset the cursor for the function tree"""
+        if event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Down:
+                if hasattr(self, 'column_filter_input') and watched == self.column_filter_input:
+                    self.column_list.setFocus()
+                    if not self.column_list.currentItem():
+                        for i in range(self.column_list.count()):
+                            if not self.column_list.item(i).isHidden():
+                                self.column_list.setCurrentRow(i)
+                                break
+                    return True
+
+                if hasattr(self, 'function_filter_input') and watched == self.function_filter_input:
+                    self.function_tree.setFocus()
+                    if not self.function_tree.currentItem():
+                        for i in range(self.function_tree.topLevelItemCount()):
+                            parent = self.function_tree.topLevelItem(i)
+                            if not parent.isHidden():
+                                self.function_tree.setCurrentItem(parent)
+                                break
+                    return True
+
+            if event.key() == Qt.Key.Key_Escape:
+                if hasattr(self,
+                           'column_filter_input') and watched == self.column_filter_input and self.column_filter_input.text():
+                    self.column_filter_input.clear()
+                    return True
+                if hasattr(self,
+                           'function_filter_input') and watched == self.function_filter_input and self.function_filter_input.text():
+                    self.function_filter_input.clear()
+                    return True
+
+        if hasattr(self,
+                   'function_tree') and watched == self.function_tree.viewport() and event.type() == QEvent.Type.Leave:
             self.function_tree.viewport().unsetCursor()
+
         return super().eventFilter(watched, event)
 
     def _clear_expression(self) -> None:
@@ -404,6 +441,9 @@ class ComputedColumnDialog(QDialog):
 
         if not name:
             is_valid = False
+            if expression:
+                error_message = "Error: Please provide a name for the new column"
+                error_source = "name"
         elif keyword.iskeyword(name):
             is_valid = False
             error_message = f"Error: '{name}' is a reserved Python keyword"
