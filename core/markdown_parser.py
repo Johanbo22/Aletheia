@@ -5,9 +5,9 @@ This module provides functions to parse markdown changelog text and extract
 specific sections such as fixes and version history and converts it to HTML
 """
 
+import logging
 import re
 from enum import Enum
-import logging
 
 class ParseMode(Enum):
     """Defines the operational mode for the changelog parser."""
@@ -95,37 +95,56 @@ def _parse_version_history(past_sections: list[str]) -> str:
     
     return html_output
 
+def _format_inline_markdown(text: str) -> str:
+    """
+    Converts inline markdown formatting to HTML tags
+
+    :param text: Raw markdown inline text
+    :return: HTML formatted string
+    """
+    formatted: str = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+    formatted = re.sub(r'`(.*?)`', r'<code>\1</code>', formatted)
+    return formatted
+
 def _markdown_list_to_html(text: str) -> str:
     """Helper function to convert markdown bullet list to HTML li element"""
     lines: list[str] = text.split("\n")
     html: str = ""
     in_list: bool = False
-    
+    current_li: str = ""
+
     for line in lines:
         stripped: str = line.strip()
+        if not stripped:
+            if in_list:
+                html += f"<li>{_format_inline_markdown(current_li)}</li></ul>"
+                in_list = False
+                current_li = ""
+            continue
+
         is_list_item: bool = stripped.startswith("- ") or stripped.startswith("* ")
-        
-        if not is_list_item and in_list:
-            html += "</ul>"
-            in_list = False
-        
-        if is_list_item:
-            if not in_list:
+        is_header: bool = stripped.startswith("### ")
+
+        if is_header:
+            if in_list:
+                html += f"<li>{_format_inline_markdown(current_li)}</li></ul>"
+                in_list = False
+                current_li = ""
+            header_text: str = stripped[4:].strip()
+            html += f"<h4>{_format_inline_markdown(header_text)}</h4>"
+        elif is_list_item:
+            if in_list:
+                html += f"<li>{_format_inline_markdown(current_li)}</li>"
+            else:
                 html += "<ul>"
                 in_list = True
-            
-            content: str = stripped[2:]
-            content = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', content)
-            html += f"<li>{content}</li>"
-            
-        elif stripped.startswith("### "):
-            header_text: str = stripped[4:].strip()
-            html += f"<h4>{header_text}</h4>"
-        elif not stripped:
-            continue
+            current_li = stripped[2:].strip()
+        elif in_list:
+            current_li += f" {stripped}"
         else:
-            html += f"<p>{stripped}</p>"
+            html += f"<p>{_format_inline_markdown(stripped)}</p>"
+
     if in_list:
-        html += "</ul>"
-    
+        html += f"<li>{_format_inline_markdown(current_li)}</li></ul>"
+
     return html
