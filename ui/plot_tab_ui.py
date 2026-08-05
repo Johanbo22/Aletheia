@@ -113,7 +113,7 @@ class PlotTabUI(QWidget):
 
         self.editor_button = QPushButton("Open Python Editor")
         self.editor_button.setMinimumHeight(40)
-        self.editor_button.setShortcut(QKeySequence("Ctrl+E"))
+        self.editor_button.setShortcut(QKeySequence("Ctrl+Alt+E"))
         self.editor_button.setIcon(IconBuilder.build(IconType.OpenPythonEditor))
         self.editor_button.setToolTip("Open the code editor to view/write python code for the plot.")
 

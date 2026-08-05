@@ -73,7 +73,7 @@ class ShortcutViewerDialog(QDialog):
             ("Select points", "Left Click + Drag", "Mark a selection of data"),
             ("Zoom In", "Scroll Up on the mouse wheel", "Zoom in to the canvas"),
             ("Zoom Out", "Scroll Down on the mouse wheel", "Zoom out on the canvas"),
-            ("Open Python Editor", f"{ctrl} + E", "Open the code editor for custom scripts")
+            ("Open Python Editor", f"{ctrl} + Alt + E", "Open the code editor for custom scripts")
         ]
 
     def _populate_shortcuts(self) -> None:

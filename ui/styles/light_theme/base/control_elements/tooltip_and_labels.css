@@ -26,7 +26,7 @@ QLabel:disabled {
     color: #95a5a6;
 }
 
-QLabel#selectedColumnsStickyLabel{
+QLabel#selectedColumnsStickyLabel,QLabel#hiddenColumnsStickyLabel{
     color: #2c3e50;
     background-color: #f8f9fa;
     padding: 8px;
