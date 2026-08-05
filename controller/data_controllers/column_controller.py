@@ -16,6 +16,41 @@ class ColumnController(BaseDataController):
     Sub-controller handling column-level operations
     """
 
+    def __init__(self, data_handler, status_bar, view, subset_manager) -> None:
+        super().__init__(data_handler, status_bar, view, subset_manager)
+        self.hidden_columns: set[str] = set()
+
+    def set_column_visibility(self, column_name: str, visible: bool) -> None:
+        """Set the visibility of a single column"""
+        if visible:
+            self.hidden_columns.discard(column_name)
+        else:
+            self.hidden_columns.add(column_name)
+        self.apply_column_visibility()
+
+    def show_all_columns(self) -> None:
+        """Show all columns in the table view"""
+        self.hidden_columns.clear()
+        self.apply_column_visibility()
+
+    def hide_all_columns(self) -> None:
+        """Hide all columns in the table view"""
+        if self.data_handler.df is not None:
+            self.hidden_columns = set(self.data_handler.df.columns)
+        self.apply_column_visibility()
+
+    def apply_column_visibility(self) -> None:
+        """Applies hidden state of columns to the main data view"""
+        if self.data_handler.df is None or self.view.data_table is None:
+            return
+
+        df_cols = list(self.data_handler.df.columns)
+        self.hidden_columns = {col for col in self.hidden_columns if col in df_cols}
+
+        for idx, col in enumerate(df_cols):
+            is_hidden = col in self.hidden_columns
+            self.view.data_table.setColumnHidden(idx, is_hidden)
+
     def drop_column(self) -> None:
         """Drop selected columns from the dataset."""
         if self.data_handler.df is None:

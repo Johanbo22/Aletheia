@@ -160,6 +160,18 @@ class DataTabController:
         """Open the dialog to configure and apply regex text replacement."""
         self.column_controller.open_regex_replace_dialog()
 
+    def set_column_visibility(self, column_name: str, visible: bool) -> None:
+        """Set column visibility state."""
+        self.column_controller.set_column_visibility(column_name, visible)
+
+    def show_all_columns(self) -> None:
+        """Show all columns in the table."""
+        self.column_controller.show_all_columns()
+
+    def hide_all_columns(self) -> None:
+        """Hide all columns in the table."""
+        self.column_controller.hide_all_columns()
+
     def extract_date_component(self):
         """Extracts date components into a new column"""
         self.column_controller.extract_date_component()

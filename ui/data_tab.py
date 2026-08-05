@@ -408,8 +408,11 @@ class DataTab(QWidget):
 
         panel.filtering_tab.filter_column.clear()
         panel.filtering_tab.filter_column.addItems(columns)
-        panel.columns_tab.column_list.clear()
-        panel.columns_tab.column_list.addItems(columns)
+
+        hidden_cols = self.controller.column_controller.hidden_columns
+        panel.columns_tab.set_columns(columns, hidden_cols)
+        self.controller.column_controller.apply_column_visibility()
+
         panel.datetime_tab.dt_source_combo.clear()
         panel.datetime_tab.dt_source_combo.addItems(columns)
         panel.datetime_tab.dt_start_combo.clear()

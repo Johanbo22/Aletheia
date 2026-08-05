@@ -1,6 +1,9 @@
 from typing import Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QFrame, QGroupBox, QLabel, QListWidget, QScrollArea, \
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+    QListWidget, \
+    QListWidgetItem, QPushButton, QScrollArea, \
     QVBoxLayout, QWidget
 
 from icons import IconType
@@ -18,10 +21,21 @@ class ColumnsTab(BaseDataTab):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
+        sticky_header_layout = QHBoxLayout()
+        sticky_header_layout.setContentsMargins(0, 0, 0, 0)
+
         self.selected_columns_label = QLabel("Selected Column(s): None")
         self.selected_columns_label.setObjectName("selectedColumnsStickyLabel")
         self.selected_columns_label.setWordWrap(True)
-        main_layout.addWidget(self.selected_columns_label)
+        sticky_header_layout.addWidget(self.selected_columns_label)
+
+        self.hidden_columns_label = QLabel("")
+        self.hidden_columns_label.setObjectName("hiddenColumnsStickyLabel")
+        self.hidden_columns_label.setVisible(False)
+        sticky_header_layout.addWidget(self.hidden_columns_label, 0,
+                                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+        main_layout.addLayout(sticky_header_layout)
 
         separator = QFrame()
         separator.setObjectName("selectedColumnsSeparator")
@@ -48,11 +62,27 @@ class ColumnsTab(BaseDataTab):
         column_column_info.setProperty("styleClass", "info_text")
         layout.addWidget(column_column_info)
 
+        self.column_search_input = QLineEdit()
+        self.column_search_input.setPlaceholderText("Search columns...")
+        self.column_search_input.textChanged.connect(self._on_column_search_changed)
+        layout.addWidget(self.column_search_input)
+
+        bulk_layout = QHBoxLayout()
+        self.show_all_btn = QPushButton("Show All")
+        self.show_all_btn.clicked.connect(self._on_show_all_clicked)
+        bulk_layout.addWidget(self.show_all_btn)
+
+        self.hide_all_btn = QPushButton("Hide All")
+        self.hide_all_btn.clicked.connect(self._on_hide_all_clicked)
+        bulk_layout.addWidget(self.hide_all_btn)
+        layout.addLayout(bulk_layout)
+
         self.column_list = QListWidget()
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.column_list.setMaximumHeight(400)
         self.column_list.itemSelectionChanged.connect(self._update_selection_label)
         self.column_list.itemDoubleClicked.connect(self._on_column_double_clicked)
+        self.column_list.itemChanged.connect(self._on_item_changed)
         layout.addWidget(self.column_list)
 
         layout.addLayout(self._create_operation_row(
@@ -207,6 +237,79 @@ class ColumnsTab(BaseDataTab):
         layout.addStretch()
         column_scroll_area.setWidget(inner_tab)
         main_layout.addWidget(column_scroll_area)
+
+    def set_columns(self, columns: list[str], hidden_columns: set[str]) -> None:
+        """Populates the column list with checkable items"""
+        self.column_list.blockSignals(True)
+        self.column_list.clear()
+        for col in columns:
+            item = QListWidgetItem(col)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            check_state = Qt.CheckState.Unchecked if col in hidden_columns else Qt.CheckState.Checked
+            item.setCheckState(check_state)
+            self.column_list.addItem(item)
+        self.column_list.blockSignals(False)
+        self._update_hidden_label()
+
+    def get_hidden_columns(self) -> list[str]:
+        """Return list of column names that currently unchecked"""
+        hidden: list[str] = []
+        for i in range(self.column_list.count()):
+            item = self.column_list.item(i)
+            if item and item.checkState() == Qt.CheckState.Unchecked:
+                hidden.append(item.text())
+        return hidden
+
+    def _update_hidden_label(self) -> None:
+        """Update the hidden columns indicator label and tooltip"""
+        hidden_cols = self.get_hidden_columns()
+        if hidden_cols:
+            count = len(hidden_cols)
+            self.hidden_columns_label.setText(f"<b>Hidden ({count})</b>")
+            self.hidden_columns_label.setToolTip("Hidden Columns:\n• " + "\n• ".join(hidden_cols))
+            self.hidden_columns_label.setVisible(True)
+        else:
+            self.hidden_columns_label.setVisible(False)
+
+    def _on_column_search_changed(self, text: str) -> None:
+        """Filter column list items based on search query"""
+        search_term = text.strip().lower()
+        for i in range(self.column_list.count()):
+            item = self.column_list.item(i)
+            if item:
+                item.setHidden(bool(search_term and search_term not in item.text().lower()))
+
+    def _on_item_changed(self, item: QListWidgetItem) -> None:
+        """Handles a single column checkstate change"""
+        col_name = item.text()
+        is_visible = (item.checkState() == Qt.CheckState.Checked)
+        if self.controller:
+            self.controller.set_column_visibility(col_name, is_visible)
+        self._update_hidden_label()
+
+    def _on_show_all_clicked(self) -> None:
+        """Show all columns in the table"""
+        self.column_list.blockSignals(True)
+        for i in range(self.column_list.count()):
+            item = self.column_list.item(i)
+            if item:
+                item.setCheckState(Qt.CheckState.Checked)
+        self.column_list.blockSignals(False)
+        if self.controller:
+            self.controller.show_all_columns()
+        self._update_hidden_label()
+
+    def _on_hide_all_clicked(self) -> None:
+        """Hide all columns in the table."""
+        self.column_list.blockSignals(True)
+        for i in range(self.column_list.count()):
+            item = self.column_list.item(i)
+            if item:
+                item.setCheckState(Qt.CheckState.Unchecked)
+        self.column_list.blockSignals(False)
+        if self.controller:
+            self.controller.hide_all_columns()
+        self._update_hidden_label()
 
     def get_selected_columns(self) -> list[str]:
         return [item.text() for item in self.column_list.selectedItems()]
