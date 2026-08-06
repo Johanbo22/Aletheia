@@ -1222,6 +1222,7 @@ class CodeEditor(QPlainTextEdit):
 
         if event.key() == Qt.Key.Key_Backspace:
             self._handle_backspace_key(event, cursor)
+            return
 
         if self._handle_auto_pairs(event, text, cursor):
             return
