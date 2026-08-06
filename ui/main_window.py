@@ -173,7 +173,7 @@ class MainWindow(QWidget):
             self.autosave_indicator.show_indicator()
             project_data: dict = self.get_project_data()
             worker = AutosaveWorker(self.project_manager, project_data)
-            worker.signals.finished.connect(self._on_auto_save_finished)
+            worker.signals.finished.connect(self._on_autosave_finished)
             worker.signals.error.connect(self._on_autosave_error)
             self.threadpool.start(worker)
 
@@ -231,6 +231,7 @@ class MainWindow(QWidget):
     def _mark_as_unsaved(self) -> None:
         if self.data_handler.df is not None:
             self.unsaved_changes = True
+            self._update_tab_visibility()
 
     @property
     def unsaved_changes(self) -> bool:
