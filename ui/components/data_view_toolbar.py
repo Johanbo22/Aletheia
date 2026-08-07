@@ -1,10 +1,9 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QWidget
 
 from core.resource_loader import get_resource_path
 from icons import IconBuilder, IconType
-from ui.theme import ThemeColors
 
 class DataViewToolbar(QWidget):
     """
@@ -77,6 +76,15 @@ class DataViewToolbar(QWidget):
             self.edit_dataset_toggle_button.setText("Edit Mode: OFF")
             self.edit_dataset_toggle_button.setIcon(IconBuilder.build(IconType.EditModeToggleOff))
         self.edit_mode_toggled.emit(self.is_editing)
+
+    def set_edit_mode(self, is_editing: bool) -> None:
+        """
+        Sets the edit mode toggle state
+        :param is_editing: The boolean state of the edit mode
+        """
+        if self.edit_dataset_toggle_button.isChecked() != is_editing:
+            self.edit_dataset_toggle_button.setChecked(is_editing)
+            self._handle_edit_toggled()
 
     def set_refresh_visible(self, visible: bool) -> None:
         """

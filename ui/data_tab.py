@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QEasingCurve, QItemSelectionModel, QPropertyAnimation, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QItemSelectionModel, QModelIndex, QPropertyAnimation, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QAbstractItemView, QGraphicsOpacityEffect, QHBoxLayout, QHeaderView, \
@@ -230,14 +230,19 @@ class DataTab(QWidget):
 
         return right_widget
 
-    def _on_table_double_clicked(self, *args) -> None:
+    def _on_table_double_clicked(self, index: QModelIndex) -> None:
         """
         Guidance if trying to edit without edit mode enabled
-        DataTable.EditTrigger is set to NoEditTriggers to avoid unintentional data changes
+        Enables edit mode and focuses the clicked cell
+
+        :param index: The model index of the clicked cell
         """
         if not self.is_editing:
-            global_signals.request_toast("Read-Only Mode", "Enable Edit Mode in the toolbar to modify cell values",
-                                         ToastLevel.INFO)
+            global_signals.request_toast(
+                "Edit Mode Enabled", "You can now edit the cells", ToastLevel.INFO
+            )
+            self.toolbar.set_edit_mode(True)
+            self.data_table.edit(index)
 
     def toggle_edit_mode(self, is_editing: bool) -> None:
         """
