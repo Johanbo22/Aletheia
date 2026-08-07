@@ -107,7 +107,7 @@ class ScriptManager:
             exec(script_content, safe_globals, local_vars)
 
             if "create_plot" not in local_vars:
-                raise ValueError("Script must define the function name 'create_plot' that returns (fix, ax)")
+                raise ValueError("Script must define the function name 'create_plot' that returns (fig, ax)")
 
             create_plot_func = local_vars["create_plot"]
 
@@ -199,7 +199,15 @@ class ScriptManager:
                 fig_cfg["height"] = float(h)
                 fig_cfg["dpi"] = int(fig.get_dpi())
 
-            self.plot_tab.config_manager.load_config(config)
+            was_clearing = getattr(self.plot_tab, "_is_clearing", False)
+            self.plot_tab._is_clearing = True
+
+            try:
+                self.plot_tab.config_manager.load_config(config)
+            finally:
+                self.plot_tab._is_clearing = was_clearing
+                self.plot_tab.style_update_timer.stop()
+
         except Exception as sync_error:
             self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", LogLevel.WARNING)
 
