@@ -96,49 +96,27 @@ class LandingPage(QWidget):
         # Buttons
         button_width = 280
 
-        self.button_open = QPushButton("Open Existing Project")
-        self.button_open.setObjectName("MainActionButton")
-        self.button_open.setProperty("size_variant", "large")
-        self.button_open.setIcon(IconBuilder.build(IconType.OpenProject))
-        self.button_open.setFixedWidth(button_width)
-        self.button_open.clicked.connect(self.open_project_clicked.emit)
-
-        self.button_import_file = QPushButton("Import from File")
-        self.button_import_file.setIcon(IconBuilder.build(IconType.ImportFile))
-        self.button_import_file.setProperty("size_variant", "large")
-        self.button_import_file.setFixedWidth(button_width)
-        self.button_import_file.clicked.connect(self.import_file_clicked.emit)
-
-        self.button_import_sheet = QPushButton("Import from Google Sheets")
-        self.button_import_sheet.setIcon(IconBuilder.build(IconType.ImportGoogleSheets))
-        self.button_import_sheet.setProperty("size_variant", "large")
-        self.button_import_sheet.setFixedWidth(button_width)
-        self.button_import_sheet.clicked.connect(self.import_sheets_clicked.emit)
-
-        self.button_import_db = QPushButton("Import from Database")
-        self.button_import_db.setIcon(IconBuilder.build(IconType.ImportDatabase))
-        self.button_import_db.setProperty("size_variant", "large")
-        self.button_import_db.setFixedWidth(button_width)
-        self.button_import_db.clicked.connect(self.import_db_clicked.emit)
-
-        self.button_new = QPushButton("Create Empty Dataset")
-        self.button_new.setObjectName("MainActionButton")
-        self.button_new.setProperty("size_variant", "large")
-        self.button_new.setIcon(IconBuilder.build(IconType.NewProject))
-        self.button_new.setFixedWidth(button_width)
-        self.button_new.clicked.connect(self.new_dataset_clicked.emit)
-
-        self.button_settings = QPushButton("Settings")
-        self.button_settings.setProperty("size_variant", "large")
-        self.button_settings.setIcon(IconBuilder.build(IconType.Settings))
-        self.button_settings.setFixedWidth(button_width)
-        self.button_settings.clicked.connect(self.settings_clicked.emit)
-
-        self.button_quit = QPushButton("Quit")
-        self.button_quit.setProperty("size_variant", "large")
-        self.button_quit.setIcon(IconBuilder.build(IconType.Quit))
-        self.button_quit.setFixedWidth(button_width)
-        self.button_quit.clicked.connect(self.quit_clicked.emit)
+        self.button_open = self._create_action_button(
+            "Open Existing Project", IconType.OpenProject, self.open_project_clicked, button_width, "MainActionButton"
+        )
+        self.button_import_file = self._create_action_button(
+            "Import from File", IconType.ImportFile, self.import_file_clicked, button_width
+        )
+        self.button_import_sheet = self._create_action_button(
+            "Import from Google Sheets", IconType.ImportGoogleSheets, self.import_sheets_clicked, button_width
+        )
+        self.button_import_db = self._create_action_button(
+            "Import from Database", IconType.ImportDatabase, self.import_db_clicked, button_width
+        )
+        self.button_new = self._create_action_button(
+            "Create Empty Dataset", IconType.NewProject, self.new_dataset_clicked, button_width, "MainActionButton"
+        )
+        self.button_settings = self._create_action_button(
+            "Settings", IconType.Settings, self.settings_clicked, button_width
+        )
+        self.button_quit = self._create_action_button(
+            "Quit", IconType.Quit, self.quit_clicked, button_width
+        )
 
         def create_section_label(text: str) -> QLabel:
             label = QLabel(text.upper())
@@ -284,6 +262,18 @@ class LandingPage(QWidget):
         elif link == "past_versions":
             self.show_changelog_popup("Version History", mode=ParseMode.History)
 
+    def _create_action_button(self, text: str, icon_type: IconType, signal: pyqtSignal, width: int,
+                              object_name: str = "") -> QPushButton:
+        """Creates an action button"""
+        button = QPushButton(text)
+        if object_name:
+            button.setObjectName(object_name)
+        button.setProperty("size_variant", "large")
+        button.setIcon(IconBuilder.build(icon_type))
+        button.setFixedWidth(width)
+        button.clicked.connect(signal.emit)
+        return button
+
     def show_changelog_popup(self, title: str, mode: str) -> None:
         changelog_path = Path(get_resource_path("CHANGELOG.md"))
         if not changelog_path.exists():
@@ -345,7 +335,11 @@ class LandingPage(QWidget):
         else:
             for file_path_str in display_files:
                 file_path = Path(file_path_str)
-                btn = QPushButton(file_path.name)
+
+                parent_dir = file_path.parent.name
+                display_text = f"{file_path.name} ({parent_dir})" if parent_dir else file_path.name
+
+                btn = QPushButton(display_text)
                 btn.setProperty("size_variant", "large")
                 btn.setToolTip(str(file_path.absolute()))
                 btn.setIcon(IconBuilder.build(IconType.OpenProject))
