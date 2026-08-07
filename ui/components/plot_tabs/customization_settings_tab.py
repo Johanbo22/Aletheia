@@ -135,6 +135,16 @@ class CustomizationSettingsTab(QWidget):
         self.bar_selector_combo.setVisible(False)
         bar_layout.addWidget(self.bar_selector_combo)
 
+        self.bar_patch_label = QLabel("Select Individual Bar to Customize")
+        self.bar_patch_label.setVisible(False)
+        self.bar_patch_label.setToolTip("Select a specific bar within the series to customize individually")
+        bar_layout.addWidget(self.bar_patch_label)
+
+        self.bar_patch_combo = QComboBox()
+        self.bar_patch_combo.setVisible(False)
+        self.bar_patch_combo.setToolTip("Select the specific bar/patch within the series to customize")
+        bar_layout.addWidget(self.bar_patch_combo)
+
         bar_layout.addWidget(QLabel("Bar Width:"))
         self.bar_width_spin = QDoubleSpinBox()
         self.bar_width_spin.setToolTip(

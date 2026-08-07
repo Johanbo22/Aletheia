@@ -27,6 +27,7 @@ class SeriesCustomizationManager:
         self.view.line_selector_combo.currentTextChanged.connect(self.on_line_selected)
         self.view.multibar_custom_check.stateChanged.connect(self.toggle_bar_selector)
         self.view.bar_selector_combo.currentTextChanged.connect(self.on_bar_selected)
+        self.view.bar_patch_combo.currentTextChanged.connect(self.on_bar_patch_selected)
         self.view.bar_edge_width_spin.valueChanged.connect(self.update_bar_customization_live)
         self.view.bar_edge_width_spin.valueChanged.connect(self.plot_tab.on_style_changed)
 
@@ -85,18 +86,27 @@ class SeriesCustomizationManager:
 
         if self.view.multibar_custom_check.isChecked():
             for label, container in self._get_all_bar_containers():
-                if label in self.bar_customizations:
-                    custom = self.bar_customizations[label]
-                    if hasattr(container, "patches"):
-                        for patch in container.patches:
-                            if custom.get("facecolor") is not None:
-                                patch.set_facecolor(custom["facecolor"])
-                            if custom.get("edgecolor") is not None:
-                                patch.set_edgecolor(custom["edgecolor"])
-                            if custom.get("linewidth") is not None:
-                                patch.set_linewidth(custom["linewidth"])
-                            if custom.get("alpha") is not None:
-                                patch.set_alpha(custom["alpha"])
+                if hasattr(container, "patches"):
+                    series_custom = self.bar_customizations.get(label, {})
+
+                    for patch_idx, patch in enumerate(container.patches):
+                        patch_key = f"{label}::{patch_idx}"
+
+                        if patch_key in self.bar_customizations:
+                            custom = self.bar_customizations[patch_key]
+                        elif label in self.bar_customizations:
+                            custom = self.bar_customizations[label]
+                        else:
+                            continue
+
+                        if custom.get("facecolor") is not None:
+                            patch.set_facecolor(custom["facecolor"])
+                        if custom.get("edgecolor") is not None:
+                            patch.set_edgecolor(custom["edgecolor"])
+                        if custom.get("linewidth") is not None:
+                            patch.set_linewidth(custom["linewidth"])
+                        if custom.get("alpha") is not None:
+                            patch.set_alpha(custom["alpha"])
 
         canvas = getattr(self.plot_engine, 'canvas', None)
         if canvas is None and hasattr(self.plot_engine, 'figure'):
@@ -110,6 +120,8 @@ class SeriesCustomizationManager:
         is_enabled = self.view.multibar_custom_check.isChecked()
         self.view.bar_selector_label.setVisible(is_enabled)
         self.view.bar_selector_combo.setVisible(is_enabled)
+        self.view.bar_patch_label.setVisible(is_enabled)
+        self.view.bar_patch_combo.setVisible(is_enabled)
 
         if is_enabled:
             self._initialize_all_bar_customizations()
@@ -175,6 +187,32 @@ class SeriesCustomizationManager:
         if self.view.bar_selector_combo.count() > 0:
             self.on_bar_selected(self.view.bar_selector_combo.currentText())
 
+    def update_bar_patch_selector(self, preserve_selection: bool = False) -> None:
+        """Update the patch selection dropdown with patches from the selected series"""
+        current_text = self.view.bar_patch_combo.currentText()
+        self.view.bar_patch_combo.blockSignals(True)
+        self.view.bar_patch_combo.clear()
+
+        container = self.view.bar_selector_combo.currentData()
+        if not container or not hasattr(container, "patches") or not container.patches:
+            self.view.bar_patch_combo.addItem("No bars available")
+            self.view.bar_patch_combo.setEnabled(False)
+        else:
+            self.view.bar_patch_combo.setEnabled(True)
+            for i in range(len(container.patches)):
+                self.view.bar_patch_combo.addItem(f"Bar {i + 1}", userData=i)
+
+        self.view.bar_patch_combo.blockSignals(False)
+
+        if preserve_selection and current_text:
+            idx = self.view.bar_patch_combo.findText(current_text)
+            if idx >= 0:
+                self.view.bar_patch_combo.setCurrentIndex(idx)
+                return
+
+        if self.view.bar_patch_combo.count() > 0 and self.view.bar_patch_combo.isEnabled():
+            self.on_bar_patch_selected(self.view.bar_patch_combo.currentText())
+
     def on_bar_selected(self, bar_name: str) -> None:
         """Load settings for a selected bar series"""
         if not self.view.multibar_custom_check.isChecked():
@@ -184,6 +222,8 @@ class SeriesCustomizationManager:
 
         if not container or not hasattr(container, "patches") or not container.patches:
             return
+
+        self.update_bar_patch_selector(preserve_selection=True)
 
         patch = container.patches[0]
         custom = self.bar_customizations.get(bar_name, {})
@@ -224,6 +264,57 @@ class SeriesCustomizationManager:
         self.view.alpha_slider.blockSignals(False)
         self.view.alpha_label.setText(f"{int(alpha * 100)}%")
 
+    def on_bar_patch_selected(self, patch_name: str) -> None:
+        """Load settings for a selected individual bar/patch within a series"""
+        if not self.view.multibar_custom_check.isChecked():
+            return
+
+        container = self.view.bar_selector_combo.currentData()
+        if not container or not hasattr(container, "patches") or not container.patches:
+            return
+
+        patch_idx = self.view.bar_patch_combo.currentData()
+        if patch_idx is None or not isinstance(patch_idx, int):
+            return
+
+        series_name = self.view.bar_selector_combo.currentText()
+        patch_key = f"{series_name}::{patch_idx}"
+
+        patch = container.patches[patch_idx] if patch_idx < len(container.patches) else container.patches[0]
+        custom = self.bar_customizations.get(patch_key, {})
+
+        if "facecolor" in custom:
+            facecolor = custom["facecolor"]
+        else:
+            facecolor = to_hex(patch.get_facecolor()) if patch.get_facecolor() else "#000000"
+
+        self.plot_tab.bar_color = facecolor
+        self.view.bar_color_label.setText(facecolor)
+        ColorManager.update_button_color_swatch(self.view.bar_color_button, QColor(self.plot_tab.bar_color))
+
+        if "edgecolor" in custom:
+            edgecolor = custom["edgecolor"]
+        else:
+            edgecolor = to_hex(patch.get_edgecolor()) if patch.get_edgecolor() else "#000000"
+
+        self.plot_tab.bar_edge_color = edgecolor
+        self.view.bar_edge_label.setText(edgecolor)
+        ColorManager.update_button_color_swatch(self.view.bar_edge_button, QColor(self.plot_tab.bar_edge_color))
+
+        self.view.bar_edge_width_spin.blockSignals(True)
+        self.view.bar_edge_width_spin.setValue(custom.get("linewidth", patch.get_linewidth() or 0.0))
+        self.view.bar_edge_width_spin.blockSignals(False)
+
+        if "alpha" in custom:
+            alpha = custom["alpha"]
+        else:
+            alpha = patch.get_alpha() if patch.get_alpha() is not None else 1.0
+
+        self.view.alpha_slider.blockSignals(True)
+        self.view.alpha_slider.setValue(int(alpha * 100))
+        self.view.alpha_slider.blockSignals(False)
+        self.view.alpha_label.setText(f"{int(alpha * 100)}%")
+
     def update_bar_customization_live(self) -> None:
         """Saves the current temporary bar settings if a bar is selected"""
         if not self.view.multibar_custom_check.isChecked():
@@ -233,13 +324,22 @@ class SeriesCustomizationManager:
         if not bar_name:
             return
 
-        custom = self.bar_customizations.get(bar_name, {})
+        patch_idx = self.view.bar_patch_combo.currentData()
+        if patch_idx is not None and isinstance(patch_idx, int):
+            patch_key = f"{bar_name}::{patch_idx}"
+            custom = self.bar_customizations.get(patch_key, {})
+        else:
+            custom = self.bar_customizations.get(bar_name, {})
         custom["facecolor"] = self.plot_tab.bar_color
         custom["edgecolor"] = self.plot_tab.bar_edge_color
         custom["linewidth"] = self.view.bar_edge_width_spin.value()
         custom["alpha"] = self.view.alpha_slider.value() / 100.0
 
-        self.bar_customizations[bar_name] = custom
+        if patch_idx is not None and isinstance(patch_idx, int):
+            patch_key = f"{bar_name}::{patch_idx}"
+            self.bar_customizations[patch_key] = custom
+        else:
+            self.bar_customizations[bar_name] = custom
 
     def toggle_line_selector(self) -> None:
         """Show/enable line selection"""

@@ -551,6 +551,8 @@ class PlotSettingsPanel(QWidget):
         self.bar_selector_label = cust_tab.bar_selector_label
         self.bar_selector_combo = cust_tab.bar_selector_combo
         self.bar_width_spin = cust_tab.bar_width_spin
+        self.bar_patch_combo = cust_tab.bar_patch_combo
+        self.bar_patch_label = cust_tab.bar_patch_label
         self.bar_color_button = cust_tab.bar_color_button
         self.bar_color_label = cust_tab.bar_color_label
         self.bar_edge_button = cust_tab.bar_edge_button
