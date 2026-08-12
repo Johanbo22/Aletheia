@@ -36,7 +36,10 @@ MVC_rules.md
 refactor_plan.md
 output.txt
 qodana.yaml
+/.boardown
 
 # PyInstaller build artifacts
 build/
 dist/
+
+/workIdeas

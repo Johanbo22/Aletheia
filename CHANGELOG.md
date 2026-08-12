@@ -4,6 +4,55 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.5.0
+
+### Added
+
+- Customization of the secondary axes plot elements such as label, label font size and font weight.
+- A ViewCube to interactively rotate a 3D canvas. This also updates the controls of Azimuth and Elevation angles.
+- ArrowProps editing for Manual annotations. Includes box styling options, arrow pointers with targets.
+- A Drawing Order widget to manually set Z order of plot elements
+- A Keyboard and mouse shortcut reference tool for the PlotStudio interface.
+- The QuickFilter in the Filters & Subsets tab in plot studio now highlights: numbers, strings, bools and functions
+- Toggle Column Visibility to hide or show table columns via checkboxes in the Columns tab without modifying underlying
+  data.
+
+### Changed
+
+- Improved naming and UX by naming the line on a secondary axes object with a "Secondary" to indicate the objects
+  position in the canvas. This can be overwritten by changing the labels in the "Layout and Text" options under "Legend"
+- Dropping multiple items into the application will now select the first valid data file instead of failing to load
+- Allow for editing of data table upon double click
+
+### Fixed
+
+- Fixed an issue where trying to customize the thickness, style or color lines on the secondary axis object would cause
+  the controls to revert back to default values.
+- Resolved an issue where the 3D ViewCube tool would appear inside the Export Plot preview image and also in the
+  finalized exported file.
+- Resolved an issue in the visual annotation editor where dragging an annotation marker locked it vertically atop the
+  mini-canvas
+- Fixed a bug where using the spinboxes to move an annotation would in fact not move it.
+- Resolved an issue where the proxy canvas for annotation editing failed to respond to the X/Y spinboxes or the "Enable
+  Pointer Arrow" toggle while creating a new annotation.
+- Fixed a bug where the progress bar would be at 100% and stay there while loading a task.
+- Resolved an issue where the autocomplete suggestion box for the Quick Filter edit would overlap and obscure the text
+  being typed.
+- Optimized data table rendering
+- Fixed issue where the loading screen would flash when loading small files.
+- Resolved an issue where a temporary freeze would occur when working with large dataset during auto saves.
+- Fixed a text formatting issue in the "Version History" dialog where multi-line bullet points wrapped into unnecessary
+  extra lines.
+- Fixed bug where the Plot studio tab was not visible when creating an empty dataset from the launch page.
+- Fixed bug where pressing backspace in the Script editor dialog would delete two characters instead of 1.
+- Resolved an issue where running custom Python code in the Script Editor would immediately revert the visual plot back
+  to the UI configuration
+- Fixed an issue in Light Mode where the "Insert Snippet" in the Script Editor Dialog menu text was unreadable
+- Addressed a visual glitch were hovering or clicking on variables in the Script Editor Dialog Variable Explorer made
+  the text disappear
+- Fixed a bug where the "Search Columns" bar in the Script Editor Dialog did not filter properly.
+- Fixed a bug where generating a Pie chart would render all slices in the same color with no way to change it.
+
 ## v.0.4.4 [Patch]
 
 ### Added

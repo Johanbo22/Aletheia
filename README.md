@@ -4,7 +4,8 @@
 
 # Aletheia
 
-Aletheia is a GUI implementation of the Matplotlib plotting and pandas data analytics capabilities. 
+Aletheia is a GUI Exploratory Data Analysis (EDA) implementation of the Matplotlib plotting and pandas data analytics
+capabilities.
 The program is built up of two primary interfaces:
 * A data driven tab where you can view, edit, manipulate and alter data based primarily on the pandas library and embedded tools.
 * A plotting interface where you can plot your data, as well as tweaking the plot in a graphical environment based on the Matplotlib's `pyplot` functionality.
@@ -13,11 +14,12 @@ The program is built up of two primary interfaces:
 ## Features
 * Import data from files: csv, Microsoft Excel, text files, JSON and GeoSpatial fileformats (shp, GeoPackage, GeoJSON)
 * Import data from Google Sheets documents and from SQLite, PostgreSQL and SQL databases
-* Edit and manipulate your data visually using tools from pandas and embedded custom tools
-* View statistics about your data
+* Edit and manipulate your data visually using tools from pandas, embedded custom tools or using the command-line
+  interface
+* View statistics about your data and run statistical test on the data
 * Plot the data with 30 different available plot types using Matplotlib and Seaborn
 * Interactively design and customize your plots
-* Add custom plotting code using the integrated Python editor to augment the your data visualization even further
+* Add custom Python plotting code using the integrated Python editor to augment your data visualization even further
 * Export data and Python code to share or use in other tools
 
 ## Requirements
@@ -42,7 +44,9 @@ PyQt6-WebEngine-Qt6==6.10.1
 PyQt6_sip==13.10.2
 ```
 
-## Building from source
+## Installation
+
+### Building from source
 To build the project from source:
 
 1. Clone the repository:
