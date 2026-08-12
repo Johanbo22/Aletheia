@@ -48,6 +48,8 @@ class PlotFormattingManager:
                 general_kwargs["palette"] = cmap
             else:
                 general_kwargs["cmap"] = cmap
+                if plot_type == "Pie":
+                    general_kwargs["palette"] = cmap
 
         if hue and plot_type in plots_supporting_hue:
             general_kwargs["hue"] = hue
