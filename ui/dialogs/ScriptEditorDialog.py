@@ -300,6 +300,7 @@ class ScriptEditorDialog(QDialog):
 
         for category_name, snippets in categorized_snippets.items():
             sub_menu = self.snippet_menu.addMenu(category_name)
+            sub_menu.setObjectName("script_snippet_sub_menu")
             for name, code_snippet in snippets.items():
                 action = sub_menu.addAction(name)
                 action.triggered.connect(lambda checked, c=code_snippet: self.insert_snippet_into_code(c))
@@ -564,21 +565,51 @@ class ScriptEditorDialog(QDialog):
             return
 
         search_text_lower: str = search_text.lower()
+        is_empty_search: bool = not bool(search_text_lower)
 
         for i in range(self.variable_explorer.topLevelItemCount()):
             root_item: QTreeWidgetItem | None = self.variable_explorer.topLevelItem(i)
+            if not root_item:
+                continue
 
-            columns_node: QTreeWidgetItem | None = None
+            # We reset the visibility if the search is empty
+            if is_empty_search:
+                root_item.setHidden(False)
+                for j in range(root_item.childCount()):
+                    child = root_item.child(j)
+                    child.setHidden(False)
+                    for k in range(child.childCount()):
+                        child.child(k).setHidden(False)
+                continue
+
+            root_match: bool = search_text_lower in root_item.text(0).lower()
+            has_matching_column: bool = False
+
             for j in range(root_item.childCount()):
-                if root_item.child(j).text(0) == "Columns":
-                    columns_node = root_item.child(j)
-                    break
+                child = root_item.child(j)
 
-            if columns_node:
-                for k in range(columns_node.childCount()):
-                    col_item = columns_node.child(k)
-                    col_name: str = col_item.text(0).lower()
-                    col_item.setHidden(search_text_lower not in col_name)
+                if child.text(0) == "Columns":
+                    col_matched_count: int = 0
+                    for k in range(child.childCount()):
+                        col_item = child.child(k)
+                        col_match: bool = search_text_lower in col_item.text(0).lower()
+
+                        if col_match or root_match:
+                            col_item.setHidden(False)
+                            if col_match:
+                                col_matched_count += 1
+                        else:
+                            col_item.setHidden(True)
+
+                    child.setHidden(not (root_match or col_matched_count > 0))
+                    if col_matched_count > 0:
+                        has_matching_column = True
+                else:
+                    # Non column metadata like shape of length shows only if root is matched
+                    child.setHidden(not root_match)
+
+            # Hide the root variable if neither name or columns match
+            root_item.setHidden(not (root_match or has_matching_column))
 
     def on_explorer_double_click(self, item: QTreeWidgetItem, column: int):
         """

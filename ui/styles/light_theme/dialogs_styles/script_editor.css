@@ -4,18 +4,23 @@ QLabel#script_security_label {
     font-style: italic;
 }
 
-QMenu#script_snippet_menu {
+QMenu#script_snippet_menu,
+QMenu#script_snippet_sub_menu {
     background-color: #2b2b2b;
     color: #f8f8f2;
     border: 1px solid #555;
 }
 
-QMenu#script_snippet_menu::item {
+QMenu#script_snippet_menu::item,
+QMenu#script_snippet_sub_menu::item {
     padding: 5px 20px;
+    color: #f8f8f2;
 }
 
-QMenu#script_snippet_menu::item:selected {
+QMenu#script_snippet_menu::item:selected,
+QMenu#script_snippet_sub_menu::item:selected {
     background-color: #4a9c4d;
+    color: #ffffff;
 }
 
 CodeEditor#script_code_editor {
@@ -50,6 +55,16 @@ QTreeWidget#script_variable_explorer QHeaderView::section {
 
 QTreeWidget#script_variable_explorer::item {
     padding: 4px;
+}
+
+QTreeWidget#script_variable_explorer::item:hover{
+    background-color: #3a3a3a;
+    color: #f8f8f2;
+}
+
+QTreeWidget#script_variable_explorer::item:selected{
+    background-color: #4a9c4d;
+    color: #ffffff;
 }
 
 QPlainTextEdit#script_console_output {
