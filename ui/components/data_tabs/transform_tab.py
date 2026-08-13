@@ -165,6 +165,8 @@ class TransformTab(BaseDataTab):
         layout.addWidget(saved_agg_group)
 
         layout.addStretch()
+
+        self.apply_destructive_styling_tags(["delete_agg_btn"])
     
     def get_sort_parameters(self) -> tuple[str, str]:
         return self.sort_column_combo.currentText(), self.sort_order_combo.currentText()

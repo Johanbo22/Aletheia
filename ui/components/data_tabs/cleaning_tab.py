@@ -95,18 +95,4 @@ class CleaningTab(BaseDataTab):
         layout.addWidget(outlier_group)
         layout.addStretch()
 
-        self._apply_destructive_styling_tags()
-
-    def _apply_destructive_styling_tags(self) -> None:
-        """
-        Tags destructive buttons with a severity property
-        """
-        from PyQt6.QtWidgets import QPushButton
-        destructive_ids = ["drop_missing", "drop_empty_columns", "remove_duplicates"]
-
-        for btn_id in destructive_ids:
-            btn: QPushButton = self.findChild(QPushButton, f"op_btn_{btn_id}")
-            if btn:
-                btn.setProperty("actionSeverity", "destructive")
-                btn.style().unpolish(btn)
-                btn.style().polish(btn)
+        self.apply_destructive_styling_tags(["drop_missing", "drop_empty_columns", "remove_duplicates"])

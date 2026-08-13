@@ -72,3 +72,16 @@ class BaseDataTab(QWidget):
         row_layout.addWidget(help_icon)
 
         return row_layout
+
+    def apply_destructive_styling_tags(self, destructive_ids: list[str]) -> None:
+        """
+        Tags destructive buttons with a severity property
+        """
+        for btn_id in destructive_ids:
+            btn: QPushButton = self.findChild(QPushButton, btn_id)
+            if not btn:
+                btn = self.findChild(QPushButton, f"op_btn_{btn_id}")
+            if btn:
+                btn.setProperty("actionSeverity", "destructive")
+                btn.style().unpolish(btn)
+                btn.style().polish(btn)

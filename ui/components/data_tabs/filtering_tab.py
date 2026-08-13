@@ -82,6 +82,8 @@ class FilteringTab(BaseDataTab):
         layout.addWidget(advanced_filter_group)
         
         layout.addStretch()
+
+        self.apply_destructive_styling_tags(["clear_filters"])
     
     def get_filter_parameters(self) -> tuple[str, str, str]:
         return (

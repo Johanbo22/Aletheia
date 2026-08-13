@@ -238,6 +238,8 @@ class ColumnsTab(BaseDataTab):
         column_scroll_area.setWidget(inner_tab)
         main_layout.addWidget(column_scroll_area)
 
+        self.apply_destructive_styling_tags(["drop_column"])
+
     def set_columns(self, columns: list[str], hidden_columns: set[str]) -> None:
         """Populates the column list with checkable items"""
         self.column_list.blockSignals(True)
