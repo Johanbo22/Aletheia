@@ -137,7 +137,7 @@ class DataHandler:
     def import_file(self, filepath: str) -> pd.DataFrame:
         df = self._io.import_file(filepath)
         self.df = df
-        self.original_df = df.copy(deep=True)
+        self.original_df = df.copy(deep=False)
         self._reset_history()
         return self.df
 
@@ -152,7 +152,7 @@ class DataHandler:
             gid=gid
         )
         self.df = df
-        self.original_df = df.copy(deep=True)
+        self.original_df = df.copy(deep=False)
         self._reset_history()
         return self.df
 
@@ -186,7 +186,7 @@ class DataHandler:
                 data = np.full((rows, len(column_names)), fill_value)
 
             self.df = pd.DataFrame(data, index=range(rows), columns=column_names)
-            self.original_df = self.df.copy(deep=True)
+            self.original_df = self.df.copy(deep=False)
 
             self._io.file_path = None
             self._io.is_temp_file = False
@@ -227,14 +227,31 @@ class DataHandler:
     def get_data_info(self) -> Dict[str, Any]:
         if self.df is None:
             return {}
-        return {
+
+        # Cache memory usage first
+        if not hasattr(self, "_data_info_cache"):
+            self._data_info_cache = {}
+
+        cache_key = id(self.df)
+        current_time = __import__("time").time()
+
+        # Return cached result if less than 2 seconds old
+        if cache_key in self._data_info_cache:
+            cached_result, cached_time = self._data_info_cache[cache_key]
+            if current_time - cached_time < 2.0:
+                return cached_result
+
+        info = {
             "shape"       : self.df.shape,
             "columns"     : list(self.df.columns),
             "dtypes"      : self.df.dtypes.to_dict(),
             "missing_values": self.df.isnull().sum().to_dict(),
             "statistics"  : self.df.describe().to_dict(),
-            "memory_usage": self.df.memory_usage(deep=True).to_dict(),
+            "memory_usage": self.df.memory_usage(deep=False).to_dict(),
         }
+
+        self._data_info_cache[cache_key] = (info, current_time)
+        return info
 
     def _save_state(self) -> None:
         """Save current state using diff-based history manager."""
@@ -269,7 +286,7 @@ class DataHandler:
     def reset_data(self) -> None:
         if self.original_df is not None:
             self._reset_history()
-            self.df = self.original_df.copy(deep=True)
+            self.df = self.original_df.copy(deep=False)
 
     def jump_to_history_index(self, target: Union[int, str]) -> None:
         """Jump to a specific node in the history tree."""
@@ -429,7 +446,7 @@ class DataHandler:
     def update_cell(self, row_index: int, column_index: int, value: Any) -> None:
         if self.df is None:
             return
-        old_df = self.df.copy(deep=True)
+        old_df = self.df.copy(deep=False)
         changed_df = self._mutator.update_cell(self.df, row_index, column_index, value)
         self._apply_changes(
             changed_df,

@@ -1,6 +1,8 @@
 import traceback
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
+
 from core.resource_loader import get_resource_path
 
 class StatisticsGenerator:
@@ -94,7 +96,8 @@ class StatisticsGenerator:
         
         # Memory usage information Card
         try:
-            total_memory_bytes = df.memory_usage(deep=True).sum()
+            memory_dict = info.get("memory_usage", {})
+            total_memory_bytes = sum(memory_dict.values()) if memory_dict else df.memory_usage(deep=False).sum()
             total_memory = total_memory_bytes / 1024
             if total_memory > 1024:
                 memory_str = f"{total_memory / 1024:.2f} MB"

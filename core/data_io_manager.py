@@ -176,7 +176,14 @@ class DataIOManager:
         try:
             return pd.read_csv(path, sep=separator, engine="pyarrow", dtype_backend="pyarrow")
         except Exception:
-            return pd.read_csv(path, sep=separator, engine="c", dtype_backend="pyarrow", on_bad_lines="skip")
+            try:
+                chunks = []
+                for chunk in pd.read_csv(path, sep=separator, engine="c", dtype_backend="pyarrow", on_bad_lines="skip",
+                                         chunksize=100000):
+                    chunk.append(chunk)
+                return pd.concat(chunks, ignore_index=True) if len(chunks) > 1 else chunks[0]
+            except Exception:
+                return pd.read_csv(path, sep=separator, engine="c", dtype_backend="pyarrow", on_bad_lines="skip")
     
     def read_file(self, filepath: str) -> pd.DataFrame:
         """
@@ -274,10 +281,22 @@ class DataIOManager:
                 thousands=thousands,
                 encoding="utf-8",
                 on_bad_lines="error",
-                engine="c"
+                engine="pyarrow",
+                dtype_backend="pyarrow"
             )
         except Exception as parse_error:
-            raise ValueError(f"Google Sheets Parsing Failed: {str(parse_error)}")
+            try:
+                df = pd.read_csv(
+                    StringIO(response.text),
+                    sep=delimiter,
+                    decimal=decimal,
+                    thousands=thousands,
+                    encoding="utf-8",
+                    on_bad_lines="skip",
+                    engine="c"
+                )
+            except Exception as fallback_error:
+                raise ValueError(f"Google Sheets Parsing Failed: {str(parse_error)}")
         
         if df is None or df.empty:
             self._raise_empty_sheet_error(sheet_name, gid)
@@ -345,7 +364,7 @@ class DataIOManager:
         
         chunks: List[pd.DataFrame] = []
         total_rows = 0
-        chunk_size = 50000
+        chunk_size = 100000
         hit_limit = False
         
         try:
@@ -369,8 +388,8 @@ class DataIOManager:
         
         if not chunks:
             raise ValueError("Query returned no data.")
-        
-        df = pd.concat(chunks, ignore_index=True)
+
+        df = pd.concat(chunks, ignore_index=True) if len(chunks) > 1 else chunks[0]
         
         if hit_limit:
             print(f"Warning: Query truncated at {max_rows} rows to prevent memory exhaustion")

@@ -27,7 +27,8 @@ class CleaningController(BaseDataController):
 
         try:
             df = self.data_handler.df
-            duplicate_indices = set(i for i, is_dup in enumerate(df.duplicated(keep="first")) if is_dup)
+            duplicate_mask = df.duplicated(keep="first")
+            duplicate_indices = set(df.index[duplicate_mask].tolist())
 
             if not duplicate_indices:
                 global_signals.request_toast("Info", "No duplicate rows found", ToastLevel.INFO)
@@ -85,7 +86,8 @@ class CleaningController(BaseDataController):
 
         try:
             df = self.data_handler.df
-            missing_indices = set(i for i, has_missing in enumerate(df.isnull().any(axis=1)) if has_missing)
+            missing_mask = df.isnull().any(axis=1)
+            missing_indices = set(df.index[missing_mask].tolist())
 
             if not missing_indices:
                 global_signals.request_toast("Info", "No rows with missing values found", ToastLevel.INFO)

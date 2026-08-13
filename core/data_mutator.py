@@ -891,25 +891,26 @@ class DataMutator:
             threshold = kwargs.get("threshold", 3.0)
             if not stats:
                 raise ImportError("Scipy is not installed. Scipy is required for Z-Score")
-            for col in columns:
-                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-                    col_data = df[col].dropna()
-                    if col_data.empty:
-                        continue
-                    mean = col_data.mean()
-                    std = col_data.std()
-                    df[col] = df[col].clip(lower=mean - threshold * std, upper=mean + threshold * std)
+            numeric_cols = [col for col in columns if col in df.columns and pd.api.types.is_numeric_dtype(df[col])]
+            if numeric_cols:
+                col_data = df[numeric_cols].dropna()
+                if not col_data.empty:
+                    means = col_data.mean()
+                    stds = col_data.std()
+                    lower_bounds = means - threshold * stds
+                    upper_bounds = means + threshold * stds
+                    df.loc[:, numeric_cols] = df[numeric_cols].clip(lower=lower_bounds, upper=upper_bounds)
 
         elif method == "iqr":
             multiplier = kwargs.get("multiplier", 1.5)
-            for col in columns:
-                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-                    Q1 = df[col].quantile(0.25)
-                    Q3 = df[col].quantile(0.75)
-                    IQR = Q3 - Q1
-                    df[col] = df[col].clip(
-                        lower=Q1 - multiplier * IQR, upper=Q3 + multiplier * IQR
-                    )
+            numeric_cols = [col for col in columns if col in df.columns and pd.api.types.is_numeric_dtype(df[col])]
+            if numeric_cols:
+                Q1 = df[numeric_cols].quantile(0.25)
+                Q3 = df[numeric_cols].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bounds = Q1 - multiplier * IQR
+                upper_bounds = Q3 + multiplier * IQR
+                df.loc[:, numeric_cols] = df[numeric_cols].clip(lower=lower_bounds, upper=upper_bounds)
         else:
             raise ValueError(f"Clipping is not supported for method: {method}")
 
@@ -930,33 +931,44 @@ class DataMutator:
         if not columns:
             raise ValueError("No columns specified for normalization")
 
-        for col in columns:
-            if col not in df.columns:
-                raise ValueError(f"Column '{col}' not found.")
-            if not pd.api.types.is_numeric_dtype(df[col]):
-                raise TypeError(f"Column '{col}' must be numeric to perform normalization")
+        numeric_cols = [col for col in columns if col in df.columns and pd.api.types.is_numeric_dtype(df[col])]
+        non_numeric_cols = [col for col in columns if col in df.columns and not pd.api.types.is_numeric_dtype(df[col])]
 
-            col_data = df[col]
-            if method == "min_max":
-                min_val = col_data.min()
-                max_val = col_data.max()
-                if max_val != min_val:
-                    df[col] = (col_data - min_val) / (max_val - min_val)
-            elif method == "standard":
-                mean_val = col_data.mean()
-                std_val = col_data.std()
-                if std_val != 0:
-                    df[col] = (col_data - mean_val) / std_val
-            elif method == "quantile":
-                median_val = col_data.median()
-                q75 = col_data.quantile(0.75)
-                q25 = col_data.quantile(0.25)
-                iqr = q75 - q25
-                if iqr != 0:
-                    df[col] = (col_data - median_val) / iqr
-            else:
-                raise ValueError(f"Unsupported normalization method: {method}")
+        if non_numeric_cols:
+            raise TypeError(f"Columns must be numeric to perform normalization: {', '.join(non_numeric_cols)}")
 
+        if not numeric_cols:
+            raise ValueError("No valid numeric columns found for normalization")
+
+        cols_data = df[numeric_cols].copy()
+        if method == "min_max":
+            min_vals = cols_data.min()
+            max_vals = cols_data.max()
+            range_vals = max_vals - min_vals
+            # Avoid division by zero by keeping original values where range is 0
+            for col in numeric_cols:
+                if range_vals[col] != 0:
+                    cols_data[col] = (cols_data[col] - min_vals[col]) / range_vals[col]
+        elif method == "standard":
+            mean_vals = cols_data.mean()
+            std_vals = cols_data.std()
+            # Avoid division by zero by keeping original values where standard deviation is 0
+            for col in numeric_cols:
+                if std_vals[col] != 0:
+                    cols_data[col] = (cols_data[col] - mean_vals[col]) / std_vals[col]
+        elif method == "quantile":
+            median_vals = cols_data.median()
+            q75 = cols_data.quantile(0.75)
+            q25 = cols_data.quantile(0.25)
+            iqr = q75 - q25
+            # Avoid division by zero by keeping original values where IQR is 0
+            for col in numeric_cols:
+                if iqr[col] != 0:
+                    cols_data[col] = (cols_data[col] - median_vals[col]) / iqr[col]
+        else:
+            raise ValueError(f"Unsupported normalization method: {method}")
+
+        df.loc[:, numeric_cols] = cols_data
         return df, sort_state
 
     def _extract_date_component(self, df: pd.DataFrame, sort_state, **kwargs):
