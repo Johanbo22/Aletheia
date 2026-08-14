@@ -785,7 +785,8 @@ class DataTab(QWidget):
             "nan_display"               : self.table_settings.nan_display,
             "conditional_rules"         : self.table_settings.formatting_rules,
             "text_alignment"            : self.table_settings.text_alignment,
-            "render_bools_as_checkboxes": self.table_settings.render_bools
+            "render_bools_as_checkboxes": self.table_settings.render_bools,
+            "column_names"              : list(self.data_handler.df.columns) if self.data_handler.df is not None else []
         }
 
         dialog: TableCustomizationDialog = TableCustomizationDialog(current_settings, self)

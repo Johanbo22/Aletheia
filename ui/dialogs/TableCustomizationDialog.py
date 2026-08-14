@@ -39,6 +39,10 @@ class TableCustomizationDialog(QDialog):
             "Select Rows": QAbstractItemView.SelectionBehavior.SelectRows,
             "Select Columns": QAbstractItemView.SelectionBehavior.SelectColumns
         }
+
+        # Store column names for conditional formatting
+        self.column_names = self.settings.get("column_names", [])
+
         self.init_ui()
 
     def init_ui(self):
@@ -267,94 +271,131 @@ class TableCustomizationDialog(QDialog):
         precision_group.setLayout(precision_layout)
         layout.addWidget(precision_group)
 
-        # Conditional formatting options
-        conditional_group = QGroupBox("Conditional Formatting")
-        conditional_layout = QVBoxLayout()
-
-        # Rule list
-        self.rule_list = QListWidget()
-        self.rule_list.setToolTip("List of active conditional formatting rules.")
-        self.rule_list.setMaximumHeight(120)
-        self.rule_list.setAlternatingRowColors(False)
-
-        current_rules = self.settings.get("conditional_rules", [])
-        for rule in current_rules:
-            self._add_rule_item(rule)
-
-        conditional_layout.addWidget(self.rule_list)
-
-        # Rule controls
-        add_rule_layout = QHBoxLayout()
-        add_rule_layout.addWidget(QLabel("If value"))
-        self.rule_operation_combo = QComboBox()
-        self.rule_operation_combo.addItems(["<", ">", "=", "!=", "<=", ">="])
-        self.rule_operation_combo.setFixedWidth(60)
-        add_rule_layout.addWidget(self.rule_operation_combo)
-
-        self.rule_value_spin = QDoubleSpinBox()
-        self.rule_value_spin.setRange(MIN_RULE_VALUE, MAX_RULE_VALUE)
-        self.rule_value_spin.setDecimals(DEFAULT_FLOAT_PRECISION)
-        self.rule_value_spin.setFixedWidth(100)
-        add_rule_layout.addWidget(self.rule_value_spin)
-
-        # Text color picker
-        self.rule_color_button = QPushButton("Text")
-        self.rule_color_button.setFixedWidth(60)
-        self.rule_color_code = DEFAULT_RULE_TEXT_COLOR
-        ColorManager.update_button_color_swatch(self.rule_color_button, QColor(self.rule_color_code))
-        self.rule_color_button.clicked.connect(self.choose_rule_text_color)
-        add_rule_layout.addWidget(self.rule_color_button)
-
-        # Background color picker
-        self.rule_bg_color_button = QPushButton("Fill")
-        self.rule_bg_color_button.setFixedWidth(50)
-        self.rule_bg_color_code = DEFAULT_RULE_BG_COLOR
-        ColorManager.update_button_color_swatch(self.rule_bg_color_button, QColor(self.rule_bg_color_code))
-        self.rule_bg_color_button.clicked.connect(self.choose_rule_bg_color)
-        add_rule_layout.addWidget(self.rule_bg_color_button)
-
-        add_rule_button = QPushButton("Add Rule")
-        add_rule_button.setToolTip("Add this conditional formatting fule.")
-        add_rule_button.clicked.connect(self.add_rule)
-        add_rule_layout.addWidget(add_rule_button)
-
-        conditional_layout.addLayout(add_rule_layout)
-
-        # Rule management buttons
-        rule_btn_layout = QHBoxLayout()
-
-        self.move_up_button = QPushButton("Move Up")
-        self.move_up_button.setEnabled(False)
-        self.move_up_button.setToolTip("Increase the priority of this rule")
-        self.move_up_button.clicked.connect(self.move_rule_up)
-        rule_btn_layout.addWidget(self.move_up_button)
-
-        self.move_down_button = QPushButton("Move Down")
-        self.move_down_button.setEnabled(False)
-        self.move_down_button.setToolTip("Decrease the priority of this rule.")
-        self.move_down_button.clicked.connect(self.move_rule_down)
-        rule_btn_layout.addWidget(self.move_down_button)
-
-        self.remove_rule_button = QPushButton("Remove")
-        self.remove_rule_button.setEnabled(False)
-        self.remove_rule_button.clicked.connect(self.remove_rule)
-        conditional_layout.addWidget(self.remove_rule_button)
-
-        self.clear_rules_button = QPushButton("Clear All")
-        self.clear_rules_button.setToolTip("Instantly remove all conditional formatting rules.")
-        self.clear_rules_button.setEnabled(len(current_rules) > 0)
-        self.clear_rules_button.clicked.connect(self.clear_all_rules)
-        rule_btn_layout.addWidget(self.clear_rules_button)
-
-        conditional_layout.addLayout(rule_btn_layout)
-
-        self.rule_list.itemSelectionChanged.connect(self._update_rule_button_state)
-
-        conditional_group.setLayout(conditional_layout)
+        conditional_group = self._create_conditional_formatting_group()
         layout.addWidget(conditional_group)
 
         layout.addStretch()
         return widget
+
+    def _create_conditional_formatting_group(self) -> QGroupBox:
+        """
+        Constructs the conditional formatting groupbox interface
+        :return: The created QGroupBox with the controls
+        """
+        conditional_group = QGroupBox("Conditional Formatting")
+        conditional_layout = QVBoxLayout(conditional_group)
+        conditional_layout.setSpacing(8)
+
+        builder_layout = QVBoxLayout()
+        builder_layout.setSpacing(6)
+
+        col_row = QHBoxLayout()
+        col_label = QLabel("Apply to Column:")
+        col_row.addWidget(col_label)
+
+        self.rule_column_combo = QComboBox()
+        self.rule_column_combo.setEditable(False)
+        self.rule_column_combo.setToolTip(
+            "Select which column this rule applies to, or 'All Columns' for the entire dataset"
+        )
+        self.rule_column_combo.addItem("All Columns", None)
+        for col_name in self.column_names:
+            self.rule_column_combo.addItem(str(col_name), col_name)
+        col_row.addWidget(self.rule_column_combo, 1)
+        builder_layout.addLayout(col_row)
+
+        controls_row = QHBoxLayout()
+        controls_row.setSpacing(6)
+
+        cond_label = QLabel("Condition:")
+        controls_row.addWidget(cond_label)
+
+        self.rule_operation_combo = QComboBox()
+        self.rule_operation_combo.addItems(["<", ">", "=", "!=", "<=", ">="])
+        self.rule_operation_combo.setFixedWidth(55)
+        self.rule_operation_combo.setToolTip("Comparison operator.")
+        controls_row.addWidget(self.rule_operation_combo)
+
+        self.rule_value_spin = QDoubleSpinBox()
+        self.rule_value_spin.setRange(MIN_RULE_VALUE, MAX_RULE_VALUE)
+        self.rule_value_spin.setDecimals(DEFAULT_FLOAT_PRECISION)
+        self.rule_value_spin.setMinimumWidth(85)
+        self.rule_value_spin.setToolTip("Threshold value for the condition.")
+        controls_row.addWidget(self.rule_value_spin, 1)
+
+        self.rule_color_button = QPushButton("Text")
+        self.rule_color_button.setFixedWidth(65)
+        self.rule_color_button.setToolTip("Select foreground text color.")
+        self.rule_color_code = DEFAULT_RULE_TEXT_COLOR
+        ColorManager.update_button_color_swatch(self.rule_color_button, QColor(self.rule_color_code))
+        self.rule_color_button.clicked.connect(self.choose_rule_text_color)
+        controls_row.addWidget(self.rule_color_button)
+
+        self.rule_bg_color_button = QPushButton("Fill")
+        self.rule_bg_color_button.setFixedWidth(65)
+        self.rule_bg_color_button.setToolTip("Select cell background fill color.")
+        self.rule_bg_color_code = DEFAULT_RULE_BG_COLOR
+        ColorManager.update_button_color_swatch(self.rule_bg_color_button, QColor(self.rule_bg_color_code))
+        self.rule_bg_color_button.clicked.connect(self.choose_rule_bg_color)
+        controls_row.addWidget(self.rule_bg_color_button)
+
+        self.add_rule_button = QPushButton("Add / Update")
+        self.add_rule_button.setToolTip("Add or update this conditional formatting rule.")
+        self.add_rule_button.clicked.connect(self.add_rule)
+        controls_row.addWidget(self.add_rule_button)
+
+        builder_layout.addLayout(controls_row)
+        conditional_layout.addLayout(builder_layout)
+
+        list_section_layout = QHBoxLayout()
+        list_section_layout.setSpacing(6)
+
+        self.rule_list = QListWidget()
+        self.rule_list.setToolTip("Active conditional formatting rules evaluated in top-to-bottom order.")
+        self.rule_list.setMinimumHeight(90)
+        self.rule_list.setMaximumHeight(130)
+        self.rule_list.setAlternatingRowColors(False)
+
+        current_rules: list[dict] = self.settings.get("conditional_rules", [])
+        for rule in current_rules:
+            self._add_rule_item(rule)
+
+        list_section_layout.addWidget(self.rule_list, 1)
+
+        side_btn_layout = QVBoxLayout()
+        side_btn_layout.setSpacing(4)
+
+        self.move_up_button = QPushButton("Move Up")
+        self.move_up_button.setEnabled(False)
+        self.move_up_button.setToolTip("Increase rule priority.")
+        self.move_up_button.clicked.connect(self.move_rule_up)
+        side_btn_layout.addWidget(self.move_up_button)
+
+        self.move_down_button = QPushButton("Move Down")
+        self.move_down_button.setEnabled(False)
+        self.move_down_button.setToolTip("Decrease rule priority.")
+        self.move_down_button.clicked.connect(self.move_rule_down)
+        side_btn_layout.addWidget(self.move_down_button)
+
+        self.remove_rule_button = QPushButton("Remove")
+        self.remove_rule_button.setEnabled(False)
+        self.remove_rule_button.setToolTip("Delete the selected rule.")
+        self.remove_rule_button.clicked.connect(self.remove_rule)
+        side_btn_layout.addWidget(self.remove_rule_button)
+
+        self.clear_rules_button = QPushButton("Clear All")
+        self.clear_rules_button.setToolTip("Clear all conditional formatting rules.")
+        self.clear_rules_button.setEnabled(len(current_rules) > 0)
+        self.clear_rules_button.clicked.connect(self.clear_all_rules)
+        side_btn_layout.addWidget(self.clear_rules_button)
+        side_btn_layout.addStretch()
+
+        list_section_layout.addLayout(side_btn_layout)
+        conditional_layout.addLayout(list_section_layout)
+
+        self.rule_list.itemSelectionChanged.connect(self._update_rule_button_state)
+
+        return conditional_group
 
     def create_behavior_tab(self) -> QWidget:
         widget = QWidget()
@@ -389,8 +430,7 @@ class TableCustomizationDialog(QDialog):
         color = QColorDialog.getColor(QColor(self.rule_color_code), self, "Select Rule Color", options=options)
         if color.isValid():
             self.rule_color_code = color.name(QColor.NameFormat.HexArgb)
-            text_color = "black" if color.lightness() > 128 else "white"
-            ColorManager.update_button_color_swatch(self.rule_color_button, QColor(text_color))
+            ColorManager.update_button_color_swatch(self.rule_color_button, color)
             
     def choose_rule_bg_color(self) -> None:
         """Opens the color dialog for the rule background color"""
@@ -398,8 +438,7 @@ class TableCustomizationDialog(QDialog):
         color = QColorDialog.getColor(QColor(self.rule_bg_color_code), self, "Select Rule Background Color", options=options)
         if color.isValid():
             self.rule_bg_color_code = color.name(QColor.NameFormat.HexArgb)
-            text_color = "black" if color.lightness() > 128 else "white"
-            ColorManager.update_button_color_swatch(self.rule_bg_color_button, QColor(text_color))
+            ColorManager.update_button_color_swatch(self.rule_bg_color_button, color)
 
     def _update_font_preview(self) -> None:
         """Updates the font preview label based on the selected font settings"""
@@ -414,22 +453,35 @@ class TableCustomizationDialog(QDialog):
         self.remove_rule_button.setEnabled(has_selection)
 
         row: int = self.rule_list.currentRow()
+        count: int = self.rule_list.count()
         self.move_up_button.setEnabled(has_selection and row > 0)
-        self.move_down_button.setEnabled(has_selection and self.rule_list.count() - 1 > row >= 0)
+        self.move_down_button.setEnabled(has_selection and 0 <= row < count - 1)
+        self.clear_rules_button.setEnabled(count > 0)
 
-        if has_selection:
-            rule_data: dict | None = selected_items[0].data(Qt.ItemDataRole.UserRole)
-            if rule_data:
-                self.rule_operation_combo.setCurrentText(rule_data.get("operator", "="))
-                self.rule_value_spin.setValue(float(rule_data.get("value", 0.0)))
+        if not has_selection:
+            return
 
-                self.rule_color_code = rule_data.get("color", DEFAULT_RULE_TEXT_COLOR)
-                text_fg: str = "black" if QColor(self.rule_color_code).lightness() > 128 else "white"
-                ColorManager.update_button_color_swatch(self.rule_color_button, QColor(text_fg))
+        rule_data: dict | None = selected_items[0].data(Qt.ItemDataRole.UserRole)
+        if not rule_data:
+            return
 
-                self.rule_bg_color_code = rule_data.get("bg_color", DEFAULT_RULE_BG_COLOR)
-                bg_fg: str = "black" if QColor(self.rule_bg_color_code).lightness() > 128 else "white"
-                ColorManager.update_button_color_swatch(self.rule_bg_color_button, QColor(bg_fg))
+        self.rule_operation_combo.setCurrentText(rule_data.get("operator", "="))
+        self.rule_value_spin.setValue(float(rule_data.get("value", 0.0)))
+
+        column_name = rule_data.get("column")
+        if column_name is None:
+            self.rule_column_combo.setCurrentIndex(0)
+        else:
+            for i in range(self.rule_column_combo.count()):
+                if self.rule_column_combo.itemData(i) == column_name:
+                    self.rule_column_combo.setCurrentIndex(i)
+                    break
+
+        self.rule_color_code = rule_data.get("color", DEFAULT_RULE_TEXT_COLOR)
+        ColorManager.update_button_color_swatch(self.rule_color_button, QColor(self.rule_color_code))
+
+        self.rule_bg_color_code = rule_data.get("bg_color", DEFAULT_RULE_BG_COLOR)
+        ColorManager.update_button_color_swatch(self.rule_bg_color_button, QColor(self.rule_bg_color_code))
 
     def move_rule_up(self) -> None:
         """Moves the selected formatting rule up in priority"""
@@ -451,12 +503,14 @@ class TableCustomizationDialog(QDialog):
         """Adds new rule to the list. Updates existing rule if operator and value match"""
         operator: str = self.rule_operation_combo.currentText()
         value: float = self.rule_value_spin.value()
+        selected_column = self.rule_column_combo.currentData()
 
         rule: dict = {
             "operator": self.rule_operation_combo.currentText(),
             "value": self.rule_value_spin.value(),
             "color": self.rule_color_code,
-            "bg_color": self.rule_bg_color_code
+            "bg_color": self.rule_bg_color_code,
+            "column"  : selected_column,
         }
 
         # To prevent duplicate entries
@@ -465,7 +519,12 @@ class TableCustomizationDialog(QDialog):
             item: QListWidgetItem = self.rule_list.item(i)
             existing_rule: dict | None = item.data(Qt.ItemDataRole.UserRole)
 
-            if existing_rule and existing_rule.get("operator") == operator and existing_rule.get("value") == value:
+            if (
+                    existing_rule
+                    and existing_rule.get("operator") == operator
+                    and existing_rule.get("value") == value
+                    and existing_rule.get("column") == selected_column
+            ):
                 item.setData(Qt.ItemDataRole.UserRole, rule)
 
                 text_color: QColor = QColor(self.rule_color_code)
@@ -480,13 +539,17 @@ class TableCustomizationDialog(QDialog):
                 return
 
         self._add_rule_item(rule)
+        self.clear_rules_button.setEnabled(True)
 
     def _add_rule_item(self, rule: dict) -> None:
         """
         Creates a list widget item from the dictionary of added rules
         Applies the selected colors to the item itself to serve as live visual of the rule
         """
-        text: str = f"If value {rule["operator"]} {rule["value"]}"
+        column_info = rule.get("column")
+        target_str: str = "All Columns" if column_info is None else str(column_info)
+        text: str = f"If value {rule['operator']} {rule['value']} ({target_str})"
+
         item = QListWidgetItem(text)
 
         text_color: QColor = QColor(rule.get("color", DEFAULT_RULE_TEXT_COLOR))

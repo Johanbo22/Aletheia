@@ -106,19 +106,22 @@ class DataTableModel(QAbstractTableModel):
             ">" : operator.gt,
             "=" : operator.eq,
             "<=": operator.le,
-            ">=": operator.ge
+            ">=": operator.ge,
+            "!=": operator.ne,
         }
         for rule in rules:
             op_str: str = rule.get("operator", "")
             try:
-                target: float = float(rule.get("operator", 0.0))
+                target: float = float(rule.get("value", 0.0))
             except (ValueError, TypeError):
                 target = 0.0
             color_hex: str = rule.get("color", "#000000")
+            bg_color_hex: str = rule.get("bg_color", "#FFFFFF")
+            column_name = rule.get("column")
 
             op_func = op_map.get(op_str)
             if op_func:
-                self._compiled_rules.append((op_func, target, QColor(color_hex)))
+                self._compiled_rules.append((op_func, target, QColor(color_hex), QColor(bg_color_hex), column_name))
 
     def set_highlighted_rows(self, rows: set) -> None:
         """Updates the highlighed rows and triggers a layout refresh on display changes"""
@@ -279,6 +282,18 @@ class DataTableModel(QAbstractTableModel):
             is_insert_col: bool = self.editable and col >= shape[1]
             if is_insert_row and is_insert_col:
                 return QColor("#f8f9fa")
+
+            # Check for the background color
+            if not is_insert_row and not is_insert_col:
+                try:
+                    val: Any = self._data.iat[row, col]
+                    is_missing = pd.isna(val) if not isinstance(val, (list, dict, np.ndarray)) else False
+                    bg_color = self._get_background_data(val, col, is_missing)
+                    if bg_color is not None:
+                        return bg_color
+                except Exception:
+                    pass
+
             return None
 
         shape = self._data.shape
@@ -314,7 +329,7 @@ class DataTableModel(QAbstractTableModel):
             return self._get_display_data(val, col, is_missing)
 
         if role == Qt.ItemDataRole.ForegroundRole:
-            return self._get_foreground_data(val, is_missing) if self._compiled_rules or is_missing else None
+            return self._get_foreground_data(val, col, is_missing) if self._compiled_rules or is_missing else None
 
         if role == Qt.ItemDataRole.FontRole:
             return self._nan_font if is_missing else None
@@ -389,17 +404,49 @@ class DataTableModel(QAbstractTableModel):
         except Exception:
             return ""
 
-    def _get_foreground_data(self, val: Any, is_missing: bool = False) -> QColor | None:
+    def _get_foreground_data(self, val: Any, col: int, is_missing: bool = False) -> QColor | None:
         """Evaluates conditional rules and returns the QColor for ForegroundRole"""
         try:
             if is_missing:
                 return self._nan_color
             if isinstance(val, (int, float, np.number)):
-                for op_func, target, color in self._compiled_rules:
+                # Get the column name for this column index
+                col_name = None
+                if self._data is not None and col < len(self._data.columns):
+                    col_name = self._data.columns[col]
+
+                for op_func, target, color, bg_color, rule_column in self._compiled_rules:
+                    # Check if rule applies to this column
+                    if rule_column is not None and rule_column != col_name:
+                        continue
+
                     if op_func(val, target):
                         return color
         except Exception as error:
             logger.warning(f"Error evaluating foreground conditional values: {error}")
+        return None
+
+    def _get_background_data(self, val: Any, col: int, is_missing: bool = False) -> QColor | None:
+        """Evaluates conditional rules and returns the background QColor for BackgroundRole"""
+        try:
+            if is_missing:
+                return None
+
+            # Get column name for this column index
+            col_name = None
+            if self._data is not None and col < len(self._data.columns):
+                col_name = self._data.columns[col]
+
+            if isinstance(val, (int, float, np.number)):
+                for op_func, target, color, bg_color, rule_column in self._compiled_rules:
+                    # Check if rule applies to this column
+                    if rule_column is not None and rule_column != col_name:
+                        continue
+
+                    if op_func(val, target):
+                        return bg_color
+        except Exception as error:
+            logger.warning(f"Error evaluating background conditional values: {error}")
         return None
 
     def _get_font_data(self, is_missing: bool = False) -> QFont | None:
