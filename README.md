@@ -52,6 +52,7 @@ To build the project from source:
 1. Clone the repository:
 ```
 git clone https://github.com/Johanbo22/Aletheia.git
+cd Aletheia
 ```
 
 2. Synchronize the virtual environment and install dependencies
@@ -62,6 +63,5 @@ uv sync
 
 3. Navigate into the Aletheia root directory and run main
 ```
-cd Aletheia
 python ./main.py
 ```
