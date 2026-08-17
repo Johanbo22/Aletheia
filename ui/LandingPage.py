@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from PyQt6.QtCore import QSettings, Qt, pyqtSignal
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
+from PyQt6.QtCore import QPoint, QSettings, QUrl, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QDesktopServices
+from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QMenu,
                              QPushButton, QScrollArea, QTextBrowser, QVBoxLayout, QWidget)
 
 from core.markdown_parser import ParseMode, parse_changelog
@@ -292,6 +292,54 @@ class LandingPage(QWidget):
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.exec()
 
+    def _open_folder_in_explorer(self, file_path_str: str) -> None:
+        """Opens the folder containing the project file in the system file explorer"""
+        file_path = Path(file_path_str)
+        if file_path.exists():
+            folder_path = file_path.parent.absolute()
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder_path)))
+
+    def _create_recent_project_button(self, file_path_str: str, button_width: int) -> QPushButton:
+        """Creates a recent project button with context menu support"""
+        file_path = Path(file_path_str)
+        parent_dir = file_path.parent.name
+        display_text = f"{file_path.name} ({parent_dir})" if parent_dir else file_path.name
+
+        btn = QPushButton(display_text)
+        btn.setProperty("size_variant", "large")
+        btn.setToolTip(str(file_path.absolute()))
+        btn.setIcon(IconBuilder.build(IconType.OpenProject))
+        btn.setFixedWidth(button_width)
+        btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        btn.clicked.connect(
+            lambda checked, path=file_path_str: self.recent_project_clicked.emit(path)
+        )
+
+        btn.customContextMenuRequested.connect(
+            lambda pos, path=file_path_str: self._show_recent_project_context_menu(btn, path, pos)
+        )
+
+        return btn
+
+    def _show_recent_project_context_menu(self, button: QPushButton, file_path_str: str, pos: QPoint) -> None:
+        """Shows the context menu for a recent project button"""
+        menu = QMenu(button)
+
+        open_action = QAction("Open Project", menu)
+        open_action.triggered.connect(
+            lambda: self.recent_project_clicked.emit(file_path_str)
+        )
+        menu.addAction(open_action)
+
+        reveal_action = QAction("Show in file explorer", menu)
+        reveal_action.triggered.connect(
+            lambda: self._open_folder_in_explorer(file_path_str)
+        )
+        menu.addAction(reveal_action)
+
+        menu.exec(button.mapToGlobal(pos))
+
     def _populate_recent_projects(self, button_width: int) -> None:
         settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
         recent_files = settings.value("recent_files", [])
@@ -334,20 +382,7 @@ class LandingPage(QWidget):
             self._show_no_recent_projects_label(button_width)
         else:
             for file_path_str in display_files:
-                file_path = Path(file_path_str)
-
-                parent_dir = file_path.parent.name
-                display_text = f"{file_path.name} ({parent_dir})" if parent_dir else file_path.name
-
-                btn = QPushButton(display_text)
-                btn.setProperty("size_variant", "large")
-                btn.setToolTip(str(file_path.absolute()))
-                btn.setIcon(IconBuilder.build(IconType.OpenProject))
-                btn.setFixedWidth(button_width)
-
-                btn.clicked.connect(
-                    lambda checked, path=file_path_str: self.recent_project_clicked.emit(path)
-                )
+                btn = self._create_recent_project_button(file_path_str, button_width)
                 self.recent_projects_layout.addWidget(btn)
 
         if valid_files != recent_files:
