@@ -7,7 +7,7 @@ from pathlib import Path
 from PyQt6.QtCore import QByteArray
 from PyQt6.QtGui import QIcon, QPixmap
 
-from ui.theme import ThemeColors
+from src.ui.theme import ThemeColors
 
 class IconType(Enum):
     """

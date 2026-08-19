@@ -1,0 +1,75 @@
+from typing import Any, Dict, List, TYPE_CHECKING
+
+import seaborn
+
+from src.core.plot_engine import PlotEngine
+from src.core.plot_strategies.base_strategy import BasePlotStrategy
+from src.ui.plot_tab import PlotTab
+
+if TYPE_CHECKING:
+    from src.core.plot_engine import PlotEngine
+    from src.ui.plot_tab import PlotTab
+    
+class BoxPlotStrategy(BasePlotStrategy):
+    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
+        df = plot_tab.data_handler.df
+        engine._clear_axes()
+
+        title = general_kwargs.pop('title', None)
+        xlabel = general_kwargs.pop('xlabel', None)
+        ylabel = general_kwargs.pop('ylabel', None)
+        legend = general_kwargs.pop('legend', True)
+        hue = general_kwargs.pop('hue', None)
+        cmap_name = general_kwargs.pop('cmap', general_kwargs.pop('palette', None))
+
+        kwargs = plot_kwargs.copy()
+
+        x_val = x_col if x_col and x_col in df.columns else None
+        hue_val = hue if hue and hue in df.columns else None
+
+        if cmap_name:
+            kwargs["palette"] = cmap_name
+
+        if len(y_cols) == 1:
+            # Single Y column: Mapping X to x_val and Hue to hue_val
+            if hue_val:
+                kwargs["hue"] = hue_val
+            elif x_val and "palette" in kwargs:
+                kwargs["hue"] = x_val
+
+            if axes_flipped:
+                seaborn.boxplot(data=df, x=y_cols[0], y=x_val, ax=engine.current_ax, orient="h", **kwargs)
+            else:
+                seaborn.boxplot(data=df, x=x_val, y=y_cols[0], ax=engine.current_ax, orient="v", **kwargs)
+        else:
+            # Multiple y columns, melt dataframe to compare distributions
+            id_vars = [col for col in [x_val, hue_val] if col is not None]
+            if id_vars:
+                melted_df = df.melt(id_vars=id_vars, value_vars=y_cols, var_name="Variable", value_name="Value")
+            else:
+                melted_df = df.melt(value_vars=y_cols, var_name="Variable", value_name="Value")
+
+            if x_val:
+                # If x is set, plot X as categorical and y columns as hue subgroups
+                plot_x = x_val
+                kwargs["hue"] = "Variable"
+            else:
+                # if no x, y-columns become the main categories
+                plot_x = "Variable"
+                if hue_val:
+                    kwargs["hue"] = hue_val
+                elif "palette" in kwargs:
+                    kwargs["hue"] = "Variable"
+
+            if axes_flipped:
+                seaborn.boxplot(data=melted_df, x="Value", y=plot_x, ax=engine.current_ax, orient="h", **kwargs)
+            else:
+                seaborn.boxplot(data=melted_df, x=plot_x, y="Value", ax=engine.current_ax, orient="v", **kwargs)
+
+        if axes_flipped:
+            engine._set_labels(title, ylabel, xlabel, False, **general_kwargs)
+            engine._helper_apply_flipped_labels(plot_tab, x_col, y_cols, font_family)
+        else:
+            engine._set_labels(title, xlabel, ylabel, False, **general_kwargs)
+
+        return None

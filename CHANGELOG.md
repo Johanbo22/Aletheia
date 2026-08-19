@@ -4,6 +4,17 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.5.1
+
+### Added
+
+- A context menu for the recent project buttons. Allowing to reveal project in file explorer or open project with menu.
+
+### Fixed
+
+- Fixed the layout in the Conditional Formatting group in the Table Customization Dialog
+- Fixed an issue where a specific column could not be targeted by conditional formatting
+
 ## v.0.5.0
 
 ### Added

@@ -1,9 +1,10 @@
-import pytest
-from typing import Generator
-from core.data_handler import DataHandler
 import os
-import pytest
 from pathlib import Path
+from typing import Generator
+
+import pytest
+
+from src.core.data_handler import DataHandler
 
 @pytest.fixture(scope="session", autouse=True)
 def set_project_root_cwd() -> None:

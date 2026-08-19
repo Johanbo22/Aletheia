@@ -1,8 +1,9 @@
-from typing import List, Dict, Any
-from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QColor, QPen, QPainter
+from typing import Dict, List
 
-from ui.help_animation_engine import HelpAnimationEngine
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QColor, QPainter, QPen
+
+from src.ui.help_animation_engine import HelpAnimationEngine
 
 class Animation(HelpAnimationEngine):
     """
