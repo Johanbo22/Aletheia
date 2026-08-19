@@ -124,7 +124,7 @@ class MainWindow(QWidget):
         self.tabs.addTab(self.plot_tab, plot_icon, plot_tab_name)
 
         layout.addWidget(self.tabs)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # layout.setContentsMargins(0, 0, 0, 0)
 
         self.setLayout(layout)
         self._update_tab_visibility()

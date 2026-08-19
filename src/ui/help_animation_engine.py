@@ -12,7 +12,7 @@ from src.core.resource_loader import get_resource_path
 def load_help_animation_widget(topic_id: str) -> QWidget:
     """Loads and instantiates a help animation widget by a topic ID"""
     current_dir = Path(__file__).resolve().parent
-    project_root = current_dir.parent
+    project_root = current_dir.parent.parent
 
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
