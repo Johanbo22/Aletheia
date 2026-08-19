@@ -438,8 +438,47 @@ class PlotTab(PlotTabUI):
 
     def _on_canvas_drawn(self, event: Any) -> None:
         """Syncs the drawing order list automatically"""
+        self._ensure_artists_have_gids()
         if hasattr(self, "drawing_order_popup") and self.drawing_order_popup.isVisible():
             self._drawing_order_timer.start()
+
+    def _ensure_artists_have_gids(self) -> None:
+        """Assigns GIDs to all artists, with a collision system to not have overlapping GIDs"""
+        if getattr(self, "plot_engine", None) is None:
+            return
+
+        current_figure = self.plot_engine.current_figure
+        if current_figure is None:
+            return
+
+        seen_gids: set[str] = set()
+
+        for ax in current_figure.axes:
+            for artist in ax.get_children():
+                existing_gid: Any = artist.get_gid()
+                if existing_gid:
+                    seen_gids.add(str(existing_gid))
+
+        for ax_idx, ax in enumerate(current_figure.axes):
+            for artist_idx, artist in enumerate(ax.get_children()):
+                if artist.get_gid():
+                    continue
+
+                artist_type: str = artist.__class__.__name__
+                label: Any = artist.get_label()
+                label_str: str = str(label) if label else ""
+                clean_label: str = label_str if label_str and not label_str.startswith("_") else "unl"
+
+                first_gid: str = f"gid_ax{ax_idx}_{artist_type}_{clean_label}_{artist_idx}"
+                new_gid: str = first_gid
+
+                counter: int = 1
+                while new_gid in seen_gids:
+                    new_gid = f"{first_gid}_{counter}"
+                    counter += 1
+
+                seen_gids.add(new_gid)
+                artist.set_gid(new_gid)
 
     def _refresh_drawing_order(self) -> None:
         """Called by the drawingorder timer to refresh the popup"""
