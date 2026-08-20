@@ -3,8 +3,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QEasingCurve, QItemSelectionModel, QModelIndex, QPropertyAnimation, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut
+from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QModelIndex, QObject, QPropertyAnimation, QSize, \
+    QTimer, Qt, \
+    pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut, QWheelEvent
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QAbstractItemView, QGraphicsOpacityEffect, QHBoxLayout, QHeaderView, \
     QListWidgetItem, QSplitter, QStackedWidget, QTabWidget, QTableView, QVBoxLayout, QWidget
@@ -59,24 +61,31 @@ class DataTab(QWidget):
                                             subset_manager=self.subset_manager)
         self.stats_generator = StatisticsGenerator()
         self.plot_tab = None
-        self.data_table = None
+        self.data_table: MainDataTableView | None = None
         self.stats_text = None
         self.data_tabs = None
         self.subset_view_label = None
         self.aggregation_view_label = None
-        self.is_editing = False
+        self.is_editing: bool = False
 
         self.table_settings = TableSettingsState()
 
-        self.current_precision = 2
-        self.current_formatting_rules = []
-        self.current_render_bools = True
+        self.current_precision: int = 2
+        self.current_formatting_rules: list = []
+        self.current_render_bools: bool = True
 
-        self.current_nan_display = "NaN"
-        self.current_thousands_sep = False
-        self.current_scientific_notation = False
-        self.current_grid_style = "Solid Line"
-        self.current_grid_color = "#D3D3D3"
+        self.current_nan_display: str = "NaN"
+        self.current_thousands_sep: bool = False
+        self.current_scientific_notation: bool = False
+        self.current_grid_style: str = "Solid Line"
+        self.current_grid_color: str = "#D3D3D3"
+
+        self._pending_table_font_size: int = 10
+        self._table_font_size_timer: QTimer = QTimer(self)
+        self._table_font_size_timer.setSingleShot(True)
+        table_font_size_update_interval: int = 400
+        self._table_font_size_timer.setInterval(table_font_size_update_interval)
+        self._table_font_size_timer.timeout.connect(self._emit_font_size_log)
 
         self.init_ui()
 
@@ -102,6 +111,52 @@ class DataTab(QWidget):
         self.setLayout(main_layout)
 
         self.refresh_data_view()
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """
+        Global event filter for the data tab
+        Intercepts the Ctrl+MouseWheel scrolling event on the data table viewport to adjust font size
+        :param obj: The object which the eventFilter is tied to
+        :param event: The event applied to the object
+        :return: True if event is completed, False if not
+        """
+        if hasattr(self, "data_table") and self.data_table is not None:
+            if obj is self.data_table.viewport() and event.type() == QEvent.Type.Wheel:
+                if isinstance(event, QWheelEvent) and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    delta = event.angleDelta().y()
+                    self._adjust_table_font_size(delta)
+                    return True
+        return super().eventFilter(obj, event)
+
+    def _adjust_table_font_size(self, delta: int) -> None:
+        """
+        Adjusts the table font size based on the mouse wheel delta angle
+        Positive delta increases the font size while negative delta decreases
+        :param delta: The change in mouse wheel delta angle
+        """
+        current_font: QFont = self.data_table.font()
+        current_font_size = current_font.pointSize()
+        if current_font_size <= 0:
+            current_font_size = 10
+
+        new_font_size = current_font_size + (1 if delta > 0 else -1)
+        new_font_size = max(6, min(new_font_size, 72))
+
+        if new_font_size != current_font_size:
+            current_font.setPointSize(new_font_size)
+            self.data_table.setFont(current_font)
+
+            if self.data_table.wordWrap():
+                self.data_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+                self.data_table.resizeColumnsToContents()
+            else:
+                self.data_table.verticalHeader().setDefaultSectionSize(new_font_size + 20)
+
+            self._pending_table_font_size = new_font_size
+            self._table_font_size_timer.start()
+
+    def _emit_font_size_log(self) -> None:
+        self.status_bar.log(f"Table font size updated to {self._pending_table_font_size}pt", LogLevel.INFO)
 
     def _setup_left_panel(self) -> QWidget:
         """Sets up the left panel containing the landing page and data views"""
@@ -177,6 +232,7 @@ class DataTab(QWidget):
     def _setup_data_table(self) -> None:
         """Configures the main data table view"""
         self.data_table = MainDataTableView(self.status_bar, self.data_handler, self)
+        self.data_table.viewport().installEventFilter(self)
 
         self.table_delegate = DataTableDelegate(self.data_table)
         self.data_table.setItemDelegate(self.table_delegate)
