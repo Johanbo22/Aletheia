@@ -81,6 +81,7 @@ class StatusBar(QStatusBar):
         self.memory_bar = QProgressBar()
         self.memory_bar.setObjectName("status_memory_bar")
         self.memory_bar.setFixedWidth(100)
+        self.memory_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.memory_bar.setTextVisible(True)
         self.memory_bar.setFormat("Mem: %p%")
         self.memory_bar.setProperty("usageLevel", "normal")
