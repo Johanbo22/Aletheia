@@ -366,6 +366,8 @@ class ConsoleDialog(QDialog):
                     "type": "console_command",
                     "command": command
                 })
+                self.sync_callback()
+                self._update_completer_model()
             elif "inplace" in command and "True" in command:
                 self.data_handler.operation_log.append({
                     "type": "console_command_inplace",

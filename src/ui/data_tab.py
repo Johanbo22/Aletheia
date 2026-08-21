@@ -433,9 +433,8 @@ class DataTab(QWidget):
             self.model.update_data()
             self.data_table.setSortingEnabled(False)
 
-            if self.data_table.model() is self.model:
-                return
-            self.data_table.setModel(self.model)
+            if self.data_table.model() is not self.model:
+                self.data_table.setModel(self.model)
 
         header = self.data_table.horizontalHeader()
         header.blockSignals(True)
