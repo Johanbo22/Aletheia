@@ -37,7 +37,7 @@ class FlowEdgeItem(QGraphicsPathItem):
             self.flow_pen = QPen(QColor("#2563eb"), 2.5, Qt.PenStyle.CustomDashLine)
             self.flow_pen.setDashPattern([3, 12])
         else:
-            self.base_pen = QPen(QColor("#cbd5e1"), 2.0, Qt.PenStyle.DashLine)
+            self.base_pen = QPen(QColor("#94A3B8"), 2.0, Qt.PenStyle.DashLine)
             self.flow_pen = None
 
     def set_active(self, is_active: bool) -> None:
@@ -198,7 +198,7 @@ class GraphNode(QGraphicsObject):
             self.dot_color = base_dot
             self.shadow.setEnabled(False)
         elif self.is_undone:
-            self.bg_color = QColor("#F8FAFC") if not self.is_hovered else QColor("#F1F5F9")
+            self.bg_color = QColor("#FFFFFF") if not self.is_hovered else QColor("#F8FAFC")
             self.border_color = QColor("#CBD5E1")
             self.text_color = QColor("#94A3B8")
             self.dot_color = self.border_color
