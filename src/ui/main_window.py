@@ -190,7 +190,6 @@ class MainWindow(QWidget):
         self._is_autosaving = False
         self.status_bar.log(f"Autosave failed: {str(error)}", LogLevel.ERROR)
 
-
     @pyqtSlot()
     def _check_recovery(self) -> None:
         """
@@ -378,8 +377,19 @@ class MainWindow(QWidget):
                 self.status_bar.log(f"Warning: Could not restore data source info: {str(error)}", LogLevel.ERROR)
 
         if "data" in project_data and project_data["data"] is not None:
-            self.data_handler.df = project_data["data"]
             self.data_handler.original_df = project_data["data"].copy()
+            self.data_handler.reset_data()
+
+            operations = project_data.get("operations", [])
+            if operations:
+                try:
+                    self.data_handler.apply_pipeline_macro(operations)
+                except Exception as macro_error:
+                    self.status_bar.log(
+                        f"Warning: Could not fully reconstruct operation history: {str(macro_error)}",
+                        LogLevel.ERROR
+                    )
+
             self.data_tab.refresh_data_view()
             self.plot_tab.update_column_combo()
             self.status_bar.update_data_stats(self.data_handler.df)
@@ -395,7 +405,7 @@ class MainWindow(QWidget):
         # Automatically generate the plot based on the loaded configs
         self.plot_tab.generation_manager.generate_plot()
 
-        self._unsaved_changes = False
+        self.unsaved_changes = False
         self._update_tab_visibility()
 
     def save_project(self) -> bool:
@@ -453,9 +463,10 @@ class MainWindow(QWidget):
     def get_project_data(self) -> dict:
         """Get the project data for saving"""
         source_info = self.data_handler.get_data_source()
-        df_copy = self.data_handler.df.copy(deep=False) if self.data_handler.df is not None else None
+        df_copy = self.data_handler.original_df.copy(deep=False) if self.data_handler.original_df is not None else None
         return {
-            "data": df_copy,
+            "data"      : df_copy,
+            "operations": self.data_handler.operation_log,
             "plot_config": self.plot_tab.get_config(),
             "subsets"    : self.subset_manager.export_subsets(),
             "metadata"   : {
