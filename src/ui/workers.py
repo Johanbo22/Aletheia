@@ -355,8 +355,8 @@ class SearchWorker(QThread):
         
         search_text_lower = str(self.search_text).lower()
         try:
-            for col_index, col_name in enumerate(self.df.columns):
-                col_series = self.df[col_name]
+            for col_index in range(self.df.shape[1]):
+                col_series = self.df.iloc[:, col_index]
 
                 if pd.api.types.is_object_dtype(col_series) or pd.api.types.is_string_dtype(col_series):
                     mask = col_series.str.contains(search_text_lower, case=False, regex=False, na=False)
@@ -364,7 +364,6 @@ class SearchWorker(QThread):
                     mask = col_series.astype(str).str.contains(search_text_lower, case=False, regex=False, na=False)
 
                 matched_row_indices = np.where(mask)[0]
-
                 for row_idx in matched_row_indices:
                     matches.append((int(row_idx), col_index))
 

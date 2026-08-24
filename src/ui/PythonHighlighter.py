@@ -175,12 +175,12 @@ class PythonHighlighter(QSyntaxHighlighter):
             search_offset = 3
         
         while start_index >= 0:
-            match = delimiter_pattern.search(text, start_index + 3)
+            match = delimiter_pattern.search(text, start_index + search_offset)
             if match:
                 end_index = match.start()
                 match_length = end_index - start_index + 3
                 self.setFormat(start_index, match_length, self.multi_string_format)
-                
+
                 next_match = delimiter_pattern.search(text, start_index + match_length)
                 start_index = next_match.start() if next_match else -1
                 search_offset = 3

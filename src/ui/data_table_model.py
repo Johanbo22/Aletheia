@@ -49,7 +49,7 @@ class DataTableModel(QAbstractTableModel):
         self._compile_rules(self.conditional_rules)
 
         self._last_index: tuple[int, int] | None = None
-        self._last_value: Any = None
+        self._last_val: Any = None
         self._last_is_missing: bool = False
 
         self._highlight_color = QColor("#ffcccc")

@@ -650,7 +650,7 @@ class MainWindow(QWidget):
 
     def import_file(self) -> None:
         """Import a data file"""
-        geospatial_filter = "Geospatial Files (*.geojson *.shp *gpkg)"
+        geospatial_filter = "Geospatial Files (*.geojson *.shp *.gpkg)"
         data_filter = "Data Files (*.csv *.xlsx *.xls *.txt *.json)"
         all_files_filter = "All Files (*)"
         file_filter = f"{data_filter};;{geospatial_filter};;{all_files_filter}"

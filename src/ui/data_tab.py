@@ -884,7 +884,7 @@ class DataTab(QWidget):
 
         if settings.get("show_grid"):
             grid_qcolor: QColor = QColor(self.table_settings.grid_color)
-            if not grid_qcolor.isValid():
+            if grid_qcolor.isValid():
                 palette = self.data_table.palette()
                 palette.setColor(QPalette.ColorRole.Mid, grid_qcolor)
                 self.data_table.setPalette(palette)

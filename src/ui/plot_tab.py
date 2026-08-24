@@ -56,8 +56,7 @@ class PlotTab(PlotTabUI):
         self.data_handler: DataHandler = data_handler
         self.status_bar: StatusBar = status_bar
         self.subset_manager = subset_manager
-        if self.subset_manager:
-            self.refresh_subset_list()
+
         self.plot_engine = PlotEngine()
         self.current_config = {}
         self.code_exporter = CodeExporter()
@@ -124,6 +123,9 @@ class PlotTab(PlotTabUI):
         self.update_column_combo()
         self.type_manager.select_plot_in_toolbox("Line", log=False)
         self.set_empty_state_greeting()
+
+        if self.subset_manager:
+            self.refresh_subset_list()
 
         # Caching
         self._last_data_signature = None
@@ -870,7 +872,7 @@ class PlotTab(PlotTabUI):
 
     def on_y_datetime_format_changed(self, text) -> None:
         """Handle y-axis format change"""
-        self.view.x_custom_datetime_input.setEnabled(text == "Custom")
+        self.view.y_custom_datetime_format_input.setEnabled(text == "Custom")
         self.on_data_changed()
 
     def _update_progress(self, progress_dialog, value, message):
