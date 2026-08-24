@@ -4,16 +4,38 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
-## v.0.5.1
+## v.0.5.1 [Patch]
 
 ### Added
 
 - A context menu for the recent project buttons. Allowing to reveal project in file explorer or open project with menu.
+- Change font size of the data table using Ctrl+ScrollWheel on mouse.
 
 ### Fixed
 
+- Fixed an issue where loading a project or recovering a project from an autosave would delete any data operations tied
+  to that project file.
+- Fixed an issue where the "*" unsaved changes indicator did not disappear when opening a project.
 - Fixed the layout in the Conditional Formatting group in the Table Customization Dialog
 - Fixed an issue where a specific column could not be targeted by conditional formatting
+- Fixed an issue where the GIDs of plot objects would reset when re-generated.
+- Fixed an issue where the memory tracker on the status bar would go blank and lose text.
+- Fixed a bug where entering commands using the Python Console did not update the table view with the changes made.
+- Fixed a visual bug in the History viewer, where the inactive branch was hard to see when not hovered over.
+- Fixed a bug with the ViewCube where clicking certain faces would snap to an incorrect face.
+- Fixed a visual bug where multi-line strings would incorrectly color the rest of the code in the CodeEditor
+- Resolved a crash with the Data Search Bar when searching through datasets containing columns with the same name
+- Fixed a bug what prevented custom gridline colors from displaying in the data table
+- Corrected an issue where changing the Y-axis date time format would disable X-axis options instead
+- Fixed an issue where loading saved subsets would cause an error when loading into the Plotting interface instead of
+  the data interface.
+- Fixed the file selection filter for GeoPackage spatial data files are recognized.
+- **CreateDatasetDialog Fixes:**
+  - Fixed an issue where pressing backspace or delete while editing a column name would accidentally erase the entire
+    cell
+  - Fixed an issue where the column list would jump to the bottom of the screen when increasing the total number of
+    columns
+  - Fixed a spelling error in the cancellation warning dialog
 
 ## v.0.5.0
 
