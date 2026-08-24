@@ -108,10 +108,10 @@ class ViewCubeWidget(QWidget):
         x1 = x * math.cos(azimuth_radians) - y * math.sin(azimuth_radians)
         y1 = x * math.sin(azimuth_radians) + y * math.cos(azimuth_radians)
 
-        y2 = y1 * math.cos(elevation_radians) - z * math.sin(elevation_radians)
-        z2 = y1 * math.sin(elevation_radians) + z * math.cos(elevation_radians)
+        screen_y = z * math.cos(elevation_radians) - y1 * math.sin(elevation_radians)
+        depth = y1 * math.cos(elevation_radians) + z * math.sin(elevation_radians)
 
-        return cx + x1, cy - y2, z2
+        return cx + x1, cy - screen_y, depth
 
     def set_angles(self, azimuth: float, elevation: float, emit_signal: bool = False) -> None:
         """
@@ -149,8 +149,8 @@ class ViewCubeWidget(QWidget):
         :param face: Face identifier ('X+', 'X-', 'Y+', 'Y-', 'Z+', 'Z-')
         """
         snap_angles = {
-            'Z+': (-90, 90),
-            'Z-': (-90, -90),
+            'Z+': (0, 90),
+            'Z-': (0, -90),
             'Y+': (0, 0),
             'Y-': (180, 0),
             'X+': (90, 0),
@@ -370,12 +370,12 @@ class ViewCubeWidget(QWidget):
             vertices_2d.append((px, py, pz))
 
         faces = [
-            ([0, 1, 2, 3], 'Y-', 'BACK', self._faceColorY, (0, -1, 0)),
-            ([4, 5, 6, 7], 'Y+', 'FRONT', self._faceColorY, (0, 1, 0)),
+            ([0, 1, 5, 4], 'Y-', 'BACK', self._faceColorY, (0, -1, 0)),
+            ([3, 2, 6, 7], 'Y+', 'FRONT', self._faceColorY, (0, 1, 0)),
             ([0, 4, 7, 3], 'X-', 'LEFT', self._faceColorX, (-1, 0, 0)),
             ([1, 5, 6, 2], 'X+', 'RIGHT', self._faceColorX, (1, 0, 0)),
-            ([3, 2, 6, 7], 'Z+', 'TOP', self._faceColorZ, (0, 0, 1)),
-            ([0, 1, 5, 4], 'Z-', 'BTM', self._faceColorZ, (0, 0, -1)),
+            ([4, 5, 6, 7], 'Z+', 'TOP', self._faceColorZ, (0, 0, 1)),
+            ([0, 1, 2, 3], 'Z-', 'BTM', self._faceColorZ, (0, 0, -1)),
         ]
 
         def face_depth(face_data):
@@ -389,7 +389,7 @@ class ViewCubeWidget(QWidget):
 
         for indices, face_id, display_label, color_getter, normal in sorted_faces:
             if color_getter == self._faceColorX:
-                color = self.faceColorX
+                color = self._faceColorX
             elif color_getter == self._faceColorY:
                 color = self._faceColorY
             else:
