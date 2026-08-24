@@ -255,7 +255,7 @@ class CreateDatasetDialog(QDialog):
             self.memory_warning_label.hide()
         
     def _on_column_count_changed(self, target_cols: int) -> None:
-        """Updates table rows based on requestsx"""
+        """Updates table rows based on requests"""
         self.table_label.setText(f"Column Name Editor: ({target_cols} Columns):")
         
         current_rows = self.col_table.rowCount()
@@ -268,7 +268,6 @@ class CreateDatasetDialog(QDialog):
                 item = QTableWidgetItem(f"{prefix}_{i+1}")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
                 self.col_table.setItem(i, 0, item)
-            self.col_table.scrollToBottom()
         elif target_cols < current_rows:
             self.col_table.setRowCount(target_cols)
         self.col_table.blockSignals(False)
@@ -316,6 +315,9 @@ class CreateDatasetDialog(QDialog):
     def eventFilter(self, watched: QObject, event: QEvent | QKeyEvent) -> bool:
         if watched is self.col_table and event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+                if self.col_table.state() == QAbstractItemView.State.EditingState:
+                    return super().eventFilter(watched, event)
+
                 current_item = self.col_table.currentItem()
                 if current_item:
                     self.col_table.blockSignals(True)
@@ -326,7 +328,7 @@ class CreateDatasetDialog(QDialog):
         return super().eventFilter(watched, event)
     
     def _validate_schema(self, *args) -> None:
-        """Hlighlighs duplicate column names in table"""
+        """Highlights duplicate column names in table"""
         seen = set()
         has_issues = False
         
@@ -409,8 +411,8 @@ class CreateDatasetDialog(QDialog):
         
         if has_custom_edits:
             reply = QMessageBox.question(
-                self, 
-                "Discar Changes?",
+                self,
+                "Discard Changes?",
                 "You have manually edited column names. Are you sure you want to cancel and discard your changes?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
