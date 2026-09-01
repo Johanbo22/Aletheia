@@ -1,0 +1,32 @@
+"""
+Create Temp File module for creating temporary CSV files.
+
+This module provides functions for creating temporary CSV files from DataFrames,
+used primarily when importing data from external sources like Google Sheets and databases.
+"""
+import tempfile
+from pathlib import Path
+
+import pandas as pd
+
+def create_temp_csv_file(df: pd.DataFrame, source_name: str = "google_sheets") -> Path:
+    """
+    Creates a temporary CSV file from the dataframe when importing from Google Sheets.
+    All temporary files are nested within 'Aletheia' base directory
+    """
+    try:
+        base_temp_dir: Path = Path(tempfile.gettempdir()) / "Aletheia"
+        base_temp_dir.mkdir(parents=True, exist_ok=True)
+
+        temp_dir_path: str = tempfile.mkdtemp(dir=str(base_temp_dir), prefix="session_")
+        temp_dir: Path = Path(temp_dir_path)
+
+        timestamp: str = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+        temp_filename: str = f"{source_name}_{timestamp}.csv"
+        temp_path: Path = temp_dir / temp_filename
+
+        df.to_csv(temp_path, index=False)
+
+        return temp_path
+    except Exception as CreateTempCSVFileError:
+        raise RuntimeError(f"Failed to create a temporary CSV file: {str(CreateTempCSVFileError)}")

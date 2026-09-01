@@ -1,9 +1,7 @@
-import math
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QPainter
 
-from ui.help_animation_engine import HelpAnimationEngine
-
+from src.ui.help_animation_engine import HelpAnimationEngine
 
 class Animation(HelpAnimationEngine):
     """

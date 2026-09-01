@@ -1,8 +1,9 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel
-from PyQt6.QtCore import Qt
 
-from ui.widgets.AutosaveIndicator import AutosaveIndicator
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidget
+
+from src.ui.widgets.AutosaveIndicator import AutosaveIndicator
 
 class AutosaveDebugWindow(QMainWindow):
     """

@@ -1,8 +1,8 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from PyQt6.QtWidgets import QListWidgetItem
 
-from controller.plot_controllers.reference_span_manager import ReferenceSpanManager
+from src.controller.plot_controllers.reference_span_manager import ReferenceSpanManager
 
 @pytest.fixture
 def mock_plot_tab():

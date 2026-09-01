@@ -4,8 +4,8 @@ import pandas as pd
 from PyQt6.QtCore import Qt
 from pytestqt.qtbot import QtBot
 
-from core.data_handler import DataHandler
-from ui.dialogs.AggregationDialog import AggregationDialog
+from src.core.data_handler import DataHandler
+from src.ui.dialogs import AggregationDialog
 
 @pytest.fixture
 def dummy_data_handler() -> DataHandler:

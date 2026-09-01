@@ -7,8 +7,8 @@ features_and_bugs.xlsx
 *.env
 *.venv
 desktop.ini
-ui/__pycache__/
-core/__pycache__/
+src/ui/__pycache__/
+src/core/__pycache__/
 **/__pycache__/
 *.dps
 *.dps.data

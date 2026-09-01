@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from core.data_handler import DataHandler, DataOperation
+from src.core.data_handler import DataHandler, DataOperation
 
 def test_create_empty_dataframe(empty_data_handler: DataHandler) -> None:
     target_rows: int = 5

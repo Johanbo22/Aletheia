@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QApplication
 project_root = Path(__file__).resolve().parent.parent
 sys.path.append(str(project_root))
 
-from ui.dialogs import ProgressDialog
+from src.ui.dialogs import ProgressDialog
 
 def main() -> None:
     app = QApplication(sys.argv)
