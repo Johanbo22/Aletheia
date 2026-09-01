@@ -22,7 +22,7 @@ hidden_imports += collect_submodules('scipy')
 app_datas = [
     ('resources', 'resources'),
     ('icons', 'icons'),
-    ('ui/styles', 'ui/styles'),
+    ('src/ui/styles', 'ui/styles'),
 ]
 
 spatial_datas = (
@@ -33,8 +33,8 @@ spatial_datas = (
 )
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['src/main.py'],
+    pathex=['src'],
     binaries=[],
     datas=app_datas + spatial_datas,
     hiddenimports=hidden_imports,
