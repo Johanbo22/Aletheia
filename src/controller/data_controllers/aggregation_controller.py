@@ -26,22 +26,20 @@ class AggregationController(BaseDataController):
 
         if getattr(self.data_handler, "viewing_aggregation_name", None):
             global_signals.request_toast(
-                "Action Blocked",
+                "Action Denied",
                 "Please restore the data view before creating a new aggregation",
                 ToastLevel.WARNING
             )
+            return
 
-        is_already_viewing_agg = bool(getattr(self.data_handler, "view_aggregation_name", None))
-        if not is_already_viewing_agg:
-            if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
-                self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
+        if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
+            self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
 
-        dialog = AggregationDialog(self.data_handler, self.view)
+        dialog: AggregationDialog = AggregationDialog(self.data_handler, self.view)
         if dialog.exec():
             self._apply_and_save_aggregation(dialog.get_aggregation_config())
         else:
-            if not is_already_viewing_agg and hasattr(self.data_handler,
-                                                      "pre_agg_view_df") and self.data_handler.pre_agg_view_df is not None:
+            if hasattr(self.data_handler, "pre_agg_view_df") and self.data_handler.pre_agg_view_df is not None:
                 self.data_handler.df = self.data_handler.pre_agg_view_df.copy()
                 self.data_handler.pre_agg_view_df = None
                 self.view.refresh_data_view()
