@@ -1,4 +1,5 @@
 import copy
+from inspect import Attribute
 from typing import TYPE_CHECKING
 
 import matplotlib.dates as mdates
@@ -95,7 +96,8 @@ class ScriptManager:
                     "zip"       : zip, "enumerate": enumerate, "min": min, "max": max, "sum": sum, "abs": abs,
                     "sorted"    : sorted,
                     "tuple"     : tuple, "None": None,
-                    "True"      : True, "False": False, "hasattr": hasattr, "getattr": getattr, "isinstance": isinstance
+                    "True"      : True, "False": False, "hasattr": hasattr, "getattr": getattr, "isinstance": isinstance,
+                    "Exception": Exception, "ValueError": ValueError, "TypeError": TypeError, "KeyError": KeyError, "IndexError": IndexError, "RuntimeError": RuntimeError, "ImportError": ImportError, "AttributeError": AttributeError, "NameError": NameError,
                 },
                 "pd"          : pd, "np": np, "plt": plt, "sns": sns, "mdates": mdates, "t_dist": t_dist,
                 "MaxNLocator" : MaxNLocator
