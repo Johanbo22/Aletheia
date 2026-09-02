@@ -1114,7 +1114,7 @@ class DataMutator:
             new_column = f"{column}_rolling_{window}_{operation}"
 
         if new_column in df.columns and new_column != column:
-            raise ValueError(f"Column '{column}' already exists")
+            raise ValueError(f"Column '{new_column}' already exists")
 
         rolling_obj = df[column].rolling(window=window, center=center, min_periods=min_periods)
 
