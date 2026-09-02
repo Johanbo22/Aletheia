@@ -274,6 +274,14 @@ class GraphNode(QGraphicsObject):
         painter.setPen(pen)
         painter.drawPath(path)
 
+        uuid_font = QFont("Consolas", 7)
+        painter.setFont(uuid_font)
+        uuid_color = QColor("#60a5fa") if self.is_active else QColor("#94a3b8")
+        painter.setPen(uuid_color)
+
+        shortened_uuid_to_8_chars = self.node_id[-8:] if self.node_id else ""
+        painter.drawText(QPointF(12.0, 14.0), shortened_uuid_to_8_chars)
+
         dot_radius: float = 4.5
         dot_x: float = 18.0
         dot_y: float = self.height / 2
