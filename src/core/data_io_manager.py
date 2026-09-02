@@ -66,7 +66,7 @@ class DataIOManager:
         self.last_gsheet_delimiter = None
         self.last_gsheet_decimal = None
         self.last_gsheet_thousands = None
-        self.last_gsheet_id = None
+        self.last_gsheet_gid = None
         self.last_db_connection_string = None
         self.last_db_query = None
         
@@ -177,10 +177,16 @@ class DataIOManager:
             return pd.read_csv(path, sep=separator, engine="pyarrow", dtype_backend="pyarrow")
         except Exception:
             try:
-                chunks = []
-                for chunk in pd.read_csv(path, sep=separator, engine="c", dtype_backend="pyarrow", on_bad_lines="skip",
-                                         chunksize=100000):
-                    chunk.append(chunk)
+                chunks: list[pd.DataFrame] = []
+                for chunk in pd.read_csv(
+                    path,
+                    sep=separator,
+                    engine="c",
+                    dtype_backend="pyarrow",
+                    on_bad_lines="skip",
+                    chunksize=100000,
+                ):
+                    chunks.append(chunk)
                 return pd.concat(chunks, ignore_index=True) if len(chunks) > 1 else chunks[0]
             except Exception:
                 return pd.read_csv(path, sep=separator, engine="c", dtype_backend="pyarrow", on_bad_lines="skip")
@@ -336,9 +342,18 @@ class DataIOManager:
         raise Exception(f"HTTP Error {status}: {str(error)}")
     
     def _raise_empty_sheet_error(self, sheet_name: Optional[str], gid: Optional[str]) -> None:
-        """Raises an formatted error for empty or inaccessible sheets"""
-        if sheet_name and not gid:
-            message += f"\n\nNote: Please verify the sheet name '{sheet_name}' matches"
+        """
+        Raise a ValueError when Google Sheets returns empty content
+
+        :param sheet_name: Optional name of the target worksheet
+        :param gid: Optional sheet identifier
+        :raises ValueError: If the Google Sheets sheet is empty.
+        """
+        message: str = "Google Sheet returned no data or is empty"
+        if gid:
+            message += f"\n\nNote: Verify worksheet GID '{gid}'"
+        elif sheet_name:
+            message += f"\n\nNote: Verify worksheet name '{sheet_name}'"
         raise ValueError(message)
         
     
