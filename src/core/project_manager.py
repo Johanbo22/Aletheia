@@ -86,6 +86,10 @@ class ProjectManager:
             # archive operation logs as json files
             operations_log_data: str = json.dumps(save_data.get("operations", []))
             zip_package.writestr("operations_log.json", operations_log_data)
+
+            # archive subsets data
+            subsets_data: str = json.dumps(save_data.get("subsets", {}))
+            zip_package.writestr("subsets.json", subsets_data)
             
             # create the metadata file as a SQLITE database
             with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
@@ -179,6 +183,7 @@ class ProjectManager:
         :return: The restored project state dictionary
         """
         filepath_obj = Path(filepath)
+        encoding: str = "utf-8"
         
         if not filepath_obj.exists():
             raise FileNotFoundError(f"Project package file cannot be found at: {filepath_obj}")
@@ -200,11 +205,15 @@ class ProjectManager:
                 
                 if "plot_config.json" in file_list:
                     with zip_package.open("plot_config.json") as config_file:
-                        project_data["plot_config"] = json.loads(config_file.read().decode("utf-8"))
+                        project_data["plot_config"] = json.loads(config_file.read().decode(encoding))
                 
                 if "operations_log.json" in file_list:
                     with zip_package.open("operations_log.json") as operations_file:
-                        project_data["operations"] = json.loads(operations_file.read().decode("utf-8"))
+                        project_data["operations"] = json.loads(operations_file.read().decode(encoding))
+
+                if "subsets.json" in file_list:
+                    with zip_package.open("subsets.json") as subsets_file:
+                        project_data["subsets"] = json.loads(subsets_file.read().decode(encoding))
                 
                 # Restore session from database.
                 if "session.db" in file_list:
