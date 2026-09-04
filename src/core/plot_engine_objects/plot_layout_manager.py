@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPoint
 from matplotlib.figure import Figure
 
 if TYPE_CHECKING:
@@ -253,7 +253,7 @@ class PlotLayoutManager:
             h = px_h / dpr
 
         if canvas:
-            global_pos = canvas.mapToGlobal(QPointF(x, y)).toPoint()
+            global_pos = canvas.mapToGlobal(QPoint(int(x), int(y)))
             x, y = global_pos.x(), global_pos.y()
 
         return int(x), int(y), int(w), int(h)
