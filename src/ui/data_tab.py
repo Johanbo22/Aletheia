@@ -70,16 +70,6 @@ class DataTab(QWidget):
 
         self.table_settings = TableSettingsState()
 
-        self.current_precision: int = 2
-        self.current_formatting_rules: list = []
-        self.current_render_bools: bool = True
-
-        self.current_nan_display: str = "NaN"
-        self.current_thousands_sep: bool = False
-        self.current_scientific_notation: bool = False
-        self.current_grid_style: str = "Solid Line"
-        self.current_grid_color: str = "#D3D3D3"
-
         self._pending_table_font_size: int = 10
         self._table_font_size_timer: QTimer = QTimer(self)
         self._table_font_size_timer.setSingleShot(True)
@@ -303,19 +293,22 @@ class DataTab(QWidget):
     def toggle_edit_mode(self, is_editing: bool) -> None:
         """
         Toggles the edit mode in the data table based on toolbar state
+
+        :param is_editing: Flag indicating whether the edit mode has been enabled
         """
         self.is_editing = is_editing
+        self._update_edit_triggers()
 
-        if self.is_editing:
-            self.data_table.setEditTriggers(QTableView.EditTrigger.DoubleClicked | QTableView.EditTrigger.AnyKeyPressed)
-            self.status_bar.log("Edit Mode Enabled. You are now able to edit cells in the data table", LogLevel.INFO)
-        else:
-            self.data_table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
-            self.status_bar.log("Edit Mode Disabled", LogLevel.INFO)
+        log_msg: str = (
+            "Edit Mode Enabled. You can now edit the cells in the data table"
+            if self.is_editing
+            else "Edit Mode Disabled"
+        )
+        self.status_bar.log(log_msg, LogLevel.INFO)
 
-        # Update the flags
-        if self.data_table.model() is not None and isinstance(self.data_table.model(), DataTableModel):
-            self.data_table.model().set_editable(self.is_editing)
+        current_model = self.data_table.model()
+        if isinstance(current_model, DataTableModel):
+            current_model.set_editable(self.is_editing)
         else:
             self.refresh_data_view()
 
@@ -719,8 +712,7 @@ class DataTab(QWidget):
         self.stats_animation.start()
 
     def clear(self):
-        """Clear the data tab"""
-        self.data_table.setModel(None)
+        """Clear the data tab contents and restore the initial empty view"""
         if hasattr(self, "model"):
             del self.model
         self.stats_text.setHtml("")

@@ -2,7 +2,8 @@
 import json
 from pathlib import Path
 
-from PyQt6.QtCore import QSettings, QThreadPool, QTimer, Qt, pyqtSignal, pyqtSlot
+import pandas as pd
+from PyQt6.QtCore import QSettings, QThreadPool, QTimer, QUrl, Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QMessageBox, QTabWidget, QVBoxLayout, QWidget)
 
@@ -268,29 +269,49 @@ class MainWindow(QWidget):
         if top_level and top_level != self:
             top_level.setWindowTitle(title)
 
+    def _get_recent_projects_list(self) -> list[str]:
+        """
+        Retrieve and normalize recent project paths from QSettings
+
+        :return: A list of string file paths
+        """
+        settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
+        raw_files = settings.value("recent_files", [])
+        if isinstance(raw_files, str):
+            return [raw_files]
+        if isinstance(raw_files, (list, tuple)):
+            return [str(p) for p in raw_files]
+        return []
+
     def _update_recent_projects(self, filepath: str) -> None:
+        """
+        Add a path to the recent projects list and store it in Settings
+
+        :param filepath: Target project file path
+        """
         if not filepath:
             return
 
-        settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
-        recent_files = settings.value("recent_files", [])
-
-        if isinstance(recent_files, str):
-            recent_files = [recent_files]
-        elif isinstance(recent_files, tuple):
-            recent_files = list(recent_files)
-        elif isinstance(recent_files, list):
-            recent_files = list(recent_files) if recent_files else []
-
-        standardized_path = str(Path(filepath).absolute())
+        recent_files = self._get_recent_projects_list()
+        standardized_path: str = str(Path(filepath).resolve())
 
         if standardized_path in recent_files:
             recent_files.remove(standardized_path)
-
         recent_files.insert(0, standardized_path)
-        recent_files = recent_files[:10]
 
-        settings.setValue("recent_files", recent_files)
+        QSettings(f"{APPLICATION_NAME}", "RecentProjects").setValue("recent_files", recent_files[:10])
+
+    def _remove_recent_project(self, filepath: str) -> None:
+        """
+        Remove an invalid path from the recent projects list
+
+        :param filepath: Path to remove from settings
+        """
+        recent_files = self._get_recent_projects_list()
+        standardized_path: str = str(Path(filepath).resolve())
+        if standardized_path in recent_files:
+            recent_files.remove(standardized_path)
+            QSettings(f"{APPLICATION_NAME}", "RecentProjects").setValue("recent_files", recent_files)
 
     def new_project(self):
         """Creates a new project"""
@@ -465,8 +486,8 @@ class MainWindow(QWidget):
         source_info = self.data_handler.get_data_source()
         df_copy = self.data_handler.original_df.copy(deep=False) if self.data_handler.original_df is not None else None
         return {
-            "data"      : df_copy,
-            "operations": self.data_handler.operation_log,
+            "data"       : df_copy,
+            "operations" : self.data_handler.operation_log,
             "plot_config": self.plot_tab.get_config(),
             "subsets"    : self.subset_manager.export_subsets(),
             "metadata"   : {
@@ -597,11 +618,12 @@ class MainWindow(QWidget):
 
         QTimer.singleShot(0, lambda: self._process_dropped_urls(urls))
 
-    def _process_dropped_urls(self, urls: list) -> None:
-        """Processes the deferred drop event urls"""
-        if not self._confirm_discard_changes():
-            return
+    def _process_dropped_urls(self, urls: list[QUrl]) -> None:
+        """
+        Process dropped file paths after validation
 
+        :param urls: List of dropped QUrl instances
+        """
         valid_urls = [url.toLocalFile() for url in urls if url.isLocalFile() and Path(url.toLocalFile()).is_file()]
 
         if not valid_urls:
@@ -612,23 +634,21 @@ class MainWindow(QWidget):
             )
             return
 
-        if urls:
-            if len(urls) > 1:
-                loaded_file_name = Path(valid_urls[0]).name
-                self.show_toast(
-                    "Multiple Files Dropped",
-                    f"Loading '{loaded_file_name}'. Other files will be ignored.",
-                    ToastLevel.INFO
-                )
+        if len(valid_urls) > 1:
+            loaded_file_name = Path(valid_urls[0]).name
+            self.show_toast(
+                "Multiple Files Dropped",
+                f"Loading '{loaded_file_name}'. Other dropped files will be ignored",
+                ToastLevel.INFO
+            )
 
-            filepath = valid_urls[0]
-            path_obj = Path(filepath)
-            project_ext = self.project_manager.PROJECT_EXTENSION.lower()
+        filepath = valid_urls[0]
+        project_ext = self.project_manager.PROJECT_EXTENSION.lower()
 
-            if path_obj.suffix.lower() == project_ext:
-                self._load_project_from_path(filepath)
-            else:
-                self.load_file_from_path(filepath)
+        if Path(filepath).suffix.lower() == project_ext:
+            self._load_project_from_path(filepath)
+        else:
+            self.load_file_from_path(filepath)
 
     def load_file_from_path(self, filepath: str) -> None:
         """Process and import file from a path string"""
@@ -681,30 +701,50 @@ class MainWindow(QWidget):
             self.progress_dialog.update_progress(percentage, message)
             QApplication.processEvents()
 
-    @pyqtSlot(object)
-    def _on_import_finished(self, loaded_dataframe) -> None:
-        QApplication.restoreOverrideCursor()
-        self.status_bar.show_progress(False)
-        if self.progress_dialog:
-            self.progress_dialog.update_progress(90, "Updating Interface")
+    def _finalize_dataset_import(self, loaded_dataframe: pd.DataFrame) -> None:
+        """
+        Synchronize components following a dataset import
+
+        :param loaded_dataframe: The loaded dataframe instance
+        """
         self.data_tab.refresh_data_view()
         self.plot_tab.update_column_combo()
-        self._unsaved_changes = True
+        self.unsaved_changes = True
         self.status_bar.update_data_stats(loaded_dataframe)
         self._update_tab_visibility()
-
         self.tabs.setCurrentWidget(self.data_tab)
+
+    @pyqtSlot(object)
+    def _on_import_finished(self, loaded_dataframe: pd.DataFrame) -> None:
+        """
+        Handle completion of background file import
+
+        :param loaded_dataframe: The loaded dataframe instance
+        """
+        QApplication.restoreOverrideCursor()
+        self.status_bar.show_progress(False)
+
+        if self.progress_dialog:
+            self.progress_dialog.update_progress(90, "Updating Interface")
+
+        self._finalize_dataset_import(loaded_dataframe)
 
         if self.progress_dialog:
             self.progress_dialog.update_progress(100, "Complete")
             QTimer.singleShot(600, self.progress_dialog.accept)
             self.progress_dialog = None
 
-        path = Path(self._temp_import_filepath)
-        self.status_bar.log_action(f"Imported {path.name}", level="SUCCESS",
-                                   details={"filename": path.name, "rows": loaded_dataframe.shape[0],
-                                            "columns" : loaded_dataframe.shape[1]})
-        self._temp_import_filepath = None
+        if self._temp_import_filepath:
+            path = Path(self._temp_import_filepath)
+            self.status_bar.log_action(
+                f"Imported {path.name}",
+                level=LogLevel.SUCCESS,
+                details={
+                    "filename": path.name,
+                    "rows"    : loaded_dataframe.shape[0],
+                    "columns" : loaded_dataframe.shape[1],
+                }
+            )
 
     @pyqtSlot(Exception)
     def _on_import_error(self, error: Exception) -> None:

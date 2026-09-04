@@ -768,11 +768,9 @@ class PlotTab(PlotTabUI):
 
         self._is_data_dirty = True
 
-        df = self.get_active_dataframe()
         if df is not None and len(df) <= self.AUTO_UPDATE_THRESHOLD:
             self.style_update_timer.start()
         else:
-            self._is_data_dirty = True
             self.selection_overlay.show_update_required(True)
             self.status_bar.log("Data change detected. Click 'Generate Plot' to update.", LogLevel.INFO)
 
