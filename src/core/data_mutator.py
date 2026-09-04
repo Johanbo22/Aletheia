@@ -26,11 +26,13 @@ logger = logging.getLogger(__name__)
 
 def require_dataframe(func: Callable) -> Callable:
     """Ensures the provided dataframe is not None"""
+
     @wraps(func)
     def wrapper(self, df: pd.DataFrame, *args, **kwargs) -> Any:
         if df is None:
             raise ValueError("No data is loaded")
         return func(self, df, *args, **kwargs)
+
     return wrapper
 
 class StatisticalTest(str, Enum):
@@ -70,19 +72,24 @@ class FillMethod(str, Enum):
     STATIC_VALUE = "static_value"
     LINEAR = "linear"
     TIME = "time"
+
 ###
 # Quantile functions
 def q25(x: pd.Series) -> float:
     return x.quantile(0.25)
+
 def q75(x: pd.Series) -> float:
     return x.quantile(0.75)
+
 def q90(x: pd.Series) -> float:
     return x.quantile(0.90)
+
 QUANTILE_FUNCS: Dict[str, Callable] = {
     "q25": q25,
     "q75": q75,
     "q90": q90
 }
+
 def resolve_agg_config(agg_config: Dict[str, Union[str, List[str]]]) -> Dict[str, Union[Any, List[Any]]]:
     """Resolves string aggregation functions to callable functions where necessary."""
     resolved: Dict[str, Union[Any, List[Any]]] = {}
@@ -102,39 +109,41 @@ class DataMutator:
     when the operation may invalidate it so callers can propagate the change.
     """
     FrequencyMap: Dict[str, str] = {
-        "Year": "YE",
+        "Year"   : "YE",
         "Quarter": "QE",
-        "Month": "ME",
-        "Week": "W",
-        "Day": "D",
+        "Month"  : "ME",
+        "Week"   : "W",
+        "Day"    : "D",
     }
+
     def __init__(self) -> None:
         self._operation_registry: Dict[DataOperation, Any] = {
-            DataOperation.DROP_DUPLICATES: self._drop_duplicates,
-            DataOperation.DROP_MISSING: self._drop_missing,
-            DataOperation.FILL_MISSING: self._fill_missing,
-            DataOperation.DROP_COLUMN: self._drop_column,
-            DataOperation.RENAME_COLUMN: self._rename_column,
-            DataOperation.CHANGE_DATA_TYPE: self._change_data_type,
-            DataOperation.TEXT_MANIPULATION: self._text_manipulation,
-            DataOperation.SPLIT_COLUMN: self._split_column,
-            DataOperation.REGEX_REPLACE: self._regex_replace,
-            DataOperation.REMOVE_ROWS: self._remove_rows,
-            DataOperation.CLIP_OUTLIERS: self._clip_outliers,
-            DataOperation.DUPLICATE_COLUMN: self._duplicate_column,
-            DataOperation.NORMALIZE: self._normalize_data,
-            DataOperation.EXTRACT_DATE_COMPONENT: self._extract_date_component,
+            DataOperation.DROP_DUPLICATES          : self._drop_duplicates,
+            DataOperation.DROP_MISSING             : self._drop_missing,
+            DataOperation.FILL_MISSING             : self._fill_missing,
+            DataOperation.DROP_COLUMN              : self._drop_column,
+            DataOperation.RENAME_COLUMN            : self._rename_column,
+            DataOperation.CHANGE_DATA_TYPE         : self._change_data_type,
+            DataOperation.TEXT_MANIPULATION        : self._text_manipulation,
+            DataOperation.SPLIT_COLUMN             : self._split_column,
+            DataOperation.REGEX_REPLACE            : self._regex_replace,
+            DataOperation.REMOVE_ROWS              : self._remove_rows,
+            DataOperation.CLIP_OUTLIERS            : self._clip_outliers,
+            DataOperation.DUPLICATE_COLUMN         : self._duplicate_column,
+            DataOperation.NORMALIZE                : self._normalize_data,
+            DataOperation.EXTRACT_DATE_COMPONENT   : self._extract_date_component,
             DataOperation.CALCULATE_DATE_DIFFERENCE: self._calculate_date_difference,
-            DataOperation.FLAG_OUTLIERS: self._flag_outliers,
-            DataOperation.REORDER_COLUMNS: self._reorder_columns,
-            DataOperation.DROP_EMPTY_COLUMNS: self._drop_empty_columns,
-            DataOperation.ROLLING_WINDOW: self._apply_rolling_window,
-            DataOperation.SHIFT_DATA: self._apply_shift,
-            DataOperation.PERCENTAGE_CHANGE: self._apply_pct_change
+            DataOperation.FLAG_OUTLIERS            : self._flag_outliers,
+            DataOperation.REORDER_COLUMNS          : self._reorder_columns,
+            DataOperation.DROP_EMPTY_COLUMNS       : self._drop_empty_columns,
+            DataOperation.ROLLING_WINDOW           : self._apply_rolling_window,
+            DataOperation.SHIFT_DATA               : self._apply_shift,
+            DataOperation.PERCENTAGE_CHANGE        : self._apply_pct_change
         }
 
     @require_dataframe
-    def clean_data(self, df: pd.DataFrame, action: "DataOperation | str", sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
+    def clean_data(self, df: pd.DataFrame, action: "DataOperation | str", sort_state: Optional[tuple], **kwargs) -> \
+    tuple[pd.DataFrame, Optional[tuple]]:
         """
         Caller for the cleaning/transformation action via operaton registry\n
         :param df: The DataFrame to work on
@@ -218,7 +227,8 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def filter_data(self, df: pd.DataFrame, column: str = None, condition: str = None, value: Any = None, advanced_filters: List[Dict] = None) -> pd.DataFrame:
+    def filter_data(self, df: pd.DataFrame, column: str = None, condition: str = None, value: Any = None,
+                    advanced_filters: List[Dict] = None) -> pd.DataFrame:
         """
         Filter data based on a single condition or multiple filters\n
         :param df: The DataFrame to filter
@@ -313,7 +323,8 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def sort_data(self, df: pd.DataFrame, column: str, ascending: bool = True, current_sort_state: Optional[tuple] = None) -> tuple[pd.DataFrame, tuple]:
+    def sort_data(self, df: pd.DataFrame, column: str, ascending: bool = True,
+                  current_sort_state: Optional[tuple] = None) -> tuple[pd.DataFrame, tuple]:
         """
         Sort df by column\n
         :param df: DataFrame to target
@@ -340,7 +351,8 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def aggregate_data(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str], rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
+    def aggregate_data(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]],
+                       date_grouping: Dict[str, str], rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         """
         Aggregate df with per column aggregation functions and optional datetime grouping
         """
@@ -364,8 +376,9 @@ class DataMutator:
             df = df.groupby(groupers).agg(resolved_agg_config).reset_index()
 
             if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in df.columns]
-            
+                df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in
+                              df.columns]
+
             if rename_mapping:
                 df = df.rename(columns=rename_mapping)
 
@@ -374,7 +387,9 @@ class DataMutator:
             logger.error(f"Error aggregating data: {e}", exc_info=True)
             raise
 
-    def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]], date_grouping: Dict[str, str] = None, limit: int = 5, rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
+    def preview_aggregation(self, df: pd.DataFrame, group_by: List[str], agg_config: Dict[str, Union[str, List[str]]],
+                            date_grouping: Dict[str, str] = None, limit: int = 5,
+                            rename_mapping: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         """
         Previews an aggregation without modifying the source DataFrame
         """
@@ -400,7 +415,8 @@ class DataMutator:
             preview_df = df.groupby(groupers).agg(resolved_agg_config).reset_index()
 
             if isinstance(preview_df.columns, pd.MultiIndex):
-                preview_df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in preview_df.columns]
+                preview_df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col
+                                      in preview_df.columns]
 
             if rename_mapping:
                 preview_df = preview_df.rename(columns=rename_mapping)
@@ -412,7 +428,8 @@ class DataMutator:
 
     # DATA TRANSFORMATIONS
     @require_dataframe
-    def melt_data(self, df: pd.DataFrame, id_vars: List[str], value_vars: List[str], var_name: str, value_name: str) -> pd.DataFrame:
+    def melt_data(self, df: pd.DataFrame, id_vars: List[str], value_vars: List[str], var_name: str,
+                  value_name: str) -> pd.DataFrame:
         """Unpivoting a df from a wide to a long format"""
         try:
             v_vars = value_vars if value_vars else None
@@ -423,12 +440,14 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def pivot_data(self, df: pd.DataFrame, index: List[str], columns: str, values: List[str], aggfunc: str) -> pd.DataFrame:
+    def pivot_data(self, df: pd.DataFrame, index: List[str], columns: str, values: List[str],
+                   aggfunc: str) -> pd.DataFrame:
         """Creates a pivot table from a DataFrame"""
         try:
             df = pd.pivot_table(df, index=index, columns=columns, values=values, aggfunc=aggfunc).reset_index()
             if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in df.columns]
+                df.columns = [f"{str(col[0])}_{str(col[1])}" if len(col) > 1 and col[1] else str(col[0]) for col in
+                              df.columns]
             df.columns.name = None
             return df
         except (ValueError, KeyError, TypeError) as e:
@@ -436,7 +455,8 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def merge_data(self, df: pd.DataFrame, right_df: pd.DataFrame, how: str, left_on: List[str], right_on: List[str], suffixes: tuple = ("_left", "_right")) -> pd.DataFrame:
+    def merge_data(self, df: pd.DataFrame, right_df: pd.DataFrame, how: str, left_on: List[str], right_on: List[str],
+                   suffixes: tuple = ("_left", "_right")) -> pd.DataFrame:
         """Merge the df with another df"""
         try:
             df = pd.merge(df, right_df, how=how, left_on=left_on, right_on=right_on, suffixes=suffixes)
@@ -493,7 +513,8 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def bin_column(self, df: pd.DataFrame, column: str, new_column_name: str, method: str, bins: Any, labels: List[str] = None, right_inclusive: bool = True, drop_original: bool = False) -> pd.DataFrame:
+    def bin_column(self, df: pd.DataFrame, column: str, new_column_name: str, method: str, bins: Any,
+                   labels: List[str] = None, right_inclusive: bool = True, drop_original: bool = False) -> pd.DataFrame:
         """
         Bin a continuous variable into categorical buckets\n
         :param df: The DataFrame to change
@@ -515,7 +536,8 @@ class DataMutator:
             if method == "qcut":
                 df[new_column_name] = pd.qcut(df[column], q=bins, labels=labels, duplicates="drop")
             else:
-                df[new_column_name] = pd.cut(df[column], bins=bins, labels=labels, include_lowest=True, right=right_inclusive)
+                df[new_column_name] = pd.cut(df[column], bins=bins, labels=labels, include_lowest=True,
+                                             right=right_inclusive)
 
             if not isinstance(df[new_column_name].dtype, pd.CategoricalDtype):
                 df[new_column_name] = df[new_column_name].astype("category")
@@ -529,7 +551,8 @@ class DataMutator:
             raise
 
     @require_dataframe
-    def run_statistical_test(self, df: pd.DataFrame, test_type: "Union[StatisticalTest, str]", col1: str, col2: str) -> Dict[str, Any]:
+    def run_statistical_test(self, df: pd.DataFrame, test_type: "Union[StatisticalTest, str]", col1: str, col2: str) -> \
+    Dict[str, Any]:
         """
         Run a statistical test on two numerical columns
         Supports T-test, ANOVA and Pearson corr test\n
@@ -603,9 +626,9 @@ class DataMutator:
             raise ValueError(f"Unrecognized test type: {test_type}")
 
         return {
-            "test": test_name,
-            "statistic": float(stat),
-            "p_value": float(p_val),
+            "test"          : test_name,
+            "statistic"     : float(stat),
+            "p_value"       : float(p_val),
             "interpretation": interpretation,
         }
 
@@ -632,34 +655,26 @@ class DataMutator:
                 raise ImportError(
                     "Scipy is not installed. Scipy is required to perform Z-score analysis"
                 )
-            for column in columns:
-                if column in numeric_df.columns:
-                    col_data = df[column]
-                    if isinstance(col_data, pd.DataFrame):
-                        col_data = col_data.iloc[:, 0]
-                    col_data = col_data.dropna()
-                    if col_data.empty:
-                        continue
-                    z_scores = np.abs(stats.zscore(col_data.to_numpy()))
-                    outliers = col_data.index[z_scores > threshold]
-                    outlier_indices.update(outliers)
+            numeric_cols = [col for col in columns if col in df.columns and pd.api.types.is_numeric_dtype(df[col])]
+            if numeric_cols:
+                col_data = df[numeric_cols].dropna()
+                if not col_data.empty:
+                    means = col_data.mean()
+                    stds = col_data.std()
+                    lower_bounds = means - threshold * stds
+                    upper_bounds = means + threshold * stds
+                    df.loc[:, numeric_cols] = df[numeric_cols].clip(lower=lower_bounds, upper=upper_bounds, axis=1)
 
         elif method == "iqr":
             multiplier = kwargs.get("multiplier", 1.5)
-            for column in columns:
-                if column in numeric_df.columns:
-                    col_data = df[column]
-                    if isinstance(col_data, pd.DataFrame):
-                        col_data = col_data.iloc[:, 0]
-                    Q1 = col_data.quantile(0.25)
-                    Q3 = col_data.quantile(0.75)
-                    IQR = Q3 - Q1
-                    lower_bound = Q1 - multiplier * IQR
-                    upper_bound = Q3 + multiplier * IQR
-                    outliers = col_data[
-                        (col_data < lower_bound) | (col_data > upper_bound)
-                    ].index.tolist()
-                    outlier_indices.update(outliers)
+            numeric_cols = [col for col in columns if col in df.columns and pd.api.types.is_numeric_dtype(df[col])]
+            if numeric_cols:
+                Q1 = df[numeric_cols].quantile(0.25)
+                Q3 = df[numeric_cols].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bounds = Q1 - multiplier * IQR
+                upper_bounds = Q3 + multiplier * IQR
+                df.loc[:, numeric_cols] = df[numeric_cols].clip(lower=lower_bounds, upper=upper_bounds, axis=1)
 
         elif method == "isolation_forest":
             contamination = kwargs.get("contamination", 0.1)
@@ -811,19 +826,19 @@ class DataMutator:
 
         try:
             if not (
-                pd.api.types.is_string_dtype(df[column])
-                or pd.api.types.is_object_dtype(df[column])
+                    pd.api.types.is_string_dtype(df[column])
+                    or pd.api.types.is_object_dtype(df[column])
             ):
                 raise TypeError("Column does not support string operations")
 
             op_map = {
-                "lower": df[column].str.lower,
-                "upper": df[column].str.upper,
-                "title": df[column].str.title,
+                "lower"     : df[column].str.lower,
+                "upper"     : df[column].str.upper,
+                "title"     : df[column].str.title,
                 "capitalize": df[column].str.capitalize,
-                "strip": df[column].str.strip,
-                "lstrip": df[column].str.lstrip,
-                "rstrip": df[column].str.rstrip,
+                "strip"     : df[column].str.strip,
+                "lstrip"    : df[column].str.lstrip,
+                "rstrip"    : df[column].str.rstrip,
             }
             if operation not in op_map:
                 raise ValueError(f"Unsupported text operation: {operation}")
@@ -982,24 +997,26 @@ class DataMutator:
 
         if not pd.api.types.is_datetime64_any_dtype(df[column]):
             try:
-                df[column] = pd.to_datetime(df[column], errors="coerce")
-                if df[column].isna().all():
+                date_series = pd.to_datetime(df[column], errors="coerce")
+                if date_series.isna().all():
                     raise ValueError(f"Column '{column}' could not be converted to datetime")
             except Exception as error:
                 raise ValueError(
                     f"Column '{column}' cannot be converted to datetime: {str(error)}"
                 )
+        else:
+            date_series = df[column]
 
         safe_component = component.replace(" ", "_")
         new_col_name = f"{column}_{safe_component}"
         component_map = {
-            "Year": lambda s: s.dt.year.astype("Int64"),
-            "Month": lambda s: s.dt.month.astype("Int64"),
-            "Month Name": lambda s: s.dt.month_name(),
-            "Day": lambda s: s.dt.day.astype("Int64"),
+            "Year"       : lambda s: s.dt.year.astype("Int64"),
+            "Month"      : lambda s: s.dt.month.astype("Int64"),
+            "Month Name" : lambda s: s.dt.month_name(),
+            "Day"        : lambda s: s.dt.day.astype("Int64"),
             "Day of Week": lambda s: s.dt.day_name(),
-            "Quarter": lambda s: s.dt.quarter.astype("Int64"),
-            "Hour": lambda s: s.dt.hour.astype("Int64"),
+            "Quarter"    : lambda s: s.dt.quarter.astype("Int64"),
+            "Hour"       : lambda s: s.dt.hour.astype("Int64"),
         }
         if component not in component_map:
             raise ValueError(f"Unsupported date component: {component}")
@@ -1029,11 +1046,11 @@ class DataMutator:
         new_col = "".join(c if c.isalnum() or c == "_" else "" for c in raw_col)
 
         unit_map = {
-            "Days": lambda s: s.dt.days,
-            "Hours": lambda s: s.dt.total_seconds() / 3600,
+            "Days"   : lambda s: s.dt.days,
+            "Hours"  : lambda s: s.dt.total_seconds() / 3600,
             "Minutes": lambda s: s.dt.total_seconds() / 60,
             "Seconds": lambda s: s.dt.total_seconds(),
-            "Weeks": lambda s: s.dt.days / 7,
+            "Weeks"  : lambda s: s.dt.days / 7,
         }
         if unit not in unit_map:
             raise ValueError(f"Unsupported date difference unit: {unit}")
@@ -1057,7 +1074,8 @@ class DataMutator:
 
         return df, sort_state
 
-    def _reorder_columns(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
+    def _reorder_columns(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[
+        pd.DataFrame, Optional[tuple]]:
         """
         Reorders the columns of the DataFrame
         Validates that no columns are dropped during the reordreing
@@ -1079,7 +1097,8 @@ class DataMutator:
 
         return df, sort_state
 
-    def _drop_empty_columns(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
+    def _drop_empty_columns(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[
+        pd.DataFrame, Optional[tuple]]:
         """Removes columns where all values are missing"""
         cols_to_drop: list[str] = df.columns[df.isna().all()].tolist()
         if cols_to_drop:
@@ -1088,7 +1107,8 @@ class DataMutator:
                 sort_state = None
         return df, sort_state
 
-    def _apply_rolling_window(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
+    def _apply_rolling_window(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[
+        pd.DataFrame, Optional[tuple]]:
         """Applies a rolling window operations to a numeric column
 
         Args:
@@ -1135,7 +1155,8 @@ class DataMutator:
 
         return df, sort_state
 
-    def _apply_shift(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
+    def _apply_shift(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[
+        pd.DataFrame, Optional[tuple]]:
         """Applies a shift operation on a column
 
         Args:
@@ -1163,7 +1184,8 @@ class DataMutator:
 
         return df, sort_state
 
-    def _apply_pct_change(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[pd.DataFrame, Optional[tuple]]:
+    def _apply_pct_change(self, df: pd.DataFrame, sort_state: Optional[tuple], **kwargs) -> tuple[
+        pd.DataFrame, Optional[tuple]]:
         """Calculates the percentage change between the current and a prior element.
 
         Args:
@@ -1192,7 +1214,8 @@ class DataMutator:
         try:
             df[new_column] = df[column].pct_change(periods=periods, fill_method=fill_method)
         except TypeError:
-            temp_col = df[column].ffill() if fill_method in ['pad', 'ffill'] else df[column].bfill() if fill_method in ['backfill', 'bfill'] else df[column]
+            temp_col = df[column].ffill() if fill_method in ['pad', 'ffill'] else df[column].bfill() if fill_method in [
+                'backfill', 'bfill'] else df[column]
             df[new_column] = temp_col.pct_change(periods=periods)
 
         return df, sort_state
