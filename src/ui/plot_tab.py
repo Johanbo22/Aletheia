@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, TYPE_CHECKING
 
 from PyQt6.QtCore import QThreadPool, QTimer, pyqtSignal
+from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import QMessageBox
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -512,11 +513,11 @@ class PlotTab(PlotTabUI):
         self.theme_manager.connect_signals()
         self.color_manager.connect_signals()
 
-    def showEvent(self, event) -> None:
-        """Triggered on tab visibility. Clears selectons from plot"""
+    def showEvent(self, event: QShowEvent) -> None:
+        """Triggered on tab visibility. Clears selectors from plot"""
         super().showEvent(event)
 
-        if getattr(self, "is_data_dirty", False):
+        if getattr(self, "_is_data_dirty", False):
             df = self.get_active_dataframe()
             if df is not None and len(df) <= self.AUTO_UPDATE_THRESHOLD:
                 self.style_update_timer.start()
@@ -767,11 +768,9 @@ class PlotTab(PlotTabUI):
 
         self._is_data_dirty = True
 
-        df = self.get_active_dataframe()
         if df is not None and len(df) <= self.AUTO_UPDATE_THRESHOLD:
             self.style_update_timer.start()
         else:
-            self._is_data_dirty = True
             self.selection_overlay.show_update_required(True)
             self.status_bar.log("Data change detected. Click 'Generate Plot' to update.", LogLevel.INFO)
 

@@ -64,12 +64,13 @@ class AboutDialog(QDialog):
             )
 
         app_info_layout = QVBoxLayout()
-        app_info_layout.setSpacing(2)
+        app_info_layout.setSpacing(8)
+        app_info_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignCenter)
 
         title_label = QLabel(APPLICATION_NAME)
         title_label.setObjectName("aboutTitleLabel")
 
-        version_label = QLabel(f"Version {self.application_version}")
+        version_label = QLabel(f"v{self.application_version}")
         version_label.setObjectName("aboutVersionLabel")
 
         app_info_layout.addWidget(title_label)

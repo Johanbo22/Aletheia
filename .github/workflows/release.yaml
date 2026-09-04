@@ -50,8 +50,12 @@ jobs:
         if: runner.os != 'Windows'
         run: tar -czvf ${{ matrix.artifact_name }} -C dist Aletheia
 
+      - name: Extract Release Notes from CHANGELOG
+        shell: bash
+        run: awk '/^## / { if (p) exit; p=1; next } p' CHANGELOG.md > release_notes.md
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.asset_path }}
-          generate_release_notes: true
+          body_path: release_notes.md

@@ -9,12 +9,12 @@
 }
 
 #aboutVersionLabel {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
     color: #2980b9;
     background-color: rgba(41, 128, 185, 0.1);
-    padding: 4px 10px;
-    border-radius: 10px;
+    padding: 3px 8px;
+    border-radius: 8px;
 }
 
 #aboutSubtitleLabel {

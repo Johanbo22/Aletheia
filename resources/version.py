@@ -7,7 +7,7 @@ APPLICATION_NAME: Final[str] = "Aletheia"
 ORGANIZATION_NAME: Final[str] = f"{APPLICATION_NAME}Studio"
 
 # Application version
-APPLICATION_VERSION = "0.5.1"
+APPLICATION_VERSION = "0.5.2"
 
 # File extension name
 PROJECT_EXTENSION = ".ath"

@@ -4,6 +4,27 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.5.2 [Patch]
+
+### Fixed
+
+- Resolved an issue where saved data subsets disappeared after closing and reopeninga project file
+- Resolved an error preventing custom Python scripts from running inside the code editor
+- Fixed an issue where hue groupings and color palettes were omitted when exporting scripts
+- Fixed a crash when attempting to import an empty Google Sheets document
+- Prevent an issue where creating new aggregations could overwrite original data in memory
+- Fixed an issue where plots failed to update automatically when switching to the PlotStudio tab after modifying data
+- Fixed a layout and size issue with the version label inside the About dialog window.
+- Fixed a bug in the SyntaxHighlighterSettingsDialog where color presets would flicker
+- Fixed a bug where the borders on the Color picker button in the SyntaxHighlighterSettingsDialog had poor contrast when
+  hovered.
+- Fixed a bug with interfacing freezes when moving the cursor across a scatter plot with many points.
+- Fixed a bug where calculating active subplots positions were placed incorrectly.
+- Fixed an issue where clipping outliers failed to execute.
+- Fixed a bug where memory usage did not change when memory was freed
+- Fixed a bug where trying to convert a non-compatible column to DateTime data type would cause that column to become
+  NaN.
+
 ## v.0.5.1 [Patch]
 
 ### Added

@@ -1284,8 +1284,8 @@ class CodeExporter:
             y_cols_raw = [y_cols_raw]
 
         y_cols_raw = [self._clean_value(c) for c in y_cols_raw if c]
-        hue = self._get_cfg(plot_config, "basic.hue_column ")
-        palette = self._get_cfg(plot_config, "appearance.figure.palette ", "deep ")
+        hue = self._get_cfg(plot_config, "basic.hue_column")
+        palette = self._get_cfg(plot_config, "appearance.figure.palette", "deep")
 
         lines = [
             "", 
