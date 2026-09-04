@@ -140,31 +140,35 @@ class BufferManager:
         self._buffers[buffer_id].ref_count += 1
         return self._buffers[buffer_id].data.copy()
 
-    def release(self, buffer_id: str) -> None:
+    def release(self, buffer_id: str) -> int:
         """
         Release a reference to a buffer, freeing memory if the count is zero
 
         :param buffer_id: The identifier of the target buffer
+        :return: Freed bytes count
         """
         if buffer_id not in self._buffers:
-            return
+            return 0
 
         buffer_ref = self._buffers[buffer_id]
         buffer_ref.ref_count -= 1
 
         if buffer_ref.ref_count <= 0:
-            self._total_memory_bytes -= buffer_ref.size_bytes
+            freed_bytes = buffer_ref.size_bytes
+            self._total_memory_bytes -= freed_bytes
             del self._buffers[buffer_id]
+            return freed_bytes
+        return 0
 
     def get_buffer(self, buffer_id: str) -> Optional[np.ndarray]:
         """
         Retrieve the buffer data without modifying its reference count
 
         :param buffer_id: The identifier of the target buffer
-        :return: The NumPy array if found, else None
+        :return: A copy of the NumPy array if found, else None
         """
         if buffer_id in self._buffers:
-            return self._buffers[buffer_id].data
+            return self._buffers[buffer_id].data.copy()
         return None
 
     @property
@@ -302,14 +306,18 @@ class DiffHistoryManager:
         self._notify_memory_usage()
 
     def _free_diff_records(self, records: List[DiffRecord]) -> int:
-        """Release buffer references from diff records."""
-        freed = 0
+        """
+        Release buffer references from diff records.
+        :param records: A list of the DiffRecord
+        :return: Freed bytes that the buffer reference
+        """
+        freed: int = 0
         for record in records:
             for col_diff in record.column_diffs:
                 if col_diff.old_data_ref:
-                    self.buffer_manager.release(col_diff.old_data_ref)
+                    freed += self.buffer_manager.release(col_diff.old_data_ref)
                 if col_diff.new_data_ref:
-                    self.buffer_manager.release(col_diff.new_data_ref)
+                    freed += self.buffer_manager.release(col_diff.new_data_ref)
         return freed
 
     def _get_dropped_column_diffs(self, old_df: pd.DataFrame, dropped_cols: set) -> List[ColumnDiff]:
