@@ -379,6 +379,9 @@ class DataTab(QWidget):
         if hasattr(self, "left_stack"):
             self.left_stack.setCurrentIndex(0)
 
+        if hasattr(self, "landing_page"):
+            self.landing_page.refresh_recent_projects()
+
         if hasattr(self, "right_widget"):
             self.right_widget.setVisible(False)
 

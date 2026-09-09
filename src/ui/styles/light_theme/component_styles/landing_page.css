@@ -55,6 +55,42 @@ QLabel#no_recent_label {
     padding: 10px 0;
 }
 
+QFrame#ProjectCard {
+    background-color: #ffffff;
+    border: 1px solid #dfe6e9;
+    border-radius: 8px;
+}
+
+QFrame#ProjectCard[cardState="hovered"] {
+    background-color: #f8fafc;
+    border: 1px solid #90caf9;
+}
+
+QFrame#ProjectCard:focus {
+    border: 1px solid #2196f3;
+    outline: none;
+}
+
+QLabel#ProjectCardName {
+    font-weight: bold;
+    font-size: 13px;
+    color: #2c3e50;
+    background: transparent;
+}
+
+QLabel#ProjectCardDetail {
+    font-size: 11px;
+    color: #7f8c8d;
+    background: transparent;
+}
+
+QLabel#ProjectCardPath {
+    font-size: 10px;
+    font-style: italic;
+    color: #95a5a6;
+    background: transparent;
+}
+
 QScrollArea#landing_scroll_area {
     background-color: transparent;
     border: none;

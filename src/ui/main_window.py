@@ -353,24 +353,6 @@ class MainWindow(QWidget):
                 )
                 self._remove_recent_project(filepath)
 
-    def _remove_recent_project(self, filepath: str) -> None:
-        """Removes a specific file path from the recent projects list"""
-        settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
-        recent_files = settings.value("recent_files", [])
-
-        if isinstance(recent_files, str):
-            recent_files = [recent_files]
-        elif isinstance(recent_files, tuple):
-            recent_files = list(recent_files)
-        elif isinstance(recent_files, list):
-            recent_files = list(recent_files) if recent_files else []
-
-        standardized_path = str(Path(filepath).absolute())
-
-        if standardized_path in recent_files:
-            recent_files.remove(standardized_path)
-            settings.setValue("recent_files", recent_files)
-
     def _load_project_from_path(self, filepath: str) -> None:
         """Helper method to load project data and handle animations."""
         try:

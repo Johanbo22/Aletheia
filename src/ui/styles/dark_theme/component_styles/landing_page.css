@@ -55,6 +55,42 @@ QScrollArea#landing_scroll_area {
     border: none;
 }
 
+QFrame#ProjectCard {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+}
+
+QFrame#ProjectCard[cardState="hovered"] {
+    background-color: #253449;
+    border: 1px solid #3b82f6;
+}
+
+QFrame#ProjectCard:focus {
+    border: 1px solid #60a5fa;
+    outline: none;
+}
+
+QLabel#ProjectCardName {
+    font-weight: bold;
+    font-size: 13px;
+    color: #f1f5f9;
+    background: transparent;
+}
+
+QLabel#ProjectCardDetail {
+    font-size: 11px;
+    color: #94a3b8;
+    background: transparent;
+}
+
+QLabel#ProjectCardPath {
+    font-size: 10px;
+    font-style: italic;
+    color: #64748b;
+    background: transparent;
+}
+
 QScrollArea#landing_scroll_area QScrollBar:vertical {
     border: none;
     background: transparent;

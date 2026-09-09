@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.core.data_handler import DataHandler
+from src.core.project_file_info import ProjectFileMetadata, gather_project_file_metadata
 
 if TYPE_CHECKING:
     from src.core.project_manager import ProjectManager
@@ -35,7 +36,6 @@ class AutosaveWorker(QRunnable):
         except Exception as err:
             self.signals.error.emit(err)
 
-
 class WorkerSignals(QObject):
     """
     Defines the signal from a running worker thread
@@ -63,6 +63,7 @@ class FileReaderWorker(QRunnable):
     """
     Worker thread to handle synchronous file reading
     """
+
     def __init__(self, data_handler: DataHandler, file_path: str) -> None:
         super().__init__()
         self.data_handler = data_handler
@@ -78,7 +79,9 @@ class FileReaderWorker(QRunnable):
 
 class AggregationWorker(QRunnable):
     """Worker for performing data aggregation"""
-    def __init__(self, data_handler: DataHandler, group_by: list[str], agg_config: dict[str, str], date_grouping: dict[str, str], rename_mapping: dict[str, str] | None = None) -> None:
+
+    def __init__(self, data_handler: DataHandler, group_by: list[str], agg_config: dict[str, str],
+                 date_grouping: dict[str, str], rename_mapping: dict[str, str] | None = None) -> None:
         super().__init__()
         self.data_handler = data_handler
         self.group_by = group_by
@@ -86,14 +89,16 @@ class AggregationWorker(QRunnable):
         self.date_grouping = date_grouping
         self.rename_mapping = rename_mapping
         self.signals = WorkerSignals()
-    
+
     @pyqtSlot()
     def run(self):
         try:
             self.signals.progress.emit(10, "Preparing Aggregation...")
             self.signals.log.emit(f"Starting background aggregation task with {len(self.group_by)} groups...")
-            result_df = self.data_handler.aggregate_data(group_by=self.group_by, agg_config=self.agg_config, date_grouping=self.date_grouping, rename_mapping=self.rename_mapping)
-            
+            result_df = self.data_handler.aggregate_data(group_by=self.group_by, agg_config=self.agg_config,
+                                                         date_grouping=self.date_grouping,
+                                                         rename_mapping=self.rename_mapping)
+
             self.signals.progress.emit(100, "Aggregation complete")
             self.signals.log.emit("Background aggregation task completed successfully.")
             self.signals.finished.emit(result_df)
@@ -103,18 +108,18 @@ class AggregationWorker(QRunnable):
 
 class FilterWorker(QRunnable):
     """Worker for applying filters"""
-    
+
     def __init__(self, data_handler: DataHandler, filter_config: dict):
         super().__init__()
         self.data_handler = data_handler
         self.filter_config = filter_config
         self.signals = WorkerSignals()
-    
+
     @pyqtSlot()
     def run(self):
         try:
             self.signals.progress.emit(10, "Applying filters...")
-            
+
             result_df = self.data_handler.apply_filter(self.filter_config)
             self.signals.progress.emit(100, "Filtering complete")
             self.signals.finished.emit(result_df)
@@ -141,10 +146,11 @@ class FileImportWorker(QRunnable):
         except Exception as RunError:
             self.signals.error.emit(RunError)
 
-
 class GoogleSheetsImportWorker(QRunnable):
     """Worker thread for imports using Google Sheets"""
-    def __init__(self, data_handler: DataHandler, sheet_id: str, sheet_name: str, delimiter: str, decimal: str, thousands: str, gid: str = None):
+
+    def __init__(self, data_handler: DataHandler, sheet_id: str, sheet_name: str, delimiter: str, decimal: str,
+                 thousands: str, gid: str = None):
         super().__init__()
         self.data_handler = data_handler
         self.sheet_id = sheet_id
@@ -180,7 +186,7 @@ class TestConnectionWorker(QRunnable):
         super().__init__()
         self.connection_string = connection_string
         self.signals = WorkerSignals()
-    
+
     @pyqtSlot()
     def run(self):
         try:
@@ -188,7 +194,7 @@ class TestConnectionWorker(QRunnable):
             engine = create_engine(self.connection_string)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-            
+
             self.signals.progress.emit(100, "Connection Successful")
             self.signals.finished.emit(True)
         except Exception as ConnectionError:
@@ -201,11 +207,12 @@ class FetchSchemaWorkerSignals(QObject):
 
 class FetchSchemaWorker(QRunnable):
     """Worker thread to fetch database schema asynch"""
+
     def __init__(self, connection_string: str) -> None:
         super().__init__()
         self.connection_string = connection_string
         self.signals = FetchSchemaWorkerSignals()
-    
+
     def run(self) -> None:
         engine = None
         try:
@@ -213,7 +220,7 @@ class FetchSchemaWorker(QRunnable):
             inspector = inspect(engine)
             table_names = inspector.get_table_names()
             schema_data = []
-            
+
             for table in table_names:
                 columns = []
                 try:
@@ -227,7 +234,7 @@ class FetchSchemaWorker(QRunnable):
                         except SQLAlchemyError as FallbackError:
                             print(f"Fallback inspection failed for {table}: {FallbackError}")
                 schema_data.append({"table": table, "columns": columns})
-            
+
             self.signals.finished.emit(schema_data)
         except Exception as err:
             self.signals.error.emit(err)
@@ -237,32 +244,32 @@ class FetchSchemaWorker(QRunnable):
 
 class AutoCreateSubsetsWorker(QRunnable):
     """Worker thread for auto-creating and applying subsets"""
-    
+
     def __init__(self, subset_manager: "SubsetManager", df, column: str):
         super().__init__()
         self.subset_manager = subset_manager
         self.df = df
         self.column = column
         self.signals = WorkerSignals()
-    
+
     @pyqtSlot()
     def run(self):
         try:
             self.signals.progress.emit(10, f"Auto-creating subsets")
             created = self.subset_manager.create_subset_from_unique_values(self.df, self.column)
-            
+
             total = len(created)
             if total == 0:
                 self.signals.progress.emit(100, "No new subsets created.")
                 self.signals.finished.emit(created)
                 return
-            
+
             for i, name in enumerate(created):
                 progress = 10 + int((i / total) * 85)
-                self.signals.progress.emit(progress, f"Applying subset {i+1} of {total}: {name}...")
-                
+                self.signals.progress.emit(progress, f"Applying subset {i + 1} of {total}: {name}...")
+
                 self.subset_manager.apply_subset(self.df, name)
-            
+
             self.signals.progress.emit(100, "Finalizing...")
             self.signals.finished.emit(created)
         except Exception as Error:
@@ -277,7 +284,7 @@ class PlotDataPrepWorker(QRunnable):
         self.y_cols = y_cols
         self.quick_filter = quick_filter
         self.signals = WorkerSignals()
-        
+
     def _is_datetime_column(self, data: pd.Series) -> bool:
         if pd.api.types.is_datetime64_any_dtype(data):
             return True
@@ -299,27 +306,29 @@ class PlotDataPrepWorker(QRunnable):
                     return False
             return True
         return False
-    
+
     @pyqtSlot()
     def run(self):
         try:
             self.signals.progress.emit(10, "Copying data...")
             processed_df = self.df.copy()
-            
+
             if self.quick_filter:
                 self.signals.progress.emit(20, f"Applying quick filter: {self.quick_filter}...")
                 processed_df = processed_df.query(self.quick_filter)
                 if processed_df.empty:
                     raise ValueError(f"The filter '{self.quick_filter}' returned an empty dataset")
-            
+
             self.signals.progress.emit(50, "Sampling data...")
             MAX_PLOT_POINTS = 500_000
-            PLOTS_TO_SAMPLE = ["Scatter", "Line", "2D Density", "Hexbin", "Stem", "Stairs", "Eventplot", "ECDF", "2D Histogram", "Tricontour", "Tricontourf", "Tripcolor", "Triplot"]
+            PLOTS_TO_SAMPLE = ["Scatter", "Line", "2D Density", "Hexbin", "Stem", "Stairs", "Eventplot", "ECDF",
+                               "2D Histogram", "Tricontour", "Tricontourf", "Tripcolor", "Triplot"]
 
             if len(processed_df) > MAX_PLOT_POINTS and self.plot_type in PLOTS_TO_SAMPLE:
-                self.signals.log.emit(f"Dataset is too large ({len(processed_df)} rows) for '{self.plot_type}'. Plotting a random sample of {MAX_PLOT_POINTS:,} points.")
+                self.signals.log.emit(
+                    f"Dataset is too large ({len(processed_df)} rows) for '{self.plot_type}'. Plotting a random sample of {MAX_PLOT_POINTS:,} points.")
                 processed_df = processed_df.sample(n=MAX_PLOT_POINTS, random_state=42).sort_index()
-            
+
             self.signals.progress.emit(75, "Converting datetime columns...")
             if self.x_col and self.x_col in processed_df.columns:
                 if self._is_datetime_column(processed_df[self.x_col]):
@@ -338,21 +347,43 @@ class PlotDataPrepWorker(QRunnable):
         except Exception as e:
             self.signals.error.emit(e)
 
+class ProjectMetadataWorkerSignals(QObject):
+    # Gives the file_path, ProjectFileMetadata
+    finished = pyqtSignal(str, object)
+
+class ProjectMetadataWorker(QRunnable):
+    """
+    Worker thread to gather recent project preview metadata
+    """
+
+    def __init__(self, file_path: str) -> None:
+        super().__init__()
+        self.file_path = file_path
+        self.signals = ProjectMetadataWorkerSignals()
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            metadata: ProjectFileMetadata = gather_project_file_metadata(self.file_path)
+        except Exception as MetadataError:
+            metadata = ProjectFileMetadata(size_bytes=0, modified_timestamp=0.0, error=str(MetadataError))
+        self.signals.finished.emit(self.file_path, metadata)
+
 class SearchWorker(QThread):
     finished_search = pyqtSignal(object, int)
-    
+
     def __init__(self, df, search_text, token, parent=None) -> None:
         super().__init__(parent)
         self.df = df
         self.search_text = search_text
         self.token = token
-    
+
     def run(self) -> None:
         matches = []
         if self.df is None or self.df.empty or not self.search_text:
             self.finished_search.emit(matches, self.token)
             return
-        
+
         search_text_lower = str(self.search_text).lower()
         try:
             for col_index in range(self.df.shape[1]):
