@@ -25,32 +25,33 @@ class ToastManager(QObject):
         self._parent_widget = parent_widget
         self._active_toasts: List[ToastNotification] = []
         self._event_filters_installed = set()
-
-        self._install_filter_on_window()
         self._logger = logging.getLogger(__name__)
 
-    def _install_filter_on_window(self) -> None:
-        if self._parent_widget not in self._event_filters_installed:
-            self._parent_widget.installEventFilter(self)
-            self._event_filters_installed.add(self._parent_widget)
+        self._install_filter_on_window()
 
+    def _install_filter_on_window(self) -> None:
         try:
+            if self._parent_widget not in self._event_filters_installed:
+                self._parent_widget.installEventFilter(self)
+                self._event_filters_installed.add(self._parent_widget)
+
             top_level = self._parent_widget.window()
             if top_level and top_level not in self._event_filters_installed:
                 top_level.installEventFilter(self)
                 self._event_filters_installed.add(top_level)
-        except RuntimeError:
-            pass
+        except RuntimeError as err:
+            self._logger.debug("Failed to install event filter: %s", err)
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """Intercepts parent widget resize events to reposition the toasts"""
         try:
             top_level_window = self._parent_widget.window()
-            if event.type() == QEvent.Type.Resize and (obj is self._parent_widget or obj is top_level_window):
+            if event.type() == QEvent.Type.Resize and obj in (self._parent_widget, top_level_window):
                 self._reposition_toasts(animate=False)
-            return super().eventFilter(obj, event)
         except RuntimeError:
             return False
+
+        return super().eventFilter(obj, event)
 
     def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
                    duration_ms: int = 4000) -> None:
@@ -77,6 +78,7 @@ class ToastManager(QObject):
 
         toast.dismissing.connect(self._handle_toast_dismissing)
 
+        self._clean_dead_toasts()
         self._active_toasts.append(toast)
 
         target_pos = self._calculate_toast_position(toast)
@@ -88,8 +90,8 @@ class ToastManager(QObject):
         try:
             if toast in self._active_toasts:
                 self._active_toasts.remove(toast)
-        except RuntimeError:
-            pass
+        except RuntimeError as err:
+            self._logger.debug("Error removing dismissed toasts: %s", err)
         self._reposition_toasts(animate=True)
 
     def _clean_dead_toasts(self) -> None:
@@ -105,15 +107,27 @@ class ToastManager(QObject):
     def _reposition_toasts(self, animate: bool = True) -> None:
         """Recalculates the positions for all active toasts and translate their positon"""
         self._clean_dead_toasts()
+
+        try:
+            top_level_window: QWidget = self._parent_widget.window()
+            window_rect = top_level_window.rect()
+        except RuntimeError:
+            return
+
+        target_x = window_rect.width() - self.TOAST_WIDTH - self.MARGIN_X
+        target_y = self.MARGIN_Y
+
         for toast in self._active_toasts:
             try:
-                target_pos = self._calculate_toast_position(toast)
+                target_pos = QPoint(target_x, target_y)
                 if animate:
                     toast.animate_to_position(target_pos)
                 else:
                     toast.move(target_pos)
+
+                target_y += toast.height() + self.SPACING_Y
             except RuntimeError:
-                pass
+                continue
 
     def _calculate_toast_position(self, target_toast: ToastNotification) -> QPoint:
         """

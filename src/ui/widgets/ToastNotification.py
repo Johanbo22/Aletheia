@@ -7,12 +7,14 @@ require user interaction, for messages that do require user interaction assign Q
 The widget consists of the following properties:
 TODO
 """
+import logging
+
 from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QEnterEvent, QIcon
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QSizePolicy, QStyle, QVBoxLayout, QWidget
 
-from src.core.global_signals import ToastLevel
 from icons import IconBuilder, IconType
+from src.core.global_signals import ToastLevel
 
 class ToastNotification(QWidget):
     """
@@ -31,10 +33,12 @@ class ToastNotification(QWidget):
 
     ANIMATION_DURATION_MS: int = 300
     PROGRESS_UPDATE_INTERVAL_MS: int = 10
+    DISMISS_OFFSET_X: int = 20
 
     def __init__(self, parent: QWidget, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
                  duration_ms: int = 3000) -> None:
         super().__init__(parent)
+        self._logger = logging.getLogger(__name__)
         self._title: str = title
         self._message: str = message
         self._level: ToastLevel = level
@@ -138,15 +142,24 @@ class ToastNotification(QWidget):
 
         pixmap_map = {
             ToastLevel.WARNING: QStyle.StandardPixmap.SP_MessageBoxWarning,
-            ToastLevel.ERROR: QStyle.StandardPixmap.SP_MessageBoxCritical,
+            ToastLevel.ERROR  : QStyle.StandardPixmap.SP_MessageBoxCritical,
         }
         standard_pixmap = pixmap_map.get(self._level, QStyle.StandardPixmap.SP_MessageBoxInformation)
         return self.style().standardIcon(standard_pixmap)
 
     def _update_progress(self) -> None:
         """Updates the visual progress bar and triggers dismissal when the timer expires"""
+        if self._is_dismissing:
+            return
+
         self._time_left_ms -= self.PROGRESS_UPDATE_INTERVAL_MS
-        self._progress_bar.setValue(self._time_left_ms)
+
+        try:
+            self._progress_bar.setValue(self._time_left_ms)
+        except RuntimeError as err:
+            self._logger.debug("Failed to update progress bar, widget deleted: %s", err)
+            self._timer.stop()
+            return
 
         if self._time_left_ms <= 0:
             self._timer.stop()
@@ -154,14 +167,21 @@ class ToastNotification(QWidget):
 
     def enterEvent(self, event: QEnterEvent) -> None:
         """Pauses the auto-dismiss timer when the hover enter event is triggered"""
-        if not self._is_dismissing:
-            self._timer.stop()
+        try:
+            if not self._is_dismissing:
+                self._timer.stop()
+        except RuntimeError as err:
+            self._logger.debug("Runtime error on enterEvent: %s", err)
         super().enterEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:
         """Resumes to the auto-dismiss timer when the cursor leaves the widget and triggers the leaveEvent"""
-        if not self._is_dismissing and self._time_left_ms > 0:
-            self._timer.start()
+        try:
+            if not self._is_dismissing and self._time_left_ms > 0:
+                self._timer.start()
+        except RuntimeError as e:
+            self._logger.debug("Runtime error on leaveEvent: %s", e)
+
         super().leaveEvent(event)
 
     def start_entry_animation(self, target_pos: QPoint, start_offset_x: int) -> None:
@@ -171,52 +191,67 @@ class ToastNotification(QWidget):
         :param target_pos: The final position of the toast
         :param start_offset_x: How far to the right the toast should start off-screen
         """
-        start_pos = QPoint(target_pos.x() + start_offset_x, target_pos.y())
-        self.move(start_pos)
-        self.show()
-        self.raise_()
+        try:
+            start_pos = QPoint(target_pos.x() + start_offset_x, target_pos.y())
+            self.move(start_pos)
+            self.show()
+            self.raise_()
 
-        self._slide_animation.stop()
-        self._slide_animation.setStartValue(start_pos)
-        self._slide_animation.setEndValue(target_pos)
-        self._slide_animation.setEasingCurve(QEasingCurve.Type.OutQuart)
-        self._slide_animation.start()
+            self._slide_animation.stop()
+            self._slide_animation.setStartValue(start_pos)
+            self._slide_animation.setEndValue(target_pos)
+            self._slide_animation.setEasingCurve(QEasingCurve.Type.OutQuart)
+            self._slide_animation.start()
 
-        self._timer.start()
+            self._timer.start()
+        except RuntimeError as e:
+            self._logger.debug("Entry animation failed, widget deleted: %s", e)
 
     def animate_to_position(self, target_pos: QPoint) -> None:
         """
         Translates the toast to a new position
         used when a toast above is closed
         """
-        self.raise_()
-        self._slide_animation.stop()
-        self._slide_animation.setStartValue(self.pos())
-        self._slide_animation.setEndValue(target_pos)
-        self._slide_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
-        self._slide_animation.start()
+        try:
+            self.raise_()
+            self._slide_animation.stop()
+            self._slide_animation.setStartValue(self.pos())
+            self._slide_animation.setEndValue(target_pos)
+            self._slide_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+            self._slide_animation.start()
+        except RuntimeError as e:
+            self._logger.debug("Position animation failed: %s", e)
 
     def dismiss(self) -> None:
         """Initiates the exit animation and preparest the toast for destruction"""
+        if self._is_dismissing:
+            return
+
+        self._is_dismissing = True
         self._timer.stop()
-        self._close_button.setEnabled(False)
-
-        current_pos = self.pos()
-        target_pos = QPoint(current_pos.x() + self.width() + 20, current_pos.y())
-
-        self._slide_animation.stop()
+        self.dismissing.emit(self)
 
         try:
-            self._slide_animation.finished.disconnect()
-        except TypeError:
-            pass
+            self._close_button.setEnabled(False)
+            current_pos = self.pos()
+            target_pos = QPoint(current_pos.x() + self.width() + self.DISMISS_OFFSET_X, current_pos.y())
 
-        self._slide_animation.setStartValue(current_pos)
-        self._slide_animation.setEndValue(target_pos)
-        self._slide_animation.setEasingCurve(QEasingCurve.Type.InBack)
+            self._slide_animation.stop()
 
-        self._slide_animation.finished.connect(self._on_dismiss_finished)
-        self._slide_animation.start()
+            try:
+                self._slide_animation.finished.disconnect()
+            except TypeError as e:
+                self._logger.debug("No finished signal connected: %s", e)
+
+            self._slide_animation.setStartValue(current_pos)
+            self._slide_animation.setEndValue(target_pos)
+            self._slide_animation.setEasingCurve(QEasingCurve.Type.InBack)
+
+            self._slide_animation.finished.connect(self._on_dismiss_finished)
+            self._slide_animation.start()
+        except RuntimeError as e:
+            self._logger.debug("Dismiss animation failed, cleaning up: %s", e)
+            self._on_dismiss_finished()
 
     def _on_dismiss_finished(self) -> None:
         """Cleans up the widget at animation finish"""
