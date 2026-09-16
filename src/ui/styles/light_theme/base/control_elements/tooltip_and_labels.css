@@ -8,13 +8,12 @@ The QLabel styling here is the general styling of a plain QLabel without any Obj
 */
 
 QToolTip {
-    background-color: #2b2b2b;
-    color: #fdfdfd;
-    border: 1px solid #1a1a1a;
-    border-radius: 4px;
-    padding: 4px 8px;
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 10px;
     font-size: 10pt;
-    opacity: 230;
 }
 
 QLabel {
