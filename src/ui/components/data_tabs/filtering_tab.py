@@ -1,56 +1,62 @@
 from typing import Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel, QLineEdit, QVBoxLayout
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QFrame, QGroupBox, QLabel, QLineEdit, QVBoxLayout
 
 from icons import IconType
 from src.ui.components.data_tabs.base_data_tab import BaseDataTab
 
 if TYPE_CHECKING:
     from src.controller.data_tab_controller import DataTabController
-    
+
 class FilteringTab(BaseDataTab):
     def __init__(self, parent=None, controller: Optional["DataTabController"] = None) -> None:
         super().__init__(parent, controller)
         self.init_ui()
-    
+
     def init_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        
-        filter_info = QLabel("Filter your dataset by defining criteria. Use the Quick Filter for single conditions, or the Advanced Filter for complex, multi-conditional queries.")
+        layout = self.setup_scrollable_layout()
+        layout.setSpacing(16)
+
+        filter_info = QLabel(
+            "Filter your dataset by defining criteria. Use the Quick Filter for single conditions, or the Advanced Filter for complex, multi-conditional queries.")
         filter_info.setWordWrap(True)
         filter_info.setProperty("styleClass", "info_text")
         layout.addWidget(filter_info)
-        layout.addSpacing(10)
 
         self.filter_status_label = QLabel("Status: No active filters")
         self.filter_status_label.setWordWrap(True)
         self.filter_status_label.setProperty("styleClass", "status_indicator_inactive")
         layout.addWidget(self.filter_status_label)
-        layout.addSpacing(10)
-        
+
         quick_filter_group = QGroupBox("Quick Filter")
         quick_filter_layout = QVBoxLayout(quick_filter_group)
-        quick_filter_layout.setSpacing(12)
-        
+
         form_layout = QFormLayout()
-        
+
         self.filter_column = QComboBox()
         self.filter_column.setToolTip("Select the column you wish to apply a filter to")
         form_layout.addRow(QLabel("Column:"), self.filter_column)
-        
+
         self.filter_condition = QComboBox()
-        self.filter_condition.addItems(["==", "!=", ">", "<", ">=", "<=", "contains"])
-        self.filter_condition.setToolTip("Select which conditional to apply to column. N.B. Uses Python Syntax")
+        self.filter_condition.addItem("Equals", "==")
+        self.filter_condition.addItem("Does not equal", "!=")
+        self.filter_condition.addItem("Greater than", ">")
+        self.filter_condition.addItem("Less than", "<")
+        self.filter_condition.addItem("Greater than or equal", ">=")
+        self.filter_condition.addItem("Less than or equal", "<=")
+        self.filter_condition.addItem("Contains", "contains")
+        self.filter_condition.setToolTip("Select the conditional operation to apply to the column.")
         form_layout.addRow(QLabel("Condition:"), self.filter_condition)
-        
+
         self.filter_value = QLineEdit()
         self.filter_value.setPlaceholderText("Enter evaluation value...")
         self.filter_value.setClearButtonEnabled(True)
-        self.filter_value.setToolTip("Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
+        self.filter_value.setToolTip(
+            "Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
         form_layout.addRow(QLabel("Value:"), self.filter_value)
-        
+
         quick_filter_layout.addLayout(form_layout)
-        
+
         quick_filter_layout.addLayout(self._create_operation_row(
             title="Apply Filter",
             tooltip="Apply the configured filter",
@@ -58,7 +64,7 @@ class FilteringTab(BaseDataTab):
             help_id="apply_filter",
             icon_type=IconType.Filter
         ))
-        
+
         quick_filter_layout.addLayout(self._create_operation_row(
             title="Clear Filters",
             tooltip="Reset the dataset to its original state and remove the filters",
@@ -67,11 +73,17 @@ class FilteringTab(BaseDataTab):
             icon_type=IconType.ClearFilter
         ))
         layout.addWidget(quick_filter_group)
-        
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setObjectName("landing_vertical_separator")
+        layout.addWidget(separator)
+
         advanced_filter_group = QGroupBox("Advanced Filter")
         advanced_filter_layout = QVBoxLayout(advanced_filter_group)
         advanced_filter_layout.setSpacing(12)
-        
+
         advanced_filter_layout.addLayout(self._create_operation_row(
             title="Advanced Filter",
             tooltip="Open the advanced multi-conditional filter to build more complex filters",
@@ -80,15 +92,15 @@ class FilteringTab(BaseDataTab):
             icon_type=IconType.AdvancedFilter
         ))
         layout.addWidget(advanced_filter_group)
-        
+
         layout.addStretch()
 
         self.apply_destructive_styling_tags(["clear_filters"])
-    
+
     def get_filter_parameters(self) -> tuple[str, str, str]:
         return (
             self.filter_column.currentText(),
-            self.filter_condition.currentText(),
+            self.filter_condition.currentData(),
             self.filter_value.text()
         )
 
