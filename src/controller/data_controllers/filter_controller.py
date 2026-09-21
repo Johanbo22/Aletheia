@@ -39,6 +39,7 @@ class FilterController(BaseDataController):
                 except ValueError:
                     pass
 
+            self.update_filter_preview_live()
             before = len(self.data_handler.df)
             self.data_handler.filter_data(column, condition, value)
             after = len(self.data_handler.df)
@@ -73,7 +74,32 @@ class FilterController(BaseDataController):
             return
 
         reset_callback()
+        self.view.operations_panel.filtering_tab.clear_filter_preview()
         self.status_bar.log("Filters cleared and data reset to original state", LogLevel.INFO)
+
+    def update_filter_preview_live(self) -> None:
+        if self.data_handler.df is None:
+            return
+
+        try:
+            column, condition, value = self.view.operations_panel.get_filter_parameters()
+
+            if not column or not condition:
+                self.view.operations_panel.filtering_tab.clear_filter_preview()
+                return
+
+            total_count = len(self.data_handler.df)
+            filtered_df = self.data_handler._mutator.filter_data(
+                self.data_handler.df.copy(deep=False),
+                column=column,
+                condition=condition,
+                value=value
+            )
+            filtered_count = len(filtered_df)
+
+            self.view.operations_panel.filtering_tab.update_filter_preview(filtered_count, total_count)
+        except (ValueError, TypeError, KeyError):
+            self.view.operations_panel.filtering_tab.clear_filter_preview()
 
     def open_advanced_filter(self) -> None:
         """Open the advanced filter dialog to apply complex/multiple conditions."""
@@ -90,6 +116,14 @@ class FilterController(BaseDataController):
                 return
 
             try:
+                total_count = len(self.data_handler.df)
+                filtered_df = self.data_handler._mutator.filter_data(
+                    self.data_handler.df.copy(deep=False),
+                    advanced_filters=filters
+                )
+                filtered_count = len(filtered_df)
+                self.view.operations_panel.filtering_tab.update_filter_preview(filtered_count, total_count)
+
                 self.data_handler.filter_data(advanced_filters=filters)
 
                 formatted_parts = []

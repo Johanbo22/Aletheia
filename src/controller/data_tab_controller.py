@@ -121,6 +121,10 @@ class DataTabController:
         """Apply filter to data"""
         self.filter_controller.apply_filter()
 
+    def update_filter_preview_live(self) -> None:
+        """Updates the filter preview label as the parameters are given"""
+        self.filter_controller.update_filter_preview_live()
+
     def clear_filters(self):
         """Clear filters by resetting the data to original state"""
         self.filter_controller.clear_filters(reset_callback=self.history_controller.reset_data)

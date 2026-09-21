@@ -43,3 +43,12 @@ QLabel[styleClass="status_indicator_active"]{
     padding: 6px;
     font-weight: bold;
 }
+QLabel[styleClass="filter_preview_label"] {
+    color: #61afef;
+    background-color: rgba(97, 175, 239, 0.1);
+    border: 1px dashed rgba(97, 175, 239, 0.4);
+    border-radius: 4px;
+    padding: 8px;
+    font-weight: 500;
+    font-size: 10pt;
+}
