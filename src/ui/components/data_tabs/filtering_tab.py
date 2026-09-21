@@ -55,6 +55,12 @@ class FilteringTab(BaseDataTab):
             "Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
         form_layout.addRow(QLabel("Value:"), self.filter_value)
 
+        self.filter_preview_label = QLabel("")
+        self.filter_preview_label.setWordWrap(True)
+        self.filter_preview_label.setProperty("styleClass", "filter_preview_label")
+        self.filter_preview_label.setVisible(False)
+        form_layout.addRow("", self.filter_preview_label)
+
         quick_filter_layout.addLayout(form_layout)
 
         quick_filter_layout.addLayout(self._create_operation_row(
@@ -96,6 +102,9 @@ class FilteringTab(BaseDataTab):
         layout.addStretch()
 
         self.apply_destructive_styling_tags(["clear_filters"])
+        self.filter_column.currentTextChanged.connect(self.controller.update_filter_preview_live)
+        self.filter_condition.currentTextChanged.connect(self.controller.update_filter_preview_live)
+        self.filter_value.textChanged.connect(self.controller.update_filter_preview_live)
 
     def get_filter_parameters(self) -> tuple[str, str, str]:
         return (
@@ -120,3 +129,26 @@ class FilteringTab(BaseDataTab):
 
         self.filter_status_label.style().unpolish(self.filter_status_label)
         self.filter_status_label.style().polish(self.filter_status_label)
+
+    def update_filter_preview(self, filtered_count: int, total_count: int) -> None:
+        """
+        Updates the filter preview label to show how many rows would be affected by the current filter
+        :param filtered_count: Number of rows that match the filter criteria
+        :param total_count: The total number of rows in the dataset
+        """
+        if filtered_count == total_count or filtered_count == 0:
+            self.filter_preview_label.setVisible(False)
+            return
+
+        percentage = (filtered_count / total_count * 100) if total_count > 0 else 0
+        preview_text = f"This will filter to {filtered_count:,} rows ({percentage:.0f}% of the data)"
+        self.filter_preview_label.setText(preview_text)
+        self.filter_preview_label.setVisible(True)
+
+        self.filter_preview_label.style().unpolish(self.filter_preview_label)
+        self.filter_preview_label.style().polish(self.filter_preview_label)
+
+    def clear_filter_preview(self) -> None:
+        """Clears and hides the filter preview label"""
+        self.filter_preview_label.setText("")
+        self.filter_preview_label.setVisible(False)
