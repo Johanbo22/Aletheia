@@ -1,5 +1,7 @@
 from typing import Callable
 
+from PyQt6.QtCore import QTimer
+
 from src.controller.data_controllers.base_data_controller import BaseDataController
 from src.core.global_signals import global_signals
 from src.ui.dialogs import FilterAdvancedDialog
@@ -13,6 +15,14 @@ class FilterController(BaseDataController):
     Manages the quick filter operation and the opening of the
     advanced filter dialog window. Also handles the clearing of active filters
     """
+
+    def __init__(self, data_handler, status_bar, view, subset_manager=None) ->None:
+        super().__init__(data_handler, status_bar, view, subset_manager)
+        self._preview_timer = QTimer(self.view)
+        self._preview_timer.setSingleShot(True)
+        timer_interval: int = 300
+        self._preview_timer.setInterval(timer_interval)
+        self._preview_timer.timeout.connect(self._execute_filter_preview)
 
     def apply_filter(self) -> None:
         """Apply a quick single-condition filter to the data."""
@@ -81,21 +91,28 @@ class FilterController(BaseDataController):
         if self.data_handler.df is None:
             return
 
+        self._preview_timer.start()
+
+    def _execute_filter_preview(self) -> None:
+        """Calculate and display the impact of the current filter on the dataset"""
+        if self.data_handler.df is None:
+            return
+
         try:
-            column, condition, value = self.view.operations_panel.get_filter_parameters()
+            column, condition, value = self.view.operations_panel.filtering_tab.get_filter_parameters()
 
             if not column or not condition:
                 self.view.operations_panel.filtering_tab.clear_filter_preview()
                 return
 
-            total_count = len(self.data_handler.df)
+            total_count: int = len(self.data_handler.df)
             filtered_df = self.data_handler._mutator.filter_data(
                 self.data_handler.df.copy(deep=False),
                 column=column,
                 condition=condition,
                 value=value
             )
-            filtered_count = len(filtered_df)
+            filtered_count: int = len(filtered_df)
 
             self.view.operations_panel.filtering_tab.update_filter_preview(filtered_count, total_count)
         except (ValueError, TypeError, KeyError):

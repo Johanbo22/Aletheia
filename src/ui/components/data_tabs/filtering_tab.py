@@ -59,7 +59,7 @@ class FilteringTab(BaseDataTab):
         self.filter_preview_label.setWordWrap(True)
         self.filter_preview_label.setProperty("styleClass", "filter_preview_label")
         self.filter_preview_label.setVisible(False)
-        form_layout.addRow("", self.filter_preview_label)
+        form_layout.addRow(self.filter_preview_label)
 
         quick_filter_layout.addLayout(form_layout)
 
