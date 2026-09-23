@@ -1,5 +1,6 @@
 from typing import List, Optional, TYPE_CHECKING
 
+import pandas as pd
 from PyQt6.QtWidgets import QComboBox, QListWidget
 
 if TYPE_CHECKING:
@@ -168,3 +169,120 @@ class DataSelectionManager:
         if hasattr(self.view, "secondary_zorder_check"):
             self.view.secondary_zorder_check.setEnabled(is_enabled)
         self.type_manager.update_customization_visibility(self.plot_tab.current_plot_type_name)
+
+    def adapt_selection_for_plot_type(self, plot_type: str) -> None:
+        """
+        Adapt column selection to satisfy requirements of the chosen plot type
+
+        This method inspects the active DataFrame s dtypes and reassigns if the current
+        selections does not match target plots data types
+
+        :param plot_type: The name identifier of the target plot
+        """
+        df = self.data_handler.df
+        if df is None or df.empty:
+            return
+
+        numeric_cols: list[str] = [col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])]
+        all_cols: list[str] = list(df.columns)
+        if not all_cols:
+            return
+
+        self._block_column_signals(True)
+        try:
+            self._adjust_columns_for_target_type(plot_type, df, numeric_cols, all_cols)
+        finally:
+            self._block_column_signals(False)
+
+    def _block_column_signals(self, block: bool) -> None:
+        """Block or unblock the x/y/z axis selection widgets"""
+        self.view.x_column.blockSignals(block)
+        self.view.y_column.blockSignals(block)
+        self.view.z_column.blockSignals(block)
+        self.view.y_columns_list.blockSignals(block)
+        self.view.multi_y_check.blockSignals(block)
+
+    def _adjust_columns_for_target_type(self, plot_type: str, df: pd.DataFrame, numeric_cols: list[str],
+                                        all_cols: list[str]) -> None:
+        plots_3d = {"3D Scatter", "3D Line", "3D Surface"}
+        plots_gridded = {"Image Show (imshow)", "pcolormesh", "PColormesh", "Contour", "Contourf"}
+        plots_vector = {"Barbs", "Quiver", "Streamplot"}
+        plots_strict_numeric_2d = {
+            "Scatter", "Hexbin", "2D Density", "2D Histogram", "Stem", "Stairs", "Triplot"
+        }
+        plots_numeric_y = {
+            "Line", "Bar", "Area", "Box", "Violin", "Pie", "Histogram", "KDE", "ECDF", "Stackplot"
+        }
+
+        if plot_type in plots_3d:
+            self._adapt_3d_columns(numeric_cols)
+        elif plot_type in plots_gridded:
+            self._adapt_multi_y_columns(numeric_cols, all_cols, min_count=2)
+        elif plot_type in plots_vector:
+            self._adapt_multi_y_columns(numeric_cols, all_cols, min_count=3)
+        elif plot_type in plots_strict_numeric_2d:
+            self._adapt_strict_numeric_2d(df, numeric_cols)
+        elif plot_type in plots_numeric_y:
+            self._adapt_numeric_y(numeric_cols)
+
+    def _adapt_3d_columns(self, numeric_cols: list[str]) -> None:
+        """Assign available numeric columns across X, Y and Z axes"""
+        if not numeric_cols:
+            return
+
+        if self.view.x_column.currentText() not in numeric_cols:
+            self.view.x_column.setCurrentText(numeric_cols[0])
+
+        if self.view.y_column.currentText() not in numeric_cols:
+            y_target = numeric_cols[1] if len(numeric_cols) > 1 else numeric_cols[0]
+            self.view.y_column.setCurrentText(y_target)
+
+        if self.view.z_column.currentText() not in numeric_cols:
+            z_target = numeric_cols[2] if len(numeric_cols) > 2 else numeric_cols[0]
+            self.view.z_column.setCurrentText(z_target)
+
+    def _adapt_multi_y_columns(self, numeric_cols: list[str], all_cols: list[str], min_count: int) -> None:
+        """Activates the multi y column mode and selects the minimum required quantity of series"""
+        source_cols = numeric_cols if len(numeric_cols) >= min_count else all_cols
+        if len(source_cols) < min_count:
+            return
+
+        self.view.multi_y_check.setChecked(True)
+        self.view.y_column.setVisible(False)
+        self.view.y_columns_list.setVisible(True)
+
+        selected_items = [item.text() for item in self.view.y_columns_list.selectedItems()]
+        valid_selection = [col for col in selected_items if col in source_cols]
+
+        if len(valid_selection) < min_count:
+            self.view.y_columns_list.clearSelection()
+            target_cols = set(source_cols[:min_count])
+            for i in range(self.view.y_columns_list.count()):
+                item = self.view.y_columns_list.item(i)
+                if item and item.text() in target_cols:
+                    item.setSelected(True)
+
+    def _adapt_strict_numeric_2d(self, df: pd.DataFrame, numeric_cols: list[str]) -> None:
+        """Ensure X is numeric or datetime and Y is numeric"""
+        if not numeric_cols:
+            return
+
+        current_x = self.view.x_column.currentText()
+        is_valid_x = current_x in df.columns and (
+                    pd.api.types.is_numeric_dtype(df[current_x]) or pd.api.types.is_datetime64_any_dtype(df[current_x]))
+        if not is_valid_x:
+            self.view.x_column.setCurrentText(numeric_cols[0])
+
+        current_y = self.view.y_column.currentText()
+        if current_y not in numeric_cols:
+            chosen_x = self.view.x_column.currentText()
+            y_target = numeric_cols[1] if (len(numeric_cols) > 1 and numeric_cols[0] == chosen_x) else numeric_cols[0]
+            self.view.y_column.setCurrentText(y_target)
+
+    def _adapt_numeric_y(self, numeric_cols: list[str]) -> None:
+        """Ensure primary y series contains numeric columns"""
+        if not numeric_cols:
+            return
+
+        if self.view.y_column.currentText() not in numeric_cols:
+            self.view.y_column.setCurrentText(numeric_cols[0])
