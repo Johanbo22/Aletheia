@@ -1,4 +1,4 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QFrame, QGroupBox, QHB
 
 from icons import IconType
 from src.ui.components.data_tabs.base_data_tab import BaseDataTab
+from src.ui.widgets.DatatypeChip import DtypeChipCreator
 
 if TYPE_CHECKING:
     from src.controller.data_tab_controller import DataTabController
@@ -159,7 +160,7 @@ class ColumnsTab(BaseDataTab):
 
         self.text_operation_combo = QComboBox()
         self.text_operation_combo.addItems([
-            "Trim Whitespace", "Trim leading whitespace", "Trim trailing whitepsace",
+            "Trim Whitespace", "Trim leading whitespace", "Trim trailing whitespace",
             "Convert to lowercase", "Convert to UPPERCASE", "Convert to Title Case",
             "Capitalize First Letter",
         ])
@@ -240,16 +241,24 @@ class ColumnsTab(BaseDataTab):
 
         self.apply_destructive_styling_tags(["drop_column"])
 
-    def set_columns(self, columns: list[str], hidden_columns: set[str]) -> None:
+    def set_columns(self, columns: list[str], hidden_columns: set[str], df: Optional[Any] = None) -> None:
         """Populates the column list with checkable items"""
         self.column_list.blockSignals(True)
         self.column_list.clear()
+        self.column_list.setIconSize(DtypeChipCreator.CHIP_SIZE)
         for col in columns:
-            item = QListWidgetItem(col)
+            icon = DtypeChipCreator.get_icon_for_column(df, col)
+            item = QListWidgetItem(icon, col)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             check_state = Qt.CheckState.Unchecked if col in hidden_columns else Qt.CheckState.Checked
             item.setCheckState(check_state)
+
+            spec = DtypeChipCreator.get_spec_for_column(df, col)
+            exact_dtype = str(df[col].dtype) if df is not None and col in df.columns else "Unknown"
+            item.setToolTip(f"Column: {col}\nData type: {exact_dtype} ({spec.tooltip})")
+
             self.column_list.addItem(item)
+
         self.column_list.blockSignals(False)
         self._update_hidden_label()
 

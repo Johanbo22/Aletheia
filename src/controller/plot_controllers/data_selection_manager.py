@@ -3,6 +3,8 @@ from typing import List, Optional, TYPE_CHECKING
 import pandas as pd
 from PyQt6.QtWidgets import QComboBox, QListWidget
 
+from src.ui.widgets.DatatypeChip import DtypeChipCreator
+
 if TYPE_CHECKING:
     from src.ui.plot_tab import PlotTab
 
@@ -128,37 +130,12 @@ class DataSelectionManager:
 
     def _sync_combo(self, combo: QComboBox, items: List[str], prepend_item: Optional[str] = None) -> None:
         """Sync comboboxes while maintaining selection"""
-        current_text = combo.currentText()
-        combo.blockSignals(True)
-        combo.clear()
-
-        if prepend_item:
-            combo.addItem(prepend_item)
-
-        combo.addItems(items)
-
-        first_item_index: int = 0
-        if current_text in items:
-            combo.setCurrentText(current_text)
-        elif prepend_item and current_text == prepend_item:
-            combo.setCurrentText(prepend_item)
-        elif prepend_item:
-            combo.setCurrentIndex(first_item_index)
-
-        combo.blockSignals(False)
+        prepend_items = [prepend_item] if prepend_item else None
+        DtypeChipCreator.sync_combobox(combo, self.data_handler.df, items, prepend_items=prepend_items)
 
     def _sync_list_widget(self, list_widget: QListWidget, items: List[str], selected_items: List[str]) -> None:
         """Sync a QListWidget while maintaining multi selection"""
-        list_widget.blockSignals(True)
-        list_widget.clear()
-
-        for item_text in items:
-            list_widget.addItem(item_text)
-            if item_text in selected_items:
-                item = list_widget.item(list_widget.count() - 1)
-                item.setSelected(item)
-
-        list_widget.blockSignals(False)
+        DtypeChipCreator.sync_list_widget(list_widget, self.data_handler.df, items, selected_items)
 
     def toggle_secondary_input(self, enabled: bool) -> None:
         """Toggle secondary Y-axis inputs visibility and state."""
@@ -269,7 +246,7 @@ class DataSelectionManager:
 
         current_x = self.view.x_column.currentText()
         is_valid_x = current_x in df.columns and (
-                    pd.api.types.is_numeric_dtype(df[current_x]) or pd.api.types.is_datetime64_any_dtype(df[current_x]))
+                pd.api.types.is_numeric_dtype(df[current_x]) or pd.api.types.is_datetime64_any_dtype(df[current_x]))
         if not is_valid_x:
             self.view.x_column.setCurrentText(numeric_cols[0])
 

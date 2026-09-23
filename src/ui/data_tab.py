@@ -29,6 +29,7 @@ from src.ui.dialogs import TableCustomizationDialog
 from src.ui.models.table_settings_state import TableSettingsState
 from src.ui.status_bar import LogLevel, StatusBar
 from src.ui.theme import ThemeColors
+from src.ui.widgets.DatatypeChip import DtypeChipCreator
 
 logger = logging.getLogger(__name__)
 
@@ -459,28 +460,24 @@ class DataTab(QWidget):
     def _update_column_selectors(self) -> None:
         """Updates column selection boxes"""
         df: DataFrame | None = self.data_handler.df
-        columns: list[Any] = list(df.columns)
+        columns: list[str] = [str(col) for col in df.columns] if df is not None else []
         panel: DataOperationsPanel = self.operations_panel
 
-        panel.filtering_tab.filter_column.clear()
-        panel.filtering_tab.filter_column.addItems(columns)
+        DtypeChipCreator.sync_combobox(panel.filtering_tab.filter_column, df, columns)
 
         hidden_cols = self.controller.column_controller.hidden_columns
-        panel.columns_tab.set_columns(columns, hidden_cols)
+        panel.columns_tab.set_columns(columns, hidden_cols, df=df)
         self.controller.column_controller.apply_column_visibility()
 
-        panel.datetime_tab.dt_source_combo.clear()
-        panel.datetime_tab.dt_source_combo.addItems(columns)
-        panel.datetime_tab.dt_start_combo.clear()
-        panel.datetime_tab.dt_start_combo.addItems(columns)
-        panel.datetime_tab.dt_end_combo.clear()
-        panel.datetime_tab.dt_end_combo.addItems(columns)
+        DtypeChipCreator.sync_combobox(panel.datetime_tab.dt_source_combo, df, columns)
+        DtypeChipCreator.sync_combobox(panel.datetime_tab.dt_start_combo, df, columns)
+        DtypeChipCreator.sync_combobox(panel.datetime_tab.dt_end_combo, df, columns)
 
         if hasattr(panel, "transform_tab") and hasattr(panel.transform_tab, "sort_column_combo"):
             current_sort = panel.transform_tab.sort_column_combo.currentText()
-            panel.transform_tab.sort_column_combo.clear()
-            panel.transform_tab.sort_column_combo.addItem("[Index]")
-            panel.transform_tab.sort_column_combo.addItems(columns)
+            DtypeChipCreator.sync_combobox(
+                panel.transform_tab.sort_column_combo, df, columns, prepend_items=["[Index]"]
+            )
             if current_sort and (current_sort == "[Index]" or current_sort in columns):
                 panel.transform_tab.sort_column_combo.setCurrentText(current_sort)
             elif self.data_handler.sort_state and self.data_handler.sort_state[0] in columns:
@@ -490,18 +487,17 @@ class DataTab(QWidget):
 
         if hasattr(panel, "subsets_tab") and hasattr(panel.subsets_tab, "subset_column_combo"):
             try:
-                panel.subsets_tab.subset_column_combo.clear()
-                panel.subsets_tab.subset_column_combo.addItems(columns)
-            except Exception as Error:
-                logger.warning(f"Could not update subset columns: {Error}")
-                self.status_bar.log(f"Warning: Could not update subset columns: {Error}", LogLevel.WARNING)
+                DtypeChipCreator.sync_combobox(panel.subsets_tab.subset_column_combo, df, columns)
+            except Exception as error:
+                logger.warning(f"Could not update subset columns: {error}")
+                self.status_bar.log(f"Warning: Could not update subset columns: {error}", LogLevel.WARNING)
 
         if not self.plot_tab:
             return
         self.plot_tab.update_column_combo()
 
     def _update_data_source_status(self) -> None:
-        """Updates the status bar and refreshes butotns based on datat source"""
+        """Updates the status bar and refreshes buttons based on data source"""
         if self.data_handler.has_google_sheets_import():
             self.toolbar.set_refresh_visible(True)
             display_name = self.data_handler.last_gsheet_name
