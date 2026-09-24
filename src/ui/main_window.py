@@ -1,6 +1,7 @@
 # ui/main_window.py
 import json
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 from PyQt6.QtCore import QSettings, QThreadPool, QTimer, QUrl, Qt, pyqtSignal, pyqtSlot
@@ -52,6 +53,7 @@ class MainWindow(QWidget):
         self.setAcceptDrops(True)
 
         self._unsaved_changes: bool = False
+        self._checkpoint_history_node_id: Optional[str] = None
         self._is_autosaving: bool = False
         self.init_ui()
 
@@ -122,6 +124,8 @@ class MainWindow(QWidget):
         plot_tab_name = "Plot Studio"
         self.plot_tab = PlotTab(self.data_handler, self.status_bar)
         self.plot_tab.brush_selection_made.connect(self._on_brush_selection_made)
+        self.plot_tab.plot_button.clicked.connect(self._on_plot_modified)
+        self.plot_tab.clear_button.clicked.connect(self._on_plot_modified)
         self.tabs.addTab(self.plot_tab, plot_icon, plot_tab_name)
 
         layout.addWidget(self.tabs)
@@ -228,9 +232,33 @@ class MainWindow(QWidget):
                 self.project_manager.cleanup_autosave()
 
     def _mark_as_unsaved(self) -> None:
-        if self.data_handler.df is not None:
+        if self.data_handler.df is None:
+            return
+        self._check_history_against_checkpoint()
+        self._update_tab_visibility()
+
+    def _on_plot_modified(self) -> None:
+        """
+        Slot triggered when plot config or canvas changes
+        Marks the project as unsaved
+        """
+        if self.data_handler.df is None:
+            return
+
+        self._checkpoint_history_node_id = None
+        self.unsaved_changes = True
+        self._update_tab_visibility()
+
+    def _check_history_against_checkpoint(self) -> None:
+        """
+        Compares the active history node to the checkpoint node
+        If identical, the unsaved state is removed else marked
+        """
+        current_node: Optional[str] = self.data_handler.get_history_info().get("current_node_id")
+        if self._checkpoint_history_node_id is not None and current_node is not None:
+            self.unsaved_changes = (current_node != self._checkpoint_history_node_id)
+        else:
             self.unsaved_changes = True
-            self._update_tab_visibility()
 
     @property
     def unsaved_changes(self) -> bool:
@@ -324,6 +352,7 @@ class MainWindow(QWidget):
             # Forces an update of the UI to switch from the welcome screen to project screen
             self.data_handler.create_empty_dataframe(0, 0)
             self.data_tab.refresh_data_view()
+            self._checkpoint_history_node_id = self.data_handler.get_history_info().get("current_node_id")
             self.unsaved_changes = False
             self.status_bar.log("New Project Created")
             self._update_tab_visibility()
@@ -408,6 +437,7 @@ class MainWindow(QWidget):
         # Automatically generate the plot based on the loaded configs
         self.plot_tab.generation_manager.generate_plot()
 
+        self._checkpoint_history_node_id = self.data_handler.get_history_info().get("current_node_id")
         self.unsaved_changes = False
         self._update_tab_visibility()
 
@@ -441,6 +471,7 @@ class MainWindow(QWidget):
             self.show_toast("Project saved", f"Project saved to {filepath}", ToastLevel.SUCCESS)
 
             if saved_path:
+                self._checkpoint_history_node_id = self.data_handler.get_history_info().get("current_node_id")
                 self._unsaved_changes = False
                 self.project_manager.cleanup_autosave()
                 op_name = "save_project_as" if force_dialog else "save_project"
@@ -536,6 +567,7 @@ class MainWindow(QWidget):
         self.status_bar.update_data_stats(None)
         self._update_tab_visibility()
 
+        self._checkpoint_history_node_id = None
         self.unsaved_changes = False
         self.status_bar.log("Workspace cleared", LogLevel.INFO)
 
@@ -691,6 +723,7 @@ class MainWindow(QWidget):
         """
         self.data_tab.refresh_data_view()
         self.plot_tab.update_column_combo()
+        self._checkpoint_history_node_id = None
         self.unsaved_changes = True
         self.status_bar.update_data_stats(loaded_dataframe)
         self._update_tab_visibility()
@@ -797,6 +830,9 @@ class MainWindow(QWidget):
             QTimer.singleShot(300, self.progress_dialog.accept)
             self.progress_dialog = None
 
+        self._checkpoint_history_node_id = None
+        self.unsaved_changes = True
+
         self.status_bar.log_action(
             f"Imported Google Sheet document: {sheet_name}", level="SUCCESS",
             details={
@@ -832,6 +868,7 @@ class MainWindow(QWidget):
                 self.progress_dialog.update_progress(90, "Updating Interface")
                 self.data_tab.refresh_data_view()
                 self.plot_tab.update_column_combo()
+                self._checkpoint_history_node_id = None
                 self._unsaved_changes = True
                 self.status_bar.update_data_stats(self.data_handler.df)
                 self._update_tab_visibility()
@@ -1032,7 +1069,7 @@ class MainWindow(QWidget):
             self.plot_tab.update_column_combo()
             self.plot_tab.on_data_changed()
             self.status_bar.update_data_stats(self.data_handler.df)
-            self.unsaved_changes = True
+            self._check_history_against_checkpoint()
             self.status_bar.log("Undo: Previous state restored")
         else:
             self.show_toast("History", "Reached beginning of history. Nothing to undo", ToastLevel.INFO,
@@ -1045,7 +1082,7 @@ class MainWindow(QWidget):
             self.plot_tab.update_column_combo()
             self.plot_tab.on_data_changed()
             self.status_bar.update_data_stats(self.data_handler.df)
-            self.unsaved_changes = True
+            self._check_history_against_checkpoint()
             self.status_bar.log("Redo: Action restored")
         else:
             self.show_toast("History", "Nothing to redo", ToastLevel.INFO, duration_ms=2000)

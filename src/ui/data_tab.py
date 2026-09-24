@@ -334,7 +334,12 @@ class DataTab(QWidget):
             self.data_table.scrollTo(index, QTableView.ScrollHint.PositionAtCenter)
             self.data_table.setFocus()
 
-    def refresh_data_view(self, reload_model: bool = True):
+    def _on_table_data_mutated(self) -> None:
+        """Handles changes to the data table model"""
+        self.update_statistics()
+        self.data_modified.emit()
+
+    def refresh_data_view(self, reload_model: bool = True, emit_modified: bool = True) -> None:
         """Refresh the data table and statistics"""
         if self.data_handler.df is None:
             self._handle_empty_data_view()
@@ -373,7 +378,8 @@ class DataTab(QWidget):
         self._update_data_source_status()
         self._update_subsets_status()
         self._update_history_list()
-        self.data_modified.emit()
+        if emit_modified:
+            self.data_modified.emit()
 
     def _handle_empty_data_view(self) -> None:
         """Clears the UI when no data is loaded"""
@@ -424,6 +430,7 @@ class DataTab(QWidget):
             self.model.set_scientific_notation(self.table_settings.scientific_notation)
 
             self.model.columnsInserted.connect(self._update_column_selectors)
+            self.model.modelDataModified.connect(self._on_table_data_mutated)
             self.data_table.setSortingEnabled(False)
             self.data_table.setModel(self.model)
         else:
