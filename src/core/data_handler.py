@@ -206,10 +206,10 @@ class DataHandler:
     def export_google_sheets(self, credentials_path: str, sheet_id: str, sheet_name: str = "Sheet1") -> bool:
         result = self._io.export_google_sheets(self.df, credentials_path, sheet_id, sheet_name)
         self._history.operation_log.append({
-            "type"     : "export_google_sheets",
-            "sheet_id" : sheet_id,
+            "type"      : "export_google_sheets",
+            "sheet_id"  : sheet_id,
             "sheet_name": sheet_name,
-            "parent_id": self._history.current_node_id
+            "parent_id" : self._history.current_node_id
         })
         return result
 
@@ -242,12 +242,12 @@ class DataHandler:
                 return cached_result
 
         info = {
-            "shape"       : self.df.shape,
-            "columns"     : list(self.df.columns),
-            "dtypes"      : self.df.dtypes.to_dict(),
+            "shape"         : self.df.shape,
+            "columns"       : list(self.df.columns),
+            "dtypes"        : self.df.dtypes.to_dict(),
             "missing_values": self.df.isnull().sum().to_dict(),
-            "statistics"  : self.df.describe().to_dict(),
-            "memory_usage": self.df.memory_usage(deep=False).to_dict(),
+            "statistics"    : self.df.describe().to_dict(),
+            "memory_usage"  : self.df.memory_usage(deep=False).to_dict(),
         }
 
         self._data_info_cache[cache_key] = (info, current_time)
@@ -318,6 +318,8 @@ class DataHandler:
             )
         elif op_type == "filter_multiple":
             self.filter_data(advanced_filters=kwargs.get("filters"))
+        elif op_type == "clear_filters":
+            self.clear_filters()
         elif op_type == "sort":
             self.sort_data(
                 column=kwargs.get("column"),
@@ -486,6 +488,148 @@ class DataHandler:
             return self.filter_data(advanced_filters=filter_config.get("filters", []))
         return self.df
 
+    def has_active_filters(self) -> bool:
+        """
+        Checks if any filter operations exists on the active history branch
+        :return: True if at least one filter operation is active else False
+        """
+        if self.df is None or not hasattr(self._history, "nodes"):
+            return False
+
+        current_id: Optional[str] = self._history.current_node_id
+        while current_id and current_id in self._history.nodes:
+            node = self._history.nodes[current_id]
+            if node.diff_record and (
+                    node.diff_record.operation_type == OperationType.FILTER or node.diff_record.metadata.get(
+                "type") in ("filter", "filter_multiple")
+            ):
+                return True
+            current_id = node.parent_id
+
+        return False
+
+    def _apply_single_reconstructed_operation(self, df: pd.DataFrame, op_type: str, kwargs: dict[str, Any],
+                                              sort_state: Optional[tuple]) -> tuple[pd.DataFrame, Optional[tuple]]:
+        """
+        Apply a single non-filter operation during reconstruction
+        :param df: Target DataFrame to transform
+        :param op_type: Type identifier of the operation
+        :param kwargs: Arguments associated with the operation
+        :param sort_state: Current sort state tuple
+        :return: Transformed DataFrame and updated sort state
+        """
+        if op_type == "sort":
+            return self._mutator.sort_data(
+                df, kwargs.get("column", ""), kwargs.get("ascending", True), sort_state
+            )
+        if op_type == "computed_column":
+            col_name = kwargs.get("new_column", "")
+            expr = kwargs.get("expression", "")
+            return self._mutator.create_computed_column(df, col_name, expr), sort_state
+        if op_type == "aggregate":
+            return self._mutator.aggregate_data(
+                df,
+                kwargs.get("group_by", []),
+                kwargs.get("agg_config", {}),
+                kwargs.get("date_grouping", {}),
+                kwargs.get("rename_mapping")
+            ), None
+        if op_type == "melt":
+            return self._mutator.melt_data(
+                df,
+                kwargs.get("id_vars", []),
+                kwargs.get("value_vars", []),
+                kwargs.get("var_name", "variable"),
+                kwargs.get("value_name", "value")
+            ), None
+        if op_type == "pivot":
+            return self._mutator.pivot_data(
+                df,
+                kwargs.get("index", []),
+                kwargs.get("columns", ""),
+                kwargs.get("values", []),
+                kwargs.get("aggfunc", "mean")
+            ), None
+        if op_type == "bin_column":
+            return self._mutator.bin_column(
+                df,
+                kwargs.get("column", ""),
+                kwargs.get("new_column", ""),
+                kwargs.get("method", "uniform"),
+                kwargs.get("bins"),
+                kwargs.get("labels"),
+                kwargs.get("right_inclusive", True),
+                kwargs.get("drop_original", False)
+            ), sort_state
+        if op_type == "update_cell":
+            return self._mutator.update_cell(
+                df, kwargs.get("row", 0), kwargs.get("col", 0), kwargs.get("value")
+            ), sort_state
+
+        return self._mutator.clean_data(df, op_type, sort_state, **kwargs)
+
+    def clear_filters(self) -> pd.DataFrame:
+        """
+        Remove all active filter operations from the current dataset
+
+        Reconstructs the dataset from original data to the newest alteration without using the filter
+        operations. Appends a state transition in the history
+
+        :return: Restored DataFrame
+        :raises ValueError: If no dataset is loaded
+        """
+        if self.df is None:
+            raise ValueError("No data loaded")
+
+        if not self.has_active_filters() or self.original_df is None:
+            return self.df
+
+        active_node_ids: list[str] = []
+        current_id: Optional[str] = self._history.current_node_id
+        while current_id and current_id != self._history.root_id:
+            active_node_ids.append(current_id)
+            current_id = self._history.nodes[current_id].parent_id if current_id in self._history.nodes else None
+        active_node_ids.reverse()
+
+        reconstructed_df: pd.DataFrame = self.original_df.copy(deep=True)
+        current_sort_state: Optional[tuple] = None
+
+        for node_id in active_node_ids:
+            node = self._history.nodes.get(node_id)
+            if not node or not node.diff_record:
+                continue
+
+            op_meta: dict[str, Any] = node.diff_record.metadata.copy()
+            op_type: str = str(op_meta.pop("type", node.diff_record.operation_type.value))
+
+            if op_type in ("filter", "filter_multiple") or node.diff_record.operation_type == OperationType.FILTER:
+                continue
+
+            good_kwargs = {
+                k: v for k, v in op_meta.items()
+                if k not in ("node_id", "parent_id", "old_index", "new_index", "old_columns", "new_columns")
+            }
+
+            try:
+                reconstructed_df, current_sort_state = self._apply_single_reconstructed_operation(
+                    reconstructed_df, op_type, good_kwargs, current_sort_state
+                )
+            except Exception as replay_err:
+                logger.warning(f"Replay of operation '{op_type}' failed: {replay_err}")
+
+        old_df: pd.DataFrame = self.df.copy(deep=False)
+        log_entry: dict[str, Any] = {"type": "clear_filters"}
+        op_params: dict[str, Any] = {"type": "clear_filters"}
+
+        return self._apply_changes(
+            reconstructed_df,
+            log_entry,
+            new_sort_state=current_sort_state,
+            old_df=old_df,
+            operation_type=OperationType.CUSTOM,
+            operation_params=op_params
+        )
+
     def sort_data(self, column: str, ascending: bool = True) -> pd.DataFrame:
         if self.df is None:
             raise ValueError("No data loaded")
@@ -530,20 +674,20 @@ class DataHandler:
         return self._apply_changes(
             changed_df,
             {
-                "type"         : "aggregate",
-                "group_by"     : group_by,
-                "agg_config"   : agg_config,
-                "date_grouping": date_grouping,
+                "type"          : "aggregate",
+                "group_by"      : group_by,
+                "agg_config"    : agg_config,
+                "date_grouping" : date_grouping,
                 "rename_mapping": rename_mapping
             },
             new_sort_state=None,
             old_df=old_df,
             operation_type=OperationType.AGGREGATE,
             operation_params={
-                "type"         : "aggregate",
-                "group_by"     : group_by,
-                "agg_config"   : agg_config,
-                "date_grouping": date_grouping,
+                "type"          : "aggregate",
+                "group_by"      : group_by,
+                "agg_config"    : agg_config,
+                "date_grouping" : date_grouping,
                 "rename_mapping": rename_mapping
             }
         )
@@ -564,20 +708,20 @@ class DataHandler:
         return self._apply_changes(
             changed_df,
             {
-                "type"    : "melt",
-                "id_vars" : id_vars,
+                "type"      : "melt",
+                "id_vars"   : id_vars,
                 "value_vars": value_vars,
-                "var_name": var_name,
+                "var_name"  : var_name,
                 "value_name": value_name,
             },
             new_sort_state=None,
             old_df=old_df,
             operation_type=OperationType.CUSTOM,
             operation_params={
-                "type"    : "melt",
-                "id_vars" : id_vars,
+                "type"      : "melt",
+                "id_vars"   : id_vars,
                 "value_vars": value_vars,
-                "var_name": var_name,
+                "var_name"  : var_name,
                 "value_name": value_name,
             }
         )
@@ -608,7 +752,7 @@ class DataHandler:
             new_sort_state=None,
             old_df=old_df,
             operation_type=OperationType.CUSTOM,
-            operation_params={"type": "merge", "how": how, "left_on": left_on, "right_on": right_on,
+            operation_params={"type"    : "merge", "how": how, "left_on": left_on, "right_on": right_on,
                               "suffixes": suffixes}
         )
 
@@ -650,22 +794,22 @@ class DataHandler:
         return self._apply_changes(
             changed_df,
             {
-                "type"  : "bin_column",
-                "column": column,
-                "new_column": new_column_name,
-                "method": method,
-                "bins"  : bins,
-                "labels": labels,
-            },
-            old_df=old_df,
-            operation_type=OperationType.ADD_COLUMN,
-            operation_params={
                 "type"      : "bin_column",
                 "column"    : column,
                 "new_column": new_column_name,
                 "method"    : method,
                 "bins"      : bins,
                 "labels"    : labels,
+            },
+            old_df=old_df,
+            operation_type=OperationType.ADD_COLUMN,
+            operation_params={
+                "type"         : "bin_column",
+                "column"       : column,
+                "new_column"   : new_column_name,
+                "method"       : method,
+                "bins"         : bins,
+                "labels"       : labels,
                 "drop_original": drop_original
             }
         )
@@ -684,24 +828,24 @@ class DataHandler:
             else:
                 action_value = action.value
             op_type_map = {
-                "drop_duplicates"       : OperationType.DROP_DUPLICATES,
-                "fill_missing"          : OperationType.FILL_MISSING,
-                "drop_missing"          : OperationType.DROP_ROWS,
-                "drop_empty_columns"    : OperationType.DROP_COLUMN,
-                "drop_column"           : OperationType.DROP_COLUMN,
-                "rename_column"         : OperationType.RENAME_COLUMN,
-                "change_dtype"          : OperationType.CHANGE_DTYPE,
-                "text_operation"        : OperationType.TEXT_OPERATION,
-                "split_column"          : OperationType.SPLIT_COLUMN,
-                "normalize"             : OperationType.MODIFY_COLUMN,
-                "extract_date_component": OperationType.ADD_COLUMN,
+                "drop_duplicates"          : OperationType.DROP_DUPLICATES,
+                "fill_missing"             : OperationType.FILL_MISSING,
+                "drop_missing"             : OperationType.DROP_ROWS,
+                "drop_empty_columns"       : OperationType.DROP_COLUMN,
+                "drop_column"              : OperationType.DROP_COLUMN,
+                "rename_column"            : OperationType.RENAME_COLUMN,
+                "change_dtype"             : OperationType.CHANGE_DTYPE,
+                "text_operation"           : OperationType.TEXT_OPERATION,
+                "split_column"             : OperationType.SPLIT_COLUMN,
+                "normalize"                : OperationType.MODIFY_COLUMN,
+                "extract_date_component"   : OperationType.ADD_COLUMN,
                 "calculate_date_difference": OperationType.ADD_COLUMN,
-                "rolling_window"        : OperationType.ADD_COLUMN,
-                "shift_data"            : OperationType.ADD_COLUMN,
-                "percentage_change"     : OperationType.ADD_COLUMN,
-                "reorder_columns"       : OperationType.MODIFY_COLUMN,
-                "regex_replace"         : OperationType.MODIFY_COLUMN,
-                "duplicate_column"      : OperationType.ADD_COLUMN,
+                "rolling_window"           : OperationType.ADD_COLUMN,
+                "shift_data"               : OperationType.ADD_COLUMN,
+                "percentage_change"        : OperationType.ADD_COLUMN,
+                "reorder_columns"          : OperationType.MODIFY_COLUMN,
+                "regex_replace"            : OperationType.MODIFY_COLUMN,
+                "duplicate_column"         : OperationType.ADD_COLUMN,
             }
             operation_type = op_type_map.get(action_value, OperationType.CUSTOM)
             op_params = {"type": action_value, **kwargs}

@@ -127,7 +127,7 @@ class DataTabController:
 
     def clear_filters(self):
         """Clear filters by resetting the data to original state"""
-        self.filter_controller.clear_filters(reset_callback=self.history_controller.reset_data)
+        self.filter_controller.clear_filters()
 
     def open_advanced_filter(self):
         """Open advanced filter dialog"""

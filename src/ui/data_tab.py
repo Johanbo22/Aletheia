@@ -659,6 +659,8 @@ class DataTab(QWidget):
         match operation_type:
             case "filter" | "filter_multiple":
                 return IconBuilder.build(IconType.Filter)
+            case "clear_filters":
+                return IconBuilder.build(IconType.ClearFilter)
             case "drop_column":
                 return IconBuilder.build(IconType.DropColumn)
             case "rename_column":
@@ -744,6 +746,8 @@ class DataTab(QWidget):
             case "filter_multiple":
                 filters = operation.get("filters", [])
                 return f"Advanced Filter ({len(filters)} conditions)"
+            case "clear_filters":
+                return "Clear Filters"
             case "drop_column":
                 cols = operation.get("columns", operation.get("column", ""))
                 if isinstance(cols, list):

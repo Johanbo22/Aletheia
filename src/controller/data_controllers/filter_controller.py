@@ -1,5 +1,3 @@
-from typing import Callable
-
 from PyQt6.QtCore import QTimer
 
 from src.controller.data_controllers.base_data_controller import BaseDataController
@@ -16,7 +14,7 @@ class FilterController(BaseDataController):
     advanced filter dialog window. Also handles the clearing of active filters
     """
 
-    def __init__(self, data_handler, status_bar, view, subset_manager=None) ->None:
+    def __init__(self, data_handler, status_bar, view, subset_manager=None) -> None:
         super().__init__(data_handler, status_bar, view, subset_manager)
         self._preview_timer = QTimer(self.view)
         self._preview_timer.setSingleShot(True)
@@ -78,14 +76,47 @@ class FilterController(BaseDataController):
             self.status_bar.log(f"Failed to execute 'Filter': {str(e)}", LogLevel.ERROR)
             global_signals.request_toast("Filter Error", "Failed to apply filter", ToastLevel.ERROR)
 
-    def clear_filters(self, reset_callback: Callable[[], None]) -> None:
+    def clear_filters(self) -> None:
         """Clear active filters by delegating back to the main reset data routine."""
         if self.data_handler.df is None:
+            self.no_data_loaded_toast()
             return
 
-        reset_callback()
-        self.view.operations_panel.filtering_tab.clear_filter_preview()
-        self.status_bar.log("Filters cleared and data reset to original state", LogLevel.INFO)
+        if not self.data_handler.has_active_filters():
+            self.view.operations_panel.filtering_tab.clear_filter_preview()
+            self.view.operations_panel.filtering_tab.set_filter_active_state(False)
+            global_signals.request_toast("Info", "No active filters to clear", ToastLevel.INFO)
+            self.status_bar.log("No active filters to clear", LogLevel.INFO)
+            return
+
+        try:
+            rows_before: int = len(self.data_handler.df)
+            self.data_handler.clear_filters()
+            rows_after: int = len(self.data_handler.df)
+            rows_restored: int = rows_after - rows_before
+
+            self.view.operations_panel.filtering_tab.clear_filter_preview()
+            self.view.operations_panel.filtering_tab.set_filter_active_state(False)
+            self.view.refresh_data_view()
+
+            self.status_bar.log_action(
+                f"Cleared filters: restored {rows_restored:,} rows",
+                details={
+                    "rows_before"  : rows_before,
+                    "rows_after"   : rows_after,
+                    "rows_restored": rows_restored,
+                    "operation"    : "clear_filters",
+                },
+                level=LogLevel.SUCCESS,
+            )
+            global_signals.request_toast(
+                "Filters Cleared",
+                f"Active filters removed. Restored {rows_restored:,} rows.",
+                ToastLevel.SUCCESS
+            )
+        except Exception as err:
+            self.status_bar.log(f"Failed to clear filters: {str(err)}", LogLevel.ERROR)
+            global_signals.request_toast("Error", "Failed to clear filters", ToastLevel.ERROR)
 
     def update_filter_preview_live(self) -> None:
         if self.data_handler.df is None:

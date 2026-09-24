@@ -1,6 +1,6 @@
 from typing import Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QComboBox, QFormLayout, QFrame, QGroupBox, QLabel, QLineEdit, QVBoxLayout
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QFrame, QGroupBox, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
 from icons import IconType
 from src.ui.components.data_tabs.base_data_tab import BaseDataTab
@@ -71,13 +71,17 @@ class FilteringTab(BaseDataTab):
             icon_type=IconType.Filter
         ))
 
-        quick_filter_layout.addLayout(self._create_operation_row(
+        clear_filter_row = self._create_operation_row(
             title="Clear Filters",
             tooltip="Reset the dataset to its original state and remove the filters",
             callback=self.controller.clear_filters,
             help_id="",
             icon_type=IconType.ClearFilter
-        ))
+        )
+        clear_btn = clear_filter_row.itemAt(0).widget()
+        if isinstance(clear_btn, QPushButton):
+            clear_btn.setObjectName("op_btn_clear_filters")
+        quick_filter_layout.addLayout(clear_filter_row)
         layout.addWidget(quick_filter_group)
 
         separator = QFrame()
