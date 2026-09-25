@@ -17,7 +17,10 @@ class ValidationState(Enum):
     InvalidCharacter = auto()
 
 class RenameColumnDialog(QDialog):
-    """Dialog for renaming a column"""
+    """
+    Dialog for renaming a column
+    Also serves as a parent to the RenameProjectDialog
+    """
 
     def __init__(self, column_name: str, existing_columns: Optional[List[str]] = None, parent=None) -> None:
         super().__init__(parent)
@@ -28,6 +31,7 @@ class RenameColumnDialog(QDialog):
 
         self.column_name: str = column_name
         self.existing_columns: List[str] = existing_columns if existing_columns else []
+        self.case_sensitive: bool = True
         self.new_name_input: Optional[QLineEdit] = None
         self.error_label: Optional[QLabel] = None
         self.rename_button: Optional[QPushButton] = None
@@ -111,9 +115,9 @@ class RenameColumnDialog(QDialog):
     def validate_name(self, new_name: str) -> Tuple[ValidationState, str]:
         if not new_name:
             return ValidationState.Empty, "New column name cannot be empty"
-        if new_name == self.column_name:
+        if self._same_as_current(new_name):
             return ValidationState.Unchanged, "New name must be different from current name"
-        if new_name in self.existing_columns:
+        if self._already_exists(new_name):
             return ValidationState.AlreadyExists, f"Column '{new_name}' already exists in the dataset"
         if keyword.iskeyword(new_name):
             return ValidationState.Keyword, f"'{new_name}' is a reserved Python keyword"
@@ -121,6 +125,18 @@ class RenameColumnDialog(QDialog):
             return ValidationState.InvalidCharacter, "Column names cannot contain backticks (`)"
 
         return ValidationState.Valid, ""
+
+    def _same_as_current(self, new_name: str) -> bool:
+        """Check whether the candidate name equals the current one"""
+        if self.case_sensitive:
+            return new_name == self.column_name
+        return new_name.lower() == self.column_name.lower()
+
+    def _already_exists(self, new_name: str) -> bool:
+        """Check whether the candidate name collides with an existing name"""
+        if self.case_sensitive:
+            return new_name in self.existing_columns
+        return new_name.lower() in [name.lower() for name in self.existing_columns]
 
     def _animate_error(self, show: bool, message: str = "") -> None:
         """Fade the error label in or out based on the validation state"""
