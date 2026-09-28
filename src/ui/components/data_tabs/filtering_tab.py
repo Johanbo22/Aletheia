@@ -1,5 +1,6 @@
 from typing import Optional, TYPE_CHECKING
 
+import pandas as pd
 from PyQt6.QtWidgets import QComboBox, QFormLayout, QFrame, QGroupBox, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
 from icons import IconType
@@ -51,6 +52,7 @@ class FilteringTab(BaseDataTab):
         self.filter_value = QLineEdit()
         self.filter_value.setPlaceholderText("Enter evaluation value...")
         self.filter_value.setClearButtonEnabled(True)
+        self.filter_value.returnPressed.connect(self.controller.apply_filter)
         self.filter_value.setToolTip(
             "Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
         form_layout.addRow(QLabel("Value:"), self.filter_value)
@@ -107,6 +109,7 @@ class FilteringTab(BaseDataTab):
 
         self.apply_destructive_styling_tags(["clear_filters"])
         self.filter_column.currentTextChanged.connect(self.controller.update_filter_preview_live)
+        self.filter_column.currentTextChanged.connect(self._on_filter_column_changed)
         self.filter_condition.currentTextChanged.connect(self.controller.update_filter_preview_live)
         self.filter_value.textChanged.connect(self.controller.update_filter_preview_live)
 
@@ -116,6 +119,26 @@ class FilteringTab(BaseDataTab):
             self.filter_condition.currentData(),
             self.filter_value.text()
         )
+
+    def _on_filter_column_changed(self, column_name: str) -> None:
+        """
+        Update the placeholder text for the filter value input based on the columns data type
+        :param column_name: The name of the selected column
+        """
+        if not self.controller or self.controller.data_handler.df is None:
+            return
+
+        df: pd.DataFrame = self.controller.data_handler.df
+        if column_name in df.columns:
+            dtype = df[column_name].dtype
+            if pd.api.types.is_numeric_dtype(dtype):
+                self.filter_value.setPlaceholderText("Enter numeric value...")
+            elif pd.api.types.is_datetime64_any_dtype(dtype):
+                self.filter_value.setPlaceholderText("Enter date (e.g. YYYY-MM-DD)...")
+            elif pd.api.types.is_bool_dtype(dtype):
+                self.filter_value.setPlaceholderText("Enter True or False...")
+            else:
+                self.filter_value.setPlaceholderText("Enter evaluation value...")
 
     def set_filter_active_state(self, is_active: bool, message: str = "") -> None:
         """

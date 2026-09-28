@@ -97,6 +97,8 @@ class MainDataTableView(QTableView):
         copy_action: QAction | None = menu.addAction("Copy Selection")
         copy_action.setShortcut(QKeySequence.StandardKey.Copy)
 
+        copy_headers_action: QAction | None = menu.addAction("Copy Column Headers")
+
         settings_action: QAction | None = menu.addAction("Table Settings...")
         stats_test_action: QAction | None = menu.addAction("Run Statistical Test...")
 
@@ -114,6 +116,8 @@ class MainDataTableView(QTableView):
             self.clearSelection()
         elif action == copy_action:
             self.copy_selection()
+        elif action == copy_headers_action:
+            self.copy_headers()
         elif action == settings_action:
             self.request_table_settings.emit()
         elif action == stats_test_action:
@@ -146,6 +150,18 @@ class MainDataTableView(QTableView):
 
         QApplication.clipboard().setText(copied_text)
         self.status_bar.log(f"Copied {len(selected_indexes)} cell(s) to clipboard", LogLevel.SUCCESS)
+
+    def copy_headers(self) -> None:
+        """Copy the column headers of the dataset to the system clipboard"""
+        if self.data_handler.df is None:
+            return
+
+        headers: str = "\t".join(str(col) for col in self.data_handler.df.columns)
+        QApplication.clipboard().setText(headers)
+        self.status_bar.log(f"Copied column headers to clipboard", LogLevel.INFO)
+        global_signals.request_toast(
+            "Copied Headers", "Column headers copied to clipboard", ToastLevel.SUCCESS
+        )
 
     def toggle_missing_values_highlight(self, enable: bool) -> None:
         """

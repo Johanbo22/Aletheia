@@ -1,12 +1,11 @@
 from typing import Any, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
-    QListWidget, \
-    QListWidgetItem, QPushButton, QScrollArea, \
-    QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, \
+    QLineEdit, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from icons import IconType
+from src.core.global_signals import ToastLevel, global_signals
 from src.ui.components.data_tabs.base_data_tab import BaseDataTab
 from src.ui.widgets.DatatypeChip import DtypeChipCreator
 
@@ -76,6 +75,12 @@ class ColumnsTab(BaseDataTab):
         self.hide_all_btn = QPushButton("Hide All")
         self.hide_all_btn.clicked.connect(self._on_hide_all_clicked)
         bulk_layout.addWidget(self.hide_all_btn)
+
+        self.copy_selected_btn = QPushButton("Copy Selected")
+        self.copy_selected_btn.setToolTip("Copy the names of the selected columns to the system clipboard")
+        self.copy_selected_btn.clicked.connect(self._on_copy_selected_clicked)
+        bulk_layout.addWidget(self.copy_selected_btn)
+
         layout.addLayout(bulk_layout)
 
         self.column_list = QListWidget()
@@ -321,6 +326,21 @@ class ColumnsTab(BaseDataTab):
         if self.controller:
             self.controller.hide_all_columns()
         self._update_hidden_label()
+
+    def _on_copy_selected_clicked(self) -> None:
+        """Copy the names of the currently selected columns to the system clipboard"""
+        selected_columns: list[str] = self.get_selected_columns()
+        if not selected_columns:
+            global_signals.request_toast(
+                "No Selection", "Please select at least one column to copy", ToastLevel.WARNING
+            )
+            return
+
+        clipboard_text: str = "\n".join(selected_columns)
+        QApplication.clipboard().setText(clipboard_text)
+        global_signals.request_toast(
+            "Copied", f"Copied {len(selected_columns)} column name(s) to clipboard", ToastLevel.SUCCESS
+        )
 
     def get_selected_columns(self) -> list[str]:
         return [item.text() for item in self.column_list.selectedItems()]

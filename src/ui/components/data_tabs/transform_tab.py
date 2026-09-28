@@ -23,7 +23,7 @@ class TransformTab(BaseDataTab):
         transform_info.setProperty("styleClass", "info_text")
         layout.addWidget(transform_info)
         layout.addSpacing(10)
-        
+
         reshape_group = QGroupBox("Reshape && Group Data")
         reshape_layout = QVBoxLayout()
 
@@ -32,7 +32,7 @@ class TransformTab(BaseDataTab):
             tooltip="Group and aggregate data",
             callback=self.controller.open_aggregation_dialog,
             help_id="aggregate_data",
-            icon_type=IconType.DataTransform 
+            icon_type=IconType.DataTransform
         ))
 
         reshape_layout.addLayout(self._create_operation_row(
@@ -42,7 +42,7 @@ class TransformTab(BaseDataTab):
             help_id="melt_data",
             icon_type=IconType.PivotData
         ))
-        
+
         reshape_layout.addLayout(self._create_operation_row(
             title="Pivot Table",
             tooltip="Reshape data using index, columns and values",
@@ -52,10 +52,10 @@ class TransformTab(BaseDataTab):
         ))
         reshape_group.setLayout(reshape_layout)
         layout.addWidget(reshape_group)
-        
+
         combine_group = QGroupBox("Combine Datasets")
         combine_layout = QVBoxLayout()
-        
+
         combine_layout.addLayout(self._create_operation_row(
             title="Merge / Join Datasets",
             tooltip="Join the current dataset with another file",
@@ -63,7 +63,7 @@ class TransformTab(BaseDataTab):
             help_id="merge_data",
             icon_type=IconType.ImportFile
         ))
-        
+
         combine_layout.addLayout(self._create_operation_row(
             title="Append / Concatenate Data",
             tooltip="Stack datasets vertically by appending rows from another file",
@@ -73,10 +73,10 @@ class TransformTab(BaseDataTab):
         ))
         combine_group.setLayout(combine_layout)
         layout.addWidget(combine_group)
-        
+
         sequential_group = QGroupBox("Sequential && Time-Series")
         sequential_layout = QVBoxLayout()
-        
+
         sequential_layout.addLayout(self._create_operation_row(
             title="Rolling Window",
             tooltip="Calculate rolling statistics (example: moving averages)",
@@ -84,7 +84,7 @@ class TransformTab(BaseDataTab):
             help_id="rolling_window",
             icon_type=IconType.DataTransform
         ))
-        
+
         sequential_layout.addLayout(self._create_operation_row(
             title="Shift / Lag Data",
             tooltip="Shift index by desired number of periods",
@@ -113,7 +113,7 @@ class TransformTab(BaseDataTab):
         self.sort_order_combo.addItems(["Ascending", "Descending"])
         sort_controls.addWidget(self.sort_order_combo, 1)
         sorting_layout.addLayout(sort_controls)
-        
+
         sorting_layout.addLayout(self._create_operation_row(
             title="Sort Data",
             tooltip="Permanently sort dataset",
@@ -162,27 +162,31 @@ class TransformTab(BaseDataTab):
         saved_agg_layout.addWidget(self.delete_agg_btn)
 
         saved_agg_group.setLayout(saved_agg_layout)
+        self.saved_agg_group = saved_agg_group
+        self.saved_agg_group.setVisible(False)
         layout.addWidget(saved_agg_group)
 
         layout.addStretch()
 
         self.apply_destructive_styling_tags(["delete_agg_btn"])
-    
+
     def get_sort_parameters(self) -> tuple[str, str]:
         return self.sort_column_combo.currentText(), self.sort_order_combo.currentText()
-    
+
     def get_selected_saved_aggregations(self) -> Optional[str]:
         item = self.saved_agg_list.currentItem()
         return item.data(Qt.ItemDataRole.UserRole) if item else None
-    
+
     def update_saved_aggregation_list(self, aggregations: list[tuple[str, int]]) -> None:
         self.saved_agg_list.clear()
         if not aggregations:
+            self.saved_agg_group.setVisible(False)
             placeholder = QListWidgetItem("No saved aggregations")
             placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
             self.saved_agg_list.addItem(placeholder)
             return
-        
+
+        self.saved_agg_group.setVisible(True)
         for name, row_count in aggregations:
             item = QListWidgetItem(f"{name} ({row_count}) rows")
             item.setData(Qt.ItemDataRole.UserRole, name)
@@ -193,7 +197,7 @@ class TransformTab(BaseDataTab):
         item: QListWidgetItem = self.saved_agg_list.currentItem()
         is_valid_selection: bool = item is not None and bool(item.flags() & Qt.ItemFlag.ItemIsSelectable)
         self.set_aggregations_buttons_enabled(is_valid_selection)
-    
+
     def set_aggregations_buttons_enabled(self, enabled: bool) -> None:
         self.view_agg_btn.setEnabled(enabled)
         self.delete_agg_btn.setEnabled(enabled)

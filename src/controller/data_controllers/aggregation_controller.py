@@ -227,15 +227,26 @@ class AggregationController(BaseDataController):
         if not agg_name:
             return
 
+        is_currently_viewing: bool = getattr(self.data_handler, "viewing_aggregation_name", None) == agg_name
+
+        warning_text: str = f"Are you sure you want to delete the saved aggregation: '{agg_name}'?"
+        if is_currently_viewing:
+            warning_text += "\n\nNote: You are currently viewing this aggregation. Deleting it will restore the original data view"
+        else:
+            warning_text += "\n\nThis will not affect your current data view"
+
         reply = QMessageBox.question(
             self.view,
             "Confirm Delete",
-            f"Are you sure you want to delete the saved aggregation '{agg_name}'?\n\nThis will not affect your current data view.",
+            warning_text,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
             if self.aggregation_manager.delete_aggregation(agg_name):
+                if is_currently_viewing:
+                    self.restore_aggregation_view()
+
                 self.refresh_saved_agg_list()
                 self.view.operations_panel.set_aggregation_buttons_enabled(False)
                 self.status_bar.log(f"Deleted aggregation: {agg_name}", LogLevel.SUCCESS)
