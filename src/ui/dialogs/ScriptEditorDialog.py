@@ -11,8 +11,8 @@ from PyQt6.QtGui import QColor, QFont, QFontDatabase, QFontMetrics, QKeySequence
 from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QMenu, \
     QMessageBox, QPlainTextEdit, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
-from src.core.global_signals import ToastLevel, global_signals
 from resources.version import APPLICATION_NAME
+from src.core.global_signals import ToastLevel, global_signals
 from src.ui.PythonHighlighter import PythonHighlighter
 from src.ui.widgets.CodeEditor import CodeEditor
 
@@ -323,6 +323,7 @@ class ScriptEditorDialog(QDialog):
         self.editor = CodeEditor()
         self.editor.setObjectName("script_code_editor")
         self.editor.setPlainText(code if code else "")
+        self.editor.set_reference_text(code if code else "")
         self.editor.setMinimumHeight(400)
 
         editor_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
@@ -424,10 +425,10 @@ class ScriptEditorDialog(QDialog):
 
         # buttons
         button_layout = QHBoxLayout()
+        button_layout.addStretch()
         self.run_button = QPushButton("Run Script")
         self.run_button.setObjectName("MainActionButton")
         self.run_button.setMinimumHeight(40)
-        self.run_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.run_button.setShortcut("Ctrl+Shift+Return")
         self.run_button.setToolTip("Click to run the script and update the plot\nShortcut 'Ctrl+Shift+Enter'")
         self.run_button.clicked.connect(self.on_run_clicked)
@@ -435,7 +436,6 @@ class ScriptEditorDialog(QDialog):
 
         self.close_button = QPushButton("Close")
         self.close_button.setMinimumHeight(40)
-        self.close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_button.clicked.connect(self.close)
         button_layout.addWidget(self.close_button)
 
@@ -497,7 +497,7 @@ class ScriptEditorDialog(QDialog):
         for var_name, var_value in self.console_namespace.items():
             # Modules, function and internal values are filtered
             if var_name.startswith("_") or type(var_value).__name__ in (
-            "module", "function", "builtin_function_or_method", "type"):
+                    "module", "function", "builtin_function_or_method", "type"):
                 continue
 
             root = QTreeWidgetItem(self.variable_explorer)
@@ -831,6 +831,7 @@ class ScriptEditorDialog(QDialog):
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.editor.setPlainText(self.default_template)
+            self.editor.set_reference_text(self.default_template)
             self.is_code_modified = False
             self.setWindowTitle("Python Console")
             self.auto_sync_check.setChecked(False)
@@ -901,6 +902,7 @@ class ScriptEditorDialog(QDialog):
         # Reset the modified flag since current code is now executed
         self.is_code_modified = False
         self.setWindowTitle("Python Console")
+        self.editor.set_reference_text(code)
 
     def save_to_history(self, code: str) -> None:
         """Save the current code to a list, cannot go more than 5, """

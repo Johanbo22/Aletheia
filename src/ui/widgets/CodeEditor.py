@@ -1,4 +1,5 @@
 import ast
+import difflib
 import traceback
 from dataclasses import dataclass
 
@@ -153,6 +154,18 @@ class CodeEditor(QPlainTextEdit):
         self.textChanged.connect(self._scheduleFoldUpdate)
         self.textChanged.connect(self._lint_timer.start)
 
+        # Diff tracking
+        self._reference_text: str = ""
+        self._diff_map: dict[int, str] = {}
+        self._deleted_lines: set[int] = set()
+
+        diff_timer_duration: int = 300
+        self._diff_timer = QTimer(self)
+        self._diff_timer.setSingleShot(True)
+        self._diff_timer.setInterval(diff_timer_duration)
+        self._diff_timer.timeout.connect(self._compute_diff)
+        self.textChanged.connect(self._diff_timer.start)
+
         # font
         font = QFont("Consolas", 12)
         font.setStyleHint(QFont.StyleHint.Monospace)
@@ -251,6 +264,22 @@ class CodeEditor(QPlainTextEdit):
                     painter.drawLine(box_x + 2, box_y + box_size // 2, box_x + box_size - 2, box_y + box_size // 2)
                     if is_folded:
                         painter.drawLine(box_x + box_size // 2, box_y + 2, box_x + box_size // 2, box_y + box_size - 2)
+
+                indicator_width: int = 3
+                diff_state: str | None = getattr(self, "_diff_map", {}).get(block_number)
+                has_deletion_above: bool = block_number in getattr(self, "_deleted_lines", set())
+                has_deletion_below: bool = (block_number == self.blockCount() - 1) and (
+                            (block_number + 1) in getattr(self, "_deleted_lines", set()))
+
+                if diff_state == "added":
+                    painter.fillRect(0, top, indicator_width, font_metrics.height(), QColor("#4caf50"))
+                elif diff_state == "changed":
+                    painter.fillRect(0, top, indicator_width, font_metrics.height(), QColor("#2196f3"))
+
+                if has_deletion_above:
+                    painter.fillRect(0, top, indicator_width, 3, QColor("#f44336"))
+                if has_deletion_below:
+                    painter.fillRect(0, bottom - 3, indicator_width, 3, QColor("#f44336"))
 
             block = block.next()
             top = bottom
@@ -944,6 +973,47 @@ class CodeEditor(QPlainTextEdit):
 
         cursor.endEditBlock()
 
+    def set_reference_text(self, text: str) -> None:
+        """
+        Sets the reference text for diff calculation and triggers the diff update
+
+        :param text: The text to compare against
+        """
+        self._reference_text = text
+        self._compute_diff()
+
+    def _compute_diff(self) -> None:
+        """
+        Computes the differences between reference text and current text to update the gutter
+        """
+        current_text: str = self.toPlainText()
+        if not self._reference_text and not current_text:
+            self._diff_map.clear()
+            self._deleted_lines.clear()
+            self.lineNumberArea.update()
+            return
+
+        reference_lines: list[str] = self._reference_text.split("\n")
+        current_lines: list[str] = current_text.split("\n")
+
+        matcher = difflib.SequenceMatcher(None, reference_lines, current_lines)
+        diff_map: dict[int, str] = {}
+        deleted_lines: set[int] = set()
+
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "replace":
+                for j in range(j1, j2):
+                    diff_map[j] = "changed"
+            elif tag == "insert":
+                for j in range(j1, j2):
+                    diff_map[j] = "added"
+            elif tag == "delete":
+                deleted_lines.add(j1)
+
+        self._diff_map = diff_map
+        self._deleted_lines = deleted_lines
+        self.lineNumberArea.update()
+
     def _startLinting(self) -> None:
         """
         Initialize the background thread to statically lint the current text using AST
@@ -1182,7 +1252,7 @@ class CodeEditor(QPlainTextEdit):
         """
         if self.completer and self.completer.popup().isVisible():
             keys_to_ignore = (
-            Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab)
+                Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab)
             if event.key() in keys_to_ignore:
                 event.ignore()
                 return
@@ -1192,7 +1262,7 @@ class CodeEditor(QPlainTextEdit):
             return
 
         is_shortcut: bool = (
-                    event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
+                event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
         if is_shortcut:
             self.startCompleter()
             return
