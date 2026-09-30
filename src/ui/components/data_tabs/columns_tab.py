@@ -27,13 +27,13 @@ class ColumnsTab(BaseDataTab):
         self.selected_columns_label = QLabel("Selected Column(s): None")
         self.selected_columns_label.setObjectName("selectedColumnsStickyLabel")
         self.selected_columns_label.setWordWrap(True)
-        sticky_header_layout.addWidget(self.selected_columns_label)
+        sticky_header_layout.addWidget(self.selected_columns_label, 0, Qt.AlignmentFlag.AlignTop)
 
         self.hidden_columns_label = QLabel("")
         self.hidden_columns_label.setObjectName("hiddenColumnsStickyLabel")
         self.hidden_columns_label.setVisible(False)
         sticky_header_layout.addWidget(self.hidden_columns_label, 0,
-                                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         main_layout.addLayout(sticky_header_layout)
 
