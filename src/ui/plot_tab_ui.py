@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QEvent, QObject, Qt
+from PyQt6.QtCore import QEvent, QObject, QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QKeySequence
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import QFontComboBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QPushButton, QSizePolicy, \
@@ -131,12 +131,23 @@ class PlotTabUI(QWidget):
         right_widget.setLayout(right_layout)
 
         # Create splitter
-        splitter: QSplitter = self._create_splitter(left_widget, right_widget)
-        main_layout.addWidget(splitter)
+        self.splitter: QSplitter = self._create_splitter(left_widget, right_widget)
+        self.splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(self.splitter)
 
         self._setup_drawing_order_ui()
 
         self.setLayout(main_layout)
+
+    def save_splitter_state(self, settings: QSettings) -> None:
+        """Saves the current state of the splitter to QSettings"""
+        if self.splitter:
+            settings.setValue("plot_tab_splitter_state", self.splitter.saveState())
+
+    def restore_splitter_state(self, settings: QSettings) -> None:
+        """Restores the state of the splitter from QSettings"""
+        if self.splitter and settings.contains("plot_tab_splitter_state"):
+            self.splitter.restoreState(settings.value("plot_tab_splitter_state"))
 
     def _setup_drawing_order_ui(self) -> None:
         self.drawing_order_fab = DrawingOrderFloatingActionButton(self.canvas_container)

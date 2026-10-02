@@ -63,9 +63,9 @@ class DataPlotStudio(QMainWindow):
         # Load settings
         app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
         self.settings = {
-            "dark_mode"  : app_settings.value("dark_mode", False, type=bool),
-            "font_family": app_settings.value("font_family", "Consolas", type=str),
-            "font_size"  : app_settings.value("font_size", 10, type=int),
+            "dark_mode"        : app_settings.value("dark_mode", False, type=bool),
+            "font_family"      : app_settings.value("font_family", "Consolas", type=str),
+            "font_size"        : app_settings.value("font_size", 10, type=int),
             "enable_autosave"  : app_settings.value("enable_autosave", True, type=bool),
             "autosave_interval": app_settings.value("autosave_interval", 5, type=int),
         }
@@ -119,6 +119,9 @@ class DataPlotStudio(QMainWindow):
                 if current_index != -1:
                     self.main_widget.tabs.removeTab(current_index)
                     self.plot_dock.setWidget(self.main_widget.plot_tab)
+
+        self.main_widget.data_tab.restore_splitter_state(settings)
+        self.main_widget.plot_tab.restore_splitter_state(settings)
 
     def _setup_dock_widgets(self) -> None:
         """Setup of the docking panels"""
@@ -261,6 +264,8 @@ class DataPlotStudio(QMainWindow):
             settings = QSettings(f"{APPLICATION_NAME}", "AppLayout")
             settings.setValue("geometry", self.saveGeometry())
             settings.setValue("windowState", self.saveState())
+            self.main_widget.data_tab.save_splitter_state(settings)
+            self.main_widget.plot_tab.save_splitter_state(settings)
 
         if hasattr(self.main_widget, "unsaved_changes") and self.main_widget.unsaved_changes:
             reply = QMessageBox.question(

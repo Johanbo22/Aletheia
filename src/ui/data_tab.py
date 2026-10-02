@@ -3,7 +3,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QModelIndex, QObject, QPropertyAnimation, QSize, \
+from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QModelIndex, QObject, QPropertyAnimation, QSettings, \
+    QSize, \
     QTimer, Qt, \
     pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut, QWheelEvent
@@ -91,17 +92,28 @@ class DataTab(QWidget):
         left_widget: QWidget | QWidget = self._setup_left_panel()
         right_widget: QWidget | QWidget = self._setup_right_panel()
 
-        splitter: QSplitter | QSplitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
+        self.splitter: QSplitter | QSplitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.addWidget(left_widget)
+        self.splitter.addWidget(right_widget)
 
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 6)
+        self.splitter.setStretchFactor(0, 6)
+        self.splitter.setStretchFactor(1, 4)
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(self.splitter)
         self.setLayout(main_layout)
 
         self.refresh_data_view()
+
+    def save_splitter_state(self, settings: QSettings) -> None:
+        """Saves the current state of the splitter"""
+        if self.splitter:
+            settings.setValue("data_tab_splitter_state", self.splitter.saveState())
+
+    def restore_splitter_state(self, settings: QSettings) -> None:
+        """Restores the splitter state from QSettings"""
+        if self.splitter and settings.contains("data_tab_splitter_state"):
+            self.splitter.restoreState(settings.value("data_tab_splitter_state"))
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """
