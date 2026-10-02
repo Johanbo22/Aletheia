@@ -83,7 +83,7 @@ class StatusBar(QStatusBar):
         self.memory_bar.setFixedWidth(100)
         self.memory_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.memory_bar.setTextVisible(True)
-        self.memory_bar.setFormat("Mem: %p%")
+        self.memory_bar.setFormat("Mem: --")
         self.memory_bar.setProperty("usageLevel", "normal")
         self.memory_bar.setToolTip("History Buffer Memory Usage")
         self.memory_bar.hide()
@@ -326,6 +326,12 @@ class StatusBar(QStatusBar):
         self.current_anim_text = text
         self.current_anim_index = 0
         self.terminal.setText("")
+
+        if self.message_queue:
+            self.terminal.setText(text)
+            self._process_next_message()
+            return
+
         self.typewriter_timer.start()
 
     def _type_next_char(self) -> None:
@@ -388,8 +394,18 @@ class StatusBar(QStatusBar):
                     if clipboard:
                         clipboard.setText(self._full_source_path)
                         self.source_label.setText("Copied!")
+                        self.source_label.setToolTip("Path copied to clipboard")
                         QTimer.singleShot(1500, self._restore_source_label)
                 return True
+
+        if event.type() == QEvent.Type.Resize and source is self.source_label:
+            if self._full_source_path and self.source_label.text() != "Copied!":
+                metrics = self.source_label.fontMetrics()
+                full_text: str = f"Source: {self._full_source_path}"
+                elided = metrics.elidedText(full_text, Qt.TextElideMode.ElideMiddle, source.width())
+                if self.source_label.text() != elided:
+                    self.source_label.setText(elided)
+            return False
 
         return super().eventFilter(source, event)
 
@@ -417,7 +433,13 @@ class StatusBar(QStatusBar):
             return
 
         percentage: float = min((current_bytes / max_bytes) * 100, 100.0)
-        self.memory_bar.setValue(int(percentage))
+
+        if current_bytes == 0:
+            self.memory_bar.setFormat("Mem: --")
+            self.memory_bar.setValue(0)
+        else:
+            self.memory_bar.setFormat("Mem: %p%")
+            self.memory_bar.setValue(int(percentage))
 
         current_mb: float = current_bytes / (1024 * 1024)
         max_mb: float = max_bytes / (1024 * 1024)
@@ -472,6 +494,8 @@ class StatusBar(QStatusBar):
         if not show:
             self.progress_hide_timer.stop()
             self.progress_bar.hide()
+            self.progress_bar.setValue(0)
+            return
 
         self.progress_hide_timer.stop()
 
@@ -580,7 +604,9 @@ class StatusBar(QStatusBar):
             self._full_source_path = source_text
             metrics = self.source_label.fontMetrics()
             full_text = f"Source: {source_text}"
-            elided_text = metrics.elidedText(full_text, Qt.TextElideMode.ElideMiddle, 250)
+
+            width = self.source_label.width() if self.source_label.width() > 50 else 250
+            elided_text = metrics.elidedText(full_text, Qt.TextElideMode.ElideMiddle, width)
 
             self.source_label.setText(elided_text)
             self.source_label.setToolTip(f"{full_text}\n\nClick to copy full path")
@@ -596,7 +622,8 @@ class StatusBar(QStatusBar):
             return
 
         metrics = self.view_context_label.fontMetrics()
-        elided_text = metrics.elidedText(context_text, Qt.TextElideMode.ElideRight, 200)
+        width = self.view_context_label.width() if self.view_context_label.width() > 10 else 200
+        elided_text = metrics.elidedText(context_text, Qt.TextElideMode.ElideRight, width)
 
         self.view_context_label.setText(elided_text)
         self.view_context_label.setToolTip(f"Context: {context_text}")
