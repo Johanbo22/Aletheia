@@ -1,5 +1,8 @@
+from typing import Optional, TYPE_CHECKING, TypedDict
+
+import pandas as pd
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QListWidgetItem, QMessageBox
 
 from src.controller.data_controllers.base_data_controller import BaseDataController
 from src.core.aggregation_manager import AggregationManager
@@ -8,15 +11,32 @@ from src.ui.dialogs import AggregationDialog
 from src.ui.status_bar import LogLevel
 from src.ui.widgets.ToastNotification import ToastLevel
 
+if TYPE_CHECKING:
+    from src.core.data_handler import DataHandler
+    from src.core.subset_manager import SubsetManager
+    from src.ui.data_tab import DataTab
+    from src.ui.status_bar import StatusBar
+
+class AggregationConfig(TypedDict, total=False):
+    group_by: list[str]
+    agg_config: dict[str, str]
+    date_grouping: Optional[dict[str, str]]
+    aggregation_name: str
+    rename_mapping: Optional[dict[str, str]]
+
 class AggregationController(BaseDataController):
     """
     Sub-controller for handling data aggregations
     Manages the creation, saving, loading, and viewing of data aggregations
     """
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.aggregation_manager = AggregationManager()
+    def __init__(self,
+                 data_handler: "DataHandler",
+                 status_bar: "StatusBar",
+                 view: "DataTab",
+                 subset_manager: Optional["SubsetManager"] = None) -> None:
+        super().__init__(data_handler, status_bar, view, subset_manager)
+        self.aggregation_manager: AggregationManager = AggregationManager()
 
     def open_aggregation_dialog(self) -> None:
         """Open aggregation dialog to configure and apply grouping."""
@@ -44,7 +64,7 @@ class AggregationController(BaseDataController):
                 self.data_handler.pre_agg_view_df = None
                 self.view.refresh_data_view()
 
-    def _apply_and_save_aggregation(self, config: dict) -> None:
+    def _apply_and_save_aggregation(self, config: AggregationConfig) -> None:
         """Applies the aggregation configuration and optionally saves it"""
         try:
 
@@ -53,11 +73,11 @@ class AggregationController(BaseDataController):
 
             self.data_handler.reset_data()
 
-            group_cols = config.get("group_by", [])
-            agg_config = config.get("agg_config", {})
-            date_grouping = config.get("date_grouping")
-            agg_name = config.get("aggregation_name", "")
-            rename_mapping = config.get("rename_mapping")
+            group_cols: list[str] = config.get("group_by", [])
+            agg_config: dict[str, str] = config.get("agg_config", {})
+            date_grouping: Optional[dict[str, str]] = config.get("date_grouping")
+            agg_name: str = config.get("aggregation_name", "")
+            rename_mapping: Optional[dict[str, str]] = config.get("rename_mapping")
 
             self.data_handler.aggregate_data(
                 group_cols, agg_config, date_grouping, rename_mapping
@@ -85,13 +105,14 @@ class AggregationController(BaseDataController):
             if self.data_handler.df is not None:
                 self.view.refresh_data_view()
 
-    def _save_aggregation_configuration(self, agg_name: str, group_cols: list, agg_config: dict, date_grouping: dict,
-                                        rename_mapping: dict) -> None:
+    def _save_aggregation_configuration(self, agg_name: str, group_cols: list[str], agg_config: dict[str, str],
+                                        date_grouping: Optional[dict[str, str]],
+                                        rename_mapping: Optional[dict[str, str]]) -> None:
         """Saves the active aggregation configuration to the manager"""
         try:
-            desc_parts = [f"{func}({col})" for col, func in agg_config.items()]
-            description = f"Aggregated: {', '.join(desc_parts)} by {', '.join(group_cols)}"
-            result_df = self.data_handler.df.copy()
+            desc_parts: list[str] = [f"{func}({col})" for col, func in agg_config.items()]
+            description: str = f"Aggregated: {', '.join(desc_parts)} by {', '.join(group_cols)}"
+            result_df: pd.DataFrame = self.data_handler.df.copy()
 
             self.aggregation_manager.save_aggregation(
                 name=agg_name,
@@ -111,9 +132,10 @@ class AggregationController(BaseDataController):
             )
             self.status_bar.log(f"Failed to save aggregation: {str(e)}", LogLevel.ERROR)
 
-    def _log_aggregation_success(self, group_cols: list, agg_config: dict, date_grouping: dict, agg_name: str) -> None:
+    def _log_aggregation_success(self, group_cols: list[str], agg_config: dict[str, str],
+                                 date_grouping: Optional[dict[str, str]], agg_name: str) -> None:
         """Logs the successful aggregation"""
-        group_by_str = ", ".join(group_cols)
+        group_by_str: str = ", ".join(group_cols)
         self.status_bar.log_action(
             f"Aggregated data by [{group_by_str}]",
             details={
@@ -130,8 +152,8 @@ class AggregationController(BaseDataController):
     def refresh_saved_agg_list(self) -> None:
         """Refreshes the UI list of saved aggregations."""
         try:
-            agg_names = self.aggregation_manager.list_aggregations()
-            data_list = []
+            agg_names: list[str] = self.aggregation_manager.list_aggregations()
+            data_list: list[tuple[str, int]] = []
 
             if agg_names:
                 for name in agg_names:
@@ -143,19 +165,19 @@ class AggregationController(BaseDataController):
         except Exception as e:
             self.status_bar.log(f"Warning: Could not refresh aggregation list: {str(e)}", LogLevel.WARNING)
 
-    def on_saved_agg_selected(self, item) -> None:
+    def on_saved_agg_selected(self, item: Optional[QListWidgetItem]) -> None:
         """Handle selection of saved aggs in the UI table."""
-        enabled = (item is not None and item.data(Qt.ItemDataRole.UserRole) is not None)
+        enabled: bool = (item is not None and item.data(Qt.ItemDataRole.UserRole) is not None)
         self.view.operations_panel.set_aggregation_buttons_enabled(enabled)
 
     def view_saved_aggregations(self) -> None:
         """View the currently selected aggregation in the main data table."""
-        agg_name = self.view.operations_panel.get_selected_saved_aggregation()
+        agg_name: Optional[str] = self.view.operations_panel.get_selected_saved_aggregation()
         if not agg_name:
             return
 
         try:
-            agg_df = self.aggregation_manager.get_aggregation_df(agg_name)
+            agg_df: Optional[pd.DataFrame] = self.aggregation_manager.get_aggregation_df(agg_name)
             if agg_df is None:
                 global_signals.request_toast("Error", "Aggregation data not found", ToastLevel.ERROR)
                 self.status_bar.log("Error in viewing aggregation. Data is not found", LogLevel.ERROR)
@@ -223,7 +245,7 @@ class AggregationController(BaseDataController):
 
     def delete_saved_aggregation(self) -> None:
         """Delete a saved aggregation from the internal manager."""
-        agg_name = self.view.operations_panel.get_selected_saved_aggregation()
+        agg_name: Optional[str] = self.view.operations_panel.get_selected_saved_aggregation()
         if not agg_name:
             return
 
@@ -235,7 +257,7 @@ class AggregationController(BaseDataController):
         else:
             warning_text += "\n\nThis will not affect your current data view"
 
-        reply = QMessageBox.question(
+        reply: QMessageBox.StandardButton = QMessageBox.question(
             self.view,
             "Confirm Delete",
             warning_text,
