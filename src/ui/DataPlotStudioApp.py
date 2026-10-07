@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtCore import QEvent, QObject, QSettings, Qt
+from PyQt6.QtCore import QEvent, QObject, QSettings, QThreadPool, QTimer, Qt, pyqtSlot
 from PyQt6.QtGui import QAction, QCloseEvent, QFont, QIcon, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QDialog, QDockWidget, QMainWindow, QMessageBox, QPushButton, QTabBar
 
@@ -10,11 +10,12 @@ from icons.icon_registry import IconBuilder, IconType
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 from src.core.code_exporter import CodeExporter
 from src.core.data_handler import DataHandler
-from src.core.global_signals import global_signals
+from src.core.global_signals import LogLevel, global_signals
 from src.core.logger import Logger
 from src.core.project_manager import ProjectManager
 from src.core.resource_loader import get_resource_path
 from src.core.style_reloader import StyleReloader
+from src.core.version_checker import VersionCheckWorker
 from src.ui.dialogs import AboutDialog, HelpExplorerDialog, SettingsDialog
 from src.ui.main_window import MainWindow
 from src.ui.menu_bar import MenuBar
@@ -94,6 +95,8 @@ class DataPlotStudio(QMainWindow):
         if QApplication.instance() is not None:
             QApplication.instance().installEventFilter(self)
 
+        QTimer.singleShot(1500, self._check_for_updates_on_startup)
+
     def eventFilter(self, obj: QObject, event: QEvent | QKeyEvent) -> bool:
         """
         Global event filter
@@ -103,6 +106,34 @@ class DataPlotStudio(QMainWindow):
                 self.show_help_explorer()
                 return True
         return super().eventFilter(obj, event)
+
+    def _check_for_updates_on_startup(self) -> None:
+        """
+        Performs a version check against the latest release on GitHub
+        """
+        worker = VersionCheckWorker(APPLICATION_VERSION)
+        worker.signals.check_completed.connect(self._on_startup_version_check_completed)
+        worker.signals.error_object.connect(self._on_startup_version_check_failed)
+        self._startup_version_worker = worker
+        QThreadPool.globalInstance().start(worker)
+
+    @pyqtSlot(bool, str, str)
+    def _on_startup_version_check_completed(self, update_available: bool, latest_tag: str, installed_tag: str) -> None:
+        """Notifies the landing page when the installed version is outdated"""
+        self._startup_version_worker = None
+        if update_available:
+            global_signals.request_update_notification(latest_tag, installed_tag)
+            self.status_bar_widget.log(
+                f"Update available: v{latest_tag} (installed: v{installed_tag})", LogLevel.INFO
+            )
+        else:
+            self.status_bar_widget.log(f"Application is up to date (v{installed_tag})", LogLevel.INFO)
+
+    @pyqtSlot(object)
+    def _on_startup_version_check_failed(self, error: object) -> None:
+        """Logs startup version check failures"""
+        self._startup_version_worker = None
+        self.status_bar_widget.log(f"Startup version check failed: {error}", LogLevel.WARNING)
 
     def _restore_window_state(self) -> None:
         """

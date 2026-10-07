@@ -26,6 +26,17 @@ class GlobalSignals(QObject):
     toast_requested = pyqtSignal(str, str, ToastLevel, int)
     log_requested = pyqtSignal(str, str, object)
     help_explorer_requested = pyqtSignal(str)
+    update_available = pyqtSignal(str, str)
+
+    def request_update_notification(self, latest_tag: str, installed_tag: str) -> None:
+        """
+        Method to emit a update available notification globally
+        Emitted when the startup version check finds  newer GitHub release
+
+        :param latest_tag: The version tag of the latest release
+        :param installed_tag: The installed application version
+        """
+        self.update_available.emit(latest_tag, installed_tag)
 
     def request_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
                       duration_ms: int = 4000) -> None:

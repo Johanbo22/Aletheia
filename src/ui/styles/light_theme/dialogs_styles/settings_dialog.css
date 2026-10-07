@@ -1,0 +1,28 @@
+/* Contains new styling for the update status label within the SettingsDialog*/
+
+#update_status_label {
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background-color: transparent;
+    color: #333333;
+    border: 1px solid transparent;
+}
+
+#update_status_label[updateState="available"] {
+    background-color: #eaf4fe;
+    color: #1976D2;
+    border: 1px solid #b6d4fe;
+}
+
+#update_status_label[updateState="uptodate"] {
+    background-color: #edf7ed;
+    color: #27ae60;
+    border: 1px solid #c5e1a5;
+}
+
+#update_status_label[updateState="error"] {
+    background-color: #fdeded;
+    color: #e74c3c;
+    border: 1px solid #ef9a9a;
+}

@@ -52,10 +52,15 @@ class LandingPage(QWidget):
     new_dataset_clicked = pyqtSignal()
     settings_clicked = pyqtSignal()
     quit_clicked = pyqtSignal()
+    update_available = pyqtSignal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
+        self._connect_update_signal()
+
+    def _connect_update_signal(self) -> None:
+        global_signals.update_available.connect(self.update_available.emit)
 
     def init_ui(self):
         layout = QHBoxLayout(self)
