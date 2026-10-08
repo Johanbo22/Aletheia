@@ -3,7 +3,7 @@ from typing import Optional
 
 from PyQt6.QtCore import QEasingCurve, QPointF, QRect, QRectF, QSizeF, QVariantAnimation, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QMouseEvent, QPaintEvent, QPainter, QPainterPath, QPen, QPolygonF, QResizeEvent
-from PyQt6.QtWidgets import QSizePolicy, QWidget
+from PyQt6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
 class AnnotationLocatorWidget(QWidget):
     """
@@ -34,8 +34,11 @@ class AnnotationLocatorWidget(QWidget):
         self.has_arrow: bool = False
         self.arrow_preset: str = "Subtle Pointer"
         self.text_color: QColor = QColor("black")
+        self.boxstyle: str = "round"
 
         self._dragged_node: str | None = None
+        self._hovered_node: str | None = None
+        self._preview_text: str = "T"
         self._text_animation: QVariantAnimation | None = None
         self._target_animation: QVariantAnimation | None = None
         self._animation_duration: int = 250
@@ -56,10 +59,23 @@ class AnnotationLocatorWidget(QWidget):
             self.arrow_preset = preset
             self.update()
 
+    def set_boxstyle(self, style: str) -> None:
+        """Updates the visual representation of the text node to match the selected box style"""
+        if self.boxstyle != style:
+            self.boxstyle = style
+            self.update()
+
     def set_text_color(self, color: QColor) -> None:
         """Updates the text node color to match the chosen font color"""
         if self.text_color != color:
             self.text_color = color
+            self.update()
+
+    def set_preview_text(self, text: str) -> None:
+        """Updates the text preview shown inside the locator node"""
+        display_text: str = text.strip()[:3] if text.strip() else "T"
+        if self._preview_text != display_text:
+            self._preview_text = display_text
             self.update()
 
     def set_canvas_dimensions(self, width: float, height: float) -> None:
@@ -221,6 +237,13 @@ class AnnotationLocatorWidget(QWidget):
             self._dragged_node = "text"
             return
 
+        new_pos: QPointF = self._to_pos(click_pos, rect)
+        clamped_x: float = max(0.0, min(1.0, new_pos.x()))
+        clamped_y: float = max(0.0, min(1.0, new_pos.y()))
+
+        self.set_text_pos(clamped_x, clamped_y)
+        self.textPositionChanged.emit(clamped_x, clamped_y)
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Updates the internal coordinates and emits signal while dragging nodes"""
         local_pos = self.mapFromGlobal(event.globalPosition().toPoint())
@@ -232,13 +255,17 @@ class AnnotationLocatorWidget(QWidget):
             p_target = self._to_px(self.target_pos, rect)
             hit_radius = self._base_hit_radius * self.devicePixelRatioF()
 
-            hovering = False
+            new_hover: str | None = None
             if self.has_arrow and math.hypot(px.x() - p_target.x(), px.y() - p_target.y()) < hit_radius:
-                hovering = True
+                new_hover = "target"
             elif math.hypot(px.x() - p_text.x(), px.y() - p_text.y()) < hit_radius:
-                hovering = True
+                new_hover = "text"
 
-            self.setCursor(Qt.CursorShape.PointingHandCursor if hovering else Qt.CursorShape.CrossCursor)
+            if self._hovered_node != new_hover:
+                self._hovered_node = new_hover
+                self.update()
+
+            self.setCursor(Qt.CursorShape.PointingHandCursor if new_hover else Qt.CursorShape.CrossCursor)
             return
 
         old_changed = self._get_changed_rect()
@@ -260,6 +287,9 @@ class AnnotationLocatorWidget(QWidget):
         elif self._dragged_node == "target":
             self.target_pos = clamped_pos
             self.targetPositionChanged.emit(clamped_x, clamped_y)
+
+        tooltip_text: str = f"X: {clamped_x:.3f}\nY: {clamped_y:.3f}"
+        QToolTip.showText(event.globalPosition().toPoint(), tooltip_text, self)
 
         self._trigger_partial_update(old_changed)
 
@@ -311,9 +341,39 @@ class AnnotationLocatorWidget(QWidget):
         if self.has_arrow:
             self._draw_arrow_node(painter, p_text, rect, device_pixel_ratio)
 
-        painter.setBrush(QBrush(self.text_color))
+        is_text_hovered: bool = (self._hovered_node == "text")
+        base_color: QColor = self.text_color.lighter(120) if is_text_hovered else self.text_color
+
+        painter.setBrush(QBrush(base_color))
         painter.setPen(QPen(QColor(255, 255, 255, 200), 1.5 * device_pixel_ratio))
-        painter.drawEllipse(p_text, 7 * device_pixel_ratio, 7 * device_pixel_ratio)
+
+        node_radius: float = (8.5 if is_text_hovered else 7.0) * device_pixel_ratio
+        node_rect = QRectF(p_text.x() - node_radius, p_text.y() - node_radius, node_radius * 2.0, node_radius * 2.0)
+
+        if self.boxstyle == "square":
+            painter.drawRect(node_rect)
+        elif self.boxstyle == "round":
+            painter.drawRoundedRect(node_rect, 3.0 * device_pixel_ratio, 3.0 * device_pixel_ratio)
+        elif self.boxstyle == "larrow":
+            polygon = QPolygonF([
+                QPointF(node_rect.right(), node_rect.top()),
+                QPointF(node_rect.right(), node_rect.bottom()),
+                QPointF(node_rect.left() + 3.0 * device_pixel_ratio, node_rect.bottom()),
+                QPointF(node_rect.left(), node_rect.center().y()),
+                QPointF(node_rect.left() + 3.0 * device_pixel_ratio, node_rect.top())
+            ])
+            painter.drawPolygon(polygon)
+        elif self.boxstyle == "rarrow":
+            polygon = QPolygonF([
+                QPointF(node_rect.left(), node_rect.top()),
+                QPointF(node_rect.left(), node_rect.bottom()),
+                QPointF(node_rect.right() - 3.0 * device_pixel_ratio, node_rect.bottom()),
+                QPointF(node_rect.right(), node_rect.center().y()),
+                QPointF(node_rect.right() - 3.0 * device_pixel_ratio, node_rect.top())
+            ])
+            painter.drawPolygon(polygon)
+        else:
+            painter.drawEllipse(p_text, node_radius, node_radius)
 
         t_color = Qt.GlobalColor.black if self.text_color.lightness() > 150 else Qt.GlobalColor.white
         painter.setPen(QPen(t_color))
@@ -392,9 +452,14 @@ class AnnotationLocatorWidget(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawPolygon(QPolygonF([p_target, p1, p2]))
 
+        is_target_hovered: bool = (self._hovered_node == "target")
+        target_radius: float = (5.5 if is_target_hovered else 4.0) * device_pixel_ratio
+
+        target_color = line_color.lighter(120) if is_target_hovered else line_color
+
         painter.setBrush(QBrush(QColor(255, 255, 255, 150)))
-        painter.setPen(QPen(line_color, 1 * device_pixel_ratio))
-        painter.drawEllipse(p_target, 4 * device_pixel_ratio, 4 * device_pixel_ratio)
+        painter.setPen(QPen(target_color, 1 * device_pixel_ratio))
+        painter.drawEllipse(p_target, target_radius, target_radius)
 
         font = painter.font()
         font.setPixelSize(int(8 * device_pixel_ratio))

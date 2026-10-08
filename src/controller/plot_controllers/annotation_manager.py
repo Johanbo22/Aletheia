@@ -253,8 +253,12 @@ class AnnotationManager:
         self.view.annotations_tab.annotation_locator.set_arrow_enabled(has_arrow)
         self.view.annotations_tab.annotation_locator.set_arrow_preset(
             self.view.annotations_tab.arrow_preset_combo.currentText())
+        self.view.annotations_tab.annotation_locator.set_boxstyle(
+            self.view.annotations_tab.annotation_boxstyle_combo.currentText()
+        )
         self.view.annotations_tab.annotation_locator.set_text_color(QColor(self.annotation_color))
         self.view.annotations_tab.annotation_locator.set_text_pos(x, y)
+        self.view.annotations_tab.annotation_locator.set_preview_text(self.view.annotation_text.text())
         if has_arrow:
             self.view.annotations_tab.annotation_locator.set_target_pos(arrow_x, arrow_y)
 
@@ -349,9 +353,19 @@ class AnnotationManager:
             self._toggle_arrow_inputs(has_arrow)
 
             self.view.annotations_tab.annotation_locator.set_arrow_enabled(has_arrow)
-            self.view.annotations_tab.annotation_locator.set_arrow_preset(ann.get("arrow_preset", "Subtle Pointer"))
+            self.view.annotations_tab.annotation_locator.set_arrow_preset(
+                ann.get("arrow_preset", "Subtle Pointer")
+            )
+            self.view.annotations_tab.annotation_locator.set_boxstyle(
+                ann.get("boxstyle", "round")
+            )
             self.view.annotations_tab.annotation_locator.set_text_color(QColor(self.annotation_color))
-            self.view.annotations_tab.annotation_locator.set_text_pos(ann.get("x", 0.5), ann.get("y", 0.5))
+            self.view.annotations_tab.annotation_locator.set_text_pos(
+                ann.get("x", 0.5), ann.get("y", 0.5)
+            )
+            self.view.annotations_tab.annotation_locator.set_preview_text(
+                ann.get("text", "T")
+            )
             if has_arrow:
                 self.view.annotations_tab.annotation_locator.set_target_pos(ann.get("arrow_x", 0.5),
                                                                             ann.get("arrow_y", 0.4))
