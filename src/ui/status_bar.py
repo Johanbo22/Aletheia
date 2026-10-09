@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 from PyQt6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QTimer, Qt
 from PyQt6.QtGui import QAction, QMouseEvent
 from PyQt6.QtWidgets import QApplication, QFrame, QGraphicsOpacityEffect, QLabel, QLineEdit, QMenu, QProgressBar, \
-    QPushButton, QStatusBar, QWidget
+    QPushButton, QSizePolicy, QStatusBar, QWidget
 
 from src.core.global_signals import LogLevel
 from src.core.logger import Logger
@@ -101,6 +101,7 @@ class StatusBar(QStatusBar):
         self.terminal.setObjectName("status_terminal")
         self.terminal.setCursor(Qt.CursorShape.PointingHandCursor)
         self.terminal.setToolTip("Click to view Log History")
+        self.terminal.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.terminal.installEventFilter(self)
 
         # Right-click context menu
@@ -150,6 +151,9 @@ class StatusBar(QStatusBar):
 
         self.view_context_label = QLabel("")
         self.view_context_label.setObjectName("view_context_label")
+        self.view_context_label.setMinimumWidth(120)
+        self.view_context_label.installEventFilter(self)
+        self._full_view_context: str = ""
 
         self.addPermanentWidget(self._create_separator())
         self.addPermanentWidget(self.progress_bar)
@@ -407,6 +411,14 @@ class StatusBar(QStatusBar):
                     self.source_label.setText(elided)
             return False
 
+        if event.type() == QEvent.Type.Resize and source is self.view_context_label:
+            if self._full_view_context:
+                metrics = self.view_context_label.fontMetrics()
+                elided = metrics.elidedText(self._full_view_context, Qt.TextElideMode.ElideRight, source.width())
+                if self.view_context_label.text() != elided:
+                    self.view_context_label.setText(elided)
+            return False
+
         return super().eventFilter(source, event)
 
     def _restore_source_label(self) -> None:
@@ -619,8 +631,10 @@ class StatusBar(QStatusBar):
         """Update the view context label to match current viewing"""
         if not context_text or context_type == "normal":
             self._fade_widget(self.view_context_label, False)
+            self._full_view_context = ""
             return
 
+        self._full_view_context = context_text
         metrics = self.view_context_label.fontMetrics()
         width = self.view_context_label.width() if self.view_context_label.width() > 10 else 200
         elided_text = metrics.elidedText(context_text, Qt.TextElideMode.ElideRight, width)
