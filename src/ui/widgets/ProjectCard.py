@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel,
     QWidget
 
 from icons import IconBuilder, IconType
-from src.core.project_file_info import ProjectFileMetadata, format_file_size, format_saved_timestamp
+from src.core.project_file_info import ProjectFileMetadata, format_absolute_timestamp, format_file_size, \
+    format_saved_timestamp
 from src.ui.workers import ProjectMetadataWorker
 
 class ProjectCard(QFrame):
@@ -136,11 +137,22 @@ class ProjectCard(QFrame):
     cardHeight = pyqtProperty(int, _get_card_height, _set_card_height)
 
     def _animate_to(self, target_height: int, target_opacity: float) -> None:
+        current_height = self._height_animation.currentValue()
+        if current_height is None:
+            current_height = self._card_height
+
+        current_opacity = self._opacity_animation.currentValue()
+        if current_opacity is None:
+            current_opacity = self._opacity_effect.opacity()
+
         self._animation_group.stop()
-        self._height_animation.setStartValue(self._card_height)
+
+        self._height_animation.setStartValue(current_height)
         self._height_animation.setEndValue(target_height)
-        self._opacity_animation.setStartValue(self._opacity_effect.opacity())
+
+        self._opacity_animation.setStartValue(current_opacity)
         self._opacity_animation.setEndValue(target_opacity)
+
         self._animation_group.start()
 
     def _update_expansion_state(self) -> None:
@@ -192,9 +204,11 @@ class ProjectCard(QFrame):
         try:
             stat_result = Path(self.file_path).stat()
             self._saved_label.setText(f"Saved: {format_saved_timestamp(stat_result.st_mtime)}")
+            self._saved_label.setToolTip(format_absolute_timestamp(stat_result.st_mtime))
             self._size_label.setText(f"Size: {format_file_size(stat_result.st_size)}")
         except OSError:
             self._saved_label.setText("Saved: unavailable")
+            self._saved_label.setToolTip("unavailable")
             self._size_label.setText("Size: unavailable")
 
         self._shape_label.setText("Shape: loading...")

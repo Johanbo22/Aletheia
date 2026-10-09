@@ -6,6 +6,7 @@ These functions are to gather the metadata at runtime before ProjectManager.load
 
 import io
 import json
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
@@ -102,7 +103,31 @@ def format_file_size(size_bytes: int) -> str:
     return f"{size:.1f} {unit}"
 
 def format_saved_timestamp(timestamp: float) -> str:
-    """Re formats a POSIX_timestamp into a datesime string"""
+    """Formats a POSIX timestamp into a relative time string"""
+    try:
+        difference: float = max(0.0, time.time() - timestamp)
+
+        intervals: tuple[tuple[int, str], ...] = (
+            (31536000, "year"),
+            (2592000, "month"),
+            (86400, "day"),
+            (3600, "hour"),
+            (60, "minute"),
+        )
+
+        for seconds, unit in intervals:
+            if difference > seconds:
+                count = int(difference // seconds)
+                suffix = "" if count == 1 else "s"
+                return f"{count} {unit}{suffix} ago"
+
+        return "just now"
+
+    except (TypeError, ValueError, OverflowError):
+        return "Unknown"
+
+def format_absolute_timestamp(timestamp: float) -> str:
+    """Formats a POSIX timestamp into an absolute datetime string."""
     try:
         return datetime.fromtimestamp(timestamp).strftime("%b %d, %Y at %I:%M %p")
     except (OverflowError, OSError, ValueError):
