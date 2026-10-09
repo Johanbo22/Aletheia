@@ -141,6 +141,14 @@ class DataTabController:
         """Rename selected column"""
         self.column_controller.rename_column()
 
+    def set_index(self) -> None:
+        """Set selected column as the DataFrame index"""
+        self.column_controller.set_index()
+
+    def reset_index(self) -> None:
+        """Reset the DataFrame index"""
+        self.column_controller.reset_index()
+
     def duplicate_column(self) -> None:
         """Duplicate the selected column"""
         self.column_controller.duplicate_column()

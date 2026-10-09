@@ -769,6 +769,10 @@ class DataTab(QWidget):
                 return f"Drop Column: {cols}"
             case "rename_column":
                 return f"Rename: {operation.get('old_name')} -> {operation.get('new_name')}"
+            case "set_index":
+                return f"Set Index: {operation.get('column')}"
+            case "reset_index":
+                return "Reset Index"
             case "change_data_type":
                 return f"Data type change: {operation.get('column')} -> {operation.get('new_type')}"
             case "fill_missing":

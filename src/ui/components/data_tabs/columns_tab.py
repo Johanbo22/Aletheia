@@ -113,6 +113,20 @@ class ColumnsTab(BaseDataTab):
             icon_type=IconType.RenameColumn
         ))
         layout.addLayout(self._create_operation_row(
+            title="Set as Index",
+            tooltip="Use this to set the selected column as the row index",
+            callback=self.controller.set_index,
+            help_id="set_index",
+            icon_type=IconType.DataTransform
+        ))
+        layout.addLayout(self._create_operation_row(
+            title="Reset Index",
+            tooltip="Reset the index back to sequential numbers and keep the current index as a column",
+            callback=self.controller.reset_index,
+            help_id="reset_index",
+            icon_type=IconType.RefreshItem
+        ))
+        layout.addLayout(self._create_operation_row(
             title="Duplicate Column",
             tooltip="Create an exact copy of the selected column",
             callback=self.controller.duplicate_column,

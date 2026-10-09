@@ -567,7 +567,13 @@ class DiffHistoryManager:
 
         # Reshape array layout to map to the forward state
         if new_index is not None and not df.index.equals(new_index):
-            df = df.reindex(new_index)
+            try:
+                df = df.reindex(new_index)
+            except ValueError:
+                if len(df) == len(new_index):
+                    df.index = new_index
+                else:
+                    df = pd.DataFrame(index=new_index, columns=df.columns)
 
         # Remove dropped columns
         for col_name in diff_record.dropped_columns:

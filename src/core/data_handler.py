@@ -365,6 +365,10 @@ class DataHandler:
                 column_index=kwargs.get("col"),
                 value=kwargs.get("value"),
             )
+        elif op_type == "set_index":
+            self.set_index(column=kwargs.get("column"))
+        elif op_type == "reset_index":
+            self.reset_index(drop=kwargs.get("drop", False))
         elif op_type in ["merge", "concatenate", "export_google_sheets"]:
             return
         else:
@@ -456,6 +460,54 @@ class DataHandler:
             old_df=old_df,
             operation_type=OperationType.MODIFY_COLUMN,
             operation_params={"type": "update_cell", "row": row_index, "col": column_index, "value": value}
+        )
+
+    def set_index(self, column: str) -> pd.DataFrame:
+        """
+        Set the DataFrame index using an existing column
+
+        :param column: The name of the column to become the new index
+        :return: The updated DataFrame
+        """
+        if self.df is None:
+            raise ValueError("No data loaded")
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found")
+
+        old_df = self.df.copy(deep=False)
+        changed_df = self.df.set_index(column, drop=False)
+
+        return self._apply_changes(
+            changed_df,
+            {"type": "set_index", "column": column},
+            old_df=old_df,
+            operation_type=OperationType.CUSTOM,
+            operation_params={"type": "set_index", "column": column}
+        )
+
+    def reset_index(self, drop: bool = False) -> pd.DataFrame:
+        """
+        Reset the DataFrame index
+
+        :param drop: If True the current index is discarded
+        :return: The updated DataFrame object
+        """
+        if self.df is None:
+            raise ValueError("No data loaded")
+
+        old_df = self.df.copy(deep=False)
+
+        index_names = [name if name is not None else "index" for name in self.df.index.names]
+        collision = any(name in self.df.columns for name in index_names)
+
+        changed_df = self.df.reset_index(drop=True if collision else drop)
+
+        return self._apply_changes(
+            changed_df,
+            {"type": "reset_index", "drop": drop},
+            old_df=old_df,
+            operation_type=OperationType.CUSTOM,
+            operation_params={"type": "reset_index", "drop": drop}
         )
 
     def filter_data(self, column: str = None, condition: str = None, value: Any = None,

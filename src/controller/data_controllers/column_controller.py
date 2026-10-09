@@ -138,6 +138,68 @@ class ColumnController(BaseDataController):
             except Exception as e:
                 self.status_bar.log(f"Failed to rename column: {str(e)}", LogLevel.ERROR)
 
+    def set_index(self) -> None:
+        """Set the selected column as the DataFrame index"""
+        if self.data_handler.df is None:
+            self.no_data_loaded_toast()
+            return
+
+        selected_columns = self.view.operations_panel.get_selected_columns()
+
+        if not selected_columns:
+            self.status_bar.log("No columns selected", LogLevel.WARNING)
+            global_signals.request_toast(
+                "No Column Selected", "Please select a column to set as index", ToastLevel.WARNING
+            )
+            return
+
+        if len(selected_columns) > 1:
+            global_signals.request_toast(
+                "Selection Warning", "Please select only one columns for the index", ToastLevel.WARNING
+            )
+            return
+
+        col_name = selected_columns[0]
+
+        try:
+            self.data_handler.set_index(col_name)
+            self.view.refresh_data_view()
+            self.status_bar.log_action(
+                f"Set column '{col_name}' as index",
+                details={
+                    "column"   : col_name,
+                    "operation": "set_index"
+                },
+                level=LogLevel.SUCCESS
+            )
+            global_signals.request_toast(
+                "Index Set", f"Column '{col_name}' is now the index", ToastLevel.SUCCESS
+            )
+        except Exception as err:
+            self.status_bar.log(f"Failed to set index: {str(err)}", LogLevel.ERROR)
+            global_signals.request_toast("Error", "Failed to set index", ToastLevel.ERROR)
+
+    def reset_index(self) -> None:
+        """Reset the DataFrame index back to the sequential ints"""
+        if self.data_handler.df is None:
+            self.no_data_loaded_toast()
+            return
+
+        try:
+            self.data_handler.reset_index(drop=False)
+            self.view.refresh_data_view()
+            self.status_bar.log_action(
+                "Reset DataFrame index",
+                details={"operation": "reset_index"},
+                level=LogLevel.SUCCESS,
+            )
+            global_signals.request_toast(
+                "Index Reset", "The DataFrame index has been reset.", ToastLevel.SUCCESS
+            )
+        except Exception as err:
+            self.status_bar.log(f"Failed to reset index: {str(err)}", LogLevel.ERROR)
+            global_signals.request_toast("Error", "Failed to reset index", ToastLevel.ERROR)
+
     def duplicate_column(self) -> None:
         """Duplicate the selected column."""
         if self.data_handler.df is None:
