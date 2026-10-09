@@ -385,7 +385,7 @@ class AnnotationLocatorWidget(QWidget):
 
         text_rect = QRectF(p_text.x() - 7 * device_pixel_ratio, p_text.y() - 7 * device_pixel_ratio,
                            14 * device_pixel_ratio, 14 * device_pixel_ratio)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "T")
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, self._preview_text)
 
     @staticmethod
     def _draw_grid_and_axes(painter: QPainter, rect: QRectF, device_pixel_ratio: float) -> None:
