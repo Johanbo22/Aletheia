@@ -62,10 +62,13 @@ class ColumnsTab(BaseDataTab):
         column_column_info.setProperty("styleClass", "info_text")
         layout.addWidget(column_column_info)
 
+        selection_group = QGroupBox("Column Selection")
+        selection_layout = QVBoxLayout()
+
         self.column_search_input = QLineEdit()
         self.column_search_input.setPlaceholderText("Search columns...")
         self.column_search_input.textChanged.connect(self._on_column_search_changed)
-        layout.addWidget(self.column_search_input)
+        selection_layout.addWidget(self.column_search_input)
 
         bulk_layout = QHBoxLayout()
         self.show_all_btn = QPushButton("Show All")
@@ -81,7 +84,7 @@ class ColumnsTab(BaseDataTab):
         self.copy_selected_btn.clicked.connect(self._on_copy_selected_clicked)
         bulk_layout.addWidget(self.copy_selected_btn)
 
-        layout.addLayout(bulk_layout)
+        selection_layout.addLayout(bulk_layout)
 
         self.column_list = QListWidget()
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -89,57 +92,77 @@ class ColumnsTab(BaseDataTab):
         self.column_list.itemSelectionChanged.connect(self._update_selection_label)
         self.column_list.itemDoubleClicked.connect(self._on_column_double_clicked)
         self.column_list.itemChanged.connect(self._on_item_changed)
-        layout.addWidget(self.column_list)
 
-        layout.addLayout(self._create_operation_row(
+        selection_layout.addWidget(self.column_list)
+
+        selection_group.setLayout(selection_layout)
+        layout.addWidget(selection_group)
+
+        layout.addSpacing(10)
+
+        general_group = QGroupBox("General Operation")
+        general_layout = QVBoxLayout()
+
+        general_layout.addLayout(self._create_operation_row(
             title="Column Reorder Tool",
             tooltip="Open an interactive preview of your data to visually drag and drop column headers into a new order",
             callback=self.controller.open_column_reorder_dialog,
             help_id="reorder_columns",
             icon_type=IconType.DataTransform
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Drop Column",
             tooltip="Use this to remove the selected column from the dataset",
             callback=self.controller.drop_column,
             help_id="drop_column",
             icon_type=IconType.DropColumn
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Rename Column",
             tooltip="Use this to rename the selected column",
             callback=self.controller.rename_column,
             help_id="rename_column",
             icon_type=IconType.RenameColumn
         ))
-        layout.addLayout(self._create_operation_row(
-            title="Set as Index",
-            tooltip="Use this to set the selected column as the row index",
-            callback=self.controller.set_index,
-            help_id="set_index",
-            icon_type=IconType.DataTransform
-        ))
-        layout.addLayout(self._create_operation_row(
-            title="Reset Index",
-            tooltip="Reset the index back to sequential numbers and keep the current index as a column",
-            callback=self.controller.reset_index,
-            help_id="reset_index",
-            icon_type=IconType.RefreshItem
-        ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Duplicate Column",
             tooltip="Create an exact copy of the selected column",
             callback=self.controller.duplicate_column,
             help_id="duplicate_column",
             icon_type=IconType.DuplicateColumn
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Compute Column",
             tooltip="Create a new column based on a formula (eg Total = Price * Quantity)",
             callback=self.controller.open_computed_column_dialog,
             help_id="compute_column",
             icon_type=IconType.Calculator
         ))
+
+        general_group.setLayout(general_layout)
+        layout.addWidget(general_group)
+
+        index_group = QGroupBox("Index Operations")
+        index_layout = QVBoxLayout()
+
+        index_layout.addLayout(self._create_operation_row(
+            title="Set as Index",
+            tooltip="Use this to set the selected column as the row index",
+            callback=self.controller.set_index,
+            help_id="set_index",
+            icon_type=IconType.DataTransform
+        ))
+        index_layout.addLayout(self._create_operation_row(
+            title="Reset Index",
+            tooltip="Reset the index back to sequential numbers and keep the current index as a column",
+            callback=self.controller.reset_index,
+            help_id="reset_index",
+            icon_type=IconType.RefreshItem
+        ))
+
+        index_group.setLayout(index_layout)
+        layout.addWidget(index_group)
+
         layout.addSpacing(10)
 
         # Data Type conversion
