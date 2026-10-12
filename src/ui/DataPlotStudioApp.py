@@ -20,6 +20,7 @@ from src.ui.dialogs import AboutDialog, HelpExplorerDialog, SettingsDialog
 from src.ui.main_window import MainWindow
 from src.ui.menu_bar import MenuBar
 from src.ui.status_bar import StatusBar
+from src.ui.widgets.CustomTitleBar import CustomTitleBar
 
 # Simple Monkeypatch for now. Needs fixing.
 # TODO fix this. Must be removed at some point.
@@ -41,6 +42,7 @@ class DataPlotStudio(QMainWindow):
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
         self.resize(1280, 720)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
 
         # !FOR DEBUGGING ONLY
         self._current_settings: dict = {}
@@ -74,7 +76,9 @@ class DataPlotStudio(QMainWindow):
 
         # Create the menu bar
         self.menu_bar = MenuBar(self)
-        self.setMenuBar(self.menu_bar)
+        self.menu_bar.setNativeMenuBar(False)
+        self.custom_title_bar = CustomTitleBar(self, self.menu_bar)
+        self.setMenuWidget(self.custom_title_bar)
 
         # Create the main widget
         self.main_widget = MainWindow(
@@ -237,7 +241,7 @@ class DataPlotStudio(QMainWindow):
         global_signals.help_explorer_requested.connect(self.show_help_explorer_for_topic)
 
         # Window state signals
-        window_menu = self.menuBar().addMenu("&Window")
+        window_menu = self.menu_bar.addMenu("&Window")
         reset_layout_action = QAction("Reset Window Layout", self)
         reset_layout_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
         reset_layout_action.setToolTip("Restores all docks and tabs to their default position")
