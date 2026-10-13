@@ -77,23 +77,20 @@ class LandingPage(QWidget):
 
         # Logo and title
         logo_label = QLabel()
-        logo_pixmap = IconBuilder.build(IconType.AppIcon).pixmap(72, 72)
+        logo_pixmap_sizeXY: int = 72
+        logo_pixmap = IconBuilder.build(IconType.AppIcon).pixmap(logo_pixmap_sizeXY, logo_pixmap_sizeXY)
         if not logo_pixmap.isNull():
-            logo_label.setPixmap(logo_pixmap.scaled(72, 72, Qt.AspectRatioMode.KeepAspectRatio,
-                                                    Qt.TransformationMode.SmoothTransformation))
+            logo_label.setPixmap(
+                logo_pixmap.scaled(logo_pixmap_sizeXY, logo_pixmap_sizeXY, Qt.AspectRatioMode.KeepAspectRatio,
+                                   Qt.TransformationMode.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title_label = QLabel(f"{APPLICATION_NAME}")
         title_label.setObjectName("landing_title")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        subtitle_label = QLabel("Data Manipulation and Visualization Tool")
-        subtitle_label.setObjectName("landing_subtitle")
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         actions_layout.addWidget(logo_label)
         actions_layout.addWidget(title_label)
-        actions_layout.addWidget(subtitle_label)
 
         separator = QFrame()
         separator.setObjectName("sidebar_separator")
@@ -136,8 +133,9 @@ class LandingPage(QWidget):
 
         actions_layout.addSpacing(10)
 
+        spacing_between_actions: int = 15
         split_layout = QHBoxLayout()
-        split_layout.setSpacing(15)
+        split_layout.setSpacing(spacing_between_actions)
 
         left_actions_layout = QVBoxLayout()
         left_actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -146,13 +144,13 @@ class LandingPage(QWidget):
         left_actions_layout.addWidget(self.button_open)
         left_actions_layout.addWidget(self.button_new)
 
-        left_actions_layout.addSpacing(15)
+        left_actions_layout.addSpacing(spacing_between_actions)
         left_actions_layout.addWidget(create_section_label("Import Data"))
         left_actions_layout.addWidget(self.button_import_file)
         left_actions_layout.addWidget(self.button_import_sheet)
         left_actions_layout.addWidget(self.button_import_db)
 
-        left_actions_layout.addSpacing(15)
+        left_actions_layout.addSpacing(spacing_between_actions)
         left_actions_layout.addWidget(create_section_label("Application"))
         left_actions_layout.addWidget(self.button_settings)
         left_actions_layout.addWidget(self.button_quit)
@@ -165,7 +163,7 @@ class LandingPage(QWidget):
         right_recent_layout.addWidget(create_section_label("Recent Projects"))
 
         self.recent_projects_layout = QVBoxLayout()
-        self.recent_projects_layout.setSpacing(15)
+        self.recent_projects_layout.setSpacing(spacing_between_actions)
         self.recent_projects_layout.setContentsMargins(0, 0, 0, 0)
         right_recent_layout.addLayout(self.recent_projects_layout)
         self._recent_button_width = button_width
@@ -175,7 +173,8 @@ class LandingPage(QWidget):
 
         vertical_separator = QFrame()
         vertical_separator.setObjectName("landing_vertical_separator")
-        vertical_separator.setFixedWidth(2)
+        vertical_separator_width: int = 2
+        vertical_separator.setFixedWidth(vertical_separator_width)
 
         split_layout.addLayout(left_actions_layout)
         split_layout.addWidget(vertical_separator)
@@ -194,16 +193,17 @@ class LandingPage(QWidget):
         info_panel.setFrameShape(QFrame.Shape.StyledPanel)
 
         shadow_effect = QGraphicsDropShadowEffect(self)
-        shadow_effect.setBlurRadius(30)
+        blur_radius: int = 30
+        shadow_effect.setBlurRadius(blur_radius)
         shadow_effect.setColor(QColor(0, 0, 0, 35))
         shadow_effect.setOffset(0, 8)
         info_panel.setGraphicsEffect(shadow_effect)
 
         info_layout = QVBoxLayout(info_panel)
         info_layout.setContentsMargins(30, 30, 30, 30)
-        info_layout.setSpacing(15)
+        info_layout.setSpacing(spacing_between_actions)
 
-        whats_new_header_layout = QHBoxLayout()
+        whats_new_header_layout = QVBoxLayout()
         whats_new_header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         info_title = QLabel("What's New")
@@ -214,7 +214,6 @@ class LandingPage(QWidget):
 
         whats_new_header_layout.addWidget(info_title)
         whats_new_header_layout.addWidget(app_version)
-        whats_new_header_layout.addStretch()
 
         whats_new_content = "<h3 style='color:red'>Loading failed</h3>"
         try:
@@ -271,7 +270,8 @@ class LandingPage(QWidget):
         elif link == "past_versions":
             self.show_changelog_popup("Version History", mode=ParseMode.History)
 
-    def _create_action_button(self, text: str, icon_type: IconType, signal: pyqtSignal, width: int,
+    @staticmethod
+    def _create_action_button(text: str, icon_type: IconType, signal: pyqtSignal, width: int,
                               object_name: str = "") -> QPushButton:
         """Creates an action button"""
         button = QPushButton(text)
@@ -301,7 +301,8 @@ class LandingPage(QWidget):
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.exec()
 
-    def _open_folder_in_explorer(self, file_path_str: str) -> None:
+    @staticmethod
+    def _open_folder_in_explorer(file_path_str: str) -> None:
         """Opens the folder containing the project file in the system file explorer"""
         file_path = Path(file_path_str)
         if file_path.exists():

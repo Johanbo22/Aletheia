@@ -23,15 +23,6 @@ QLabel#landing_title {
     color: #f8fafc;
 }
 
-QLabel#landing_subtitle {
-    font-size: 12px;
-    font-weight: bold;
-    color: #94a3b8;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 30px;
-}
-
 QLabel[styleClass="landing_section_label"] {
     color: #64748b;
     font-size: 11px;
