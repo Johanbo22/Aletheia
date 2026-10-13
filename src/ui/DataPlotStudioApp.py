@@ -42,7 +42,6 @@ class DataPlotStudio(QMainWindow):
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
         self.resize(1280, 720)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
 
         # !FOR DEBUGGING ONLY
         self._current_settings: dict = {}
