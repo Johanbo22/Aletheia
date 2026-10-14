@@ -5,8 +5,8 @@ from pathlib import Path
 from PyQt6.QtCore import QEvent, QObject, QSettings, Qt
 from PyQt6.QtGui import QColor, QIcon, QKeySequence
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWidgets import QFontComboBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QPushButton, QSizePolicy, \
-    QSplitter, QStackedLayout, QToolBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QFontComboBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QPushButton, QSizePolicy, QSplitter, QStackedLayout, QToolBox, QToolButton, QVBoxLayout, \
+    QWidget
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
@@ -40,6 +40,9 @@ class PlotTabUI(QWidget):
             if hasattr(action, "text") and callable(action.text):
                 if action.text() in tools_to_remove:
                     self.toolbar.removeAction(action)
+
+        for button in self.toolbar.findChildren(QToolButton):
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.canvas_container = QFrame()
         self.canvas_container.setObjectName("CanvasContainer")
