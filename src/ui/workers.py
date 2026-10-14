@@ -236,7 +236,7 @@ class FetchSchemaWorker(QRunnable):
                 schema_data.append({"table": table, "columns": columns})
 
             self.signals.finished.emit(schema_data)
-        except Exception as err:
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as err:
             self.signals.error.emit(err)
         finally:
             if engine is not None:
