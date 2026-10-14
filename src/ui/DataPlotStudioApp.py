@@ -1,6 +1,6 @@
 # ui/DataPlotStudioApp.py
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from PyQt6.QtCore import QEvent, QObject, QSettings, QThreadPool, QTimer, Qt, pyqtSlot
 from PyQt6.QtGui import QAction, QCloseEvent, QFont, QIcon, QKeyEvent, QKeySequence, QShortcut
@@ -16,6 +16,7 @@ from src.core.project_manager import ProjectManager
 from src.core.resource_loader import get_resource_path
 from src.core.style_reloader import StyleReloader
 from src.core.version_checker import VersionCheckWorker
+from src.startup.startup_splash_screen import StartupStage
 from src.ui.dialogs import AboutDialog, HelpExplorerDialog, SettingsDialog
 from src.ui.main_window import MainWindow
 from src.ui.menu_bar import MenuBar
@@ -36,8 +37,9 @@ QDialog.exec = _non_blocking_exec
 class DataPlotStudio(QMainWindow):
     """Main Application shell"""
 
-    def __init__(self) -> None:
+    def __init__(self, status_callback: Optional[Callable[[StartupStage | str], None]] = None) -> None:
         super().__init__()
+        self._status_callback: Optional[Callable[[StartupStage | str], None]] = status_callback
         self.setWindowTitle(f"{APPLICATION_NAME} - v{APPLICATION_VERSION}")
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
@@ -47,6 +49,7 @@ class DataPlotStudio(QMainWindow):
         self._current_settings: dict = {}
         self._style_reloader: Optional[StyleReloader] = None
 
+        self._report_startup_status(StartupStage.CORE_MANAGERS)
         # Initialize the core managers
         self.project_manager = ProjectManager()
         self.data_handler = DataHandler()
@@ -63,6 +66,7 @@ class DataPlotStudio(QMainWindow):
         self.status_bar_widget.log(f"{APPLICATION_NAME} started", "INFO")
 
         # Load settings
+        self._report_startup_status(StartupStage.SETTINGS_AND_THEME)
         app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
         self.settings = {
             "dark_mode"        : app_settings.value("dark_mode", False, type=bool),
@@ -74,12 +78,14 @@ class DataPlotStudio(QMainWindow):
         self.apply_settings(self.settings)
 
         # Create the menu bar
+        self._report_startup_status(StartupStage.MENU_AND_TITLEBAR)
         self.menu_bar = MenuBar(self)
         self.menu_bar.setNativeMenuBar(False)
         self.custom_title_bar = CustomTitleBar(self, self.menu_bar)
         self.setMenuWidget(self.custom_title_bar)
 
         # Create the main widget
+        self._report_startup_status(StartupStage.MAIN_WORKSPACE)
         self.main_widget = MainWindow(
             self.data_handler,
             self.project_manager,
@@ -88,17 +94,28 @@ class DataPlotStudio(QMainWindow):
             self.status_bar_widget
         )
         self.setCentralWidget(self.main_widget)
+
+        self._report_startup_status(StartupStage.DOCK_PANELS)
         self._setup_dock_widgets()
-
         self._connect_signals()
-        self._restore_window_state()
 
+        self._report_startup_status(StartupStage.RESTORING_LAYOUT)
+        self._restore_window_state()
         self.main_widget._update_window_title()
 
         if QApplication.instance() is not None:
             QApplication.instance().installEventFilter(self)
 
         QTimer.singleShot(1500, self._check_for_updates_on_startup)
+
+    def _report_startup_status(self, stage: StartupStage) -> None:
+        """
+        Forwards the current init stage to the status callback
+        :param stage: The StartupStage event
+        """
+        if self._status_callback is None:
+            return
+        self._status_callback(stage)
 
     def eventFilter(self, obj: QObject, event: QEvent | QKeyEvent) -> bool:
         """

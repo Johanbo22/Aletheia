@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QSharedMemory
-from PyQt6.QtWidgets import QApplication, QSplashScreen
+from PyQt6.QtWidgets import QApplication
 
-from src import appInit
 from src.core.error_handler import GlobalErrorHandler
+from src.startup import appInit
 from src.ui.DataPlotStudioApp import DataPlotStudio
 
 def main():
@@ -24,16 +24,22 @@ def main():
     error_handler.setup_hooks()
 
     app = QApplication(sys.argv)
-    
+
     appInit.apply_global_ui_filters(app)
     instance_lock: QSharedMemory = appInit.enforce_single_instance()
-    splash_screen: QSplashScreen = appInit.display_splash_screen(app)
+    splash_screen: appInit.StartupSplashScreen = appInit.display_splash_screen(app)
 
+    splash_screen.update_status(appInit.StartupStage.BACKGROUND_SERVICES)
     appInit.initialize_background_services(app)
+
+    splash_screen.update_status(appInit.StartupStage.TRANSLATIONS)
     appInit.setup_translations(app)
+
+    splash_screen.update_status(appInit.StartupStage.METADATA)
     appInit.register_application_metadata()
 
-    window = DataPlotStudio()
+    splash_screen.update_status(appInit.StartupStage.READY)
+    window = DataPlotStudio(status_callback=splash_screen.update_status)
 
     if os.environ.get("ENV") == "development":
         window.enable_live_reloader()
@@ -41,7 +47,7 @@ def main():
 
     window.showMaximized()
     splash_screen.finish(window)
-    
+
     gc.collect()
 
     sys.exit(app.exec())
