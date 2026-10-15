@@ -4,8 +4,8 @@ from PyQt6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QFontComboBox,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QPushButton, QRadioButton, QSlider, QSpinBox, QTabWidget, QVBoxLayout, \
     QWidget
 
-from src.core.help_manager import HelpManager
 from icons import IconBuilder, IconType
+from src.core.help_manager import HelpManager
 from src.ui.dialogs import HelpDialog
 from src.ui.widgets import ToggleSwitch
 
@@ -224,7 +224,7 @@ class PlotSettingsPanel(QWidget):
     def setup_search_bar_shortcuts(self) -> None:
         """Sets up the keyboard shortcuts for activating and closing settings searching"""
         self.search_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self)
-        self.search_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.search_shortcut.setContext(Qt.ShortcutContext.WindowShortcut)
         self.search_shortcut.activated.connect(self.open_search)
 
         self.close_shortcut = QShortcut(QKeySequence("Esc"), self.settings_search_input)
@@ -746,14 +746,31 @@ class PlotSettingsPanel(QWidget):
 
     def open_search(self) -> None:
         """Displays the search bar with the slide animation and focuses input"""
-        self.settings_search_input.setVisible(True)
-        self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(0.0)
-        self.opacity_animation.setEndValue(1.0)
+        is_already_open: bool = (
+                self.settings_search_input.isVisible()
+                and self.slide_animation.state() != QPropertyAnimation.State.Running
+                and self.settings_search_input.maximumHeight() > 0
+        )
+        if is_already_open:
+            self.settings_search_input.setFocus()
+            self.settings_search_input.selectAll()
+            return
 
+        self._disconnect_close_animation()
+        self.settings_search_input.setVisible(True)
+
+        current_opacity: float = self.opacity_effect.opacity()
+        end_opacity: float = 1.0
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(current_opacity)
+        self.opacity_animation.setEndValue(end_opacity)
+
+        current_height: int = self.settings_search_input.height()
+        max_height: int = 28
+        target_height: int = max(self.settings_search_input.sizeHint().height(), max_height)
         self.slide_animation.stop()
-        self.slide_animation.setStartValue(0)
-        target_height: int = max(self.settings_search_input.sizeHint().height(), 28)
+
+        self.slide_animation.setStartValue(current_height)
         self.slide_animation.setEndValue(target_height)
 
         self.opacity_animation.start()
@@ -764,21 +781,38 @@ class PlotSettingsPanel(QWidget):
 
     def close_search(self) -> None:
         """Hides the search bar with a slide animation and clears the input"""
-        self.opacity_animation.stop()
-        self.opacity_animation.setStartValue(1.0)
-        self.opacity_animation.setEndValue(0.0)
+        if not self.settings_search_input.isVisible():
+            return
 
+        self._disconnect_close_animation()
+
+        current_opacity: float = self.opacity_effect.opacity()
+        end_opacity: float = 0.0
+        self.opacity_animation.stop()
+        self.opacity_animation.setStartValue(current_opacity)
+        self.opacity_animation.setEndValue(end_opacity)
+
+        current_height: int = self.settings_search_input.height()
+        end_height: int = 0
         self.slide_animation.stop()
-        self.slide_animation.setStartValue(self.settings_search_input.height())
-        self.slide_animation.setEndValue(0)
+
+        self.slide_animation.setStartValue(current_height)
+        self.slide_animation.setEndValue(end_height)
         self.slide_animation.finished.connect(self._on_close_animation_finished)
 
         self.opacity_animation.start()
         self.slide_animation.start()
 
+    def _disconnect_close_animation(self) -> None:
+        """Disconnect the close animation if it is connected"""
+        try:
+            self.slide_animation.finished.disconnect(self._on_close_animation_finished)
+        except TypeError:
+            pass
+
     def _on_close_animation_finished(self) -> None:
         """Called when the close animation finished to hide the widget"""
-        self.slide_animation.finished.disconnect(self._on_close_animation_finished)
+        self._disconnect_close_animation()
         self.settings_search_input.hide()
         self.settings_search_input.clear()
 
