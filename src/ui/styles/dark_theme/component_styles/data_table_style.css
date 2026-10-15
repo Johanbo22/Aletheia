@@ -1,6 +1,12 @@
 /*
 Dark theme styling for the main data table
 */
+#MainDataTable,
+#MainDataTable:focus {
+    border: 1px solid #475569;
+    outline: none;
+}
+
 #MainDataHeader::section {
     background-color: #1e293b;
     color: #f1f5f9;
