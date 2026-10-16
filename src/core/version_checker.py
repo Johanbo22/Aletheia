@@ -91,8 +91,15 @@ def fetch_latest_release_tag(timeout: int = REQUEST_TIMEOUT_SEC) -> str:
         "Accept"    : "application/vnd.github+json",
         "User-Agent": f"{APPLICATION_NAME}/{APPLICATION_VERSION}",
     }
-    response = requests.get(LATEST_RELEASE_API_URL, headers=headers, timeout=timeout)
-    response.raise_for_status()
+    try:
+        response = requests.get(LATEST_RELEASE_API_URL, headers=headers, timeout=timeout)
+        response.raise_for_status()
+    except requests.exceptions.Timeout:
+        raise ConnectionError("Connection timeout while checking for updates")
+    except requests.exceptions.ConnectionError:
+        raise ConnectionError("Unable to connect to GitHub to check for updates. Please verify your internet connection")
+    except requests.exceptions.RequestException as err:
+        raise RuntimeError(f"Failed to check for updates: {str(err)}")
 
     payload = response.json()
     if not isinstance(payload, dict):
