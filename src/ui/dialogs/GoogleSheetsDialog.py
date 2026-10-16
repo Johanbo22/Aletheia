@@ -1,7 +1,7 @@
 import re
 from typing import NamedTuple, Optional
 
-from PyQt6.QtCore import QSettings, QTimer, Qt
+from PyQt6.QtCore import QSettings, QThreadPool, QTimer, Qt, pyqtSlot
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox, QDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
     QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget
@@ -10,6 +10,7 @@ from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME
 from src.core.global_signals import ToastLevel, global_signals
 from src.core.resource_loader import get_resource_path
+from src.ui.workers import InternetConnectionCheckWorker
 
 class GoogleSheetsImportConfig(NamedTuple):
     """Payload for Google Sheets import config"""
@@ -25,6 +26,7 @@ class GoogleSheetsDialog(QDialog):
 
     _SHEET_ID_PATTERN = re.compile(r"/d/([a-zA-Z0-0-_]+)")
     _GID_PATTERN = re.compile(r"[#&?]gid=([0-9]+)")
+    INTERNET_CONNECTION_ICON_SIZE: int = 24
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -36,8 +38,38 @@ class GoogleSheetsDialog(QDialog):
         self.setMinimumWidth(500)
         self.gid = None
         self._is_current_id_valid = False
+        self.threadpool = QThreadPool.globalInstance()
 
         self.init_ui()
+
+        connection_duration: int = 5000
+        self._connection_timer = QTimer(self)
+        self._connection_timer.setInterval(connection_duration)
+        self._connection_timer.timeout.connect(self._check_connection)
+        self._connection_timer.start()
+        self._check_connection()
+
+    def _check_connection(self) -> None:
+        """Checks the connection by starting InternetConnectionCheckWorker"""
+        worker = InternetConnectionCheckWorker()
+        worker.signals.finished.connect(self._on_connection_checked)
+        self.threadpool.start(worker)
+
+    @pyqtSlot(object)
+    def _on_connection_checked(self, status: IconType) -> None:
+        """Updates the connection icon based on ping status"""
+        self.connection_status_label.setPixmap(
+            IconBuilder.build(status).pixmap(self.INTERNET_CONNECTION_ICON_SIZE, self.INTERNET_CONNECTION_ICON_SIZE)
+        )
+        tooltip_map = {
+            IconType.InternetHigh   : "Excellent internet connection",
+            IconType.InternetMedium : "Good internet connection",
+            IconType.InternetLow    : "Weak internet connection",
+            IconType.InternetProblem: "Unstable internet connection",
+            IconType.InternetOff    : "No internet connection",
+            IconType.InternetNone   : "Checking connection..."
+        }
+        self.connection_status_label.setToolTip(tooltip_map.get(status, ""))
 
     def init_ui(self) -> None:
         """Initialize dialog UI"""
@@ -64,6 +96,12 @@ class GoogleSheetsDialog(QDialog):
         self._parse_timer.timeout.connect(self._execute_parsing)
 
         header_layout.addStretch()
+
+        self.connection_status_label = QLabel()
+        self.connection_status_label.setToolTip("Checking internet connection...")
+        self.connection_status_label.setPixmap(IconBuilder.build(IconType.InternetNone).pixmap(24, 24))
+        header_layout.addWidget(self.connection_status_label)
+        header_layout.addSpacing(10)
 
         self.help_button = QPushButton("How to Import?", parent=self)
         self.help_button.setToolTip("View instructions for importing Google Sheets data")

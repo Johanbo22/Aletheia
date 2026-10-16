@@ -1,26 +1,72 @@
 from typing import Tuple
 
+from PyQt6.QtCore import QThreadPool, QTimer, pyqtSlot
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
+from icons import IconBuilder, IconType
 from src.core.global_signals import ToastLevel, global_signals
+from src.ui.workers import InternetConnectionCheckWorker
 
 class GoogleSheetsExportDialog(QDialog):
     """Dialog for configuring and executing a Google Sheets export"""
+
+    INTERNET_CONNECTION_ICON_SIZE: int = 24
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Export to Google Sheets")
         self.setModal(True)
         self.resize(550, 250)
+        self.threadpool = QThreadPool.globalInstance()
         self._init_ui()
+
+        connection_duration: int = 5000
+        self._connection_timer = QTimer(self)
+        self._connection_timer.setInterval(connection_duration)
+        self._connection_timer.timeout.connect(self._check_connection)
+        self._connection_timer.start()
+        self._check_connection()
+
+    def _check_connection(self) -> None:
+        """Checks the connection by starting InternetConnectionCheckWorker"""
+        worker = InternetConnectionCheckWorker()
+        worker.signals.finished.connect(self._on_connection_checked)
+        self.threadpool.start(worker)
+
+    @pyqtSlot(object)
+    def _on_connection_checked(self, status: IconType) -> None:
+        """Updates the connection icon based on ping status"""
+        self.connection_status_label.setPixmap(
+            IconBuilder.build(status).pixmap(self.INTERNET_CONNECTION_ICON_SIZE, self.INTERNET_CONNECTION_ICON_SIZE)
+        )
+        tooltip_map = {
+            IconType.InternetHigh   : "Excellent internet connection",
+            IconType.InternetMedium : "Good internet connection",
+            IconType.InternetLow    : "Weak internet connection",
+            IconType.InternetProblem: "Unstable internet connection",
+            IconType.InternetOff    : "No internet connection",
+            IconType.InternetNone   : "Checking connection..."
+        }
+        self.connection_status_label.setToolTip(tooltip_map.get(status, ""))
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout()
 
+        header_layout = QHBoxLayout()
         info_label = QLabel("Configure Google Sheets Export details:")
         info_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
-        layout.addWidget(info_label)
+        header_layout.addWidget(info_label)
+
+        header_layout.addStretch()
+
+        self.connection_status_label = QLabel()
+        self.connection_status_label.setToolTip("Checking internet connection...")
+        self.connection_status_label.setPixmap(
+            IconBuilder.build(IconType.InternetNone).pixmap(self.INTERNET_CONNECTION_ICON_SIZE, self.INTERNET_CONNECTION_ICON_SIZE)
+        )
+        header_layout.addWidget(self.connection_status_label)
+        layout.addLayout(header_layout)
 
         form_layout = QFormLayout()
 

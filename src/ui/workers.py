@@ -1,3 +1,5 @@
+import socket
+import time
 from typing import Any, TYPE_CHECKING
 
 import numpy as np
@@ -6,6 +8,7 @@ from PyQt6.QtCore import QObject, QRunnable, QThread, pyqtSignal, pyqtSlot
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from icons import IconType
 from src.core.data_handler import DataHandler
 from src.core.project_file_info import ProjectFileMetadata, gather_project_file_metadata
 
@@ -402,3 +405,31 @@ class SearchWorker(QThread):
             self.finished_search.emit(matches, self.token)
         except Exception:
             self.finished_search.emit([], self.token)
+
+class InternetConnectionCheckSignals(QObject):
+    finished = pyqtSignal(object)
+
+class InternetConnectionCheckWorker(QRunnable):
+    """Worker thread to check internet connection status"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.signals = InternetConnectionCheckSignals()
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            start_time = time.time()
+            socket.create_connection(("8.8.8.8", 53), timeout=1.5)
+            latency = time.time() - start_time
+            if latency < 0.05:
+                status = IconType.InternetHigh
+            elif latency < 0.15:
+                status = IconType.InternetMedium
+            elif latency < 0.5:
+                status = IconType.InternetLow
+            else:
+                status = IconType.InternetProblem
+        except OSError:
+            status = IconType.InternetOff
+        self.signals.finished.emit(status)
