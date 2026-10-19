@@ -5,7 +5,7 @@ from typing import Optional
 
 import pandas as pd
 from PyQt6.QtCore import QSettings, QThreadPool, QTimer, QUrl, Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QShowEvent
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QMessageBox, QTabWidget, QVBoxLayout, QWidget)
 
 from icons import IconBuilder, IconType
@@ -67,10 +67,16 @@ class MainWindow(QWidget):
         self.autosave_timer.start(self.autosave_interval_ms)
         self.autosave_indicator = AutosaveIndicator(self)
 
-        QTimer.singleShot(0, self._check_recovery)
         self.toast_manager = ToastManager(self)
         global_signals.toast_requested.connect(self.show_toast)
         global_signals.log_requested.connect(self.status_bar.log)
+
+    def showEvent(self, event: QShowEvent) -> None:
+        super().showEvent(event)
+        if not getattr(self, "_recovery_checked", False):
+            self._recovery_checked = True
+            start_time: int = 0
+            QTimer.singleShot(start_time, self._check_recovery)
 
     def show_toast(self, title: str, message: str, level: ToastLevel = ToastLevel.INFO,
                    duration_ms: int = 4000) -> None:
