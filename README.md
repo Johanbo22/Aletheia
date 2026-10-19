@@ -18,11 +18,12 @@ The program is built up of two primary interfaces:
   interface
 * View statistics about your data and run statistical test on the data
 * Plot the data with 30 different available plot types using Matplotlib and Seaborn
-* Interactively design and customize your plots
-* Add custom Python plotting code using the integrated Python editor to augment your data visualization even further
+* Interactively design and customise your plots
+* Add custom Python plotting code using the integrated Python editor to augment your data visualisation even further
 * Export data and Python code to share or use in other tools
 
 ## Requirements
+Aletheia requires **Python 3.12 or higher** to be installed. You can download Python from the [official website](https://www.python.org/downloads/) \
 Following Python packages are required for the application to run:
 ```text
 pandas==2.2.3
@@ -45,9 +46,10 @@ PyQt6_sip==13.10.2
 ```
 
 ## Installation
+To install Aletheia on your system, we have provided a few different approaches to suit your application installation approach.
 
-### Building from source
-To build the project from source:
+### Build from source
+To build the project into a compiled binary from source code:
 
 1. Clone the repository:
 ```
@@ -55,13 +57,46 @@ git clone https://github.com/Johanbo22/Aletheia.git
 cd Aletheia
 ```
 
-2. Synchronize the virtual environment and install dependencies
+2. Navigate into `scripts/` directory
 
 ```
+cd scripts
+```
+
+For Linux and macOS run:
+```shell
+./installAletheia.sh
+```
+
+For Windows run:
+```shell
+installAletheia.bat
+```
+This will create a compiled binary of Aletheia in the `dist/` directory.\
+Navigate to it:
+```
+cd ..
+cd dist/
+```
+
+### Run from source
+Alternatively if you do not wish to create a binary, the application can be run directly from the source code provided:
+1. Clone the repository
+```commandline
+git clone https://github.com/Johanbo22/Aletheia.git
+cd Aletheia
+```
+2. Synchronise the virtual environment and install dependencies
+```commandline
 uv sync
 ```
-
-3. Navigate into the Aletheia root directory and run main
-```
+3. Run main.py
+```commandline
 python ./main.py
 ```
+
+### Download compiled binaries
+If you do not wish to compile the application yourself, a package containing the compiled binary can be found in the [latest release](https://github.com/Johanbo22/Aletheia/releases/latest). \
+Here you can download the latest version of Aletheia matching your operating system.
+
+
