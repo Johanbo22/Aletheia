@@ -5,7 +5,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 import pandas as pd
 from PyQt6.QtCore import QPoint, QTimer, Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QColorDialog, QListWidgetItem
+from PyQt6.QtWidgets import QColorDialog, QLabel, QListWidgetItem, QPushButton
 from matplotlib.text import Text
 
 from src.controller.plot_controllers.color_manager import ColorManager
@@ -95,49 +95,58 @@ class AnnotationManager:
         self.view.textbox_position_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
         self.view.textbox_style_combo.currentTextChanged.connect(self.plot_tab.on_style_changed)
 
-    def choose_annotation_color(self) -> None:
-        color = QColorDialog.getColor(
-            initial=QColor(self.annotation_color),
+    def _pick_annotation_color(
+            self,
+            attribute_name: str,
+            title: str,
+            label: QLabel,
+            button: QPushButton,
+            update_active: bool = True
+    ) -> None:
+        """Prompts a RGBA color for the annotations and updates the buttons and annotations accordingly"""
+        color: QColor = QColorDialog.getColor(
+            initial=QColor(getattr(self, attribute_name)),
             parent=self.plot_tab,
-            title="Select Text Color",
+            title=title,
             options=QColorDialog.ColorDialogOption.ShowAlphaChannel
         )
-        if color.isValid():
-            self.annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            self.view.annotation_color_label.setText(self.annotation_color)
-            ColorManager.update_button_color_swatch(self.view.annotation_color_button, QColor(self.annotation_color))
+        if not color.isValid():
+            return
+
+        color_str: str = (
+            color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
+        )
+        setattr(self, attribute_name, color_str)
+        label.setText(color_str)
+        ColorManager.update_button_color_swatch(button, QColor(color_str))
+        if update_active:
             self.update_active_annotation()
-            self.plot_tab.on_style_changed()
+        self.plot_tab.on_style_changed()
+
+    def choose_annotation_color(self) -> None:
+        self._pick_annotation_color(
+            "annotation_color",
+            "Select Text Color",
+            self.view.annotation_color_label,
+            self.view.annotation_color_button
+        )
 
     def choose_annotation_bg_color(self) -> None:
-        color = QColorDialog.getColor(
-            initial=QColor(self.annotation_bg_color),
-            parent=self.plot_tab,
-            title="Select Background Color",
-            options=QColorDialog.ColorDialogOption.ShowAlphaChannel
+        self._pick_annotation_color(
+            "annotation_bg_color",
+            "Select Background Color",
+            self.view.annotation_bg_color_label,
+            self.view.annotation_bg_color_button
         )
-        if color.isValid():
-            self.annotation_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            self.view.annotation_bg_color_label.setText(self.annotation_bg_color)
-            ColorManager.update_button_color_swatch(self.view.annotation_bg_color_button,
-                                                    QColor(self.annotation_bg_color))
-            self.update_active_annotation()
-            self.plot_tab.on_style_changed()
 
     def choose_auto_annotate_color(self) -> None:
-        color = QColorDialog.getColor(
-            initial=QColor(self.auto_annotation_color),
-            parent=self.plot_tab,
-            title="Select Auto-Annotation Color",
-            options=QColorDialog.ColorDialogOption.ShowAlphaChannel
+        self._pick_annotation_color(
+            "auto_annotation_color",
+            "Select Auto-Annotation Color",
+            self.view.auto_annotate_color_label,
+            self.view.auto_annotate_color_button,
+            update_active=False,
         )
-        if color.isValid():
-            self.auto_annotation_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            self.view.auto_annotate_color_label.setText(self.auto_annotation_color)
-            ColorManager.update_button_color_swatch(self.view.auto_annotate_color_button,
-                                                    QColor(self.auto_annotation_color))
-
-            self.plot_tab.on_style_changed()
 
     def toggle_auto_annotate(self) -> None:
         """Toggles the automatic annotation of data points on the canvas"""
@@ -239,6 +248,26 @@ class AnnotationManager:
         self.status_bar.log(f"Added an annotation: {text}")
         self.plot_tab.on_style_changed()
 
+    def _sync_locator_widget(
+            self,
+            text: str,
+            x: float,
+            y: float,
+            has_arrow: bool,
+            arrow_x: float,
+            arrow_y: float
+    ) -> None:
+        """Syncs the AnnotationLocatorWidget preview with the current annotation"""
+        locator = self.view.annotations_tab.annotation_locator
+        locator.set_arrow_enabled(has_arrow)
+        locator.set_arrow_preset(self.view.annotations_tab.arrow_preset_combo.currentText())
+        locator.set_boxstyle(self.view.annotations_tab.annotation_boxstyle_combo.currentText())
+        locator.set_text_color(QColor(self.annotation_color))
+        locator.set_text_pos(x, y)
+        locator.set_preview_text(text)
+        if has_arrow:
+            locator.set_target_pos(arrow_x, arrow_y)
+
     def update_active_annotation(self, *args: Any) -> None:
         """Updates the selected annotation's properties when the UI parameters change"""
         if self._is_updating_ui:
@@ -250,49 +279,46 @@ class AnnotationManager:
         arrow_x = self.view.annotations_tab.arrow_x_spin.value()
         arrow_y = self.view.annotations_tab.arrow_y_spin.value()
 
-        self.view.annotations_tab.annotation_locator.set_arrow_enabled(has_arrow)
-        self.view.annotations_tab.annotation_locator.set_arrow_preset(
-            self.view.annotations_tab.arrow_preset_combo.currentText())
-        self.view.annotations_tab.annotation_locator.set_boxstyle(
-            self.view.annotations_tab.annotation_boxstyle_combo.currentText()
+        self._sync_locator_widget(
+            self.view.annotation_text.text(), x, y, has_arrow, arrow_x, arrow_y
         )
-        self.view.annotations_tab.annotation_locator.set_text_color(QColor(self.annotation_color))
-        self.view.annotations_tab.annotation_locator.set_text_pos(x, y)
-        self.view.annotations_tab.annotation_locator.set_preview_text(self.view.annotation_text.text())
-        if has_arrow:
-            self.view.annotations_tab.annotation_locator.set_target_pos(arrow_x, arrow_y)
 
         selected_items = self.view.annotations_list.selectedItems()
         if not selected_items:
             return
 
         index: int = self.view.annotations_list.row(selected_items[0])
-        if 0 <= index < len(self.annotations):
-            ann = self.annotations[index]
-            new_text = self.view.annotation_text.text().strip()
+        if not (0 <= index < len(self.annotations)):
+            return
 
-            if not new_text:
-                return
+        new_text: str = self.view.annotation_text.text().strip()
+        if not new_text:
+            return
 
-            ann["text"] = new_text
-            ann["x"] = x
-            ann["y"] = y
-            ann["fontsize"] = self.view.annotation_fontsize_spin.value()
-            ann["color"] = self.annotation_color
-            ann["bg_color"] = self.annotation_bg_color
-            ann["boxstyle"] = self.view.annotations_tab.annotation_boxstyle_combo.currentText()
-            ann["box_alpha"] = self.view.annotations_tab.annotation_bg_alpha_slider.value() / 100.0
-            ann["has_arrow"] = has_arrow
-            ann["arrow_x"] = arrow_x
-            ann["arrow_y"] = arrow_y
-            ann["arrow_preset"] = self.view.annotations_tab.arrow_preset_combo.currentText()
-            ann["arrow_dict_text"] = self.view.annotations_tab.custom_arrow_edit.toPlainText()
+        annotation = self.annotations[index]
+        annotation.update({
+            "text"           : new_text,
+            "x"              : x,
+            "y"              : y,
+            "fontsize"       : self.view.annotation_fontsize_spin.value(),
+            "color"          : self.annotation_color,
+            "bg_color"       : self.annotation_bg_color,
+            "boxstyle"       : self.view.annotations_tab.annotation_boxstyle_combo.currentText(),
+            "box_alpha"      : self.view.annotations_tab.annotation_bg_alpha_slider.value() / 100.0,
+            "has_arrow"      : has_arrow,
+            "arrow_x"        : arrow_x,
+            "arrow_y"        : arrow_y,
+            "arrow_preset"   : self.view.annotations_tab.arrow_preset_combo.currentText(),
+            "arrow_dict_text": self.view.annotations_tab.custom_arrow_edit.toPlainText(),
+        })
 
-            self._is_updating_ui = True
-            selected_items[0].setText(f"{ann['text']} @ ({ann['x']:.2f}, {ann['y']:.2f})")
-            self._is_updating_ui = False
+        self._is_updating_ui = True
+        selected_items[0].setText(
+            f"{annotation['text']} @ ({annotation['x']:.2f}, {annotation['y']:.2f})"
+        )
+        self._is_updating_ui = False
 
-            self._redraw_timer.start()
+        self._redraw_timer.start()
 
     def deselect_annotation(self) -> None:
         """Clears the current annotation selection to allow adding a new one"""
@@ -352,23 +378,14 @@ class AnnotationManager:
             self.view.annotations_tab.custom_arrow_edit.setPlainText(ann.get("arrow_dict_text", ""))
             self._toggle_arrow_inputs(has_arrow)
 
-            self.view.annotations_tab.annotation_locator.set_arrow_enabled(has_arrow)
-            self.view.annotations_tab.annotation_locator.set_arrow_preset(
-                ann.get("arrow_preset", "Subtle Pointer")
+            self._sync_locator_widget(
+                ann.get("text", "T"),
+                ann.get("x", 0.5),
+                ann.get("y", 0.5),
+                has_arrow,
+                ann.get("arrow_x", 0.5),
+                ann.get("arrow_y", 0.4),
             )
-            self.view.annotations_tab.annotation_locator.set_boxstyle(
-                ann.get("boxstyle", "round")
-            )
-            self.view.annotations_tab.annotation_locator.set_text_color(QColor(self.annotation_color))
-            self.view.annotations_tab.annotation_locator.set_text_pos(
-                ann.get("x", 0.5), ann.get("y", 0.5)
-            )
-            self.view.annotations_tab.annotation_locator.set_preview_text(
-                ann.get("text", "T")
-            )
-            if has_arrow:
-                self.view.annotations_tab.annotation_locator.set_target_pos(ann.get("arrow_x", 0.5),
-                                                                            ann.get("arrow_y", 0.4))
 
             self._is_updating_ui = False
             self._redraw_timer.start()

@@ -12,11 +12,13 @@ class ColormapPickerDialog(QDialog):
 
     COLORMAP_CATEGORIES = {
         "Perceptually Uniform": ["viridis", "plasma", "inferno", "magma", "cividis"],
-        "Sequential": ["Greys", "Purples", "Blues", "Greens", "Oranges", "Reds","YlOrBr", "YlOrRd", "OrRd", "PuRd", "RdPu", "BuPu","GnBu", "PuBu", "YlGnBu", "PuBuGn", "BuGn", "YlGn"],
-        "Diverging": ["PiYG", "PRGn", "BrBG", "PuOr", "RdGy", "RdBu","RdYlBu", "RdYlGn", "Spectral", "coolwarm", "bwr", "seismic"],
-        "Qualitative": ["Pastel1", "Pastel2", "Paired", "Accent","Dark2", "Set1", "Set2", "Set3", "tab10", "tab20", "tab20b", "tab20c"],
-        "Cyclic": ["twilight", "twilight_shifted", "hsv"],
-        "Miscellaneous": ["flag", "prism", "ocean", "gist_earth", "terrain","gist_stern", "gnuplot", "gnuplot2", "CMRmap","cubehelix", "brg", "gist_rainbow", "rainbow", "jet", "nipy_spectral", "gist_ncar"]
+        "Sequential"          : ["Greys", "Purples", "Blues", "Greens", "Oranges", "Reds", "YlOrBr", "YlOrRd", "OrRd", "PuRd", "RdPu", "BuPu", "GnBu", "PuBu", "YlGnBu", "PuBuGn",
+                                 "BuGn", "YlGn"],
+        "Diverging"           : ["PiYG", "PRGn", "BrBG", "PuOr", "RdGy", "RdBu", "RdYlBu", "RdYlGn", "Spectral", "coolwarm", "bwr", "seismic"],
+        "Qualitative"         : ["Pastel1", "Pastel2", "Paired", "Accent", "Dark2", "Set1", "Set2", "Set3", "tab10", "tab20", "tab20b", "tab20c"],
+        "Cyclic"              : ["twilight", "twilight_shifted", "hsv"],
+        "Miscellaneous"       : ["flag", "prism", "ocean", "gist_earth", "terrain", "gist_stern", "gnuplot", "gnuplot2", "CMRmap", "cubehelix", "brg", "gist_rainbow", "rainbow",
+                                 "jet", "nipy_spectral", "gist_ncar"]
     }
 
     def __init__(self, current_colormap=None, parent=None) -> None:
@@ -32,7 +34,7 @@ class ColormapPickerDialog(QDialog):
             is_reversed = True
         else:
             self.selected_colormap = current_colormap
-        
+
         self._final_selected_colormap = current_colormap
         self.colormap_to_category = {}
         for category, maps in self.COLORMAP_CATEGORIES.items():
@@ -44,13 +46,13 @@ class ColormapPickerDialog(QDialog):
         search_layout = QHBoxLayout()
         search_label = QLabel("Search:")
         search_label.setObjectName("colormapSearchLabel")
-        
+
         self.search_input = QLineEdit()
         self.search_input.setObjectName("colormapSearchInput")
         self.search_input.setPlaceholderText("Type to filter...")
         self.search_input.setClearButtonEnabled(True)
         self.search_input.textChanged.connect(self._filter_items)
-        
+
         options_layout = QHBoxLayout()
 
         self.reverse_check = QCheckBox("Reverse colormap")
@@ -58,17 +60,17 @@ class ColormapPickerDialog(QDialog):
         self.reverse_check.setToolTip("Flips the gradient direction")
         self.reverse_check.toggled.connect(self._on_item_selection_changed)
         self.reverse_check.setChecked(is_reversed)
-        
+
         self.grayscale_check = QCheckBox("Grayscale test")
         self.grayscale_check.setObjectName("colormapGrayscaleCheckBox")
         self.grayscale_check.setToolTip("Preivew hos this colormap translates to black-and-white printing")
         self.grayscale_check.toggled.connect(self._on_item_selection_changed)
-        
+
         self.discrete_check = QCheckBox("Discrete")
         self.discrete_check.setObjectName("colormapDiscreteCheckBox")
         self.discrete_check.setToolTip("Preview the colormap with quantile colorbands")
         self.discrete_check.toggled.connect(self._on_item_selection_changed)
-        
+
         self.discrete_spinbox = QSpinBox()
         self.discrete_spinbox.setObjectName("colormapDiscreteSpinBox")
         self.discrete_spinbox.setRange(2, 30)
@@ -79,7 +81,7 @@ class ColormapPickerDialog(QDialog):
         self.discrete_spinbox.setEnabled(False)
         self.discrete_spinbox.valueChanged.connect(self._on_item_selection_changed)
         self.discrete_check.toggled.connect(self.discrete_spinbox.setEnabled)
-        
+
         options_layout.addWidget(self.reverse_check)
         options_layout.addWidget(self.grayscale_check)
         options_layout.addWidget(self.discrete_check)
@@ -90,7 +92,7 @@ class ColormapPickerDialog(QDialog):
         search_layout.addWidget(self.search_input)
         layout.addLayout(search_layout)
         layout.addLayout(options_layout)
-        
+
         self.empty_search_label = QLabel("No colormaps found matching your search")
         self.empty_search_label.setObjectName("colormapEmptySearchLabel")
         self.empty_search_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -105,58 +107,58 @@ class ColormapPickerDialog(QDialog):
         self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.list_widget.itemSelectionChanged.connect(self._on_item_selection_changed)
         layout.addWidget(self.list_widget)
-        
+
         self.preview_container = QFrame()
         self.preview_container.setObjectName("colormapPreviewContainer")
         self.preview_container.setFrameShape(QFrame.Shape.StyledPanel)
         self.preview_container.setHidden(True)
-        
+
         preview_layout = QVBoxLayout(self.preview_container)
         preview_layout.setContentsMargins(8, 8, 8, 8)
 
-        preview_header_layout = QHBoxLayout()        
+        preview_header_layout = QHBoxLayout()
         self.category_label = QLabel("")
         self.category_label.setObjectName("colormapCategoryLabel")
         self.category_label.setProperty("class", "metadata-label")
-        
+
         self.name_label = QLabel("")
         self.name_label.setObjectName("colormapNameLabel")
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         font = self.name_label.font()
         font.setBold(True)
         self.name_label.setFont(font)
-        
+
         preview_header_layout.addWidget(self.category_label)
         preview_header_layout.addWidget(self.name_label)
         preview_layout.addLayout(preview_header_layout)
-        
+
         gradient_layout = QHBoxLayout()
         self.low_label = QLabel("Low")
         self.low_label.setObjectName("colormapLowLabel")
         self.low_label.setProperty("styleClass", "muted_text")
-        
+
         self.preview_label = QLabel()
         self.preview_label.setObjectName("colormapPreviewLabel")
         self.preview_label.setMinimumSize(1, 40)
         self.preview_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         self.high_label = QLabel("High")
         self.high_label.setObjectName("colormapHighLabel")
         self.high_label.setProperty("styleClass", "muted_text")
-        
+
         gradient_layout.addWidget(self.low_label)
         gradient_layout.addWidget(self.preview_label, stretch=1)
         gradient_layout.addWidget(self.high_label)
-        
+
         preview_layout.addLayout(gradient_layout)
         layout.addWidget(self.preview_container)
-        
+
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.setObjectName("colormapButtonBox")
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        
+
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         layout.addWidget(self.button_box)
 
@@ -176,7 +178,7 @@ class ColormapPickerDialog(QDialog):
                 self.list_widget.setCurrentItem(valid_items[0])
                 valid_items[0].setSelected(True)
                 self.list_widget.scrollToItem(valid_items[0])
-        
+
         self._filter_items("")
         self.search_input.setFocus()
         self.search_input.installEventFilter(self)
@@ -197,7 +199,7 @@ class ColormapPickerDialog(QDialog):
         if event.size().width() != event.oldSize().width():
             if not self.preview_container.isHidden():
                 self._on_item_selection_changed()
-    
+
     def eventFilter(self, source: QObject, event: QEvent | QKeyEvent) -> bool:
         if source is self.search_input and event.type() == QEvent.Type.KeyPress:
             if event.key() == Qt.Key.Key_Down:
@@ -222,7 +224,7 @@ class ColormapPickerDialog(QDialog):
                 self.accept()
                 return
         super().keyPressEvent(event)
-    
+
     def _on_item_selection_changed(self) -> None:
         selected_items = self.list_widget.selectedItems()
         has_valid_selection = bool(selected_items and selected_items[0].data(Qt.ItemDataRole.UserRole) != "header")
@@ -273,18 +275,18 @@ class ColormapPickerDialog(QDialog):
                 colormap_name = item.text()
                 icon = self.generate_icon(colormap_name, is_reversed, is_grayscale, discrete_steps)
                 item.setIcon(icon)
-    
+
     def accept(self) -> None:
         """An override to accept() to save a selected colormap to Settings"""
         # First we get the basename of the colormap
         # Without _r 
         # Use the list as reference?
         selected_items = self.list_widget.selectedItems()
-        
+
         if selected_items and selected_items[0].data(Qt.ItemDataRole.UserRole) == "header":
             return
         base_name = selected_items[0].text()
-        
+
         ## Save the basename to the setings history.
         # the reverse checkbox is a separate colormap
         if base_name:
@@ -298,19 +300,19 @@ class ColormapPickerDialog(QDialog):
 
         settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         settings.setValue("geometry", self.saveGeometry())
-        
+
         super().accept()
-    
+
     def _save_recent_colormap(self, name: str) -> None:
         """Saves the colormap to the QSettings history"""
         settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         recents = settings.value("recent_colormaps", [], type=list)
-        
+
         if name in recents:
             recents.remove(name)
-        
+
         recents.insert(0, name)
-        
+
         # Keep only 5
         recents = recents[:5]
         settings.setValue("recent_colormaps", recents)
@@ -321,7 +323,7 @@ class ColormapPickerDialog(QDialog):
             all_maps = set([m for m in matplotlib.colormaps if not m.endswith("_r")])
         except Exception:
             all_maps = {"viridis", "plasma", "inferno", "magma"}
-        
+
         added_maps = set()
 
         def add_header(text: str):
@@ -339,11 +341,11 @@ class ColormapPickerDialog(QDialog):
             item.setBackground(QBrush(QColor("#FFFFFF")))
             item.setSizeHint(QSize(0, 25))
             self.list_widget.addItem(item)
-        
+
         settings = QSettings(f"{APPLICATION_NAME}", "ColormapPicker")
         recents = settings.value("recent_colormaps", [], type=list)
         valid_recents = [r for r in recents if r in all_maps]
-        
+
         if valid_recents:
             add_header("Recently Used")
             for name in valid_recents:
@@ -356,13 +358,13 @@ class ColormapPickerDialog(QDialog):
                 for name in available_in_cat:
                     self._add_colormap_item(name)
                     added_maps.add(name)
-        
+
         remaining = sorted(list(all_maps - added_maps))
         if remaining:
             add_header("Other")
             for name in remaining:
                 self._add_colormap_item(name)
-    
+
     def _add_colormap_item(self, name: str) -> None:
         """Creates and adds the colormap to the list"""
         item = QListWidgetItem(name)
@@ -379,11 +381,29 @@ class ColormapPickerDialog(QDialog):
         self.list_widget.addItem(item)
 
     @staticmethod
-    @lru_cache(maxsize=512)
-    def generate_icon(colormap_name: str, is_reversed: bool = False, is_grayscale: bool = False, discrete_steps: int = 0) -> QIcon:
-        """Method to generate an icon that matches the color gradient of the matplotlib colormaps"""
-        width = 100
-        height = 20
+    def _render_colormap_pixmap(
+            colormap_name: str,
+            width: int,
+            height: int,
+            is_reversed: bool = False,
+            is_grayscale: bool = False,
+            discrete_steps: int = 0,
+            gradient_steps: int = 40,
+            draw_border: bool = False,
+    ) -> QPixmap:
+        """
+        Render a continuous or discrete Matplotlib colormap into a QPixmap.
+
+        :param colormap_name: Registered Matplotlib colormap identifier.
+        :param width: Target pixmap width in pixels.
+        :param height: Target pixmap height in pixels.
+        :param is_reversed: If True, invert the gradient direction.
+        :param is_grayscale: If True, convert RGB values to luminance grayscale.
+        :param discrete_steps: Number of discrete color bins (0 for continuous).
+        :param gradient_steps: Number of interpolation stops for continuous gradients.
+        :param draw_border: If True, draw a 1px outline around the pixmap.
+        :return: Rendered QPixmap instance.
+        """
         pixmap = QPixmap(width, height)
         pixmap.fill(Qt.GlobalColor.transparent)
 
@@ -394,17 +414,16 @@ class ColormapPickerDialog(QDialog):
             colormap = matplotlib.colormaps[colormap_name]
 
             if discrete_steps > 0:
-                band_width = width / discrete_steps
+                band_width: float = width / discrete_steps
                 painter.setPen(Qt.PenStyle.NoPen)
 
                 for i in range(discrete_steps):
-                    position = (i + 0.5) / discrete_steps
-                    color_pos = 1.0 - position if is_reversed else position
+                    position: float = (i + 0.5) / discrete_steps
+                    color_pos: float = 1.0 - position if is_reversed else position
                     rgba = colormap(color_pos)
-
                     if is_grayscale:
-                        luminance = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
-                        color = QColor.fromRgbF(luminance, luminance, luminance, 1.0)
+                        lum: float = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
+                        color = QColor.fromRgbF(lum, lum, lum, 1.0)
                     else:
                         color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
 
@@ -412,98 +431,64 @@ class ColormapPickerDialog(QDialog):
                     painter.drawRect(int(i * band_width), 0, int(band_width) + 1, height)
             else:
                 gradient = QLinearGradient(0, 0, width, 0)
-                steps = 40
-                for i in range(steps + 1):
-                    position = i / steps
+                for i in range(gradient_steps + 1):
+                    position = i / gradient_steps
                     color_pos = 1.0 - position if is_reversed else position
                     rgba = colormap(color_pos)
-
                     if is_grayscale:
-                        luminance = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
-                        color = QColor.fromRgbF(luminance, luminance, luminance, 1.0)
+                        lum = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
+                        color = QColor.fromRgbF(lum, lum, lum, 1.0)
                     else:
                         color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
-
                     gradient.setColorAt(position, color)
 
                 painter.setBrush(QBrush(gradient))
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.drawRect(0, 0, width, height)
-        except Exception as error:
+
+            if draw_border:
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.setPen(Qt.PenStyle.SolidLine)
+                painter.drawRect(0, 0, width - 1, height - 1)
+        except (KeyError, TypeError, ValueError):
             painter.setBrush(QBrush(Qt.GlobalColor.gray))
             painter.drawRect(0, 0, width, height)
-            print(f"Failed to generate icon for {colormap_name}: {error}")
         finally:
             painter.end()
+
+        return pixmap
+
+    @staticmethod
+    @lru_cache(maxsize=512)
+    def generate_icon(
+            colormap_name: str,
+            is_reversed: bool = False,
+            is_grayscale: bool = False,
+            discrete_steps: int = 0,
+    ) -> QIcon:
+        """Method to generate an icon that matches the color gradient of the matplotlib colormaps"""
+        width: int = 100
+        height: int = 20
+        gradient_steps: int = 40
+
+        pixmap = ColormapPickerDialog._render_colormap_pixmap(
+            colormap_name, width, height, is_reversed, is_grayscale, discrete_steps, gradient_steps, False
+        )
         return QIcon(pixmap)
 
     @staticmethod
     def generate_preview_pixmap(
-        colormap_name: str,
-        width: int,
-        height: int,
-        is_reversed: bool = False, 
-        is_grayscale: bool = False, 
-        discrete_steps: int = 0
-        ) -> QPixmap:
+            colormap_name: str,
+            width: int,
+            height: int,
+            is_reversed: bool = False,
+            is_grayscale: bool = False,
+            discrete_steps: int = 0
+    ) -> QPixmap:
 
-        pixmap = QPixmap(width, height)
-        pixmap.fill(Qt.GlobalColor.transparent)
-
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        try:
-            colormap = matplotlib.colormaps[colormap_name]
-            
-            if discrete_steps > 0:
-                band_width = width / discrete_steps
-                painter.setPen(Qt.PenStyle.NoPen)
-                
-                for i in range(discrete_steps):
-                    position = (i + 0.5) / discrete_steps
-                    color_pos = 1.0 - position if is_reversed else position
-                    rgba = colormap(color_pos)
-                    
-                    if is_grayscale:
-                        luminance = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
-                        color = QColor.fromRgbF(luminance, luminance, luminance, 1.0)
-                    else:
-                        color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
-                        
-                    painter.setBrush(QBrush(color))
-                    painter.drawRect(int(i * band_width), 0, int(band_width) + 1, height)
-            else:
-                gradient = QLinearGradient(0, 0, width, 0)
-                steps = 100
-                for i in range(steps + 1):
-                    position = i / steps
-                    color_pos = 1.0 - position if is_reversed else position
-                    rgba = colormap(color_pos)
-                    
-                    if is_grayscale:
-                        luminance = (0.299 * rgba[0]) + (0.587 * rgba[1]) + (0.114 * rgba[2])
-                        color = QColor.fromRgbF(luminance, luminance, luminance, 1.0)
-                    else:
-                        color = QColor.fromRgbF(rgba[0], rgba[1], rgba[2], 1.0)
-                        
-                    gradient.setColorAt(position, color)
-
-                painter.setBrush(QBrush(gradient))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawRect(0, 0, width, height)
-                
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(Qt.PenStyle.SolidLine)
-            painter.drawRect(0, 0, width - 1, height - 1)
-
-        except Exception as error:
-            painter.setBrush(QBrush(Qt.GlobalColor.gray))
-            painter.drawRect(0, 0, width, height)
-            print(f"Failed to generate preview for {colormap_name}: {error}")
-        finally:
-            painter.end()
-        return pixmap
+        return ColormapPickerDialog._render_colormap_pixmap(
+            colormap_name, width, height, is_reversed, is_grayscale, discrete_steps, 100, True
+        )
 
     def _filter_items(self, text: str) -> None:
         """Filters the items list. Show header with one or more childs"""
@@ -521,7 +506,7 @@ class ColormapPickerDialog(QDialog):
             if role == "header":
                 if current_header:
                     current_header.setHidden(not header_has_visible_child)
-                
+
                 current_header = item
                 header_has_visible_child = False
                 header_is_match = search_text in item.text().lower()
@@ -535,10 +520,10 @@ class ColormapPickerDialog(QDialog):
                     visible_colormap_count += 1
                     if first_visible_item is None:
                         first_visible_item = item
-        
+
         if current_header:
             current_header.setHidden(not header_has_visible_child)
-        
+
         self.empty_search_label.setHidden(visible_colormap_count > 0)
 
         if text and first_visible_item:
@@ -551,7 +536,7 @@ class ColormapPickerDialog(QDialog):
         """Handles double click"""
         if item.data(Qt.ItemDataRole.UserRole) == "header":
             return
-        
+
         self.selected_colormap = item.text()
         self.accept()
 

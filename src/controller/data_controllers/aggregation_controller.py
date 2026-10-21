@@ -170,6 +170,14 @@ class AggregationController(BaseDataController):
         enabled: bool = (item is not None and item.data(Qt.ItemDataRole.UserRole) is not None)
         self.view.operations_panel.set_aggregation_buttons_enabled(enabled)
 
+    def _reset_and_refresh_table_model(self) -> None:
+        """Detach and dispose the current QTableView model before refreshing the data"""
+        self.view.data_table.setModel(None)
+        if hasattr(self.view, "model") and self.view.model is not None:
+            self.view.model.deleteLater()
+            del self.view.model
+        self.view.refresh_data_view(emit_modified=False)
+
     def view_saved_aggregations(self) -> None:
         """View the currently selected aggregation in the main data table."""
         agg_name: Optional[str] = self.view.operations_panel.get_selected_saved_aggregation()
@@ -187,15 +195,10 @@ class AggregationController(BaseDataController):
             if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
                 self.data_handler.pre_agg_view_df = self.data_handler.df.copy()
 
-            self.view.data_table.setModel(None)
-            if hasattr(self.view, "model") and self.view.model is not None:
-                self.view.model.deleteLater()
-                del self.view.model
-
             self.data_handler.df = agg_df.copy()
             self.data_handler.viewing_aggregation_name = agg_name
             self.data_handler.inserted_subset_name = None
-            self.view.refresh_data_view(emit_modified=False)
+            self._reset_and_refresh_table_model()
 
             self.status_bar.log_action(
                 f"Viewing saved aggregation: {agg_name}",
@@ -217,29 +220,25 @@ class AggregationController(BaseDataController):
             return
 
         try:
-            if hasattr(self.data_handler, "pre_agg_view_df") and self.data_handler.pre_agg_view_df is not None:
-                self.data_handler.df = self.data_handler.pre_agg_view_df.copy()
-                self.data_handler.pre_agg_view_df = None
-                self.data_handler.viewing_aggregation_name = None
-                self.data_handler.inserted_subset_name = None
-
-                self.view.data_table.setModel(None)
-                if hasattr(self.view, "model") and self.view.model is not None:
-                    self.view.model.deleteLater()
-                    del self.view.model
-
-                self.view.refresh_data_view(emit_modified=False)
-
-                self.status_bar.log_action(
-                    "Restored data view from aggregation",
-                    details={"operation": "restore_aggregation_view"},
-                    level=LogLevel.INFO,
+            if not hasattr(self.data_handler, "pre_agg_view_df") and self.data_handler.pre_agg_view_df is None:
+                global_signals.request_toast(
+                    "Error", "No previous ata state to reset to", ToastLevel.ERROR
                 )
-                global_signals.request_toast("View Restored", "Restored to the unaggregated data view.")
-            else:
-                global_signals.request_toast("Error", "No previous data state to restore.", ToastLevel.ERROR)
+                return
 
-        except Exception as e:
+            self.data_handler.df = self.data_handler.pre_agg_view_df.copy()
+            self.data_handler.pre_agg_view_df = None
+            self.data_handler.viewing_aggregation_name = None
+            self.data_handler.inserted_subset_name = None
+            self._reset_and_refresh_table_model()
+
+            self.status_bar.log_action(
+                "Restored data view from aggregation",
+                details={"operation": "restore_aggregation_view"},
+                level=LogLevel.INFO,
+            )
+            global_signals.request_toast("View Restored", "Restored to the unaggregated data view.")
+        except (ValueError, RuntimeError, AttributeError) as e:
             global_signals.request_toast("Error", "Failed to restore view.", ToastLevel.ERROR)
             self.status_bar.log(f"Failed to restore view: {str(e)}", LogLevel.ERROR)
 

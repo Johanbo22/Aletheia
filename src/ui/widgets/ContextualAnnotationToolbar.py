@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QEvent, QPoint, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QGuiApplication, QHideEvent, QKeySequence, QMouseEvent, QShortcut
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QWidget
+from PyQt6.QtWidgets import QColorDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QWidget
 
 from src.controller.plot_controllers.color_manager import ColorManager
 
@@ -14,13 +14,13 @@ class ContextualAnnotationToolbar(QWidget):
     # deleteRequested emits (annotation_index: int)
     styleChanged = pyqtSignal(int, dict)
     deleteRequested = pyqtSignal(int)
-    
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent,
                          Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint)
         self.setObjectName("ContextualToolbar")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        
+
         self.current_index: int = -1
         self.current_color: str = "black"
         self.current_bg_color: str = "wheat"
@@ -34,14 +34,14 @@ class ContextualAnnotationToolbar(QWidget):
         self._update_timer.timeout.connect(self._emit_update)
 
         self._drag_pos: QPoint | None = None
-        
+
         self._init_ui()
-    
+
     def _init_ui(self) -> None:
         layout = QHBoxLayout()
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(6)
-        
+
         # Text edit area
         self.text_edit = QLineEdit()
         self.text_edit.setMinimumWidth(120)
@@ -49,7 +49,7 @@ class ContextualAnnotationToolbar(QWidget):
         self.text_edit.textChanged.connect(self._schedule_update)
         self.text_edit.returnPressed.connect(self._emit_update)
         layout.addWidget(self.text_edit)
-        
+
         layout.addWidget(QLabel("Size:"))
         self.size_spin = QSpinBox()
         self.size_spin.setRange(6, 48)
@@ -76,27 +76,27 @@ class ContextualAnnotationToolbar(QWidget):
         self.italic_btn.setFont(font)
         self.italic_btn.toggled.connect(self._schedule_update)
         layout.addWidget(self.italic_btn)
-        
+
         self.color_btn = QPushButton("A")
         self.color_btn.setToolTip("Text Color")
         self.color_btn.clicked.connect(self._choose_color)
         layout.addWidget(self.color_btn)
-        
+
         self.bg_color_btn = QPushButton("Bg")
         self.bg_color_btn.setToolTip("Background color")
         self.bg_color_btn.clicked.connect(self._choose_bg_color)
         layout.addWidget(self.bg_color_btn)
-        
+
         self.delete_btn = QPushButton("Delete")
         self.delete_btn.setObjectName("DestructiveButton")
         self.delete_btn.clicked.connect(self._emit_delete)
         layout.addWidget(self.delete_btn)
-        
+
         self.setLayout(layout)
 
         self.esc_shortcut = QShortcut(QKeySequence("Esc"), self)
         self.esc_shortcut.activated.connect(self.close)
-        
+
     def load_annotations(self, index: int, ann_data: dict) -> None:
         self.blockSignals(True)
         self.current_index = index
@@ -107,62 +107,62 @@ class ContextualAnnotationToolbar(QWidget):
 
         self.bold_btn.setChecked(ann_data.get("fontweight", "normal") == "bold")
         self.italic_btn.setChecked(ann_data.get("fontstyle", "normal") == "italic")
-        
+
         ColorManager.update_button_color_swatch(self.color_btn, QColor(self.current_color))
         ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.current_bg_color))
 
         self.text_edit.setFocus()
         self.text_edit.selectAll()
-        
-        self.blockSignals(False)
-    
-    def _choose_color(self) -> None:
-        from PyQt6.QtWidgets import QColorDialog
-        self._dialog_open = True
-        try:
-            color = QColorDialog.getColor(QColor(self.current_color), self,
-                                          options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
-        finally:
-            self._dialog_open = False
-        if color.isValid():
-            self.current_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            ColorManager.update_button_color_swatch(self.color_btn, QColor(self.current_color))
-            
-            self._emit_update()
 
-    
-    def _choose_bg_color(self) -> None:
-        from PyQt6.QtWidgets import QColorDialog
+        self.blockSignals(False)
+
+    def _pick_toolbar_color(self, attribute_name: str, button: QPushButton) -> None:
+        """Opens an alpha-enabled colour picker dialog, updates the target colour attribute and updates the button"""
         self._dialog_open = True
         try:
-            color = QColorDialog.getColor(QColor(self.current_bg_color), self,
-                                          options=QColorDialog.ColorDialogOption.ShowAlphaChannel)
+            initial_color = QColor(getattr(self, attribute_name))
+            color: QColor = QColorDialog.getColor(
+                initial_color,
+                self,
+                options=QColorDialog.ColorDialogOption.ShowAlphaChannel
+            )
         finally:
             self._dialog_open = False
-        if color.isValid():
-            self.current_bg_color = color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
-            ColorManager.update_button_color_swatch(self.bg_color_btn, QColor(self.current_bg_color))
-            
-            self._emit_update()
+
+        if not color.isValid():
+            return
+
+        hex_value: str = (
+            color.name(QColor.NameFormat.HexArgb) if color.alpha() < 255 else color.name()
+        )
+        setattr(self, attribute_name, hex_value)
+        ColorManager.update_button_color_swatch(button, QColor(hex_value))
+        self._emit_update()
+
+    def _choose_color(self) -> None:
+        self._pick_toolbar_color("current_color", self.color_btn)
+
+    def _choose_bg_color(self) -> None:
+        self._pick_toolbar_color("current_bg_color", self.bg_color_btn)
 
     def _schedule_update(self) -> None:
         if self.current_index >= 0:
             self._update_timer.start()
-    
+
     def _emit_update(self) -> None:
         if self.current_index < 0:
             return
         self._update_timer.stop()
         data = {
-            "text": self.text_edit.text(),
-            "fontsize": self.size_spin.value(),
-            "color": self.current_color,
-            "bg_color": self.current_bg_color,
+            "text"      : self.text_edit.text(),
+            "fontsize"  : self.size_spin.value(),
+            "color"     : self.current_color,
+            "bg_color"  : self.current_bg_color,
             "fontweight": "bold" if self.bold_btn.isChecked() else "normal",
-            "fontstyle": "italic" if self.italic_btn.isChecked() else "normal"
+            "fontstyle" : "italic" if self.italic_btn.isChecked() else "normal"
         }
         self.styleChanged.emit(self.current_index, data)
-    
+
     def _emit_delete(self) -> None:
         if self.current_index >= 0:
             self.deleteRequested.emit(self.current_index)

@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 
 from src.controller.plot_controllers.tick_formatting_manager import TickFormattingManager
 from src.core.global_signals import ToastLevel, global_signals
@@ -191,25 +190,7 @@ class PlotFormattingManager:
         axes_flipped = self.plot_tab.view.flip_axes_check.isChecked()
         font_family = self.plot_tab.view.font_family_combo.currentText()
 
-        try:
-            allowed_locators = ["AutoLocator", "MaxNLocator", "LinearLocator", "MultipleLocator"]
-            x_locator_name = type(self.plot_tab.plot_engine.current_ax.xaxis.get_major_locator()).__name__
-            if x_locator_name in allowed_locators:
-                self.plot_tab.plot_engine.current_ax.xaxis.set_major_locator(
-                    MaxNLocator(nbins=self.plot_tab.view.x_max_ticks_spin.value()))
-
-            y_locator_name = type(self.plot_tab.plot_engine.current_ax.yaxis.get_major_locator()).__name__
-            if y_locator_name in allowed_locators:
-                self.plot_tab.plot_engine.current_ax.yaxis.set_major_locator(
-                    MaxNLocator(nbins=self.plot_tab.view.y_max_ticks_spin.value()))
-
-            if hasattr(self.plot_tab.plot_engine.current_ax, "zaxis"):
-                z_locator_name = type(self.plot_tab.plot_engine.current_ax.zaxis.get_major_locator()).__name__
-                if z_locator_name in allowed_locators:
-                    self.plot_tab.plot_engine.current_ax.zaxis.set_major_locator(
-                        MaxNLocator(nbins=self.plot_tab.view.z_max_ticks_spin.value()))
-        except Exception as e:
-            self.plot_tab.status_bar.log(f"Could not apply tick formatting: {str(e)}", LogLevel.WARNING)
+        self.tick_manager.apply_initial_locators()
 
         if progress_dialog:
             self.plot_tab._update_progress(progress_dialog, 70, "Applying formatting")
@@ -564,46 +545,38 @@ class PlotFormattingManager:
         grid_style_map = {"Solid (-)": "-", "Dashed (--)": "--", "Dash-dot (-.)": "-.", "Dotted (:)": ":"}
 
         if self.plot_tab.view.independent_grid_check.isChecked():
-            if self.plot_tab.view.x_minor_grid_check.isChecked() or self.plot_tab.view.y_minor_grid_check.isChecked():
+            has_minor: bool = (
+                    self.plot_tab.view.x_minor_grid_check.isChecked()
+                    or self.plot_tab.view.y_minor_grid_check.isChecked()
+            )
+            if has_minor:
                 self.plot_tab.plot_engine.current_ax.minorticks_on()
             else:
                 self.plot_tab.plot_engine.current_ax.minorticks_off()
 
-            if self.plot_tab.view.x_major_grid_check.isChecked():
-                style = grid_style_map.get(self.plot_tab.view.x_major_grid_style_combo.currentText(), "-")
-                self.plot_tab.plot_engine.current_ax.grid(
-                    visible=True, which="major", axis="x",
-                    linestyle=style, linewidth=self.plot_tab.view.x_major_grid_linewidth_spin.value(),
-                    color=self.plot_tab.x_major_grid_color,
-                    alpha=self.plot_tab.view.x_major_grid_alpha_slider.value() / 100.0
-                )
-
-            if self.plot_tab.view.x_minor_grid_check.isChecked():
-                style = grid_style_map.get(self.plot_tab.view.x_minor_grid_style_combo.currentText(), ":")
-                self.plot_tab.plot_engine.current_ax.grid(
-                    visible=True, which="minor", axis="x",
-                    linestyle=style, linewidth=self.plot_tab.view.x_minor_grid_linewidth_spin.value(),
-                    color=self.plot_tab.x_minor_grid_color,
-                    alpha=self.plot_tab.view.x_minor_grid_alpha_slider.value() / 100.0
-                )
-
-            if self.plot_tab.view.y_major_grid_check.isChecked():
-                style = grid_style_map.get(self.plot_tab.view.y_major_grid_style_combo.currentText(), "-")
-                self.plot_tab.plot_engine.current_ax.grid(
-                    visible=True, which="major", axis="y",
-                    linestyle=style, linewidth=self.plot_tab.view.y_major_grid_linewidth_spin.value(),
-                    color=self.plot_tab.y_major_grid_color,
-                    alpha=self.plot_tab.view.y_major_grid_alpha_slider.value() / 100.0
-                )
-
-            if self.plot_tab.view.y_minor_grid_check.isChecked():
-                style = grid_style_map.get(self.plot_tab.view.y_minor_grid_style_combo.currentText(), ":")
-                self.plot_tab.plot_engine.current_ax.grid(
-                    visible=True, which="minor", axis="y",
-                    linestyle=style, linewidth=self.plot_tab.view.y_minor_grid_linewidth_spin.value(),
-                    color=self.plot_tab.y_minor_grid_color,
-                    alpha=self.plot_tab.view.y_minor_grid_alpha_slider.value() / 100.0
-                )
+            grid_specs: list[tuple[str, str, str, str]] = [
+                ("x_major", "major", "x", "-"),
+                ("x_minor", "minor", "x", ":"),
+                ("y_major", "major", "y", "-"),
+                ("y_minor", "minor", "y", ":"),
+            ]
+            for prefix, which_value, axis_value, fallback_style in grid_specs:
+                if getattr(self.plot_tab.view, f"{prefix}_grid_check").isChecked():
+                    style_text: str = getattr(self.plot_tab.view, f"{prefix}_grid_style_combo").currentText()
+                    style: str = grid_style_map.get(style_text, fallback_style)
+                    linewidth: float = getattr(self.plot_tab.view, f"{prefix}_grid_linewidth_spin").value()
+                    color: str = getattr(self.plot_tab, f"{prefix}_grid_color")
+                    alpha: float = getattr(self.plot_tab.view, f"{prefix}_grid_alpha_slider").value() / 100.0
+                    self.plot_tab.plot_engine.current_ax.grid(
+                        visible=True,
+                        which=which_value,
+                        axis=axis_value,
+                        linestyle=style,
+                        linewidth=linewidth,
+                        color=color,
+                        alpha=alpha
+                    )
+                return
         else:
             which_type = self.plot_tab.view.grid_which_type_combo.currentText()
             axis = self.plot_tab.view.grid_axis_combo.currentText()

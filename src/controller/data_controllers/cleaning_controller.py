@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Callable, Optional
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QMessageBox, QAbstractButton
 
 from src.controller.data_controllers.base_data_controller import BaseDataController
 from src.core.global_signals import global_signals
@@ -19,48 +19,74 @@ class CleaningController(BaseDataController):
         super().__init__(*args, **kwargs)
         self._preview_msg_box: Optional[QMessageBox] = None
 
+    def _prompt_row_removal_preview(
+            self,
+            row_indices: set[int],
+            empty_message: str,
+            prompt_text: str,
+            cancel_log: str,
+            on_confirm_callback: Callable[[], None]
+    ) -> None:
+        """Highlights target rows in the table view and display a confirmation box prompt telling how many rows are
+        affected"""
+        if self._preview_msg_box is not None:
+            self._preview_msg_box.close()
+
+        if not row_indices:
+            global_signals.request_toast("Info", empty_message, ToastLevel.INFO)
+            return
+
+        table_model = self.view.data_table.model()
+        if table_model is not None:
+            table_model.set_highlighted_rows(row_indices)
+
+        self._preview_msg_box = QMessageBox(self.view)
+        self._preview_msg_box.setIcon(QMessageBox.Icon.Question)
+        self._preview_msg_box.setWindowTitle("Confirm Removal")
+        self._preview_msg_box.setText(prompt_text)
+        self._preview_msg_box.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        self._preview_msg_box.setWindowModality(Qt.WindowModality.NonModal)
+
+        def handle_response(button: QAbstractButton) -> None:
+            current_model = self.view.data_table.model()
+            if current_model is not None:
+                current_model.set_highlighted_rows(set())
+
+            if self._preview_msg_box and (
+                self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes
+            ):
+                on_confirm_callback()
+            else:
+                self.status_bar.log(cancel_log, LogLevel.INFO)
+
+            if self._preview_msg_box is not None:
+                self._preview_msg_box.deleteLater()
+                self._preview_msg_box = None
+
+        self._preview_msg_box.buttonClicked.connect(handle_response)
+        self._preview_msg_box.show()
+
     def remove_duplicates(self) -> None:
         if self.data_handler.df is None:
             return
-        if self._preview_msg_box is not None:
-            self._preview_msg_box.close()
 
         try:
             df = self.data_handler.df
             duplicate_mask = df.duplicated(keep="first")
-            duplicate_indices = set(df.index[duplicate_mask].tolist())
-
-            if not duplicate_indices:
-                global_signals.request_toast("Info", "No duplicate rows found", ToastLevel.INFO)
-                return
-
-            if self.view.data_table.model() is not None:
-                self.view.data_table.model().set_highlighted_rows(duplicate_indices)
-
-            self._preview_msg_box = QMessageBox(self.view)
-            self._preview_msg_box.setIcon(QMessageBox.Icon.Question)
-            self._preview_msg_box.setWindowTitle("Confirm Removal")
-            self._preview_msg_box.setText(f"Found {len(duplicate_indices)} duplicate row(s) (highlighted).")
-            self._preview_msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            self._preview_msg_box.setWindowModality(Qt.WindowModality.NonModal)
-
-            def handle_response(button) -> None:
-                if self.view.data_table.model() is not None:
-                    self.view.data_table.model().set_highlighted_rows(set())
-
-                if self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes:
-                    self._execute_remove_duplicates()
-                else:
-                    self.status_bar.log("Remove duplicates cancelled.", LogLevel.INFO)
-
-                self._preview_msg_box.deleteLater()
-                self._preview_msg_box = None
-
-            self._preview_msg_box.buttonClicked.connect(handle_response)
-            self._preview_msg_box.show()
-
-        except Exception as e:
-            self.status_bar.log(f"Failed to prepare duplicate preview {str(e)}", LogLevel.ERROR)
+            duplicate_indices: set[int] = set(df.index[duplicate_mask].tolist())
+            self._prompt_row_removal_preview(
+                row_indices=duplicate_indices,
+                empty_message="No duplicate rows found",
+                prompt_text=f"Found {len(duplicate_indices)} duplicate row(s) (highlighted in red)",
+                cancel_log="Remove duplicates cancelled",
+                on_confirm_callback=self._execute_remove_duplicates,
+            )
+        except (ValueError, KeyError, TypeError) as err:
+            self.status_bar.log(
+                f"Faled to prepare dubplicate row preview: {err}", LogLevel.ERROR
+            )
 
     def _execute_remove_duplicates(self) -> None:
         try:
@@ -81,45 +107,22 @@ class CleaningController(BaseDataController):
     def drop_missing(self) -> None:
         if self.data_handler.df is None:
             return
-        if self._preview_msg_box is not None:
-            self._preview_msg_box.close()
 
         try:
             df = self.data_handler.df
             missing_mask = df.isnull().any(axis=1)
-            missing_indices = set(df.index[missing_mask].tolist())
-
-            if not missing_indices:
-                global_signals.request_toast("Info", "No rows with missing values found", ToastLevel.INFO)
-                return
-
-            if self.view.data_table.model() is not None:
-                self.view.data_table.model().set_highlighted_rows(missing_indices)
-
-            self._preview_msg_box = QMessageBox(self.view)
-            self._preview_msg_box.setIcon(QMessageBox.Icon.Question)
-            self._preview_msg_box.setWindowTitle("Confirm Removal")
-            self._preview_msg_box.setText(f"Found {len(missing_indices)} row(s) with missing values.")
-            self._preview_msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            self._preview_msg_box.setWindowModality(Qt.WindowModality.NonModal)
-
-            def handle_response(button) -> None:
-                if self.view.data_table.model() is not None:
-                    self.view.data_table.model().set_highlighted_rows(set())
-
-                if self._preview_msg_box.standardButton(button) == QMessageBox.StandardButton.Yes:
-                    self._execute_drop_missing()
-                else:
-                    self.status_bar.log("Drop missing cancelled.", LogLevel.INFO)
-
-                self._preview_msg_box.deleteLater()
-                self._preview_msg_box = None
-
-            self._preview_msg_box.buttonClicked.connect(handle_response)
-            self._preview_msg_box.show()
-
-        except Exception as e:
-            self.status_bar.log(f"Failed to prepare missing values preview: {str(e)}", LogLevel.ERROR)
+            missing_indices: set[int] = set(df.index[missing_mask].tolist())
+            self._prompt_row_removal_preview(
+                row_indices=missing_indices,
+                empty_message="No rows with missing values found",
+                prompt_text=f"Found {len(missing_indices)} row(s) with missing values",
+                cancel_log="Drop missing cancelled",
+                on_confirm_callback=self._execute_drop_missing,
+            )
+        except (ValueError, KeyError, TypeError) as err:
+            self.status_bar.log(
+                f"Failed to prepare missing values preview: {err}", LogLevel.ERROR
+            )
 
     def _execute_drop_missing(self) -> None:
         try:

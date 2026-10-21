@@ -164,15 +164,22 @@ class DataHandler:
         return self.df
 
     def refresh_google_sheets(self) -> pd.DataFrame:
-        if not self._io.is_google_sheet_import():
-            raise ValueError("No history of a Google Sheets import")
+        if not self._io.has_google_sheets_import():
+            raise ValueError("No history of Google Sheets Import")
 
-        params = self._io.get_google_sheets_refresh_params()
-        thousands_param = (None if params["thousands"] in [None, "None", ""] else params["thousands"])
+        params: dict[str, str | None] = self._io.get_google_sheets_refresh_params()
+        thousands_param: str | None = (
+            None if params["thousands"] in (None, "None", "") else params["thousands"]
+        )
 
-        return self.import_google_sheets(sheet_id=params["sheet_id"], sheet_name=params["sheet_name"],
-                                         delimiter=params["delimiter"], decimal=params["decimal"],
-                                         thousands=thousands_param, gid=params["gid"])
+        return self.import_google_sheets(
+            sheet_id=params["sheet_id"] or "",
+            sheet_name=params["sheet_name"] or "",
+            delimiter=params["delimiter"] or ",",
+            decimal=params["decimal"] or ".",
+            thousands=thousands_param,
+            gid=params["gid"],
+        )
 
     def create_empty_dataframe(self, rows: int, columns: int, column_names: List[str] = None,
                                fill_value: Any = None) -> pd.DataFrame:
@@ -213,11 +220,8 @@ class DataHandler:
         })
         return result
 
-    def has_google_sheet_import(self) -> bool:
-        return self._io.has_google_sheet_import()
-
     def has_google_sheets_import(self) -> bool:
-        return self._io.is_google_sheet_import()
+        return self._io.has_google_sheets_import()
 
     def get_data_source(self) -> Dict[str, Any]:
         info = self._io.get_data_source_info()
@@ -259,11 +263,18 @@ class DataHandler:
         # We'll need to track the previous state before mutations
         pass
 
-    def _save_state_with_diff(self, old_df: pd.DataFrame, new_df: pd.DataFrame,
-                              operation_type: Union[OperationType, str], params: Dict[str, Any],
-                              operation_log_entry: Optional[Dict[str, Any]] = None) -> None:
-        """Save state transition with diff tracking."""
-        self._history.save_state(old_df, new_df, operation_type, params, operation_log_entry)
+    def _save_state_with_diff(
+            self,
+            old_df: pd.DataFrame,
+            new_df: pd.DataFrame,
+            operation_type: OperationType | str,
+            params: dict[str, object],
+            operation_log_entry: dict[str, object] | None = None
+    ) -> None:
+        """Record a state transition in the diff manager"""
+        self._history.save_state(
+            old_df, new_df, operation_type, params, operation_log_entry
+        )
 
     def undo(self) -> bool:
         restored_df, success = self._history.undo(self.df)

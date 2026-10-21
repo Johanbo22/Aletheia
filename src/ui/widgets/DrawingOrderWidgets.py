@@ -125,10 +125,9 @@ class DraggableLayerList(QListView):
             return
 
         items = source_model.takeRow(current_row)
-        insert_row = target_row if offset < 0 else target_row
-        source_model.insertRow(insert_row, items)
+        source_model.insertRow(target_row, items)
 
-        new_source_idx = source_model.index(insert_row, 0)
+        new_source_idx = source_model.index(target_row, 0)
         new_proxy_idx = proxy.mapFromSource(new_source_idx)
         self.selectionModel().setCurrentIndex(
             new_proxy_idx,
@@ -364,41 +363,12 @@ class DrawingOrderPopup(QFrame):
     def _on_user_dropped_item(self) -> None:
         """Extract the new top to bottom order and emit the update signal"""
         ordered_ids: list[str] = []
-        current_zorders: list[float] = []
-
         for row in range(self._model.rowCount()):
-            item = self._model.item(row)
-            if item:
-                z_val = item.data(ZORDER_ROLE)
-                current_zorders.append(float(z_val) if z_val is not None else 0.0)
-
-        current_zorders.sort(reverse=True)
-
-        try:
-            self._model.itemChanged.disconnect(self._on_item_changed)
-        except TypeError:
-            pass
-
-        epsilon_step = 1e-5
-
-        for row in range(self._model.rowCount()):
-            item = self._model.item(row)
-            if item:
-                layer_id = item.data(LAYER_ID_ROLE)
-                ordered_ids.append(layer_id)
-
-                if row < len(current_zorders):
-                    base_z = round(current_zorders[row], 3)
-                    strict_zorder = base_z - (row * epsilon_step)
-                    base_label = item.data(BASE_LABEL_ROLE) or "Layer"
-
-                    display_text = (f"{base_label} (Z: {strict_zorder:.0f})")
-
-                    item.setData(strict_zorder, ZORDER_ROLE)
-                    item.setText(display_text)
-                    item.setToolTip(display_text)
-
-        self._model.itemChanged.connect(self._on_item_changed)
+            item: QStandardItem | None = self._model.item(row)
+            if item is not None:
+                layer_id: str | None = item.data(LAYER_ID_ROLE)
+                if layer_id is not None:
+                    ordered_ids.append(layer_id)
 
         if ordered_ids:
             self.layerOrderChanged.emit(ordered_ids)
