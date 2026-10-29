@@ -403,14 +403,7 @@ class LandingPage(QWidget):
         self._populate_recent_projects(self._recent_button_width)
 
     def _populate_recent_projects(self, button_width: int) -> None:
-        recent_files = self._get_recent_projects_list()
-
-        if not recent_files:
-            recent_files = []
-        elif isinstance(recent_files, str):
-            recent_files = [recent_files]
-        elif not isinstance(recent_files, list):
-            recent_files = list(recent_files)
+        recent_files: list[str] = self._get_recent_projects_list()
 
         valid_files: list[str] = []
         max_history_limit: int = 20

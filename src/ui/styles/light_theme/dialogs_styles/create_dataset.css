@@ -16,10 +16,7 @@ QTableWidget#CreateDatasetColumnTable {
     border-radius: 4px;
     background-color: #FFFFFF;
     alternate-background-color: #F8FAFC;
-}
-
-QTableWidget#CreateDatasetColumnTable {
-    outline: none;
+    outlne: none;
 }
 
 QTableWidget#CreateDatasetColumnTable::item:selected {

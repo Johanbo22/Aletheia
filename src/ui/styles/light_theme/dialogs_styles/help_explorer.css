@@ -54,7 +54,6 @@
 
 #helpTopicTree::item:selected,
 #helpTopicTree::item:selected:active,
-#helpTopicTree::item:selected,
 #helpTopicTree::item:pressed {
     background: white;
     color: #0078d7;

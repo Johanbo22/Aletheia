@@ -818,18 +818,12 @@ class MainWindow(QWidget):
                                 LogLevel.ERROR)
 
     @pyqtSlot(object, str)
-    def _on_google_sheet_import_finished(self, loaded_dataframe, sheet_name) -> None:
+    def _on_google_sheet_import_finished(self, loaded_dataframe: pd.DataFrame, sheet_name: str) -> None:
         self.status_bar.show_progress(False)
         if self.progress_dialog:
             self.progress_dialog.update_progress(90, "Updating Interface")
-        self.data_tab.refresh_data_view()
-        self.plot_tab.update_column_combo()
-        self._unsaved_changes = True
 
-        self.status_bar.update_data_stats(loaded_dataframe)
-        self._update_tab_visibility()
-
-        self.tabs.setCurrentWidget(self.data_tab)
+        self._finalize_dataset_import(loaded_dataframe)
 
         if self.progress_dialog:
             self.progress_dialog.update_progress(100, "Complete")
@@ -872,12 +866,8 @@ class MainWindow(QWidget):
                 self.status_bar.set_progress(90)
 
                 self.progress_dialog.update_progress(90, "Updating Interface")
-                self.data_tab.refresh_data_view()
-                self.plot_tab.update_column_combo()
-                self._checkpoint_history_node_id = None
-                self._unsaved_changes = True
-                self.status_bar.update_data_stats(self.data_handler.df)
-                self._update_tab_visibility()
+                if self.data_handler.df is not None:
+                    self._finalize_dataset_import(self.data_handler.df)
 
                 self.status_bar.set_progress(100)
                 self.status_bar.show_progress(False)
