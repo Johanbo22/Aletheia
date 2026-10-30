@@ -1,6 +1,5 @@
 import copy
-from inspect import Attribute
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -26,7 +25,7 @@ class ScriptManager:
 
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
-        self.script_editor = None
+        self.script_editor: Optional[ScriptEditorDialog] = None
         self.script_sync_timer = QTimer()
         self.script_sync_timer.setSingleShot(True)
         self.script_sync_timer.setInterval(self.SCRIPT_SYNC_TIMER_MS)
@@ -36,7 +35,6 @@ class ScriptManager:
         """Regenerates the script and updates the editor if its is open and autosync is enabled"""
         if self.script_editor and self.script_editor.isVisible():
             self.script_sync_timer.start()
-            self._perform_script_sync()
 
     def _perform_script_sync(self) -> None:
         config = self.plot_tab.get_config()
@@ -64,7 +62,7 @@ class ScriptManager:
         # Open dialog
         if self.script_editor is None:
             self.script_editor = ScriptEditorDialog(code, df=df, parent=self.plot_tab)
-            self.script_editor.run_script_signal.connect(self.run_custom_script)
+            self.script_editor.runScriptRequested.connect(self.run_custom_script)
 
         if not self.script_editor.isVisible():
             self.script_editor.update_code(code)
@@ -90,14 +88,15 @@ class ScriptManager:
 
             safe_globals = {
                 "__builtins__": {
-                    "__import__": safe_import,
-                    "print"     : print, "range": range, "len": len, "list": list, "dict": dict, "set": set, "str": str,
-                    "int"       : int, "float": float, "bool": bool,
-                    "zip"       : zip, "enumerate": enumerate, "min": min, "max": max, "sum": sum, "abs": abs,
-                    "sorted"    : sorted,
-                    "tuple"     : tuple, "None": None,
-                    "True"      : True, "False": False, "hasattr": hasattr, "getattr": getattr, "isinstance": isinstance,
-                    "Exception": Exception, "ValueError": ValueError, "TypeError": TypeError, "KeyError": KeyError, "IndexError": IndexError, "RuntimeError": RuntimeError, "ImportError": ImportError, "AttributeError": AttributeError, "NameError": NameError,
+                    "__import__" : safe_import,
+                    "print"      : print, "range": range, "len": len, "list": list, "dict": dict, "set": set, "str": str,
+                    "int"        : int, "float": float, "bool": bool,
+                    "zip"        : zip, "enumerate": enumerate, "min": min, "max": max, "sum": sum, "abs": abs,
+                    "sorted"     : sorted,
+                    "tuple"      : tuple, "None": None,
+                    "True"       : True, "False": False, "hasattr": hasattr, "getattr": getattr, "isinstance": isinstance,
+                    "Exception"  : Exception, "ValueError": ValueError, "TypeError": TypeError, "KeyError": KeyError, "IndexError": IndexError, "RuntimeError": RuntimeError,
+                    "ImportError": ImportError, "AttributeError": AttributeError, "NameError": NameError,
                 },
                 "pd"          : pd, "np": np, "plt": plt, "sns": sns, "mdates": mdates, "t_dist": t_dist,
                 "MaxNLocator" : MaxNLocator
@@ -172,11 +171,11 @@ class ScriptManager:
                         color = spine.get_edgecolor()
                         if color and color != "none":
                             spines_cfg[side]["color"] = to_hex(color, keep_alpha=False)
-                    except Exception:
+                    except (ValueError, TypeError):
                         pass
                     try:
                         spines_cfg[side]["width"] = spine.get_linewidth()
-                    except Exception:
+                    except (ValueError, TypeError):
                         pass
 
             try:
@@ -191,7 +190,7 @@ class ScriptManager:
                 y_axis_cfg["tick_label_size"] = int(y_params.get("labelsize", y_axis_cfg["tick_label_size"]))
                 if "labelrotation" in y_params:
                     y_axis_cfg["tick_rotation"] = int(y_params["labelrotation"])
-            except Exception:
+            except (KeyError, ValueError, TypeError):
                 pass
 
             if fig:
@@ -213,12 +212,14 @@ class ScriptManager:
         except Exception as sync_error:
             self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", LogLevel.WARNING)
 
+    @staticmethod
     def _sync_label(self, config: dict, section: str, key: str, value: str) -> None:
         """Sync text labels and enabled them if populated"""
         if value and str(value).strip():
             config[section][key]["text"] = str(value)
             config[section][key]["enabled"] = True
 
+    @staticmethod
     def _sync_axis_limits(self, config: dict, axis_key: str, limits: tuple) -> None:
         """Sync axis limits and disable auto-limits"""
         axis_cfg = config["axes"][axis_key]
@@ -226,5 +227,5 @@ class ScriptManager:
             axis_cfg["min"] = float(limits[0])
             axis_cfg["max"] = float(limits[1])
             axis_cfg["auto_limits"] = False
-        except Exception:
+        except ValueError:
             pass

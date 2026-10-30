@@ -1,13 +1,16 @@
 import ast
+import logging
 import sys
 from datetime import datetime
-from typing import Any
+from typing import Optional, TextIO
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QEvent, QPoint, QSettings, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontDatabase, QFontMetrics, QKeySequence, QShortcut, QTextCursor
+from PyQt6.QtCore import QEvent, QObject, QPoint, QSettings, Qt, pyqtSignal
+from PyQt6.QtGui import (
+    QColor, QFont, QFontDatabase, QFontMetrics, QKeyEvent, QKeySequence, QShortcut, QTextCursor, QTextDocument
+)
 from PyQt6.QtWidgets import QApplication, QCheckBox, QComboBox, QDialog, QHBoxLayout, QLabel, QLineEdit, QMenu, \
     QMessageBox, QPlainTextEdit, QPushButton, QSplitter, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
 
@@ -16,15 +19,17 @@ from src.core.global_signals import ToastLevel, global_signals
 from src.ui.PythonHighlighter import PythonHighlighter
 from src.ui.widgets.CodeEditor import CodeEditor
 
+logger = logging.getLogger(__name__)
+
 class StreamRedirector:
     """Redirects stdout/stderr to a plain text widget from the code editor"""
 
-    def __init__(self, widget: QPlainTextEdit, original_stream, color: str = None):
+    def __init__(self, widget: QPlainTextEdit, original_stream: Optional[TextIO], color: Optional[str] = None):
         self.widget = widget
         self.original_stream = original_stream
         self.color = color
 
-    def write(self, text) -> int:
+    def write(self, text: object) -> int:
         text_str = str(text)
         if self.original_stream:
             self.original_stream.write(text_str)
@@ -55,10 +60,10 @@ class StreamRedirector:
 class ScriptEditorDialog(QDialog):
     """A dialog for editing and running custom python plotting scripts"""
 
-    run_script_signal = pyqtSignal(str)
+    runScriptRequested = pyqtSignal(str)
     _has_warning_untrusted: bool = False
 
-    def __init__(self, initial_code: str = "", df=None, parent=None):
+    def __init__(self, initial_code: str = "", df: Optional[pd.DataFrame] = None, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Python Console")
         self.resize(1100, 750)
@@ -68,12 +73,16 @@ class ScriptEditorDialog(QDialog):
         self.script_history: list[dict[str, str]] = []
         self.run_counter: int = 0
         self.is_code_modified: bool = False
-        self.default_template: str = initial_code if initial_code else "def create_plot(df):\n    # Create your custom plot here\n    pass\n"
+        self.default_template: str = (
+            initial_code
+            if initial_code
+            else "def create_plot(df):\n    # Create your custom plot here\n    pass\n"
+        )
 
         self.console_history: list[str] = []
         self.console_history_idx: int = 0
 
-        self.console_namespace: dict[str, Any] = {
+        self.console_namespace: dict[str, object] = {
             "df" : self.df,
             "plt": plt,
             "pd" : pd,
@@ -117,67 +126,90 @@ class ScriptEditorDialog(QDialog):
         if hasattr(self, "vertical_splitter"):
             settings.setValue("vertical_splitter_state", self.vertical_splitter.saveState())
 
-    def eventFilter(self, source, event: QEvent) -> bool:
-        if source == self.console_output and event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Up:
-                if self.console_history and self.console_history_idx > 0:
-                    self.console_history_idx -= 1
-                    self._replace_console_input(self.console_history[self.console_history_idx])
-                return True
+    def eventFilter(self, source: QObject, event: QEvent) -> bool:
+        if source != self.console_output or event.type() != QEvent.Type.KeyPress:
+            return super().eventFilter(source, event)
 
-            elif event.key() == Qt.Key.Key_Down:
-                if self.console_history and self.console_history_idx < len(self.console_history) - 1:
-                    self.console_history_idx += 1
-                    self._replace_console_input(self.console_history[self.console_history_idx])
-                elif self.console_history_idx == len(self.console_history) - 1:
-                    self.console_history_idx = len(self.console_history)
-                    self._replace_console_input("")
-                return True
+        if not isinstance(event, QKeyEvent):
+            return super().eventFilter(source, event)
 
-            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                cursor = self.console_output.textCursor()
-                cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+        if event.key() == Qt.Key.Key_Up:
+            self._navigate_console_history(step=-1)
+            return True
 
-                raw_line = cursor.selectedText()
-                command: str = raw_line.replace(">>>", "", 1).strip() if raw_line.startswith(
-                    ">>>") else raw_line.strip()
+        if event.key() == Qt.Key.Key_Down:
+            self._navigate_console_history(step=1)
+            return True
 
-                if command in ("help", "?"):
-                    self._add_to_history(command)
-                    cursor.movePosition(QTextCursor.MoveOperation.End)
-                    self.console_output.setTextCursor(cursor)
-                    print("\nDataPlotStudio Script Editor Help")
-                    print("This console allows you to execute Python commands")
-                    print("The current DataFrame is accessible via the 'df' command")
-                    print("Type your script in the editor above and click 'Run Script' to execute")
-                    print("Remember to never run any untrusted code as this can harm your computer.")
-                    return True
-                elif command:
-                    self._add_to_history(command)
-                    cursor.movePosition(QTextCursor.MoveOperation.End)
-                    self.console_output.setTextCursor(cursor)
-                    print("")
-                    try:
-                        try:
-                            result = eval(command, globals(), self.console_namespace)
-                            if result is not None:
-                                print(result)
-                        except SyntaxError:
-                            exec(command, globals(), self.console_namespace)
-                    except Exception as execution_error:
-                        self._print_error(f"Error: {execution_error}")
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._handle_console_return()
+            return True
 
-                    self.update_variable_explorer()
-                    self._append_console_prompt()
-                    return True
-                else:
-                    # if commmand is empty, moving to new line and a new prompt
-                    cursor.movePosition(QTextCursor.MoveOperation.End)
-                    self.console_output.setTextCursor(cursor)
-                    print("")
-                    self._append_console_prompt()
-                    return True
         return super().eventFilter(source, event)
+
+    def _navigate_console_history(self, step: int) -> None:
+        """Move through the command history buffer"""
+        if not self.console_history:
+            return
+
+        target_idx: int = self.console_history_idx + step
+        if 0 <= target_idx < len(self.console_history):
+            self.console_history_idx = target_idx
+            self._replace_console_input(self.console_history[self.console_history_idx])
+        elif step > 0 and self.console_history_idx == len(self.console_history) - 1:
+            self.console_history_idx = len(self.console_history)
+            self._replace_console_input("")
+
+    def _handle_console_return(self) -> None:
+        """Extract and execute the current console line"""
+        cursor = self.console_output.textCursor()
+        cursor.select(QTextCursor.SelectionType.LineUnderCursor)
+        raw_line: str = cursor.selectedText()
+        command: str = (
+            raw_line.replace(">>>", "", 1).strip()
+            if raw_line.startswith(">>>")
+            else raw_line.strip()
+        )
+
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.console_output.setTextCursor(cursor)
+
+        if not command:
+            print("")
+            self._append_console_prompt()
+            return
+
+        self._add_to_history(command)
+        if command in ("help", "?"):
+            print(
+                "\nDataPlotStudio Script Editor Help\n"
+                "This console allows you to execute Python commands.\n"
+                "The current DataFrame is accessible via the 'df' variable.\n"
+                "Type your script in the editor above and click 'Run Script' to execute.\n"
+                "Never run untrusted code."
+            )
+            self._append_console_prompt()
+            return
+
+        print("")
+        self._execute_console_snippet(command, is_single_line=True)
+        self.update_variable_explorer()
+        self._append_console_prompt()
+
+    def _execute_console_snippet(self, code_str: str, is_single_line: bool = False) -> None:
+        """Execute a code string against the console namespace"""
+        try:
+            if is_single_line:
+                try:
+                    result: object = eval(code_str, {}, self.console_namespace)
+                    if result is not None:
+                        print(result)
+                    return
+                except SyntaxError:
+                    pass
+            exec(code_str, {}, self.console_namespace)
+        except Exception as error:
+            self._print_error(f"Error: {error}")
 
     def _add_to_history(self, command: str) -> None:
         if not self.console_history or self.console_history[-1] != command:
@@ -534,8 +566,8 @@ class ScriptEditorDialog(QDialog):
                         val_item = QTreeWidgetItem(root)
                         val_item.setText(0, "Value")
                         val_item.setText(1, str(var_value))
-                except Exception as err:
-                    print(err)
+                except (TypeError, ValueError) as err:
+                    logger.debug("Failed to inspect sequence variable %s: %s", var_name, err)
             elif isinstance(var_value, (int, float, bool)):
                 val_item = QTreeWidgetItem(root)
                 val_item.setText(0, "Value")
@@ -565,51 +597,56 @@ class ScriptEditorDialog(QDialog):
             return
 
         search_text_lower: str = search_text.lower()
-        is_empty_search: bool = not bool(search_text_lower)
-
         for i in range(self.variable_explorer.topLevelItemCount()):
-            root_item: QTreeWidgetItem | None = self.variable_explorer.topLevelItem(i)
-            if not root_item:
-                continue
+            root_item: Optional[QTreeWidgetItem] = self.variable_explorer.topLevelItem(i)
+            if root_item is not None:
+                self._filter_root_variable_item(root_item, search_text_lower)
 
-            # We reset the visibility if the search is empty
-            if is_empty_search:
-                root_item.setHidden(False)
-                for j in range(root_item.childCount()):
-                    child = root_item.child(j)
-                    child.setHidden(False)
-                    for k in range(child.childCount()):
-                        child.child(k).setHidden(False)
-                continue
+    def _filter_root_variable_item(self, root_item: QTreeWidgetItem, search_text_lower: str) -> None:
+        """Update visibility for a single top level variable item and its children"""
+        if not search_text_lower:
+            self._reset_tree_item_visibility(root_item)
+            return
 
-            root_match: bool = search_text_lower in root_item.text(0).lower()
-            has_matching_column: bool = False
+        root_match: bool = search_text_lower in root_item.text(0).lower()
+        has_matching_column: bool = False
 
-            for j in range(root_item.childCount()):
-                child = root_item.child(j)
+        for j in range(root_item.childCount()):
+            child = root_item.child(j)
+            if child.text(0) == "Columns":
+                has_matching_column = self._filter_column_children(child, search_text_lower, root_match)
+            else:
+                child.setHidden(not root_match)
 
-                if child.text(0) == "Columns":
-                    col_matched_count: int = 0
-                    for k in range(child.childCount()):
-                        col_item = child.child(k)
-                        col_match: bool = search_text_lower in col_item.text(0).lower()
+        root_item.setHidden(not (root_match or has_matching_column))
 
-                        if col_match or root_match:
-                            col_item.setHidden(False)
-                            if col_match:
-                                col_matched_count += 1
-                        else:
-                            col_item.setHidden(True)
+    @staticmethod
+    def _reset_tree_item_visibility(root_item: QTreeWidgetItem) -> None:
+        """Unhide a top level item all nested children"""
+        root_item.setHidden(False)
+        for j in range(root_item.childCount()):
+            child = root_item.child(j)
+            child.setHidden(False)
+            for k in range(child.childCount()):
+                child.child(k).setHidden(False)
 
-                    child.setHidden(not (root_match or col_matched_count > 0))
-                    if col_matched_count > 0:
-                        has_matching_column = True
-                else:
-                    # Non column metadata like shape of length shows only if root is matched
-                    child.setHidden(not root_match)
+    @staticmethod
+    def _filter_column_children(
+            columns_node: QTreeWidgetItem,
+            search_text_lower: str,
+            root_match: bool
+    ) -> bool:
+        """Filter column items under a DataFrame columns node and return True if any match"""
+        matched_count: int = 0
+        for k in range(columns_node.childCount()):
+            col_item = columns_node.child(k)
+            col_match: bool = search_text_lower in col_item.text(0).lower()
+            col_item.setHidden(not (col_match or root_match))
+            if col_match:
+                matched_count += 1
 
-            # Hide the root variable if neither name or columns match
-            root_item.setHidden(not (root_match or has_matching_column))
+        columns_node.setHidden(not (root_match or matched_count > 0))
+        return matched_count > 0
 
     def on_explorer_double_click(self, item: QTreeWidgetItem, column: int):
         """
@@ -707,9 +744,9 @@ class ScriptEditorDialog(QDialog):
             widget.setFont(font)
 
     def on_text_changed(self):
-        """Tracker to to see if user modified code to prevent unwanted changes"""
+        """Tracker to see if user modified code to prevent unwanted changes"""
         if not self.is_code_modified:
-            self.setWindowTitle("Pyton Console *")
+            self.setWindowTitle("Python Console *")
         self.is_code_modified = True
         # set the autosync to off so the user does not lose data
         if self.auto_sync_check.isChecked() and self.editor.hasFocus():
@@ -721,59 +758,72 @@ class ScriptEditorDialog(QDialog):
             self.update_variable_explorer()
 
     def get_editor_static_variables(self) -> set[str]:
+        """Get assigned variable names from the AST"""
         code: str = self.editor.toPlainText()
-        variables: set[str] = set()
         try:
             tree = ast.parse(code)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Assign):
-                    for target in node.targets:
-                        if isinstance(target, ast.Name):
-                            variables.add(target.id)
-                        elif isinstance(target, (ast.Tuple, ast.List)):
-                            for elt in target.elts:
-                                if isinstance(elt, ast.Name):
-                                    variables.add(elt.id)
-                elif isinstance(node, ast.AnnAssign):
-                    if isinstance(node.target, ast.Name):
-                        variables.add(node.target.id)
         except SyntaxError:
-            pass
+            return set()
+
+        variables: set[str] = set()
+        for node in ast.walk(tree):
+            self._collect_assigned_names(node, variables)
 
         return {v for v in variables if v not in self.console_namespace and not v.startswith("_")}
+
+    @staticmethod
+    def _collect_assigned_names(node: ast.AST, variables: set[str]) -> None:
+        """Collect variable identifiers from AST assignment node"""
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    variables.add(target.id)
+                elif isinstance(target, (ast.Tuple, ast.List)):
+                    variables.update(elt.id for elt in target.elts if isinstance(elt, ast.Name))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            variables.add(node.target.id)
 
     def toggle_comments(self) -> None:
         """Toggles Python comments (#) on the currently selected lines."""
         cursor = self.editor.textCursor()
         cursor.beginEditBlock()
 
-        start_block: int = self.editor.document().findBlock(cursor.selectionStart()).blockNumber()
-        end_block: int = self.editor.document().findBlock(cursor.selectionEnd()).blockNumber()
+        doc: QTextDocument = self.editor.document()
+        start_block: int = doc.findBlock(cursor.selectionStart()).blockNumber()
+        end_block: int = doc.findBlock(cursor.selectionEnd()).blockNumber()
 
-        # Determine if we are commenting or uncommenting based on the first line
-        comment_symbol = "#"
-        first_block_text: str = self.editor.document().findBlockByNumber(start_block).text().lstrip()
+        comment_symbol: str = "#"
+        first_block_text: str = doc.findBlockByNumber(start_block).text().lstrip()
         is_uncommenting: bool = first_block_text.startswith(comment_symbol)
 
-        for i in range(start_block, end_block, 1):
-            block = self.editor.document().findBlockByNumber(i)
-            text: str = block.text()
-
-            # Resposition cursor to the start of the current block
-            cursor.setPosition(block.position())
-            if is_uncommenting:
-                idx: int = text.find(comment_symbol)
-                if idx != -1:
-                    cursor.setPosition(block.position() + idx)
-                    cursor.deleteChar()
-
-                    space = " "
-                    if len(text) > idx + 1 and text[idx + 1] == space:
-                        cursor.deleteChar()
-            else:
-                cursor.insertText(comment_symbol)
+        for block_idx in range(start_block, end_block + 1):
+            block = doc.findBlockByNumber(block_idx)
+            self._toggle_block_comment(cursor, block.position(), block.text(), is_uncommenting, comment_symbol)
 
         cursor.endEditBlock()
+
+    @staticmethod
+    def _toggle_block_comment(
+            cursor: QTextCursor,
+            block_pos: int,
+            text: str,
+            is_uncommenting: bool,
+            comment_symbol: str
+    ) -> None:
+        """Apply or remove a comment prefix on a single block"""
+        cursor.setPosition(block_pos)
+        if not is_uncommenting:
+            cursor.insertText(comment_symbol)
+            return
+
+        idx: int = text.find(comment_symbol)
+        if idx == 1:
+            return
+
+        cursor.setPosition(block_pos + idx)
+        cursor.deleteChar()
+        if len(text) > idx + 1 and text[idx + 1] == " ":
+            cursor.deleteChar()
 
     def clear_console(self) -> None:
         self.console_output.clear()
@@ -800,18 +850,7 @@ class ScriptEditorDialog(QDialog):
         action_label = "Selection" if has_selection else "Line"
         print(f"\n[Running {action_label}]\n{selected_text}")
 
-        try:
-            if not has_selection:
-                try:
-                    result = eval(selected_text.strip(), globals(), self.console_namespace)
-                    if result is not None:
-                        print(result)
-                except SyntaxError:
-                    exec(selected_text, globals(), self.console_namespace)
-            else:
-                exec(selected_text, globals(), self.console_namespace)
-        except Exception as execution_error:
-            self._print_error(f"Error executing {action_label.lower()}: {execution_error}")
+        self._execute_console_snippet(selected_text.strip() if not has_selection else selected_text, not has_selection)
 
         self.update_variable_explorer()
         self._append_console_prompt()
@@ -897,7 +936,7 @@ class ScriptEditorDialog(QDialog):
 
         self.save_to_history(code)
 
-        self.run_script_signal.emit(code)
+        self.runScriptRequested.emit(code)
 
         # Reset the modified flag since current code is now executed
         self.is_code_modified = False
