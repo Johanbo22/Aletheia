@@ -143,6 +143,12 @@ class MainWindow(QWidget):
         """Hides the tab bar if no data is loaded"""
         has_data = self.data_handler.df is not None
         self.tabs.tabBar().setVisible(has_data)
+        self.tabs.setProperty("tabBarHidden", not has_data)
+
+        style = self.tabs.style()
+        if style is not None:
+            style.unpolish(self.tabs)
+            style.polish(self.tabs)
 
     @pyqtSlot(set)
     def _on_brush_selection_made(self, indices: set) -> None:
