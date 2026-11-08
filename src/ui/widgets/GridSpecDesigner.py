@@ -8,19 +8,54 @@ from PyQt6.QtWidgets import QHBoxLayout, QHeaderView, QLabel, QMenu, QMessageBox
 
 from src.core.global_signals import ToastLevel, global_signals
 
+# Constants for num values
+# i am starting this generally to make it more clear - Timmy
+DEFAULT_GRID_DIMENSION: int = 2
+MIN_GRID_DIMENSION: int = 1
+MAX_GRID_DIMENSION: int = 10
+MIN_TABLE_HEIGHT: int = 150
+MIN_ROW_HEIGHT: int = 34
+PALETTE_COUNT: int = 6
+
 @dataclass
 class GridSpan:
+    """Represents a rectangular subplot span in grid coordinates"""
     row_start: int
     row_end: int
     col_start: int
     col_end: int
 
+    @property
+    def is_unit_span(self) -> bool:
+        """Check if the span covers a single 1x1 grid cell and return True if it does"""
+        return (self.row_end - self.row_start == 1) and (self.col_end - self.col_start == 1)
+
     def overlaps_with(self, other: "GridSpan") -> bool:
         """Determines if this span intersects with another span using AABB collison logic"""
-        return not (self.row_start >= other.row_end or
-                    self.row_end <= other.row_start or
-                    self.col_start >= other.col_end or
-                    self.col_end <= other.col_start)
+        return not (
+                self.row_start >= other.row_end
+                or self.row_end <= other.row_start
+                or self.col_start >= other.col_end
+                or self.col_end <= other.col_start
+        )
+
+    def split_excluding(self, excluded: "GridSpan") -> list["GridSpan"]:
+        """
+        Translate span into 1x1 spans outside the excluded regions
+        Prevents partial selection merges or removals from deleting unselected cells
+        :param excluded: The region to remove from this span
+        :return: A list of the remaining GridSpan
+        """
+        if not self.overlaps_with(excluded):
+            return [self]
+
+        remaining: list[GridSpan] = []
+        for row in range(self.row_start, self.row_end):
+            for col in range(self.col_start, self.col_end):
+                unit = GridSpan(row, row + 1, col, col + 1)
+                if not unit.overlaps_with(excluded):
+                    remaining.append(unit)
+        return remaining
 
     def as_tuple(self) -> Tuple[int, int, int, int]:
         return self.row_start, self.row_end, self.col_start, self.col_end
@@ -48,6 +83,8 @@ class GridSpecDesignerWidget(QWidget):
         self._defined_spans: List[GridSpan] = []
         self._sharex: bool = False
         self._sharey: bool = False
+        self._previous_rows: int = DEFAULT_GRID_DIMENSION
+        self._previous_cols: int = DEFAULT_GRID_DIMENSION
 
         self._init_ui()
         self._connect_signals()
@@ -62,14 +99,18 @@ class GridSpecDesignerWidget(QWidget):
         self.rows_spin = QSpinBox()
         self.rows_spin.setToolTip("The amount of rows included in the subplot layout")
         self.rows_spin.setObjectName("gridRowsSpinBox")
-        self.rows_spin.setRange(1, 10)
-        self.rows_spin.setValue(2)
+        self.rows_spin.setRange(MIN_GRID_DIMENSION, MAX_GRID_DIMENSION)
+        self.rows_spin.setValue(DEFAULT_GRID_DIMENSION)
+        self.rows_spin.setSuffix(" rows")
+        self.rows_spin.setKeyboardTracking(False)
 
         self.cols_spin = QSpinBox()
         self.cols_spin.setToolTip("The amount of columns included in the subplot layout")
         self.cols_spin.setObjectName("gridColsSpinBox")
-        self.cols_spin.setRange(1, 10)
-        self.cols_spin.setValue(2)
+        self.cols_spin.setRange(MIN_GRID_DIMENSION, MAX_GRID_DIMENSION)
+        self.cols_spin.setValue(DEFAULT_GRID_DIMENSION)
+        self.cols_spin.setSuffix(" columns")
+        self.cols_spin.setKeyboardTracking(False)
 
         row_label = QLabel("Grid Rows:")
         row_label.setProperty("styleClass", "settings_label")
@@ -92,11 +133,14 @@ class GridSpecDesignerWidget(QWidget):
         self.grid_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.grid_table.horizontalHeader().setVisible(False)
         self.grid_table.verticalHeader().setVisible(False)
-        self.grid_table.setMinimumHeight(150)
-
+        self.grid_table.setMinimumHeight(MIN_TABLE_HEIGHT)
         self.grid_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         self.actions_layout = QHBoxLayout()
+        self.actions_layout.setSpacing(6)
+
+        edit_row_layout = QHBoxLayout()
+
         self.merge_cells_btn = QPushButton("Add / Merge Plot")
         self.merge_cells_btn.setObjectName("mergeCellsBtn")
         self.merge_cells_btn.setToolTip("Create a new plot or merge existing ones in the selected area.")
@@ -104,6 +148,11 @@ class GridSpecDesignerWidget(QWidget):
         self.remove_cells_btn = QPushButton("Remove Plot")
         self.remove_cells_btn.setObjectName("removeCellsBtn")
         self.remove_cells_btn.setToolTip("Remove the plot from the selected area, leaving an empty space.")
+
+        edit_row_layout.addWidget(self.merge_cells_btn)
+        edit_row_layout.addWidget(self.remove_cells_btn)
+
+        commit_row_layout = QHBoxLayout()
 
         self.reset_grid_btn = QPushButton("Reset Grid")
         self.reset_grid_btn.setObjectName("resetGridBtn")
@@ -114,11 +163,11 @@ class GridSpecDesignerWidget(QWidget):
         self.apply_layout_btn.setToolTip("Apply the current configuration layout to the canvas")
         self.apply_layout_btn.setProperty("actionType", "primary")
 
-        self.actions_layout.addWidget(self.merge_cells_btn)
-        self.actions_layout.addWidget(self.remove_cells_btn)
-        self.actions_layout.addWidget(self.reset_grid_btn)
-        self.actions_layout.addStretch()
-        self.actions_layout.addWidget(self.apply_layout_btn)
+        commit_row_layout.addWidget(self.reset_grid_btn)
+        commit_row_layout.addWidget(self.apply_layout_btn)
+
+        self.actions_layout.addLayout(edit_row_layout)
+        self.actions_layout.addLayout(commit_row_layout)
 
         self.main_layout.addLayout(self.controls_layout)
         self.main_layout.addWidget(self.grid_table)
@@ -136,6 +185,7 @@ class GridSpecDesignerWidget(QWidget):
 
         self.grid_table.cellDoubleClicked.connect(self._handle_double_click)
         self.grid_table.customContextMenuRequested.connect(self._show_context_menu)
+        self.grid_table.itemSelectionChanged.connect(self._update_action_buttons_state)
 
         self.grid_table.installEventFilter(self)
 
@@ -157,15 +207,13 @@ class GridSpecDesignerWidget(QWidget):
         its state from empty to plot and vice-versa
         """
         target_point = GridSpan(row_start=row, row_end=row + 1, col_start=col, col_end=col + 1)
-        span_to_remove: Optional[GridSpan] = None
+        has_overlap = any(span.overlaps_with(target_point) for span in self._defined_spans)
 
-        for span in self._defined_spans:
-            if target_point.overlaps_with(span):
-                span_to_remove = span
-                break
-
-        if span_to_remove:
-            self._defined_spans.remove(span_to_remove)
+        if has_overlap:
+            updated_spans: list[GridSpan] = []
+            for span in self._defined_spans:
+                updated_spans.extend(span.split_excluding(target_point))
+            self._defined_spans = updated_spans
         else:
             self._defined_spans.append(target_point)
 
@@ -220,40 +268,65 @@ class GridSpecDesignerWidget(QWidget):
 
         for r in range(rows):
             for c in range(cols):
+                is_new_cell = (r >= self._previous_rows) or (c >= self._previous_cols)
+                if not is_new_cell:
+                    continue
                 is_covered = any(
-                    span.row_start <= r < span.row_end and
-                    span.col_start <= c < span.col_end for span in self._defined_spans
+                    span.row_start <= r < span.row_end and span.col_start <= c < span.col_end
+                    for span in self._defined_spans
                 )
                 if not is_covered:
                     self._defined_spans.append(
                         GridSpan(row_start=r, row_end=r + 1, col_start=c, col_end=c + 1)
                     )
+
+        self._previous_rows = rows
+        self._previous_cols = cols
         self._redraw_table()
+
+    def _is_default_grid(self) -> bool:
+        """Verify whether te current layout matches the default 2x2 grid"""
+        if (
+                self.rows_spin.value() != DEFAULT_GRID_DIMENSION
+                or self.cols_spin.value() != DEFAULT_GRID_DIMENSION
+        ):
+            return False
+
+        expected_count = DEFAULT_GRID_DIMENSION * DEFAULT_GRID_DIMENSION
+        if len(self._defined_spans) != expected_count:
+            return False
+
+        return all(span.is_unit_span for span in self._defined_spans)
 
     def _reset_grid_data(self) -> None:
         """
         Clears the current layout and rebuilds a default 1x1 plots
         """
-        rows = self.rows_spin.value()
-        cols = self.cols_spin.value()
+        self.rows_spin.blockSignals(True)
+        self.cols_spin.blockSignals(True)
+        self.rows_spin.setValue(DEFAULT_GRID_DIMENSION)
+        self.cols_spin.setValue(DEFAULT_GRID_DIMENSION)
+        self.rows_spin.blockSignals(False)
+        self.cols_spin.blockSignals(False)
+
+        self._previous_rows = DEFAULT_GRID_DIMENSION
+        self._previous_cols = DEFAULT_GRID_DIMENSION
 
         self._defined_spans.clear()
-        for r in range(rows):
-            for c in range(cols):
-                self._defined_spans.append(GridSpan(row_start=r, row_end=r + 1, col_start=c, col_end=c + 1))
+        for r in range(DEFAULT_GRID_DIMENSION):
+            for c in range(DEFAULT_GRID_DIMENSION):
+                self._defined_spans.append(
+                    GridSpan(row_start=r, row_end=r + 1, col_start=c, col_end=c + 1)
+                )
         self._redraw_table()
 
     def _confirm_reset_grid(self) -> None:
         """Prompts before destroying a customized layout"""
-        rows = self.rows_spin.value()
-        cols = self.cols_spin.value()
-        total_default_cells = rows * cols
-
-        if len(self._defined_spans) != total_default_cells:
+        if not self._is_default_grid():
             reply = QMessageBox.question(
                 self,
                 "Reset Grid Layout",
-                "Are you sure you want to reset the grid? This will discard all changes",
+                "Are you sure you want to resset the grid? This will discard all changes",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
@@ -271,7 +344,8 @@ class GridSpecDesignerWidget(QWidget):
         self.grid_table.style().polish(self.grid_table)
 
         self._redraw_table()
-
+    
+    @staticmethod
     def _generate_plot_tooltip(self, index: int, row_span: int, col_span: int, has_x: bool, has_y: bool) -> str:
         """Generates a tooltip for a plot cell indicating its span and active axes"""
         span_description = f"{row_span}x{col_span} block" if (row_span > 1 or col_span > 1) else "1x1 block"
@@ -295,6 +369,7 @@ class GridSpecDesignerWidget(QWidget):
         rows = self.rows_spin.value()
         cols = self.cols_spin.value()
 
+        self.grid_table.setMinimumHeight(max(MIN_TABLE_HEIGHT, rows * MIN_ROW_HEIGHT))
         self.grid_table.setRowCount(rows)
         self.grid_table.setColumnCount(cols)
 
@@ -329,17 +404,20 @@ class GridSpecDesignerWidget(QWidget):
             row_span = span.row_end - span.row_start
             col_span = span.col_end - span.col_start
 
-            item.setToolTip(self._generate_plot_tooltip(idx, row_span, col_span, has_x, has_y))
+            tooltip_text = self._generate_plot_tooltip(idx, row_span, col_span, has_x, has_y)
+            item.setToolTip(tooltip_text)
             self.grid_table.setItem(span.row_start, span.col_start, item)
 
             cell_widget = QLabel(f"Plot {idx + 1}")
             cell_widget.setObjectName(f"plotCellWidget_{idx}")
             cell_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
             cell_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            cell_widget.setToolTip(tooltip_text)
 
             cell_widget.setProperty("styleClass", "plot_cell_label")
-            cell_widget.setProperty("has_x_axis", has_x)
-            cell_widget.setProperty("has_y_axis", has_y)
+            cell_widget.setProperty("colorIndex", str(idx % PALETTE_COUNT))
+            cell_widget.setProperty("has_x_axis", "true" if has_x else "false")
+            cell_widget.setProperty("has_y_axis", "true" if has_y else "false")
 
             cell_widget.style().unpolish(cell_widget)
             cell_widget.style().polish(cell_widget)
@@ -350,6 +428,19 @@ class GridSpecDesignerWidget(QWidget):
                 self.grid_table.setSpan(span.row_start, span.col_start, row_span, col_span)
 
         self.grid_table.clearSelection()
+        self._update_action_buttons_state()
+
+    def _update_action_buttons_state(self) -> None:
+        target_span = self._get_selected_span()
+        has_selection = target_span is not None
+        has_overlapping_plot = bool(
+            target_span and any(span.overlaps_with(target_span) for span in self._defined_spans)
+        )
+
+        self.merge_cells_btn.setEnabled(has_selection)
+        self.remove_cells_btn.setEnabled(has_overlapping_plot)
+        self.reset_grid_btn.setEnabled(not self._is_default_grid())
+        self.apply_layout_btn.setEnabled(len(self._defined_spans) > 0)
 
     def _get_selected_span(self) -> Optional[GridSpan]:
         """Extracts the currently selected range as GridSpan"""
@@ -371,9 +462,11 @@ class GridSpecDesignerWidget(QWidget):
         if not target_span:
             return
 
-        # Filter out any spans that overlap with new merged area
-        self._defined_spans = [span for span in self._defined_spans if not span.overlaps_with(target_span)]
-        self._defined_spans.append(target_span)
+        updated_spans: list[GridSpan] = []
+        for span in self._defined_spans:
+            updated_spans.extend(span.split_excluding(target_span))
+        updated_spans.append(target_span)
+        self._defined_spans = updated_spans
         self._redraw_table()
 
     def _remove_selected(self) -> None:
@@ -382,8 +475,49 @@ class GridSpecDesignerWidget(QWidget):
         if not target_span:
             return
 
-        # Keep only the spans that do not overlap with the selection
-        self._defined_spans = [span for span in self._defined_spans if not span.overlaps_with(target_span)]
+        updated_spans: list[GridSpan] = []
+        for span in self._defined_spans:
+            updated_spans.extend(span.split_excluding(target_span))
+        self._defined_spans = updated_spans
+        self._redraw_table()
+
+    def get_custom_grid(self) -> list[tuple[int, int, int, int]]:
+        """Export the current subplot spans as a list of coordinate tuples"""
+        return [span.as_tuple() for span in self._defined_spans]
+
+    def set_custom_grid(
+            self,
+            rows: int,
+            cols: int,
+            custom_grid: Optional[list[tuple[int, int, int, int]]] = None
+    ) -> None:
+        """Restores grid dimensions from saved configs"""
+        clamped_rows = max(MIN_GRID_DIMENSION, min(MAX_GRID_DIMENSION, rows))
+        clamped_cols = max(MIN_GRID_DIMENSION, min(MAX_GRID_DIMENSION, cols))
+
+        self.rows_spin.blockSignals(True)
+        self.cols_spin.blockSignals(True)
+        self.rows_spin.setValue(clamped_rows)
+        self.cols_spin.setValue(clamped_cols)
+        self.rows_spin.blockSignals(False)
+        self.cols_spin.blockSignals(False)
+
+        self._previous_rows = clamped_rows
+        self._previous_cols = clamped_cols
+
+        if custom_grid:
+            self._defined_spans = [
+                GridSpan(int(r_start), int(r_end), int(c_start), int(c_end))
+                for r_start, r_end, c_start, c_end in custom_grid
+                if 0 <= int(r_start) < int(r_end) <= clamped_rows
+                   and 0 <= int(c_start) < int(c_end) <= clamped_cols
+            ]
+        else:
+            self._defined_spans = [
+                GridSpan(r, r + 1, c, c + 1)
+                for r in range(clamped_rows)
+                for c in range(clamped_cols)
+            ]
         self._redraw_table()
 
     def _emit_layout(self) -> None:
