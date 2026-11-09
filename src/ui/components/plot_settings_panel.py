@@ -30,6 +30,13 @@ class PlotSettingsPanel(QWidget):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(5, 5, 5, 5)
 
+        # A label to indicate an active subplot when away from the Generals tab?
+        # Linked to signal from subplot toggle, only visible when there are using subplots
+        self.active_subplot_indicator = QLabel("")
+        self.active_subplot_indicator.setProperty("styleClass", "optional_badge")
+        self.active_subplot_indicator.setVisible(False)
+        header_layout.addWidget(self.active_subplot_indicator)
+
         self.settings_search_input = QLineEdit()
         self.settings_search_input.setObjectName("settingsSearchInput")
         self.settings_search_input.setPlaceholderText("Search settings (e.g., 'Spines')")
@@ -245,6 +252,12 @@ class PlotSettingsPanel(QWidget):
 
         self.active_subplot_combo = self.basic_tab.active_subplot_combo
         self.freeze_data_check = self.basic_tab.freeze_data_check
+
+        self.active_subplot_indicator.setText(f"Active: {self.active_subplot_combo.currentText()}")
+        self.active_subplot_combo.currentTextChanged.connect(
+            lambda text: self.active_subplot_indicator.setText(f"Active: {text}") if text else None
+        )
+        self.add_subplots_check.toggled.connect(self.active_subplot_indicator.setVisible)
 
         self.x_column = self.basic_tab.x_column
         self.multi_y_check = self.basic_tab.multi_y_check
