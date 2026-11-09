@@ -115,13 +115,15 @@ class PlotConfigManager:
             "secondary_plot_type": self.pt.secondary_plot_type_combo.currentText(),
             "quick_filter"       : self.pt.quick_filter_input.text(),
             "subplots"           : {
-                "enabled"    : self.pt.add_subplots_check.isChecked(),
-                "rows"       : self.pt.view.grid_designer.rows_spin.value(),
-                "cols"       : self.pt.view.grid_designer.cols_spin.value(),
-                "custom_grid": self.pt.view.grid_designer.get_custom_grid(),
-                "sharex"     : self.pt.subplot_sharex_check.isChecked(),
-                "sharey"     : self.pt.subplot_sharey_check.isChecked(),
-                "freeze_data": self.pt.freeze_data_check.isChecked()
+                "enabled"        : self.pt.add_subplots_check.isChecked(),
+                "rows"           : self.pt.view.grid_designer.rows_spin.value(),
+                "cols"           : self.pt.view.grid_designer.cols_spin.value(),
+                "custom_grid"    : self.pt.view.grid_designer.get_custom_grid(),
+                "active_subplot" : self.pt.view.active_subplot_combo.currentIndex(),
+                "sharex"         : self.pt.subplot_sharex_check.isChecked(),
+                "sharey"         : self.pt.subplot_sharey_check.isChecked(),
+                "freeze_data"    : self.pt.freeze_data_check.isChecked(),
+                "subplot_configs": self.pt.subplot_manager.export_configs(),
             }
         }
 
@@ -491,15 +493,7 @@ class PlotConfigManager:
         self.pt.use_subset()
 
         sub_conf = config.get("subplots", {})
-        self.pt.add_subplots_check.setChecked(sub_conf.get("enabled", False))
-        self.pt.subplot_sharex_check.setChecked(sub_conf.get("sharex", False))
-        self.pt.subplot_sharey_check.setChecked(sub_conf.get("sharey", False))
-        self.pt.freeze_data_check.setChecked(sub_conf.get("freeze_data", False))
-        self.pt.view.grid_designer.set_custom_grid(
-            rows=int(sub_conf.get("rows", 2)),
-            cols=int(sub_conf.get("cols", 2)),
-            custom_grid=sub_conf.get("custom_grid")
-        )
+        self.pt.subplot_manager.restore_from_config(sub_conf)
 
     def _load_appearance_config(self, config: dict):
         # Font
