@@ -346,7 +346,7 @@ class GridSpecDesignerWidget(QWidget):
         self._redraw_table()
     
     @staticmethod
-    def _generate_plot_tooltip(self, index: int, row_span: int, col_span: int, has_x: bool, has_y: bool) -> str:
+    def _generate_plot_tooltip(index: int, row_span: int, col_span: int, has_x: bool, has_y: bool) -> str:
         """Generates a tooltip for a plot cell indicating its span and active axes"""
         span_description = f"{row_span}x{col_span} block" if (row_span > 1 or col_span > 1) else "1x1 block"
 
