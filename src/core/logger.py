@@ -65,7 +65,7 @@ class Logger:
         """Log warning message"""
         self._add_entry("WARNING", message)
     
-    def error(self, message: str) -> None:
+    def error(self, message: str, exc_info: bool = True) -> None:
         """Log error message"""
         self._add_entry("ERROR", message)
     
