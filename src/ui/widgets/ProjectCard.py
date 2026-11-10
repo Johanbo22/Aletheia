@@ -185,6 +185,11 @@ class ProjectCard(QFrame):
         self._ensure_metadata_loaded()
         super().focusInEvent(event)
 
+    def focusOutEvent(self, event: QFocusEvent) -> None:
+        self._focused = False
+        self._update_expansion_state()
+        super().focusOutEvent(event)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.openRequested.emit(self.file_path)
