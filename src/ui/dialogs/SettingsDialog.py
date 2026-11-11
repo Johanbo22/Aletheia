@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TypeAlias
 
 from PyQt6.QtCore import QThreadPool, QUrl, Qt
 from PyQt6.QtGui import QDesktopServices, QFont
@@ -11,15 +11,17 @@ from src.core.global_signals import ToastLevel, global_signals
 from src.core.version_checker import RELEASES_PAGE_URL, VersionCheckWorker
 from src.ui.widgets import ToggleSwitch
 
+SettingsMap: TypeAlias = dict[str, bool | str | int]
+
 class SettingsDialog(QDialog):
     """Application settings dialog"""
 
-    def __init__(self, current_settings, parent=None) -> None:
+    def __init__(self, current_settings: SettingsMap, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.resize(500, 400)
-        self.current_settings = current_settings
-        self._version_check_worker = None
+        self.current_settings: SettingsMap = current_settings
+        self._version_check_worker: VersionCheckWorker | None = None
         self.init_ui()
 
     def init_ui(self) -> None:
@@ -77,6 +79,15 @@ class SettingsDialog(QDialog):
         self.version_label.setObjectName("app_version_label")
         about_layout.addRow(QLabel("Version:"), self.version_label)
 
+        self.auto_update_check = ToggleSwitch("Check for updates on launch")
+        self.auto_update_check.setChecked(
+            bool(self.current_settings.get("check_updates_on_launch", True))
+        )
+        self.auto_update_check.setToolTip(
+            "Automatically check for a new release of Aletheia on application launch"
+        )
+        about_layout.addRow(QLabel("Startup Check:"), self.auto_update_check)
+
         update_row = QVBoxLayout()
         update_row.setSpacing(10)
 
@@ -110,13 +121,14 @@ class SettingsDialog(QDialog):
 
         self.setLayout(settings_layout)
 
-    def get_settings(self) -> dict[str, Any]:
+    def get_settings(self) -> SettingsMap:
         return {
-            "enable_autosave"  : self.autosave_check.isChecked(),
-            "autosave_interval": self.autosave_interval_spin.value(),
-            "dark_mode"        : self.dark_mode_check.isChecked(),
-            "font_family"      : self.font_combo.currentFont().family(),
-            "font_size"        : self.font_size_spin.value()
+            "enable_autosave"        : self.autosave_check.isChecked(),
+            "autosave_interval"      : self.autosave_interval_spin.value(),
+            "dark_mode"              : self.dark_mode_check.isChecked(),
+            "font_family"            : self.font_combo.currentFont().family(),
+            "font_size"              : self.font_size_spin.value(),
+            "check_updates_on_launch": self.auto_update_check.isChecked()
         }
 
     def _on_check_update_clicked(self) -> None:

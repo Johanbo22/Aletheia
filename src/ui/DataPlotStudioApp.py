@@ -49,6 +49,11 @@ class DataPlotStudio(QMainWindow):
         self._current_settings: dict = {}
         self._style_reloader: Optional[StyleReloader] = None
 
+        # Caching to reduce thread blocking when quitting settings...
+        self._stylesheet_cache: dict[bool, str] = {}
+        self._applied_dark_mode: Optional[bool] = None
+        self._applied_font_key: Optional[tuple[str, int]] = None
+
         self._report_startup_status(StartupStage.CORE_MANAGERS)
         # Initialize the core managers
         self.project_manager = ProjectManager()
@@ -69,11 +74,12 @@ class DataPlotStudio(QMainWindow):
         self._report_startup_status(StartupStage.SETTINGS_AND_THEME)
         app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
         self.settings = {
-            "dark_mode"        : app_settings.value("dark_mode", False, type=bool),
-            "font_family"      : app_settings.value("font_family", "Consolas", type=str),
-            "font_size"        : app_settings.value("font_size", 10, type=int),
-            "enable_autosave"  : app_settings.value("enable_autosave", True, type=bool),
-            "autosave_interval": app_settings.value("autosave_interval", 5, type=int),
+            "dark_mode"              : app_settings.value("dark_mode", False, type=bool),
+            "font_family"            : app_settings.value("font_family", "Consolas", type=str),
+            "font_size"              : app_settings.value("font_size", 10, type=int),
+            "enable_autosave"        : app_settings.value("enable_autosave", True, type=bool),
+            "autosave_interval"      : app_settings.value("autosave_interval", 5, type=int),
+            "check_updates_on_launch": app_settings.value("check_updates_on_launch", True, type=bool)
         }
         self.apply_settings(self.settings)
 
@@ -131,6 +137,9 @@ class DataPlotStudio(QMainWindow):
         """
         Performs a version check against the latest release on GitHub
         """
+        if not bool(self.settings.get("check updates_on_launch", True)):
+            return
+
         worker = VersionCheckWorker(APPLICATION_VERSION)
         worker.signals.check_completed.connect(self._on_startup_version_check_completed)
         worker.signals.error_object.connect(self._on_startup_version_check_failed)
@@ -344,22 +353,29 @@ class DataPlotStudio(QMainWindow):
     def open_settings(self) -> None:
         """Opens the settings dialog"""
         dialog = SettingsDialog(self.settings, self)
-        if dialog.exec():
-            new_settings = dialog.get_settings()
 
-            theme_changed = self.settings.get("dark_mode") != new_settings.get("dark_mode")
-            if theme_changed:
-                theme_name = "Dark" if new_settings.get("dark_mode") else "Light"
-                self.main_widget.show_toast("Theme Changed", f"Applying {theme_name} theme...", duration_ms=2000)
-                QApplication.processEvents()
+        if not dialog.exec():
+            return
 
-            self.settings.update(new_settings)
+        new_settings: dict[str, str | int | bool] = dialog.get_settings()
+        theme_changed: bool = self.settings.get("dark_mode") != new_settings.get("dark_mode")
 
-            app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
-            for key, value in self.settings.items():
-                app_settings.setValue(key, value)
-            self.apply_settings(self.settings)
-            self.status_bar_widget.log("Settings updated", "INFO")
+        self.settings.update(new_settings)
+
+        app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
+        for key, value in self.settings.items():
+            app_settings.setValue(key, value)
+
+        self.apply_settings(self.settings)
+        self.main_widget.apply_autosave_settings(self.settings)
+
+        if theme_changed:
+            theme_name: str = "Dark" if new_settings.get("dark_mode") else "Light"
+            self.main_widget.show_toast(
+                "Theme Changed", f"Applied {theme_name} theme", duration_ms=2000
+            )
+
+        self.status_bar_widget.log("Settings updated", "INFO")
 
     def show_about(self) -> None:
         """Shows the About dialog box"""
@@ -390,26 +406,50 @@ class DataPlotStudio(QMainWindow):
         if self._help_explorer is not None:
             self._help_explorer.navigate_to_topic(topic_id)
 
-    def apply_settings(self, settings: dict) -> None:
-        """Apply the settings to main app loop"""
-        self._current_settings = settings
-        font = QFont(settings["font_family"], settings["font_size"])
-        QApplication.setFont(font)
+    def apply_settings(self, settings: dict[str, str | int | bool], force_reload: bool = False) -> None:
+        """
+        Apply settings update to the application if changed
 
-        base_css: str = ""
-        styles_root: Path = Path(get_resource_path("ui/styles"))
+        Skip font and stylesheet updates if the settings are unchanged
+        """
+        self._current_settings = settings.copy()
+        font_family: str = str(settings.get("font_family", "Consolas"))
+        font_size: int = int(settings.get("font_size", 10))
+        dark_mode: bool = bool(settings.get("dark_mode", False))
 
-        theme_folder: str = "dark_theme" if settings["dark_mode"] else "light_theme"
-        active_theme_dir: Path = styles_root / theme_folder
+        font_key: tuple[str, int] = (font_family, font_size)
+        if force_reload or self._applied_font_key != font_key:
+            QApplication.setFont(QFont(font_family, font_size))
+            self._applied_font_key = font_key
 
-        stylesheet_paths: list[Path] = []
-        if active_theme_dir.exists() and active_theme_dir.is_dir():
-            stylesheet_paths = list(active_theme_dir.rglob("*.css"))
+        if force_reload or self._applied_dark_mode != dark_mode:
+            self._apply_theme_stylesheet(dark_mode, force_reload=force_reload)
+            self._applied_dark_mode = dark_mode
 
-        base_css = self.load_stylesheets(stylesheet_paths)
+    def _apply_theme_stylesheet(self, dark_mode: bool, force_reload: bool = False) -> None:
+        """Load, cache and apply theme settings"""
+        app = QApplication.instance()
+        if not isinstance(app, QApplication):
+            return
 
-        if QApplication.instance() is not None:
-            QApplication.instance().setStyleSheet(base_css)
+        if force_reload or dark_mode not in self._stylesheet_cache:
+            styles_root: Path = Path(get_resource_path("ui/styles"))
+            theme_folder: str = "dark_theme" if dark_mode else "light_theme"
+            active_theme_dir: Path = styles_root / theme_folder
+
+            stylesheet_paths: list[Path] = []
+            if active_theme_dir.exists() and active_theme_dir.is_dir():
+                stylesheet_paths = sorted(active_theme_dir.rglob("*.css"))
+
+            self._stylesheet_cache[dark_mode] = self.load_stylesheets(stylesheet_paths)
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.setUpdatesEnabled(False)
+        try:
+            app.setStyleSheet(self._stylesheet_cache[dark_mode])
+        finally:
+            self.setUpdatesEnabled(True)
+            QApplication.restoreOverrideCursor()
 
     def enable_live_reloader(self) -> None:
         styles_dir: Path = Path(get_resource_path("ui/styles"))
@@ -422,7 +462,7 @@ class DataPlotStudio(QMainWindow):
     def reload_styles(self) -> None:
         if not self._current_settings:
             return
-        self.apply_settings(self._current_settings)
+        self.apply_settings(self._current_settings, force_reload=True)
         self.main_widget.apply_autosave_settings(self._current_settings)
         self.status_bar_widget.log("Styles reloaded", "INFO")
 
