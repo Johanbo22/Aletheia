@@ -9,7 +9,9 @@ from PyQt6.QtWidgets import QApplication, QComboBox, QCompleter, QDateEdit, QDia
     QSizePolicy, QStackedWidget, QVBoxLayout, QWidget
 
 from icons import IconBuilder, IconType
+from src.core.filter_query_parser import FilterQueryParseError, FilterQueryParser, ParsedFilterRule
 from src.core.global_signals import LogLevel, ToastLevel, global_signals
+from src.ui.widgets.QuickFilterEdit import QuickFilterEdit
 from src.ui.workers import FilterWorker
 
 class FilterAdvancedDialog(QDialog):
@@ -125,6 +127,29 @@ class FilterAdvancedDialog(QDialog):
     def init_ui(self):
         """Initialize dialog UI"""
         layout = QVBoxLayout(self)
+
+        query_group = QGroupBox("Query to Builder", parent=self)
+        query_layout = QHBoxLayout(query_group)
+
+        self.query_input = QuickFilterEdit(parent=self)
+        self.query_input.set_columns(self.columns)
+        self.query_input.setPlaceholderText(
+            "Type filter query (e.g. `Column` > 100 and Status == 'Active') and press Enter..."
+        )
+        self.query_input.setToolTip(
+            "Enter a filter expression using ==, !=, >, <, >=, <=, in, is None, or contains.\n"
+            "Press Enter or click 'Validate Query' to populate the filter rows below."
+        )
+        self.query_input.returnPressed.connect(self.translate_query_to_gui)
+        query_layout.addWidget(self.query_input, 1)
+
+        self.translate_query_btn = QPushButton("Validate Query", parent=self)
+        self.translate_query_btn.setToolTip("Parse the typed expression into the filter rows below")
+        self.translate_query_btn.clicked.connect(self.translate_query_to_gui)
+        query_layout.addWidget(self.translate_query_btn)
+
+        layout.addWidget(query_group)
+        layout.addSpacing(8)
 
         instruction_label = QLabel("Construct filter query:")
         instruction_label.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
@@ -460,7 +485,7 @@ class FilterAdvancedDialog(QDialog):
         effect = group.graphicsEffect()
         if not effect:
             effect = QGraphicsOpacityEffect(group)
-            group.setGraphicsEffect(group)
+            group.setGraphicsEffect(effect)
 
         anim_group = QParallelAnimationGroup(self)
 
@@ -505,7 +530,7 @@ class FilterAdvancedDialog(QDialog):
 
         col_dtype = pd.Series(dtype="object").dtype
         df = self.data_handler.df
-        if df is None and col_name in df.columns:
+        if df is not None and col_name in df.columns:
             col_dtype = df[col_name].dtype
 
         self._update_condition_combo_for_dtype(cond_combo, col_dtype)
@@ -816,6 +841,88 @@ class FilterAdvancedDialog(QDialog):
                 self.update_preview()
 
         _cascade_remove()
+
+    def translate_query_to_gui(self) -> None:
+        """Parse text in query input to populate the filter rows in the GUI"""
+        raw_query: str = (self.query_input.toPlainText() or "").strip()
+        if not raw_query:
+            return
+
+        parser = FilterQueryParser(self.columns)
+        try:
+            parsed_rules: list[ParsedFilterRule] = parser.parse(raw_query)
+        except FilterQueryParseError as parse_err:
+            self._set_query_validation_state("error")
+            self._shake_widget(self.query_input)
+            global_signals.request_toast("Query translation error", str(parse_err), ToastLevel.ERROR)
+            return
+
+        self._set_query_validation_state("error")
+        self._clear_rows_immediately()
+
+        for index, rule in enumerate(parsed_rules):
+            if index >= len(self.filter_rows):
+                self.add_filter_row()
+            self._populate_row_from_rule(self.filter_rows[index], rule, is_root=(index == 0))
+
+        self.update_preview()
+
+    def _set_query_validation_state(self, state: str) -> None:
+        if self.query_input.property("validationState") != state:
+            self.query_input.setProperty("validationState", state)
+            self.query_input.style().unpolish(self.query_input)
+            self.query_input.style().polish(self.query_input)
+
+    def _clear_rows_immediately(self) -> None:
+        """Sync remove all row filters except the first row and populate them"""
+        while len(self.filter_rows) > 1:
+            row_data = self.filter_rows.pop()
+            group = row_data["group"]
+            self.scroll_layout.removeWidget(group)
+            group.deleteLater()
+
+    def _populate_row_from_rule(self, row: dict, rule: ParsedFilterRule, is_root: bool) -> None:
+        """Apply the ParsedFilterRule to the filter row dict"""
+        if not is_root and rule.operator in ("AND", "OR"):
+            row["logic"].setCurrentText(rule.operator)
+            self._update_logic_styling(row, rule.operator)
+        else:
+            self._update_logic_styling(row, "ROOT")
+
+        row["column"].setCurrentText(rule.column)
+        self.update_row_ui(row)
+
+        display_cond: str = next(
+            (label for label, code in self.ConditionMap.items() if code == rule.condition),
+            rule.condition
+        )
+        if row["condition"].findText(display_cond) == -1:
+            row["condition"].addItem(display_cond)
+        row["condition"].setCurrentText(display_cond)
+        self.update_row_ui(row)
+
+        if rule.value is None:
+            return
+
+        str_val: str = str(rule.value)
+        row["inputs"]["text"].setText(str_val)
+
+        if isinstance(rule.value, (int, float)):
+            spinbox: QDoubleSpinBox = row["inputs"]["number"]
+            if rule.value < spinbox.minimum():
+                spinbox.setMinimum(float(rule.value) - 10.0)
+            if rule.value > spinbox.maximum():
+                spinbox.setMaximum(float(rule.value) + 10.0)
+            spinbox.setValue(float(rule.value))
+
+        category_combo: QComboBox = row["inputs"]["category"]
+        if category_combo.findText(str_val) == -1:
+            category_combo.addItem(str_val)
+        category_combo.setCurrentText(str_val)
+
+        parsed_date: QDate = QDate.fromString(str_val, "yyyy-MM-dd")
+        if parsed_date.isValid():
+            row["inputs"]["date"].setDate(parsed_date)
 
     def update_preview(self) -> None:
         """Debounce the preview rendering from self.preview_timer"""
