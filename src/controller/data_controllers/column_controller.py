@@ -125,7 +125,12 @@ class ColumnController(BaseDataController):
                 self.data_handler.clean_data(
                     "rename_column", old_name=old_name, new_name=new_name
                 )
+                # Update the name and preserve the selection of the new name
+                for item in self.view.operations_panel.columns_tab.column_list.selectedItems():
+                    if item.text() == old_name:
+                        item.setText(new_name)
                 self.view.refresh_data_view()
+
                 self.status_bar.log_action(
                     f"Renamed '{old_name}' -> '{new_name}'",
                     details={

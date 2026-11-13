@@ -285,9 +285,13 @@ class ColumnsTab(BaseDataTab):
 
     def set_columns(self, columns: list[str], hidden_columns: set[str], df: Optional[Any] = None) -> None:
         """Populates the column list with checkable items"""
+        previously_selected: set[str] = set(self.get_selected_columns())
+        search_term: str = self.column_search_input.text().strip().lower()
+
         self.column_list.blockSignals(True)
         self.column_list.clear()
         self.column_list.setIconSize(DtypeChipCreator.CHIP_SIZE)
+
         for col in columns:
             icon = DtypeChipCreator.get_icon_for_column(df, col)
             item = QListWidgetItem(icon, col)
@@ -300,9 +304,14 @@ class ColumnsTab(BaseDataTab):
             item.setToolTip(f"Column: {col}\nData type: {exact_dtype} ({spec.tooltip})")
 
             self.column_list.addItem(item)
+            if col in previously_selected:
+                item.setSelected(True)
+            if search_term:
+                item.setHidden(search_term not in col.lower())
 
         self.column_list.blockSignals(False)
         self._update_hidden_label()
+        self._update_selection_label()
 
     def get_hidden_columns(self) -> list[str]:
         """Return list of column names that currently unchecked"""
