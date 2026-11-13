@@ -28,6 +28,8 @@ filetree.md
 resources/themes/test.json
 raw_dump.md
 dump_core.md
+CLAUDE.md
+.claude
 dump_main_and_resources.md
 dump_ui.md
 /crash_reports
@@ -42,3 +44,6 @@ build/
 dist/
 
 /workIdeas
+img.png
+img_1.png
+showingHistory.png
