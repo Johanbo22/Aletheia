@@ -121,9 +121,13 @@ class DataTabController:
         """Apply filter to data"""
         self.filter_controller.apply_filter()
 
+    def update_filter_preview_live(self) -> None:
+        """Updates the filter preview label as the parameters are given"""
+        self.filter_controller.update_filter_preview_live()
+
     def clear_filters(self):
         """Clear filters by resetting the data to original state"""
-        self.filter_controller.clear_filters(reset_callback=self.history_controller.reset_data)
+        self.filter_controller.clear_filters()
 
     def open_advanced_filter(self):
         """Open advanced filter dialog"""
@@ -136,6 +140,14 @@ class DataTabController:
     def rename_column(self):
         """Rename selected column"""
         self.column_controller.rename_column()
+
+    def set_index(self) -> None:
+        """Set selected column as the DataFrame index"""
+        self.column_controller.set_index()
+
+    def reset_index(self) -> None:
+        """Reset the DataFrame index"""
+        self.column_controller.reset_index()
 
     def duplicate_column(self) -> None:
         """Duplicate the selected column"""

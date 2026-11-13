@@ -81,6 +81,8 @@ class SubsetController(BaseDataController):
         )
         global_signals.request_toast("Success", f"Created {len(created)} subsets from column '{column}'",
                                      ToastLevel.SUCCESS)
+        if created:
+            self.view.data_modified.emit()
 
     def _on_quick_create_subsets_error(self, error: Exception) -> None:
         """Callback for when subset auto-creation fails in the background."""
@@ -136,6 +138,7 @@ class SubsetController(BaseDataController):
 
             dialog.exec()
             self.refresh_active_subsets()
+            self.view.data_modified.emit()
         except Exception as e:
             self.status_bar.log(f"Failed to open subset manager dialog: {str(e)}", LogLevel.ERROR)
             global_signals.request_toast("Error", "Failed to open subset manager dialog", ToastLevel.ERROR)
@@ -180,7 +183,7 @@ class SubsetController(BaseDataController):
             self.data_handler.df = subset_df.copy()
             self.data_handler.inserted_subset_name = subset_name
 
-            self.view.refresh_data_view()
+            self.view.refresh_data_view(emit_modified=False)
 
             self.view.operations_panel.set_injection_status_ui(is_subset_active=True, subset_name=subset_name)
             self.view.operations_panel.subsets_tab.restore_original_btn.setEnabled(True)
@@ -218,7 +221,7 @@ class SubsetController(BaseDataController):
             self.data_handler.pre_insert_df = None
             self.data_handler.inserted_subset_name = None
 
-            self.view.refresh_data_view()
+            self.view.refresh_data_view(emit_modified=False)
             self.view.operations_panel.set_injection_status_ui(is_subset_active=False)
 
             self.status_bar.log_action(

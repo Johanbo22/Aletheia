@@ -3,7 +3,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QModelIndex, QObject, QPropertyAnimation, QSize, \
+from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QModelIndex, QObject, QPropertyAnimation, QSettings, \
+    QSize, \
     QTimer, Qt, \
     pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QKeySequence, QPalette, QShortcut, QWheelEvent
@@ -29,6 +30,7 @@ from src.ui.dialogs import TableCustomizationDialog
 from src.ui.models.table_settings_state import TableSettingsState
 from src.ui.status_bar import LogLevel, StatusBar
 from src.ui.theme import ThemeColors
+from src.ui.widgets.DatatypeChip import DtypeChipCreator
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +92,28 @@ class DataTab(QWidget):
         left_widget: QWidget | QWidget = self._setup_left_panel()
         right_widget: QWidget | QWidget = self._setup_right_panel()
 
-        splitter: QSplitter | QSplitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
+        self.splitter: QSplitter | QSplitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.addWidget(left_widget)
+        self.splitter.addWidget(right_widget)
 
-        splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 6)
+        self.splitter.setStretchFactor(0, 6)
+        self.splitter.setStretchFactor(1, 4)
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(self.splitter)
         self.setLayout(main_layout)
 
         self.refresh_data_view()
+
+    def save_splitter_state(self, settings: QSettings) -> None:
+        """Saves the current state of the splitter"""
+        if self.splitter:
+            settings.setValue("data_tab_splitter_state", self.splitter.saveState())
+
+    def restore_splitter_state(self, settings: QSettings) -> None:
+        """Restores the splitter state from QSettings"""
+        if self.splitter and settings.contains("data_tab_splitter_state"):
+            self.splitter.restoreState(settings.value("data_tab_splitter_state"))
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         """
@@ -333,7 +346,12 @@ class DataTab(QWidget):
             self.data_table.scrollTo(index, QTableView.ScrollHint.PositionAtCenter)
             self.data_table.setFocus()
 
-    def refresh_data_view(self, reload_model: bool = True):
+    def _on_table_data_mutated(self) -> None:
+        """Handles changes to the data table model"""
+        self.update_statistics()
+        self.data_modified.emit()
+
+    def refresh_data_view(self, reload_model: bool = True, emit_modified: bool = True) -> None:
         """Refresh the data table and statistics"""
         if self.data_handler.df is None:
             self._handle_empty_data_view()
@@ -372,12 +390,16 @@ class DataTab(QWidget):
         self._update_data_source_status()
         self._update_subsets_status()
         self._update_history_list()
-        self.data_modified.emit()
+        if emit_modified:
+            self.data_modified.emit()
 
     def _handle_empty_data_view(self) -> None:
         """Clears the UI when no data is loaded"""
         if hasattr(self, "left_stack"):
             self.left_stack.setCurrentIndex(0)
+
+        if hasattr(self, "landing_page"):
+            self.landing_page.refresh_recent_projects()
 
         if hasattr(self, "right_widget"):
             self.right_widget.setVisible(False)
@@ -420,6 +442,7 @@ class DataTab(QWidget):
             self.model.set_scientific_notation(self.table_settings.scientific_notation)
 
             self.model.columnsInserted.connect(self._update_column_selectors)
+            self.model.modelDataModified.connect(self._on_table_data_mutated)
             self.data_table.setSortingEnabled(False)
             self.data_table.setModel(self.model)
         else:
@@ -456,28 +479,24 @@ class DataTab(QWidget):
     def _update_column_selectors(self) -> None:
         """Updates column selection boxes"""
         df: DataFrame | None = self.data_handler.df
-        columns: list[Any] = list(df.columns)
+        columns: list[str] = [str(col) for col in df.columns] if df is not None else []
         panel: DataOperationsPanel = self.operations_panel
 
-        panel.filtering_tab.filter_column.clear()
-        panel.filtering_tab.filter_column.addItems(columns)
+        DtypeChipCreator.sync_combobox(panel.filtering_tab.filter_column, df, columns)
 
         hidden_cols = self.controller.column_controller.hidden_columns
-        panel.columns_tab.set_columns(columns, hidden_cols)
+        panel.columns_tab.set_columns(columns, hidden_cols, df=df)
         self.controller.column_controller.apply_column_visibility()
 
-        panel.datetime_tab.dt_source_combo.clear()
-        panel.datetime_tab.dt_source_combo.addItems(columns)
-        panel.datetime_tab.dt_start_combo.clear()
-        panel.datetime_tab.dt_start_combo.addItems(columns)
-        panel.datetime_tab.dt_end_combo.clear()
-        panel.datetime_tab.dt_end_combo.addItems(columns)
+        DtypeChipCreator.sync_combobox(panel.datetime_tab.dt_source_combo, df, columns)
+        DtypeChipCreator.sync_combobox(panel.datetime_tab.dt_start_combo, df, columns)
+        DtypeChipCreator.sync_combobox(panel.datetime_tab.dt_end_combo, df, columns)
 
         if hasattr(panel, "transform_tab") and hasattr(panel.transform_tab, "sort_column_combo"):
             current_sort = panel.transform_tab.sort_column_combo.currentText()
-            panel.transform_tab.sort_column_combo.clear()
-            panel.transform_tab.sort_column_combo.addItem("[Index]")
-            panel.transform_tab.sort_column_combo.addItems(columns)
+            DtypeChipCreator.sync_combobox(
+                panel.transform_tab.sort_column_combo, df, columns, prepend_items=["[Index]"]
+            )
             if current_sort and (current_sort == "[Index]" or current_sort in columns):
                 panel.transform_tab.sort_column_combo.setCurrentText(current_sort)
             elif self.data_handler.sort_state and self.data_handler.sort_state[0] in columns:
@@ -487,18 +506,17 @@ class DataTab(QWidget):
 
         if hasattr(panel, "subsets_tab") and hasattr(panel.subsets_tab, "subset_column_combo"):
             try:
-                panel.subsets_tab.subset_column_combo.clear()
-                panel.subsets_tab.subset_column_combo.addItems(columns)
-            except Exception as Error:
-                logger.warning(f"Could not update subset columns: {Error}")
-                self.status_bar.log(f"Warning: Could not update subset columns: {Error}", LogLevel.WARNING)
+                DtypeChipCreator.sync_combobox(panel.subsets_tab.subset_column_combo, df, columns)
+            except Exception as error:
+                logger.warning(f"Could not update subset columns: {error}")
+                self.status_bar.log(f"Warning: Could not update subset columns: {error}", LogLevel.WARNING)
 
         if not self.plot_tab:
             return
         self.plot_tab.update_column_combo()
 
     def _update_data_source_status(self) -> None:
-        """Updates the status bar and refreshes butotns based on datat source"""
+        """Updates the status bar and refreshes buttons based on data source"""
         if self.data_handler.has_google_sheets_import():
             self.toolbar.set_refresh_visible(True)
             display_name = self.data_handler.last_gsheet_name
@@ -653,6 +671,8 @@ class DataTab(QWidget):
         match operation_type:
             case "filter" | "filter_multiple":
                 return IconBuilder.build(IconType.Filter)
+            case "clear_filters":
+                return IconBuilder.build(IconType.ClearFilter)
             case "drop_column":
                 return IconBuilder.build(IconType.DropColumn)
             case "rename_column":
@@ -738,6 +758,8 @@ class DataTab(QWidget):
             case "filter_multiple":
                 filters = operation.get("filters", [])
                 return f"Advanced Filter ({len(filters)} conditions)"
+            case "clear_filters":
+                return "Clear Filters"
             case "drop_column":
                 cols = operation.get("columns", operation.get("column", ""))
                 if isinstance(cols, list):
@@ -747,6 +769,10 @@ class DataTab(QWidget):
                 return f"Drop Column: {cols}"
             case "rename_column":
                 return f"Rename: {operation.get('old_name')} -> {operation.get('new_name')}"
+            case "set_index":
+                return f"Set Index: {operation.get('column')}"
+            case "reset_index":
+                return "Reset Index"
             case "change_data_type":
                 return f"Data type change: {operation.get('column')} -> {operation.get('new_type')}"
             case "fill_missing":

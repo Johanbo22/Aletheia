@@ -24,6 +24,16 @@ class PlotGenerationManager:
     PLOTS_NO_Y: frozenset[str] = frozenset(["Count Plot", "Heatmap", "GeoSpatial"])
     PLOTS_GRIDDED: frozenset[str] = frozenset(["Image Show (imshow)", "pcolormesh", "Contour", "Contourf"])
     PLOTS_VECTOR: frozenset[str] = frozenset(["Barbs", "Quiver", "Streamplot"])
+    PLOTS_3D: frozenset[str] = frozenset(["3D Line", "3D Scatter", "3D Surface"])
+    PLOTS_STRICT_NUMERIC_2D: frozenset[str] = frozenset([
+        "Scatter", "Hexbin", "2D Density", "2D Histogram", "Stem", "Stairs", "Triplot"
+    ])
+    PLOTS_NUMERIC_Y: frozenset[str] = frozenset([
+        "Line", "Bar", "Area", "Box", "Violin", "Pie", "Stackplot",
+        "Image Show (imshow)", "pcolormesh", "PColormesh", "Contour", "Contourf",
+        "Barbs", "Quiver", "Streamplot", "Tricontour", "Tricontourf", "Tripcolor"
+    ])
+    PLOTS_DISTRIBUTION: frozenset[str] = frozenset(["Histogram", "KDE", "ECDF"])
 
     def __init__(self, plot_tab: "PlotTab") -> None:
         self.plot_tab = plot_tab
@@ -55,6 +65,16 @@ class PlotGenerationManager:
                 return
 
             config["plot_type"] = self.plot_tab.current_plot_type_name
+            z_col = self.view.z_column.currentText()
+            is_valid, validation_msg = self._validate_plot_requirements(
+                config["plot_type"], active_df, config["x_col"], config["y_cols"], z_col
+            )
+            if not is_valid:
+                self._is_generating = False
+                if validation_msg:
+                    self.plot_tab.status_bar.log(validation_msg, LogLevel.WARNING)
+                return
+
             self._execute_or_cache_plot(active_df, subplot_index, config, animate)
         except Exception:
             self._is_generating = False
@@ -262,10 +282,16 @@ class PlotGenerationManager:
             show_prog = (data_size > 1000 and not keep_data)
             dialog = self._init_progress_dialog(show_prog, data_size)
 
-            if not keep_data and not self._validate_plot_requirements(config["plot_type"], config["x_col"],
-                                                                      config["y_cols"]):
+            z_col = config.get("z_column")
+            is_valid, validation_msg = self._validate_plot_requirements(
+                config["plot_type"], active_df, config["x_col"], config["y_cols"], z_col
+            )
+
+            if not keep_data and not is_valid:
                 if dialog:
                     dialog.accept()
+                if validation_msg:
+                    self.plot_tab.status_bar.log(validation_msg, LogLevel.WARNING)
                 return
 
             self._update_progress(dialog, 20, "Building Plot Configuration")
@@ -409,20 +435,114 @@ class PlotGenerationManager:
                 self.plot_tab.status_bar.log("Plot generation cancelled", LogLevel.WARNING)
                 raise InterruptedError("User cancelled")
 
-    def _validate_plot_requirements(self, plot_type: str, x_col: str, y_cols: List[str]) -> bool:
-        if not x_col and plot_type not in self.PLOTS_NO_X:
-            global_signals.request_toast("Warning", f"X column required for {plot_type}", ToastLevel.INFO)
-            return False
-        if not y_cols and plot_type not in self.PLOTS_NO_Y:
-            global_signals.request_toast("Warning", f"Y column required for {plot_type}", ToastLevel.INFO)
-            return False
+    def _validate_plot_requirements(self, plot_type: str, df: Optional[pd.DataFrame] = None,
+                                    x_col: Optional[str] = None, y_cols: Optional[List[str]] = None,
+                                    z_col: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """
+        Validates the prescence, dimension counts and data type suitablity for the selected axes
+
+        :param plot_type: Target plot type
+        :param df: Active daataframe instance under evaluation
+        :param x_col: Name of selected x axis column
+        :param y_cols: Name of selected y axis columns
+        :param z_col: Name of selected z axis column for 3D / gridded plots
+        :return: Tuple of validity and optional error message
+        """
+        target_df = df if df is not None else self.plot_tab.data_handler.df
+        if target_df is None or target_df.empty:
+            return False, "No active dataset loaded for plotting"
+
+        target_x = x_col if x_col is not None else self.view.x_column.currentText()
+        target_y = y_cols if y_cols is not None else self.plot_tab.get_selected_y_columns()
+        target_z = z_col if z_col is not None else (
+            self.view.z_column.currentText() if hasattr(self.view, "z_column") else None
+        )
+
+        is_present, presence_err = self._validate_column_presence(
+            plot_type, target_df, target_x, target_y, target_z
+        )
+        if not is_present:
+            return False, presence_err
+
+        return self._validate_column_types(
+            plot_type, target_df, target_x, target_y, target_z
+        )
+
+    def _validate_column_presence(
+            self,
+            plot_type: str,
+            df: pd.DataFrame,
+            x_col: str,
+            y_cols: List[str],
+            z_col: Optional[str]
+    ) -> Tuple[bool, Optional[str]]:
+        """Verify required columns are selected and exists"""
+        if plot_type == "GeoSpatial":
+            if "geometry" not in df.columns:
+                return False, "GeoSpatial plot requires a dataset with a 'geometry' column."
+            return True, None
+
+        if plot_type not in self.PLOTS_NO_X:
+            if not x_col or x_col not in df.columns:
+                return False, f"Please select a valid X column for {plot_type}."
+
+        if plot_type not in self.PLOTS_NO_Y:
+            if not y_cols or not any(col in df.columns for col in y_cols):
+                return False, f"Please select at least one valid Y column for {plot_type}."
+
         if plot_type in self.PLOTS_GRIDDED and len(y_cols) < 2:
-            global_signals.request_toast("Warning", f"{plot_type} needs 2 Y columns (Y, Z)", ToastLevel.INFO)
-            return False
+            return False, f"{plot_type} requires 2 Y columns (Y-axis and Z-value)."
+
         if plot_type in self.PLOTS_VECTOR and len(y_cols) < 3:
-            global_signals.request_toast("Warning", f"{plot_type} needs 3 Y columns (Y, U, V)", ToastLevel.INFO)
-            return False
-        return True
+            return False, f"{plot_type} requires 3 Y columns (Y, U, V)."
+
+        if plot_type == "Stackplot" and len(y_cols) < 2:
+            return False, "Stackplot requires at least two Y columns."
+
+        if plot_type in self.PLOTS_3D:
+            if not z_col or z_col == "None" or z_col not in df.columns:
+                return False, f"{plot_type} requires a valid Z Column mapped in General Settings."
+
+        return True, None
+
+    def _validate_column_types(
+            self,
+            plot_type: str,
+            df: pd.DataFrame,
+            x_col: str,
+            y_cols: List[str],
+            z_col: Optional[str]
+    ) -> Tuple[bool, Optional[str]]:
+        """Verify selected column data types match plot type constraints."""
+        if plot_type in self.PLOTS_3D:
+            if not pd.api.types.is_numeric_dtype(df[x_col]):
+                return False, f"{plot_type} requires numeric X column. '{x_col}' is not numeric."
+            if not pd.api.types.is_numeric_dtype(df[y_cols[0]]):
+                return False, f"{plot_type} requires numeric Y column. '{y_cols[0]}' is not numeric."
+            if z_col and not pd.api.types.is_numeric_dtype(df[z_col]):
+                return False, f"{plot_type} requires numeric Z column. '{z_col}' is not numeric."
+            return True, None
+
+        if plot_type in self.PLOTS_STRICT_NUMERIC_2D:
+            if not (pd.api.types.is_numeric_dtype(df[x_col]) or pd.api.types.is_datetime64_any_dtype(df[x_col])):
+                return False, f"{plot_type} requires a numeric or datetime X column. '{x_col}' is not suitable."
+            if not pd.api.types.is_numeric_dtype(df[y_cols[0]]):
+                return False, f"{plot_type} requires a numeric Y column. '{y_cols[0]}' is not suitable."
+            return True, None
+
+        if plot_type in self.PLOTS_NUMERIC_Y:
+            for y_col in y_cols:
+                if y_col in df.columns and not pd.api.types.is_numeric_dtype(df[y_col]):
+                    return False, f"{plot_type} requires a numeric Y column. '{y_col}' is not numeric."
+            return True, None
+
+        if plot_type in self.PLOTS_DISTRIBUTION:
+            target_col = y_cols[0] if (y_cols and y_cols[0] in df.columns) else x_col
+            if target_col in df.columns and not pd.api.types.is_numeric_dtype(df[target_col]):
+                return False, f"{plot_type} requires a numeric data column. '{target_col}' is not numeric."
+            return True, None
+
+        return True, None
 
     def _log_plot_message(self, active_df: pd.DataFrame, config: Dict[str, Any]) -> None:
         plot_details = {

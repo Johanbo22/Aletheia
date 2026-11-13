@@ -16,7 +16,7 @@ class ShortcutViewerDialog(QDialog):
 
         self.setWindowFlags(Qt.WindowType.Tool)
         self.setModal(False)
-        self.setMinimumSize(450, 400)
+        self.setMinimumSize(650, 400)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         self.is_mac: bool = sys.platform == "darwin"
@@ -35,14 +35,17 @@ class ShortcutViewerDialog(QDialog):
         self.search_input.textChanged.connect(self._filter_shortcuts)
         layout.addWidget(self.search_input)
 
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["Interaction", "Shortcut"])
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Interaction", "Shortcut", "Description"])
 
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
         header.setObjectName("MainDataHeader")
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setStretchLastSection(True)
 
+        self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -83,7 +86,8 @@ class ShortcutViewerDialog(QDialog):
 
         for row, (name, key, description) in enumerate(data):
             name_item = QTableWidgetItem(name)
-            name_item.setToolTip(description)
+            key_item = QTableWidgetItem(key)
+            desc_item = QTableWidgetItem(description)
 
             font = name_item.font()
             font.setBold(True)
@@ -91,9 +95,8 @@ class ShortcutViewerDialog(QDialog):
             name_item.setFont(font)
 
             self.table.setItem(row, 0, name_item)
-
-            key_item = QTableWidgetItem(key)
             self.table.setItem(row, 1, key_item)
+            self.table.setItem(row, 2, desc_item)
 
     def _filter_shortcuts(self, query: str) -> None:
         """
@@ -105,13 +108,14 @@ class ShortcutViewerDialog(QDialog):
         for row in range(self.table.rowCount()):
             name_item = self.table.item(row, 0)
             key_item = self.table.item(row, 1)
+            desc_item = self.table.item(row, 2)
 
-            if not name_item or not key_item:
+            if not name_item or not key_item or not desc_item:
                 continue
 
             name_match = query_lower in name_item.text().lower()
             key_match = query_lower in key_item.text().lower()
-            desc_match = query_lower in name_item.toolTip().lower()
+            desc_match = query_lower in name_item.text().lower()
 
             self.table.setRowHidden(
                 row, not (name_match or key_match or desc_match)

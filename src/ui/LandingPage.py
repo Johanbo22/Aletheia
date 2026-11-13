@@ -1,14 +1,17 @@
 from pathlib import Path
 
-from PyQt6.QtCore import QPoint, QSettings, QUrl, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QDesktopServices
-from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QMenu,
-                             QPushButton, QScrollArea, QTextBrowser, QVBoxLayout, QWidget)
+from PyQt6.QtCore import QSettings, QUrl, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QDesktopServices
+from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel,
+                             QMessageBox, QPushButton, QScrollArea, QTextBrowser, QVBoxLayout, QWidget)
 
 from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION
+from src.core.global_signals import ToastLevel, global_signals
 from src.core.markdown_parser import ParseMode, parse_changelog
 from src.core.resource_loader import get_resource_path
+from src.ui.dialogs.RenameProjectDialog import RenameProjectDialog
+from src.ui.widgets.ProjectCard import ProjectCard
 
 class ChangelogViewer(QDialog):
     """
@@ -49,10 +52,15 @@ class LandingPage(QWidget):
     new_dataset_clicked = pyqtSignal()
     settings_clicked = pyqtSignal()
     quit_clicked = pyqtSignal()
+    update_available = pyqtSignal(str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
+        self._connect_update_signal()
+
+    def _connect_update_signal(self) -> None:
+        global_signals.update_available.connect(self.update_available.emit)
 
     def init_ui(self):
         layout = QHBoxLayout(self)
@@ -69,23 +77,20 @@ class LandingPage(QWidget):
 
         # Logo and title
         logo_label = QLabel()
-        logo_pixmap = IconBuilder.build(IconType.AppIcon).pixmap(72, 72)
+        logo_pixmap_sizeXY: int = 72
+        logo_pixmap = IconBuilder.build(IconType.AppIcon).pixmap(logo_pixmap_sizeXY, logo_pixmap_sizeXY)
         if not logo_pixmap.isNull():
-            logo_label.setPixmap(logo_pixmap.scaled(72, 72, Qt.AspectRatioMode.KeepAspectRatio,
-                                                    Qt.TransformationMode.SmoothTransformation))
+            logo_label.setPixmap(
+                logo_pixmap.scaled(logo_pixmap_sizeXY, logo_pixmap_sizeXY, Qt.AspectRatioMode.KeepAspectRatio,
+                                   Qt.TransformationMode.SmoothTransformation))
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title_label = QLabel(f"{APPLICATION_NAME}")
         title_label.setObjectName("landing_title")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        subtitle_label = QLabel("Data Manipulation and Visualization Tool")
-        subtitle_label.setObjectName("landing_subtitle")
-        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         actions_layout.addWidget(logo_label)
         actions_layout.addWidget(title_label)
-        actions_layout.addWidget(subtitle_label)
 
         separator = QFrame()
         separator.setObjectName("sidebar_separator")
@@ -128,8 +133,9 @@ class LandingPage(QWidget):
 
         actions_layout.addSpacing(10)
 
+        spacing_between_actions: int = 15
         split_layout = QHBoxLayout()
-        split_layout.setSpacing(15)
+        split_layout.setSpacing(spacing_between_actions)
 
         left_actions_layout = QVBoxLayout()
         left_actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -138,13 +144,13 @@ class LandingPage(QWidget):
         left_actions_layout.addWidget(self.button_open)
         left_actions_layout.addWidget(self.button_new)
 
-        left_actions_layout.addSpacing(15)
+        left_actions_layout.addSpacing(spacing_between_actions)
         left_actions_layout.addWidget(create_section_label("Import Data"))
         left_actions_layout.addWidget(self.button_import_file)
         left_actions_layout.addWidget(self.button_import_sheet)
         left_actions_layout.addWidget(self.button_import_db)
 
-        left_actions_layout.addSpacing(15)
+        left_actions_layout.addSpacing(spacing_between_actions)
         left_actions_layout.addWidget(create_section_label("Application"))
         left_actions_layout.addWidget(self.button_settings)
         left_actions_layout.addWidget(self.button_quit)
@@ -157,16 +163,18 @@ class LandingPage(QWidget):
         right_recent_layout.addWidget(create_section_label("Recent Projects"))
 
         self.recent_projects_layout = QVBoxLayout()
-        self.recent_projects_layout.setSpacing(15)
+        self.recent_projects_layout.setSpacing(spacing_between_actions)
         self.recent_projects_layout.setContentsMargins(0, 0, 0, 0)
         right_recent_layout.addLayout(self.recent_projects_layout)
+        self._recent_button_width = button_width
         self._populate_recent_projects(button_width)
 
         right_recent_layout.addStretch()
 
         vertical_separator = QFrame()
         vertical_separator.setObjectName("landing_vertical_separator")
-        vertical_separator.setFixedWidth(2)
+        vertical_separator_width: int = 2
+        vertical_separator.setFixedWidth(vertical_separator_width)
 
         split_layout.addLayout(left_actions_layout)
         split_layout.addWidget(vertical_separator)
@@ -185,16 +193,17 @@ class LandingPage(QWidget):
         info_panel.setFrameShape(QFrame.Shape.StyledPanel)
 
         shadow_effect = QGraphicsDropShadowEffect(self)
-        shadow_effect.setBlurRadius(30)
+        blur_radius: int = 30
+        shadow_effect.setBlurRadius(blur_radius)
         shadow_effect.setColor(QColor(0, 0, 0, 35))
         shadow_effect.setOffset(0, 8)
         info_panel.setGraphicsEffect(shadow_effect)
 
         info_layout = QVBoxLayout(info_panel)
         info_layout.setContentsMargins(30, 30, 30, 30)
-        info_layout.setSpacing(15)
+        info_layout.setSpacing(spacing_between_actions)
 
-        whats_new_header_layout = QHBoxLayout()
+        whats_new_header_layout = QVBoxLayout()
         whats_new_header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         info_title = QLabel("What's New")
@@ -205,7 +214,6 @@ class LandingPage(QWidget):
 
         whats_new_header_layout.addWidget(info_title)
         whats_new_header_layout.addWidget(app_version)
-        whats_new_header_layout.addStretch()
 
         whats_new_content = "<h3 style='color:red'>Loading failed</h3>"
         try:
@@ -262,7 +270,8 @@ class LandingPage(QWidget):
         elif link == "past_versions":
             self.show_changelog_popup("Version History", mode=ParseMode.History)
 
-    def _create_action_button(self, text: str, icon_type: IconType, signal: pyqtSignal, width: int,
+    @staticmethod
+    def _create_action_button(text: str, icon_type: IconType, signal: pyqtSignal, width: int,
                               object_name: str = "") -> QPushButton:
         """Creates an action button"""
         button = QPushButton(text)
@@ -292,64 +301,109 @@ class LandingPage(QWidget):
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.exec()
 
-    def _open_folder_in_explorer(self, file_path_str: str) -> None:
+    @staticmethod
+    def _open_folder_in_explorer(file_path_str: str) -> None:
         """Opens the folder containing the project file in the system file explorer"""
         file_path = Path(file_path_str)
         if file_path.exists():
             folder_path = file_path.parent.absolute()
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder_path)))
 
-    def _create_recent_project_button(self, file_path_str: str, button_width: int) -> QPushButton:
-        """Creates a recent project button with context menu support"""
+    def _create_recent_project_card(self, file_path_str: str, button_width: int) -> ProjectCard:
+        """Creates a recent project card """
+        card = ProjectCard(file_path_str, button_width, parent=self)
+        card.openRequested.connect(self.recent_project_clicked.emit)
+        card.renameRequested.connect(self._handle_rename_request)
+        card.revealRequested.connect(self._open_folder_in_explorer)
+        card.removeRequested.connect(self._handle_remove_request)
+        card.deleteRequested.connect(self._handle_delete_request)
+        return card
+
+    def _handle_rename_request(self, file_path_str: str) -> None:
+        """Renames a project file on disk and updates the list"""
         file_path = Path(file_path_str)
-        parent_dir = file_path.parent.name
-        display_text = f"{file_path.name} ({parent_dir})" if parent_dir else file_path.name
+        if not file_path.exists():
+            global_signals.request_toast("File Not Found", "The project file could not be found", ToastLevel.WARNING)
+            self._handle_remove_request(file_path_str)
+            return
 
-        btn = QPushButton(display_text)
-        btn.setProperty("size_variant", "large")
-        btn.setToolTip(str(file_path.absolute()))
-        btn.setIcon(IconBuilder.build(IconType.OpenProject))
-        btn.setFixedWidth(button_width)
-        btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        sibling_stems = [
+            sibling.stem for sibling in file_path.parent.glob(f"*{file_path.suffix}")
+            if sibling.name != file_path.name
+        ]
 
-        btn.clicked.connect(
-            lambda checked, path=file_path_str: self.recent_project_clicked.emit(path)
+        dialog = RenameProjectDialog(file_path.stem, sibling_stems, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        new_path = file_path.with_name(f"{dialog.get_new_name()}{file_path.suffix}")
+        try:
+            file_path.rename(new_path)
+        except OSError as RenameError:
+            global_signals.request_toast("Rename Failed", f"Could not rename project: {RenameError}", ToastLevel.ERROR)
+            return
+
+        recent_files = self._get_recent_projects_list()
+        if file_path_str in recent_files:
+            recent_files[recent_files.index(file_path_str)] = str(new_path)
+            self._save_recent_projects_list(recent_files)
+
+        global_signals.request_toast("Project Renamed", f"Renamed to {new_path.name}", ToastLevel.SUCCESS)
+        self.refresh_recent_projects()
+
+    def _handle_remove_request(self, file_path_str: str) -> None:
+        """Removes a project file entry from the list without deleting the file"""
+        recent_files = self._get_recent_projects_list()
+        if file_path_str in recent_files:
+            recent_files.remove(file_path_str)
+            self._save_recent_projects_list(recent_files)
+        self.refresh_recent_projects()
+
+    def _handle_delete_request(self, file_path_str: str) -> None:
+        """Deletes a project file from disk and removes it from recents"""
+        file_path = Path(file_path_str)
+
+        confirm = QMessageBox.question(
+            self, "Delete Project",
+            f"Are you sure you want to permanently delete '{file_path.name}'?\nThis cannot be undone",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
 
-        btn.customContextMenuRequested.connect(
-            lambda pos, path=file_path_str: self._show_recent_project_context_menu(btn, path, pos)
-        )
+        try:
+            if file_path.exists():
+                file_path.unlink()
+        except OSError as DeleteError:
+            global_signals.request_toast("Delete Failed", f"Could not delete project: {DeleteError}", ToastLevel.ERROR)
+            return
 
-        return btn
+        self._handle_remove_request(file_path_str)
+        global_signals.request_toast("Project Deleted", f"Deleted {file_path.name}", ToastLevel.SUCCESS)
 
-    def _show_recent_project_context_menu(self, button: QPushButton, file_path_str: str, pos: QPoint) -> None:
-        """Shows the context menu for a recent project button"""
-        menu = QMenu(button)
-
-        open_action = QAction("Open Project", menu)
-        open_action.triggered.connect(
-            lambda: self.recent_project_clicked.emit(file_path_str)
-        )
-        menu.addAction(open_action)
-
-        reveal_action = QAction("Show in file explorer", menu)
-        reveal_action.triggered.connect(
-            lambda: self._open_folder_in_explorer(file_path_str)
-        )
-        menu.addAction(reveal_action)
-
-        menu.exec(button.mapToGlobal(pos))
-
-    def _populate_recent_projects(self, button_width: int) -> None:
+    def _get_recent_projects_list(self) -> list[str]:
+        """Retrieve the recent project paths from QSettings"""
         settings = QSettings(f"{APPLICATION_NAME}", "RecentProjects")
         recent_files = settings.value("recent_files", [])
 
         if not recent_files:
-            recent_files = []
-        elif isinstance(recent_files, str):
-            recent_files = [recent_files]
-        elif not isinstance(recent_files, list):
-            recent_files = list(recent_files)
+            return []
+        if isinstance(recent_files, str):
+            return [recent_files]
+        if not isinstance(recent_files, list):
+            return list(recent_files)
+        return recent_files
+
+    def _save_recent_projects_list(self, recent_files: list[str]) -> None:
+        QSettings(f"{APPLICATION_NAME}", "RecentProjects").setValue("recent_files", recent_files)
+
+    def refresh_recent_projects(self) -> None:
+        """Redraw the recent project cards"""
+        self._populate_recent_projects(self._recent_button_width)
+
+    def _populate_recent_projects(self, button_width: int) -> None:
+        recent_files: list[str] = self._get_recent_projects_list()
 
         valid_files: list[str] = []
         max_history_limit: int = 20
@@ -382,11 +436,11 @@ class LandingPage(QWidget):
             self._show_no_recent_projects_label(button_width)
         else:
             for file_path_str in display_files:
-                btn = self._create_recent_project_button(file_path_str, button_width)
-                self.recent_projects_layout.addWidget(btn)
+                card = self._create_recent_project_card(file_path_str, button_width)
+                self.recent_projects_layout.addWidget(card)
 
         if valid_files != recent_files:
-            settings.setValue("recent_files", valid_files)
+            self._save_recent_projects_list(valid_files)
 
     def _show_no_recent_projects_label(self, button_width: int) -> None:
         """Displays and empty state indicator when no recent projects exist"""

@@ -306,7 +306,6 @@ class TransformationController(BaseDataController):
                     action="percentage_change",
                     column=config["column"],
                     periods=config["periods"],
-                    fill_method=config["fill_method"],
                     new_column=config["new_column"]
                 )
                 self.view.refresh_data_view()
@@ -314,15 +313,14 @@ class TransformationController(BaseDataController):
                 self.status_bar.log_action(
                     f"Applied {config['periods']}-period percentage change on '{config['column']}'",
                     details={
-                        "column"     : config["column"],
-                        "periods"    : config["periods"],
-                        "fill_method": config["fill_method"],
-                        "new_column" : config["new_column"],
-                        "operation"  : "percentage_change"
+                        "column"    : config["column"],
+                        "periods"   : config["periods"],
+                        "new_column": config["new_column"],
+                        "operation" : "percentage_change"
                     },
                     level=LogLevel.SUCCESS
                 )
-            except Exception as e:
+            except (ValueError, TypeError, KeyError) as e:
                 self.status_bar.log(f"Failed to calculate percentage change: {str(e)}", LogLevel.ERROR)
                 global_signals.request_toast("Error", "Failed to calculate percentage change", ToastLevel.ERROR)
 

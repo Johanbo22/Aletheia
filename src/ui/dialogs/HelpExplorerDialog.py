@@ -1,7 +1,7 @@
 import logging
 
 from PyQt6.QtCore import QModelIndex, QSettings, QSortFilterProxyModel, QTimer, QUrl, Qt
-from PyQt6.QtGui import QCloseEvent, QDesktopServices, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
+from PyQt6.QtGui import QCloseEvent, QDesktopServices, QKeySequence, QShortcut, QStandardItem, QStandardItemModel, QTextCursor
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, \
     QSplitter, QTextBrowser, QTreeView, QVBoxLayout, QWidget
 
@@ -257,7 +257,7 @@ class HelpExplorerDialog(QDialog):
             self.content_animation_pane.setVisible(False)
 
         content: str = detail.detailed_description if detail.detailed_description else detail.description
-        self.content_browser.setMarkdown(content)
+        self._set_markdown_with_spacing(content)
 
         self.current_link = detail.link
         self.link_button.setVisible(bool(detail.link))
@@ -275,10 +275,37 @@ class HelpExplorerDialog(QDialog):
             self.current_animation_widget = None
 
         self.content_animation_pane.setVisible(False)
-        self.content_browser.setMarkdown(content)
+        self._set_markdown_with_spacing(content)
         self.current_link = None
         self.link_button.setVisible(False)
         self.link_button.setToolTip("")
+
+    def _set_markdown_with_spacing(self, content: str) -> None:
+        """Applies Markdown content and proper line spacing. Uses the formatting written in the database"""
+        self.content_browser.setMarkdown(content)
+
+        document = self.content_browser.document()
+        cursor = QTextCursor(document)
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+
+        while True:
+            block = cursor.block()
+            fmt = block.blockFormat()
+
+            if not block.textList():
+                if fmt.headingLevel() > 0:
+                    fmt.setTopMargin(16.0)
+                    fmt.setBottomMargin(8.0)
+                else:
+                    fmt.setTopMargin(4.0)
+                    fmt.setBottomMargin(12.0)
+            else:
+                fmt.setBottomMargin(6.0)
+
+            cursor.setBlockFormat(fmt)
+
+            if not cursor.movePosition(QTextCursor.MoveOperation.NextBlock):
+                break
 
     def _open_external_link(self) -> None:
         if self.current_link:

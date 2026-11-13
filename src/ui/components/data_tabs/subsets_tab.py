@@ -76,6 +76,9 @@ class SubsetsTab(BaseDataTab):
         subset_list_btns.addWidget(self.refresh_subsets_btn)
         subset_list_layout.addLayout(subset_list_btns)
         subset_list_group.setLayout(subset_list_layout)
+
+        self.subset_list_group = subset_list_group
+        self.subset_list_group.setVisible(False)
         layout.addWidget(subset_list_group)
         layout.addSpacing(10)
 
@@ -132,11 +135,13 @@ class SubsetsTab(BaseDataTab):
         self.active_subsets_list.clear()
 
         if not subsets:
+            self.subset_list_group.setVisible(False)
             placeholder = QListWidgetItem("No active subsets available")
             placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
             self.active_subsets_list.addItem(placeholder)
             return
 
+        self.subset_list_group.setVisible(True)
         for name, row_text in subsets:
             item = QListWidgetItem(f"{name} ({row_text})")
             item.setData(Qt.ItemDataRole.UserRole, name)

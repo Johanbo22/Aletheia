@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 
 from src.core.global_signals import global_signals
@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 class DataTableModel(QAbstractTableModel):
     """ table for the data Table"""
+
+    modelDataModified = pyqtSignal()
 
     _SUPPORTED_ROLES = {
         Qt.ItemDataRole.DisplayRole,
@@ -497,6 +499,7 @@ class DataTableModel(QAbstractTableModel):
 
             self.dataChanged.emit(index, index, [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole,
                                                  Qt.ItemDataRole.CheckStateRole])
+            self.modelDataModified.emit()
             return True
 
         except Exception as UpdateDataModelError:
@@ -549,6 +552,7 @@ class DataTableModel(QAbstractTableModel):
         self._data = self.data_handler.df
 
         self.endInsertRows()
+        self.modelDataModified.emit()
 
     def insert_empty_column(self) -> None:
         """Append a new column with NaN values ath the of the DF"""
@@ -564,6 +568,7 @@ class DataTableModel(QAbstractTableModel):
 
         self._update_column_alignments()
         self.endInsertColumns()
+        self.modelDataModified.emit()
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Returns the header of the data"""
@@ -652,6 +657,7 @@ class DataTableModel(QAbstractTableModel):
             self.highlighted_cells.clear()
             self._last_index = None
             self._update_column_alignments()
+            self.modelDataModified.emit()
         except Exception as SortError:
             logger.error(f"Error sorting data: {SortError}", exc_info=True)
             global_signals.request_toast("Sort Error", "Failed to sort data", ToastLevel.ERROR)

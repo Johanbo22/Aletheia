@@ -179,6 +179,7 @@ class StatsController(BaseDataController):
                                                 <option value="pvalue">Sort: Most Significant (P-Value)</option>
                                                 <option value="type">Sort: Test Type</option>
                                             </select>
+                                            <button id="sortDirectionToggle" class="global-control-btn">&#8593; Asc</button>
                                             <button id="expandAllBtn" class="global-control-btn">Expand All</button>
                                             <button id="collapseAllBtn" class="global-control-btn">Collapse All</button>
                                         </div>

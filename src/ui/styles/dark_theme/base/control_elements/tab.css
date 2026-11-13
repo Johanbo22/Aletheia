@@ -16,6 +16,10 @@ QTabWidget::pane {
     top: -1px;
 }
 
+QTabWidget[tabBarHidden="true"]::pane{
+    border-top-left-radius: 6px;
+}
+
 QTabBar {
     qproperty-drawBase: 0;
     background: transparent;

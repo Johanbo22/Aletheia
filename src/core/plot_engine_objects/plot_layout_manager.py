@@ -170,7 +170,7 @@ class PlotLayoutManager:
                 offset_text.set_visible(False)
             ax.set_xlabel("")
 
-        if sharey and not ss.is_first_row():
+        if sharey and not ss.is_first_col():
             for label in ax.get_yticklabels(which="both"):
                 label.set_visible(False)
             offset_text = ax.yaxis.get_offset_text()

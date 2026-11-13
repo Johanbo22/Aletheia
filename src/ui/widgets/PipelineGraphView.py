@@ -1,3 +1,4 @@
+import html
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import QEasingCurve, QParallelAnimationGroup, QPoint, QPointF, QPropertyAnimation, QRectF, \
@@ -211,8 +212,6 @@ class GraphNode(QGraphicsObject):
         self._setup_tooltip()
         self._update_styling()
 
-        self._update_styling()
-
     def boundingRect(self) -> QRectF:
         """Returns the pre-calculated node geometry rectangle"""
         return self._bounding_rect
@@ -225,19 +224,21 @@ class GraphNode(QGraphicsObject):
         """Constructs the HTML tooltip text"""
         if self.operation:
             items_html: str = "".join(
-                f"<li><b>{k}</b>: {v}</li>" for k, v in self.operation.items() if k != "type"
+                f"<li><b>{html.escape(str(k))}</b>: {html.escape(str(v))}</li>"
+                for k, v in self.operation.items()
+                if k != "type"
             )
             self.setToolTip(
-                f"<div style='padding: 4px; color: #F8FAFC;'>"
-                f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
+                f"<div style='padding: 4px;'>"
+                f"<b style='font-size: 13px;'>{self.label}</b><br><br>"
                 f"<b>Operation Details:</b><br>"
                 f"<ul style='margin-top: 4px; margin-bottom: 0px;'>{items_html}</ul>"
                 f"</div>"
             )
             return
         self.setToolTip(
-            f"<div style='color: #F8FAFC;'>"
-            f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
+            f"<div>"
+            f"<b style='font-size: 13px;'>{self.label}</b><br><br>"
             f"Original imported data state</div>"
         )
 
@@ -379,7 +380,7 @@ class PipelineGraphView(QGraphicsView):
         self.setScene(self.graph_scene)
 
         self.setMouseTracking(True)
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
         self.setRenderHints(
             QPainter.RenderHint.Antialiasing |
@@ -602,6 +603,7 @@ class PipelineGraphView(QGraphicsView):
                 distance: float = (event.position() - self._middle_click_pos).manhattanLength()
                 if distance < 5.0:
                     self.resetTransform()
+                    self._zoom_level = 0
                     active_node: Optional[GraphNode] = next(
                         (n for n in self.nodes if n.node_id == self.current_id), None
                     )
@@ -615,11 +617,18 @@ class PipelineGraphView(QGraphicsView):
             return
         super().mouseReleaseEvent(event)
 
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         if event.key() == Qt.Key.Key_F:
-            scene_rect: QRectF | None = self.graph_scene.itemsBoundingRect()
-            scene_rect.adjust(-20, -20, 20, 20)
-            self.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
+            if not self.graph_scene.items():
+                event.accept()
+                return
+
+            scene_rect: QRectF = self.graph_scene.itemsBoundingRect()
+            if scene_rect is not None:
+                scene_rect.adjust(-20, -20, 20, 20)
+                self.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
+                self._zoom_level = 0
+
             event.accept()
             return
         super().keyPressEvent(event)
@@ -795,7 +804,7 @@ class PipelineGraphView(QGraphicsView):
             max_y: float = max(max_y, y_pos)
 
             if node_data.parent_id and node_data.parent_id in positions:
-                is_active_path: bool = is_active or (node_id in active_path_set)
+                is_active_path: bool = node_id in active_path_set
                 edge: FlowEdgeItem = self._create_edge_item(
                     positions[node_data.parent_id],
                     (x_pos, y_pos, depth),

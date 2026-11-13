@@ -1,16 +1,3 @@
-QProgressBar#main_progress_bar {
-    border: 2px solid #3498db;
-    border-radius: 5px;
-    text-align: center;
-    font-weight: bold;
-    background-color: #ecf0f1;
-}
-
-QProgressBar#main_progress_bar::chunk {
-    background-color: #3498db;
-    border-radius: 3px;
-}
-
 QDialog#progress_dialog_main {
     background-color: #ffffff;
 }

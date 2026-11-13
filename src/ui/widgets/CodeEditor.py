@@ -1,11 +1,13 @@
 import ast
+import difflib
 import traceback
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QRect, QStringListModel, QThread, QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QFont, QKeyEvent, QKeySequence, QMouseEvent, QPaintEvent, QPainter, \
+from PyQt6.QtGui import QAction, QColor, QContextMenuEvent, QFont, QKeyEvent, QKeySequence, QMouseEvent, QPaintEvent, \
+    QPainter, \
     QResizeEvent, QTextBlock, QTextCharFormat, QTextCursor, QTextDocument, QTextFormat, QTextOption, QWheelEvent
-from PyQt6.QtWidgets import QCompleter, QInputDialog, QPlainTextEdit, QTextEdit, QToolTip, QWidget
+from PyQt6.QtWidgets import QCompleter, QInputDialog, QMenu, QPlainTextEdit, QTextEdit, QToolTip, QWidget
 
 from src.core.global_signals import LogLevel, ToastLevel, global_signals
 from src.ui.LineNumberArea import LineNumberArea
@@ -44,7 +46,7 @@ class LintWorker(QThread):
             if syntax_err.lineno is not None:
                 offset: int = syntax_err.offset if syntax_err.offset is not None else 1
                 errors.append(LintError(syntax_err.lineno, offset, str(syntax_err.msg)))
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
         self.lint_complete.emit(errors)
@@ -135,6 +137,23 @@ class CodeEditor(QPlainTextEdit):
         whitespace_action.triggered.connect(self.toggleWhitespaceVisibility)
         self.addAction(whitespace_action)
 
+        # Strip trailing whitespace
+        strip_whitespace_action = QAction("Strip Trailing Whitespace", self)
+        strip_whitespace_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
+        strip_whitespace_action.triggered.connect(self.stripTrailingWhitespace)
+        self.addAction(strip_whitespace_action)
+
+        # Convert tabs to spaces
+        convert_tabs_action = QAction("Convert Tabs to Spacse", self)
+        convert_tabs_action.triggered.connect(self.convertTabsToSpaces)
+        self.addAction(convert_tabs_action)
+
+        # Reset Zoom level
+        zoom_reset_action = QAction("Reset Zoom", self)
+        zoom_reset_action.setShortcut(QKeySequence("Ctrl+0"))
+        zoom_reset_action.triggered.connect(self.resetZoom)
+        self.addAction(zoom_reset_action)
+
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._folded_cursors: list[QTextCursor] = []
 
@@ -152,6 +171,18 @@ class CodeEditor(QPlainTextEdit):
 
         self.textChanged.connect(self._scheduleFoldUpdate)
         self.textChanged.connect(self._lint_timer.start)
+
+        # Diff tracking
+        self._reference_text: str = ""
+        self._diff_map: dict[int, str] = {}
+        self._deleted_lines: set[int] = set()
+
+        diff_timer_duration: int = 300
+        self._diff_timer = QTimer(self)
+        self._diff_timer.setSingleShot(True)
+        self._diff_timer.setInterval(diff_timer_duration)
+        self._diff_timer.timeout.connect(self._compute_diff)
+        self.textChanged.connect(self._diff_timer.start)
 
         # font
         font = QFont("Consolas", 12)
@@ -251,6 +282,22 @@ class CodeEditor(QPlainTextEdit):
                     painter.drawLine(box_x + 2, box_y + box_size // 2, box_x + box_size - 2, box_y + box_size // 2)
                     if is_folded:
                         painter.drawLine(box_x + box_size // 2, box_y + 2, box_x + box_size // 2, box_y + box_size - 2)
+
+                indicator_width: int = 3
+                diff_state: str | None = getattr(self, "_diff_map", {}).get(block_number)
+                has_deletion_above: bool = block_number in getattr(self, "_deleted_lines", set())
+                has_deletion_below: bool = (block_number == self.blockCount() - 1) and (
+                        (block_number + 1) in getattr(self, "_deleted_lines", set()))
+
+                if diff_state == "added":
+                    painter.fillRect(0, top, indicator_width, font_metrics.height(), QColor("#4caf50"))
+                elif diff_state == "changed":
+                    painter.fillRect(0, top, indicator_width, font_metrics.height(), QColor("#2196f3"))
+
+                if has_deletion_above:
+                    painter.fillRect(0, top, indicator_width, 3, QColor("#f44336"))
+                if has_deletion_below:
+                    painter.fillRect(0, bottom - 3, indicator_width, 3, QColor("#f44336"))
 
             block = block.next()
             top = bottom
@@ -393,6 +440,7 @@ class CodeEditor(QPlainTextEdit):
         # Bracket matching highlight
         try:
             extraSelections.extend(self.getBracketSelections())
+            extraSelections.extend(self.getWordOccurenceSelections())
             if hasattr(self, '_lint_selections'):
                 extraSelections.extend(self._lint_selections)
         except Exception as e:
@@ -413,19 +461,9 @@ class CodeEditor(QPlainTextEdit):
         self.completer.popup().setObjectName("interactive_console_popup")
         self.completer.activated.connect(self.insertCompletion)
 
-        try:
-            from resources.autocomplete_keywords import AUTOCOMPLETE_KEYWORDS
-            keywords = AUTOCOMPLETE_KEYWORDS
-        except ImportError:
-            print("Warning:_Could not import autocomplete_keywords. Using default")
-            keywords = [
-                "def", "class", "if", "else", "elif", "while", "for", "in", "return",
-                "try", "except", "import", "from", "as", "True", "False", "None",
-                "and", "or", "not", "break", "continue", "pass", "lambda", "with",
-                "is", "global", "raise", "yield", "print", "range", "len", "list",
-                "dict", "set", "str", "int", "float", "bool", "super", "__init__",
-                "self", "None", "open", "zip", "enumerate", "isinstance"
-            ]
+        from resources.autocomplete_keywords import AUTOCOMPLETE_KEYWORDS
+        keywords = AUTOCOMPLETE_KEYWORDS
+
         model = QStringListModel(keywords, self.completer)
         self.completer.setModel(model)
 
@@ -721,6 +759,56 @@ class CodeEditor(QPlainTextEdit):
 
         self.document().setDefaultTextOption(option)
 
+    def stripTrailingWhitespace(self) -> None:
+        """Removes all trailing whitespace from the end of lines"""
+        cursor: QTextCursor = self.textCursor()
+        cursor.beginEditBlock()
+
+        doc: QTextDocument = self.document()
+        block: QTextBlock = doc.firstBlock()
+
+        while block.isValid():
+            text: str = block.text()
+            if text.endswith(" ") or text.endswith("\t"):
+                stripped_len: int = len(text) - len(text.rstrip(" \t"))
+                if stripped_len > 0:
+                    edit_cursor = QTextCursor(block)
+                    edit_cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
+                    edit_cursor.movePosition(
+                        QTextCursor.MoveOperation.Left,
+                        QTextCursor.MoveMode.KeepAnchor,
+                        stripped_len
+                    )
+                    edit_cursor.removeSelectedText()
+            block = block.next()
+
+        cursor.endEditBlock()
+
+    def convertTabsToSpaces(self) -> None:
+        """Converts all tab characters in the document to tab spaces"""
+        cursor: QTextCursor = self.textCursor()
+        cursor.beginEditBlock()
+
+        doc: QTextDocument = self.document()
+        block: QTextBlock = doc.firstBlock()
+
+        while block.isValid():
+            text: str = block.text()
+            if "\t" in text:
+                edit_cursor = QTextCursor(block)
+                edit_cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                new_text = text.replace("\t", self.TAB_SPACES)
+                edit_cursor.insertText(new_text)
+            block = block.next()
+
+        cursor.endEditBlock()
+
+    def resetZoom(self) -> None:
+        """Resets the editors font size to default"""
+        font: QFont = self.font()
+        font.setPointSize(12)
+        self.setFont(font)
+
     def getBracketSelections(self) -> list[QTextEdit.ExtraSelection]:
         """
         Find and highlight matching bracket pairs '()', '[]', '{}' if the cursor is adjacent to one
@@ -797,6 +885,56 @@ class CodeEditor(QPlainTextEdit):
             current_pos += search_direction
 
         return selections
+
+    def getWordOccurenceSelections(self) -> list[QTextEdit.ExtraSelection]:
+        """
+        Identify and highlight all occurences of a word that is beneath the cursor
+        :return: A list of objects containing the formatting for the matched words
+        """
+        selections: list[QTextEdit.ExtraSelection] = []
+        cursor: QTextCursor = self.textCursor()
+
+        cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        word: str = cursor.selectedText()
+
+        if not word or not word.isalnum():
+            return selections
+
+        doc: QTextDocument = self.document()
+        text_format = QTextCharFormat()
+        text_format.setBackground(QColor("#404040"))
+        text_format.setProperty(QTextFormat.Property.FullWidthSelection, False)
+
+        search_cursor = QTextCursor(doc)
+        while True:
+            search_cursor = doc.find(word, search_cursor, QTextDocument.FindFlag.FindWholeWords)
+            if search_cursor.isNull():
+                break
+
+            selection = QTextEdit.ExtraSelection()
+            selection.format = text_format
+            selection.cursor = search_cursor
+            selections.append(selection)
+
+        return selections
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """
+        Generate and display a context menu
+        This is default context menu for the QTextEdit class
+
+        :param event: The contextMenuEvent to trigger
+        """
+        menu: QMenu = self.createStandardContextMenu()
+        if menu is None:
+            return
+
+        menu.addSeparator()
+
+        for action in self.actions():
+            menu.addAction(action)
+
+        menu.exec(event.globalPos())
 
     def duplicateLine(self) -> None:
         """
@@ -943,6 +1081,47 @@ class CodeEditor(QPlainTextEdit):
             self.setTextCursor(cursor)
 
         cursor.endEditBlock()
+
+    def set_reference_text(self, text: str) -> None:
+        """
+        Sets the reference text for diff calculation and triggers the diff update
+
+        :param text: The text to compare against
+        """
+        self._reference_text = text
+        self._compute_diff()
+
+    def _compute_diff(self) -> None:
+        """
+        Computes the differences between reference text and current text to update the gutter
+        """
+        current_text: str = self.toPlainText()
+        if not self._reference_text and not current_text:
+            self._diff_map.clear()
+            self._deleted_lines.clear()
+            self.lineNumberArea.update()
+            return
+
+        reference_lines: list[str] = self._reference_text.split("\n")
+        current_lines: list[str] = current_text.split("\n")
+
+        matcher = difflib.SequenceMatcher(None, reference_lines, current_lines)
+        diff_map: dict[int, str] = {}
+        deleted_lines: set[int] = set()
+
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "replace":
+                for j in range(j1, j2):
+                    diff_map[j] = "changed"
+            elif tag == "insert":
+                for j in range(j1, j2):
+                    diff_map[j] = "added"
+            elif tag == "delete":
+                deleted_lines.add(j1)
+
+        self._diff_map = diff_map
+        self._deleted_lines = deleted_lines
+        self.lineNumberArea.update()
 
     def _startLinting(self) -> None:
         """
@@ -1141,10 +1320,10 @@ class CodeEditor(QPlainTextEdit):
         pairs: dict[str, str] = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
         closing_chars: set[str] = {')', ']', '}', '"', "'"}
 
-        if text in closing_chars:
-            pos_in_block: int = cursor.positionInBlock()
-            block_text: str = cursor.block().text()
+        pos_in_block: int = cursor.positionInBlock()
+        block_text: str = cursor.block().text()
 
+        if text in closing_chars:
             if pos_in_block < len(block_text):
                 char_after: str = block_text[pos_in_block]
                 if char_after == text:
@@ -1153,6 +1332,20 @@ class CodeEditor(QPlainTextEdit):
                     return True
 
         if text in pairs:
+            if text in ('"', "'") and pos_in_block >= 2:
+                if block_text[pos_in_block - 2:pos_in_block] == text * 2:
+                    super().keyPressEvent(event)
+                    self.insertPlainText(text * 3)
+
+                    new_cursor: QTextCursor = self.textCursor()
+                    new_cursor.movePosition(
+                        QTextCursor.MoveOperation.Left,
+                        QTextCursor.MoveMode.KeepAnchor,
+                        3
+                    )
+                    self.setTextCursor(new_cursor)
+                    return True
+
             super().keyPressEvent(event)
             self.insertPlainText(pairs[text])
             self.moveCursor(QTextCursor.MoveOperation.Left)
@@ -1182,7 +1375,7 @@ class CodeEditor(QPlainTextEdit):
         """
         if self.completer and self.completer.popup().isVisible():
             keys_to_ignore = (
-            Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab)
+                Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Escape, Qt.Key.Key_Tab, Qt.Key.Key_Backtab)
             if event.key() in keys_to_ignore:
                 event.ignore()
                 return
@@ -1192,7 +1385,7 @@ class CodeEditor(QPlainTextEdit):
             return
 
         is_shortcut: bool = (
-                    event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
+                event.modifiers() == Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_Space)
         if is_shortcut:
             self.startCompleter()
             return

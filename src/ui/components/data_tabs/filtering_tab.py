@@ -1,56 +1,70 @@
 from typing import Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QComboBox, QFormLayout, QGroupBox, QLabel, QLineEdit, QVBoxLayout
+import pandas as pd
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QFrame, QGroupBox, QLabel, QLineEdit, QPushButton, QVBoxLayout
 
 from icons import IconType
 from src.ui.components.data_tabs.base_data_tab import BaseDataTab
 
 if TYPE_CHECKING:
     from src.controller.data_tab_controller import DataTabController
-    
+
 class FilteringTab(BaseDataTab):
     def __init__(self, parent=None, controller: Optional["DataTabController"] = None) -> None:
         super().__init__(parent, controller)
         self.init_ui()
-    
+
     def init_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        
-        filter_info = QLabel("Filter your dataset by defining criteria. Use the Quick Filter for single conditions, or the Advanced Filter for complex, multi-conditional queries.")
+        layout = self.setup_scrollable_layout()
+        layout.setSpacing(16)
+
+        filter_info = QLabel(
+            "Filter your dataset by defining criteria. Use the Quick Filter for single conditions, or the Advanced Filter for complex, multi-conditional queries.")
         filter_info.setWordWrap(True)
         filter_info.setProperty("styleClass", "info_text")
         layout.addWidget(filter_info)
-        layout.addSpacing(10)
 
         self.filter_status_label = QLabel("Status: No active filters")
         self.filter_status_label.setWordWrap(True)
         self.filter_status_label.setProperty("styleClass", "status_indicator_inactive")
         layout.addWidget(self.filter_status_label)
-        layout.addSpacing(10)
-        
+
         quick_filter_group = QGroupBox("Quick Filter")
         quick_filter_layout = QVBoxLayout(quick_filter_group)
-        quick_filter_layout.setSpacing(12)
-        
+
         form_layout = QFormLayout()
-        
+
         self.filter_column = QComboBox()
         self.filter_column.setToolTip("Select the column you wish to apply a filter to")
         form_layout.addRow(QLabel("Column:"), self.filter_column)
-        
+
         self.filter_condition = QComboBox()
-        self.filter_condition.addItems(["==", "!=", ">", "<", ">=", "<=", "contains"])
-        self.filter_condition.setToolTip("Select which conditional to apply to column. N.B. Uses Python Syntax")
+        self.filter_condition.addItem("Equals", "==")
+        self.filter_condition.addItem("Does not equal", "!=")
+        self.filter_condition.addItem("Greater than", ">")
+        self.filter_condition.addItem("Less than", "<")
+        self.filter_condition.addItem("Greater than or equal", ">=")
+        self.filter_condition.addItem("Less than or equal", "<=")
+        self.filter_condition.addItem("Contains", "contains")
+        self.filter_condition.setToolTip("Select the conditional operation to apply to the column.")
         form_layout.addRow(QLabel("Condition:"), self.filter_condition)
-        
+
         self.filter_value = QLineEdit()
         self.filter_value.setPlaceholderText("Enter evaluation value...")
         self.filter_value.setClearButtonEnabled(True)
-        self.filter_value.setToolTip("Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
+        self.filter_value.returnPressed.connect(self.controller.apply_filter)
+        self.filter_value.setToolTip(
+            "Enter the value you want the column to be evaluated to.\nNote: Reference your data. This is case-sensitive")
         form_layout.addRow(QLabel("Value:"), self.filter_value)
-        
+
+        self.filter_preview_label = QLabel("")
+        self.filter_preview_label.setWordWrap(True)
+        self.filter_preview_label.setProperty("styleClass", "filter_preview_label")
+        self.filter_preview_label.setVisible(False)
+        form_layout.addRow(self.filter_preview_label)
+
         quick_filter_layout.addLayout(form_layout)
-        
+
         quick_filter_layout.addLayout(self._create_operation_row(
             title="Apply Filter",
             tooltip="Apply the configured filter",
@@ -58,20 +72,30 @@ class FilteringTab(BaseDataTab):
             help_id="apply_filter",
             icon_type=IconType.Filter
         ))
-        
-        quick_filter_layout.addLayout(self._create_operation_row(
+
+        clear_filter_row = self._create_operation_row(
             title="Clear Filters",
             tooltip="Reset the dataset to its original state and remove the filters",
             callback=self.controller.clear_filters,
             help_id="",
             icon_type=IconType.ClearFilter
-        ))
+        )
+        clear_btn = clear_filter_row.itemAt(0).widget()
+        if isinstance(clear_btn, QPushButton):
+            clear_btn.setObjectName("op_btn_clear_filters")
+        quick_filter_layout.addLayout(clear_filter_row)
         layout.addWidget(quick_filter_group)
-        
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setObjectName("landing_vertical_separator")
+        layout.addWidget(separator)
+
         advanced_filter_group = QGroupBox("Advanced Filter")
         advanced_filter_layout = QVBoxLayout(advanced_filter_group)
         advanced_filter_layout.setSpacing(12)
-        
+
         advanced_filter_layout.addLayout(self._create_operation_row(
             title="Advanced Filter",
             tooltip="Open the advanced multi-conditional filter to build more complex filters",
@@ -80,17 +104,41 @@ class FilteringTab(BaseDataTab):
             icon_type=IconType.AdvancedFilter
         ))
         layout.addWidget(advanced_filter_group)
-        
+
         layout.addStretch()
 
         self.apply_destructive_styling_tags(["clear_filters"])
-    
+        self.filter_column.currentTextChanged.connect(self.controller.update_filter_preview_live)
+        self.filter_column.currentTextChanged.connect(self._on_filter_column_changed)
+        self.filter_condition.currentTextChanged.connect(self.controller.update_filter_preview_live)
+        self.filter_value.textChanged.connect(self.controller.update_filter_preview_live)
+
     def get_filter_parameters(self) -> tuple[str, str, str]:
         return (
             self.filter_column.currentText(),
-            self.filter_condition.currentText(),
+            self.filter_condition.currentData(),
             self.filter_value.text()
         )
+
+    def _on_filter_column_changed(self, column_name: str) -> None:
+        """
+        Update the placeholder text for the filter value input based on the columns data type
+        :param column_name: The name of the selected column
+        """
+        if not self.controller or self.controller.data_handler.df is None:
+            return
+
+        df: pd.DataFrame = self.controller.data_handler.df
+        if column_name in df.columns:
+            dtype = df[column_name].dtype
+            if pd.api.types.is_numeric_dtype(dtype):
+                self.filter_value.setPlaceholderText("Enter numeric value...")
+            elif pd.api.types.is_datetime64_any_dtype(dtype):
+                self.filter_value.setPlaceholderText("Enter date (e.g. YYYY-MM-DD)...")
+            elif pd.api.types.is_bool_dtype(dtype):
+                self.filter_value.setPlaceholderText("Enter True or False...")
+            else:
+                self.filter_value.setPlaceholderText("Enter evaluation value...")
 
     def set_filter_active_state(self, is_active: bool, message: str = "") -> None:
         """
@@ -108,3 +156,26 @@ class FilteringTab(BaseDataTab):
 
         self.filter_status_label.style().unpolish(self.filter_status_label)
         self.filter_status_label.style().polish(self.filter_status_label)
+
+    def update_filter_preview(self, filtered_count: int, total_count: int) -> None:
+        """
+        Updates the filter preview label to show how many rows would be affected by the current filter
+        :param filtered_count: Number of rows that match the filter criteria
+        :param total_count: The total number of rows in the dataset
+        """
+        if filtered_count == total_count or filtered_count == 0:
+            self.filter_preview_label.setVisible(False)
+            return
+
+        percentage = (filtered_count / total_count * 100) if total_count > 0 else 0
+        preview_text = f"This will filter to {filtered_count:,} rows ({percentage:.0f}% of the data)"
+        self.filter_preview_label.setText(preview_text)
+        self.filter_preview_label.setVisible(True)
+
+        self.filter_preview_label.style().unpolish(self.filter_preview_label)
+        self.filter_preview_label.style().polish(self.filter_preview_label)
+
+    def clear_filter_preview(self) -> None:
+        """Clears and hides the filter preview label"""
+        self.filter_preview_label.setText("")
+        self.filter_preview_label.setVisible(False)

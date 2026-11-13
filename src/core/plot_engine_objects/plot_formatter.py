@@ -101,161 +101,136 @@ class PlotFormatter:
             plot_tab.status_bar.log(f"Datetime detection warning: {str(error)}", LogLevel.WARNING)
         return False
 
-    def apply_auto_datetime_format(self, plot_tab: "PlotTab", axis: Any, data: Any) -> None:
+    @staticmethod
+    def _prepare_datetime_series(data: pd.Series) -> pd.Series | None:
+        """Converts an object Series to datetime and drops missing values"""
+        if data.dtype == "object":
+            data = pd.to_datetime(data, utc=True, errors="coerce")
+        no_nan_series: pd.Series = data.dropna()
+        return no_nan_series if len(no_nan_series) >= 2 else None
+
+    def apply_auto_datetime_format(self, plot_tab: "PlotTab", axis: object, data: pd.Series | None) -> None:
         """Applies optimal datetime formatting based on the input data range."""
-        if data is None or len(data) < 2 or not self.is_datetime_column(plot_tab, data):
+        if data is None or not isinstance(data, pd.Series) or not self.is_datetime_column(plot_tab, data):
             return
 
         try:
-            if isinstance(data, pd.Series):
-                if data.dtype == "object":
-                    data = pd.to_datetime(data, utc=True, errors="coerce")
-
-            data = data.dropna()
-
-            if len(data) < 2:
+            cleaned_series = self._prepare_datetime_series(data)
+            if cleaned_series is None:
                 return
 
-            date_range = data.max() - data.min()
+            date_range: pd.Timedelta = cleaned_series.max() - cleaned_series.min()
             if date_range <= pd.Timedelta(hours=6):
-                axis.set_major_formatter(mdates.DateFormatter("%H:%M:%S"))
-                axis.set_major_locator(mdates.MinuteLocator(interval=max(1, len(data) // 10)))
+                fmt_str = "%H:%M:%S"
             elif date_range <= pd.Timedelta(days=1):
-                axis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-                axis.set_major_locator(mdates.HourLocator(interval=max(1, len(data) // 12)))
+                fmt_str = "%H:%M"
             elif date_range <= pd.Timedelta(days=7):
-                axis.set_major_formatter(mdates.DateFormatter("%m/%d %H:%M"))
+                fmt_str = "%m/%d %H:%M"
+            elif date_range <= pd.Timedelta(days=30):
+                fmt_str = "%m/%d"
+            elif date_range <= pd.Timedelta(days=365):
+                fmt_str = "%Y-%m-%d"
+            else:
+                fmt_str = "%Y-%m"
+
+            axis.set_major_formatter(mdates.DateFormatter(fmt_str))
+            self.set_intelligent_locator(plot_tab, axis, cleaned_series)
+        except (ValueError, TypeError, AttributeError) as error:
+            plot_tab.status_bar.log(
+                f"Failed to auto-format datetime axis: {error}", LogLevel.ERROR
+            )
+
+    def set_intelligent_locator(self, plot_tab: "PlotTab", axis: object, data: pd.Series | None) -> None:
+        """Sets tick locators based intelligently on the data range."""
+        if data is None or not isinstance(data, pd.Series) or not self.is_datetime_column(plot_tab, data):
+            return
+
+        try:
+            cleaned_series = self._prepare_datetime_series(data)
+            if cleaned_series is None:
+                return
+
+            date_range: pd.Timedelta = cleaned_series.max() - cleaned_series.min()
+            if date_range <= pd.Timedelta(hours=6):
+                axis.set_major_locator(mdates.MinuteLocator(interval=max(1, len(cleaned_series) // 10)))
+            elif date_range <= pd.Timedelta(days=1):
+                axis.set_major_locator(mdates.HourLocator(interval=max(1, len(cleaned_series) // 12)))
+            elif date_range <= pd.Timedelta(days=7):
                 axis.set_major_locator(mdates.DayLocator(interval=1))
             elif date_range <= pd.Timedelta(days=30):
-                axis.set_major_formatter(mdates.DateFormatter("%m/%d"))
                 axis.set_major_locator(mdates.DayLocator(interval=max(1, date_range.days // 10)))
             elif date_range <= pd.Timedelta(days=365):
-                axis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
                 axis.set_major_locator(mdates.MonthLocator(interval=max(1, date_range.days // 90)))
             else:
-                axis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
                 axis.set_major_locator(mdates.YearLocator())
-        except Exception as error:
-            plot_tab.status_bar.log(f"Failed to auto-format datetime: {str(error)}", LogLevel.WARNING)
+        except (ValueError, TypeError, AttributeError) as error:
+            plot_tab.status_bar.log(f"Failed to set datetime locator: {error}", LogLevel.WARNING)
 
-    def set_intelligent_locator(self, plot_tab: "PlotTab", axis: Any, data: Any) -> None:
-        """Sets tick locators based intelligently on the data range."""
-        if data is None or len(data) < 2 or not self.is_datetime_column(plot_tab, data):
+    def _format_single_datetime_axis(
+            self,
+            plot_tab: "PlotTab",
+            axis: object,
+            data: pd.Series,
+            format_text: str,
+            custom_format: str,
+            axis_label: str,
+    ) -> None:
+        """Normalise timezone and apply custom or auto datetime formatting to one axis"""
+        try:
+            if data.dtype == "object":
+                data = pd.to_datetime(data, utc=True, errors="coerce")
+            elif not hasattr(data.dtype, "tz") or data.dtype.tz is None:
+                data = data.dt.tz_localize("UTC", nonexistent="shift_forward", ambiguous="infer")
+        except (ValueError, TypeError, AttributeError) as error:
+            plot_tab.status_bar.log(
+                f"{axis_label}-axis timezone handling warning: {error}", LogLevel.WARNING
+            )
+
+        if not plot_tab.view.custom_datetime_check.isChecked() or format_text == "Auto":
+            self.apply_auto_datetime_format(plot_tab, axis, data)
+            return
+
+        target_fmt: str = custom_format.strip() if format_text == "Custom" else format_text.split(" ")[0]
+        if not target_fmt:
+            self.apply_auto_datetime_format(plot_tab, axis, data)
             return
 
         try:
-            if isinstance(data, pd.Series):
-                if data.dtype == "object":
-                    data = pd.to_datetime(data, utc=True, errors="coerce")
-            data = data.dropna()
+            axis.set_major_formatter(mdates.DateFormatter(target_fmt))
+            self.set_intelligent_locator(plot_tab, axis, data)
+        except (ValueError, TypeError) as error:
+            plot_tab.status_bar.log(
+                f"Invalid datetime format: {error}. Applying default formatting", LogLevel.WARNING
+            )
+            self.apply_auto_datetime_format(plot_tab, axis, data)
 
-            if len(data) < 2:
-                return
-
-            date_range = data.max() - data.min()
-            if date_range <= pd.Timedelta(hours=6):
-                axis.set_major_locator(mdates.MinuteLocator(interval=max(1, len(data) // 10)))
-            elif date_range <= pd.Timedelta(days=1):
-                axis.set_major_locator(mdates.HourLocator(interval=max(1, len(data) // 12)))
-            elif date_range <= pd.Timedelta(days=7):
-                axis.set_major_locator(mdates.DayLocator(interval=1))
-            elif date_range <= pd.Timedelta(days=30):
-                axis.set_major_locator(mdates.MonthLocator(interval=max(1, date_range.days // 10)))
-            elif date_range <= pd.Timedelta(days=365):
-                axis.set_major_locator(mdates.MonthLocator(interval=max(1, date_range.days // 90)))
-            else:
-                axis.set_major_locator(mdates.YearLocator())
-        except Exception as error:
-            plot_tab.status_bar.log(f"Failed to set datetime locator: {str(error)}", LogLevel.WARNING)
-
-    def format_datetime_axis(self, plot_tab: "PlotTab", ax: Any, x_data: Any, y_data: Any = None) -> None:
+    def format_datetime_axis(
+            self,
+            plot_tab: "PlotTab",
+            ax: object,
+            x_data: pd.Series | None,
+            y_data: pd.Series | None = None,
+    ) -> None:
         """Formats datetime axes using user overrides or intelligent auto-scaling."""
-        is_x_datetime = self.is_datetime_column(plot_tab, x_data)
-        is_y_datetime = self.is_datetime_column(plot_tab, y_data) if y_data is not None else False
+        if x_data is not None and self.is_datetime_column(plot_tab, x_data):
+            self._format_single_datetime_axis(
+                plot_tab,
+                ax.xaxis,
+                x_data,
+                plot_tab.view.x_datetime_format_combo.currentText(),
+                plot_tab.view.x_custom_datetime_input.text(),
+                "X"
+            )
 
-        use_custom_format: bool = plot_tab.custom_datetime_check.isChecked()
-
-        if is_x_datetime:
-            try:
-                if isinstance(x_data, pd.Series):
-                    if x_data.dtype == "object":
-                        x_data = pd.to_datetime(x_data, utc=True, errors="coerce")
-                    elif not hasattr(x_data.dtype, "tz") or x_data.dtype.tz is None:
-                        x_data = x_data.dt.tz_localize("UTC", nonexistent="shift_forward", ambiguous="infer")
-            except Exception as error:
-                plot_tab.status_bar.log(f"X-axis timezone handling: {str(error)}", LogLevel.WARNING)
-
-            if use_custom_format:
-                format_text = plot_tab.x_datetime_format_combo.currentText()
-
-                if format_text == "Custom":
-                    custom_format = plot_tab.x_custom_datetime_input.text().strip()
-                    if custom_format:
-                        try:
-                            ax.xaxis.set_major_formatter(mdates.DateFormatter(custom_format))
-                            self.set_intelligent_locator(plot_tab, ax.xaxis, x_data)
-                        except Exception as error:
-                            plot_tab.status_bar.log(f"Invalid datetime format: {str(error)}", LogLevel.WARNING)
-                            self.apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-                    else:
-                        self.apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-                elif format_text == "Auto":
-                    self.apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-                else:
-                    format_code = format_text.split(" ")[0]
-                    try:
-                        ax.xaxis.set_major_formatter(mdates.DateFormatter(format_code))
-                        self.set_intelligent_locator(plot_tab, ax.xaxis, x_data)
-                    except Exception as error:
-                        plot_tab.status_bar.log(f"Invalid datetime format: {str(error)}", LogLevel.WARNING)
-                        self.apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-            else:
-                self.apply_auto_datetime_format(plot_tab, ax.xaxis, x_data)
-
-        if is_y_datetime:
-            try:
-                if isinstance(y_data, pd.Series):
-                    if y_data.dtype == 'object':
-                        y_data = pd.to_datetime(y_data, utc=True, errors='coerce')
-                    elif not hasattr(y_data.dtype, 'tz') or y_data.dtype.tz is None:
-                        y_data = y_data.dt.tz_localize('UTC', nonexistent='shift_forward', ambiguous='infer')
-            except Exception as error:
-                plot_tab.status_bar.log(f"Y-axis timezone handling: {str(error)}", LogLevel.WARNING)
-
-            if use_custom_format:
-                format_text = plot_tab.y_datetime_format_combo.currentText()
-
-                if format_text == "Custom":
-                    custom_format = plot_tab.y_custom_datetime_format_input.text().strip()
-                    if custom_format:
-                        try:
-                            ax.yaxis.set_major_formatter(mdates.DateFormatter(custom_format))
-                            self.set_intelligent_locator(plot_tab, ax.yaxis, y_data)
-                        except Exception as error:
-                            plot_tab.status_bar.log(f"Invalid datetime format: {str(error)}", LogLevel.WARNING)
-                            self.apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-                    else:
-                        self.apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-                elif x_data is not None and hasattr(x_data, "dtype") and (
-                        x_data.dtype == "object" or isinstance(x_data.dtype, pd.CategoricalDtype)):
-                    try:
-                        labels = x_data.unique()
-                        labels = [l for l in labels if pd.notna(l)]
-                        self.format_categorical_axis(ax.xaxis, labels)
-                    except Exception:
-                        pass
-                elif format_text == "Auto":
-                    self.apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-                else:
-                    format_code = format_text.split(" ")[0]
-                    try:
-                        ax.yaxis.set_major_formatter(mdates.DateFormatter(format_code))
-                        self.set_intelligent_locator(plot_tab, ax.yaxis, y_data)
-                    except Exception as error:
-                        plot_tab.status_bar.log(f"Invalid datetime format: {str(error)}", LogLevel.WARNING)
-                        self.apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
-            else:
-                self.apply_auto_datetime_format(plot_tab, ax.yaxis, y_data)
+        if y_data is not None and self.is_datetime_column(plot_tab, y_data):
+            self._format_single_datetime_axis(
+                plot_tab,
+                ax.yaxis,
+                y_data,
+                plot_tab.view.y_datetime_format_combo.currentText(),
+                plot_tab.view.y_custom_datetime_format_input.text(),
+                "Y",
+            )
 
     def apply_flipped_labels(self, plot_tab: "PlotTab", x_col: str, y_cols: List[str], font_family: str) -> None:
         """Correctly applies axes labels when horizontal/flipped representation is active."""

@@ -1,8 +1,8 @@
 # ui/DataPlotStudioApp.py
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
-from PyQt6.QtCore import QEvent, QObject, QSettings, Qt
+from PyQt6.QtCore import QEvent, QObject, QSettings, QThreadPool, QTimer, Qt, pyqtSlot
 from PyQt6.QtGui import QAction, QCloseEvent, QFont, QIcon, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QDialog, QDockWidget, QMainWindow, QMessageBox, QPushButton, QTabBar
 
@@ -10,15 +10,18 @@ from icons.icon_registry import IconBuilder, IconType
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 from src.core.code_exporter import CodeExporter
 from src.core.data_handler import DataHandler
-from src.core.global_signals import global_signals
+from src.core.global_signals import LogLevel, global_signals
 from src.core.logger import Logger
 from src.core.project_manager import ProjectManager
 from src.core.resource_loader import get_resource_path
 from src.core.style_reloader import StyleReloader
+from src.core.version_checker import VersionCheckWorker
+from src.startup.startup_splash_screen import StartupStage
 from src.ui.dialogs import AboutDialog, HelpExplorerDialog, SettingsDialog
 from src.ui.main_window import MainWindow
 from src.ui.menu_bar import MenuBar
 from src.ui.status_bar import StatusBar
+from src.ui.widgets.CustomTitleBar import CustomTitleBar
 
 # Simple Monkeypatch for now. Needs fixing.
 # TODO fix this. Must be removed at some point.
@@ -34,8 +37,9 @@ QDialog.exec = _non_blocking_exec
 class DataPlotStudio(QMainWindow):
     """Main Application shell"""
 
-    def __init__(self) -> None:
+    def __init__(self, status_callback: Optional[Callable[[StartupStage | str], None]] = None) -> None:
         super().__init__()
+        self._status_callback: Optional[Callable[[StartupStage | str], None]] = status_callback
         self.setWindowTitle(f"{APPLICATION_NAME} - v{APPLICATION_VERSION}")
         self.setWindowIcon(IconBuilder.build(IconType.AppIcon))
         self.setMinimumSize(800, 600)
@@ -45,6 +49,12 @@ class DataPlotStudio(QMainWindow):
         self._current_settings: dict = {}
         self._style_reloader: Optional[StyleReloader] = None
 
+        # Caching to reduce thread blocking when quitting settings...
+        self._stylesheet_cache: dict[bool, str] = {}
+        self._applied_dark_mode: Optional[bool] = None
+        self._applied_font_key: Optional[tuple[str, int]] = None
+
+        self._report_startup_status(StartupStage.CORE_MANAGERS)
         # Initialize the core managers
         self.project_manager = ProjectManager()
         self.data_handler = DataHandler()
@@ -61,21 +71,27 @@ class DataPlotStudio(QMainWindow):
         self.status_bar_widget.log(f"{APPLICATION_NAME} started", "INFO")
 
         # Load settings
+        self._report_startup_status(StartupStage.SETTINGS_AND_THEME)
         app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
         self.settings = {
-            "dark_mode"  : app_settings.value("dark_mode", False, type=bool),
-            "font_family": app_settings.value("font_family", "Consolas", type=str),
-            "font_size"  : app_settings.value("font_size", 10, type=int),
-            "enable_autosave"  : app_settings.value("enable_autosave", True, type=bool),
-            "autosave_interval": app_settings.value("autosave_interval", 5, type=int),
+            "dark_mode"              : app_settings.value("dark_mode", False, type=bool),
+            "font_family"            : app_settings.value("font_family", "Consolas", type=str),
+            "font_size"              : app_settings.value("font_size", 10, type=int),
+            "enable_autosave"        : app_settings.value("enable_autosave", True, type=bool),
+            "autosave_interval"      : app_settings.value("autosave_interval", 5, type=int),
+            "check_updates_on_launch": app_settings.value("check_updates_on_launch", True, type=bool)
         }
         self.apply_settings(self.settings)
 
         # Create the menu bar
+        self._report_startup_status(StartupStage.MENU_AND_TITLEBAR)
         self.menu_bar = MenuBar(self)
-        self.setMenuBar(self.menu_bar)
+        self.menu_bar.setNativeMenuBar(False)
+        self.custom_title_bar = CustomTitleBar(self, self.menu_bar)
+        self.setMenuWidget(self.custom_title_bar)
 
         # Create the main widget
+        self._report_startup_status(StartupStage.MAIN_WORKSPACE)
         self.main_widget = MainWindow(
             self.data_handler,
             self.project_manager,
@@ -84,15 +100,28 @@ class DataPlotStudio(QMainWindow):
             self.status_bar_widget
         )
         self.setCentralWidget(self.main_widget)
+
+        self._report_startup_status(StartupStage.DOCK_PANELS)
         self._setup_dock_widgets()
-
         self._connect_signals()
-        self._restore_window_state()
 
+        self._report_startup_status(StartupStage.RESTORING_LAYOUT)
+        self._restore_window_state()
         self.main_widget._update_window_title()
 
         if QApplication.instance() is not None:
             QApplication.instance().installEventFilter(self)
+
+        QTimer.singleShot(1500, self._check_for_updates_on_startup)
+
+    def _report_startup_status(self, stage: StartupStage) -> None:
+        """
+        Forwards the current init stage to the status callback
+        :param stage: The StartupStage event
+        """
+        if self._status_callback is None:
+            return
+        self._status_callback(stage)
 
     def eventFilter(self, obj: QObject, event: QEvent | QKeyEvent) -> bool:
         """
@@ -103,6 +132,37 @@ class DataPlotStudio(QMainWindow):
                 self.show_help_explorer()
                 return True
         return super().eventFilter(obj, event)
+
+    def _check_for_updates_on_startup(self) -> None:
+        """
+        Performs a version check against the latest release on GitHub
+        """
+        if not bool(self.settings.get("check updates_on_launch", True)):
+            return
+
+        worker = VersionCheckWorker(APPLICATION_VERSION)
+        worker.signals.check_completed.connect(self._on_startup_version_check_completed)
+        worker.signals.error_object.connect(self._on_startup_version_check_failed)
+        self._startup_version_worker = worker
+        QThreadPool.globalInstance().start(worker)
+
+    @pyqtSlot(bool, str, str)
+    def _on_startup_version_check_completed(self, update_available: bool, latest_tag: str, installed_tag: str) -> None:
+        """Notifies the landing page when the installed version is outdated"""
+        self._startup_version_worker = None
+        if update_available:
+            global_signals.request_update_notification(latest_tag, installed_tag)
+            self.status_bar_widget.log(
+                f"Update available: v{latest_tag} (installed: v{installed_tag})", LogLevel.INFO
+            )
+        else:
+            self.status_bar_widget.log(f"Application is up to date (v{installed_tag})", LogLevel.INFO)
+
+    @pyqtSlot(object)
+    def _on_startup_version_check_failed(self, error: object) -> None:
+        """Logs startup version check failures"""
+        self._startup_version_worker = None
+        self.status_bar_widget.log(f"Startup version check failed: {error}", LogLevel.WARNING)
 
     def _restore_window_state(self) -> None:
         """
@@ -119,6 +179,9 @@ class DataPlotStudio(QMainWindow):
                 if current_index != -1:
                     self.main_widget.tabs.removeTab(current_index)
                     self.plot_dock.setWidget(self.main_widget.plot_tab)
+
+        self.main_widget.data_tab.restore_splitter_state(settings)
+        self.main_widget.plot_tab.restore_splitter_state(settings)
 
     def _setup_dock_widgets(self) -> None:
         """Setup of the docking panels"""
@@ -203,7 +266,7 @@ class DataPlotStudio(QMainWindow):
         global_signals.help_explorer_requested.connect(self.show_help_explorer_for_topic)
 
         # Window state signals
-        window_menu = self.menuBar().addMenu("&Window")
+        window_menu = self.menu_bar.addMenu("&Window")
         reset_layout_action = QAction("Reset Window Layout", self)
         reset_layout_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
         reset_layout_action.setToolTip("Restores all docks and tabs to their default position")
@@ -261,6 +324,8 @@ class DataPlotStudio(QMainWindow):
             settings = QSettings(f"{APPLICATION_NAME}", "AppLayout")
             settings.setValue("geometry", self.saveGeometry())
             settings.setValue("windowState", self.saveState())
+            self.main_widget.data_tab.save_splitter_state(settings)
+            self.main_widget.plot_tab.save_splitter_state(settings)
 
         if hasattr(self.main_widget, "unsaved_changes") and self.main_widget.unsaved_changes:
             reply = QMessageBox.question(
@@ -288,22 +353,29 @@ class DataPlotStudio(QMainWindow):
     def open_settings(self) -> None:
         """Opens the settings dialog"""
         dialog = SettingsDialog(self.settings, self)
-        if dialog.exec():
-            new_settings = dialog.get_settings()
 
-            theme_changed = self.settings.get("dark_mode") != new_settings.get("dark_mode")
-            if theme_changed:
-                theme_name = "Dark" if new_settings.get("dark_mode") else "Light"
-                self.main_widget.show_toast("Theme Changed", f"Applying {theme_name} theme...", duration_ms=2000)
-                QApplication.processEvents()
+        if not dialog.exec():
+            return
 
-            self.settings.update(new_settings)
+        new_settings: dict[str, str | int | bool] = dialog.get_settings()
+        theme_changed: bool = self.settings.get("dark_mode") != new_settings.get("dark_mode")
 
-            app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
-            for key, value in self.settings.items():
-                app_settings.setValue(key, value)
-            self.apply_settings(self.settings)
-            self.status_bar_widget.log("Settings updated", "INFO")
+        self.settings.update(new_settings)
+
+        app_settings = QSettings(f"{APPLICATION_NAME}", "UserSettings")
+        for key, value in self.settings.items():
+            app_settings.setValue(key, value)
+
+        self.apply_settings(self.settings)
+        self.main_widget.apply_autosave_settings(self.settings)
+
+        if theme_changed:
+            theme_name: str = "Dark" if new_settings.get("dark_mode") else "Light"
+            self.main_widget.show_toast(
+                "Theme Changed", f"Applied {theme_name} theme", duration_ms=2000
+            )
+
+        self.status_bar_widget.log("Settings updated", "INFO")
 
     def show_about(self) -> None:
         """Shows the About dialog box"""
@@ -334,26 +406,50 @@ class DataPlotStudio(QMainWindow):
         if self._help_explorer is not None:
             self._help_explorer.navigate_to_topic(topic_id)
 
-    def apply_settings(self, settings: dict) -> None:
-        """Apply the settings to main app loop"""
-        self._current_settings = settings
-        font = QFont(settings["font_family"], settings["font_size"])
-        QApplication.setFont(font)
+    def apply_settings(self, settings: dict[str, str | int | bool], force_reload: bool = False) -> None:
+        """
+        Apply settings update to the application if changed
 
-        base_css: str = ""
-        styles_root: Path = Path(get_resource_path("ui/styles"))
+        Skip font and stylesheet updates if the settings are unchanged
+        """
+        self._current_settings = settings.copy()
+        font_family: str = str(settings.get("font_family", "Consolas"))
+        font_size: int = int(settings.get("font_size", 10))
+        dark_mode: bool = bool(settings.get("dark_mode", False))
 
-        theme_folder: str = "dark_theme" if settings["dark_mode"] else "light_theme"
-        active_theme_dir: Path = styles_root / theme_folder
+        font_key: tuple[str, int] = (font_family, font_size)
+        if force_reload or self._applied_font_key != font_key:
+            QApplication.setFont(QFont(font_family, font_size))
+            self._applied_font_key = font_key
 
-        stylesheet_paths: list[Path] = []
-        if active_theme_dir.exists() and active_theme_dir.is_dir():
-            stylesheet_paths = list(active_theme_dir.rglob("*.css"))
+        if force_reload or self._applied_dark_mode != dark_mode:
+            self._apply_theme_stylesheet(dark_mode, force_reload=force_reload)
+            self._applied_dark_mode = dark_mode
 
-        base_css = self.load_stylesheets(stylesheet_paths)
+    def _apply_theme_stylesheet(self, dark_mode: bool, force_reload: bool = False) -> None:
+        """Load, cache and apply theme settings"""
+        app = QApplication.instance()
+        if not isinstance(app, QApplication):
+            return
 
-        if QApplication.instance() is not None:
-            QApplication.instance().setStyleSheet(base_css)
+        if force_reload or dark_mode not in self._stylesheet_cache:
+            styles_root: Path = Path(get_resource_path("ui/styles"))
+            theme_folder: str = "dark_theme" if dark_mode else "light_theme"
+            active_theme_dir: Path = styles_root / theme_folder
+
+            stylesheet_paths: list[Path] = []
+            if active_theme_dir.exists() and active_theme_dir.is_dir():
+                stylesheet_paths = sorted(active_theme_dir.rglob("*.css"))
+
+            self._stylesheet_cache[dark_mode] = self.load_stylesheets(stylesheet_paths)
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.setUpdatesEnabled(False)
+        try:
+            app.setStyleSheet(self._stylesheet_cache[dark_mode])
+        finally:
+            self.setUpdatesEnabled(True)
+            QApplication.restoreOverrideCursor()
 
     def enable_live_reloader(self) -> None:
         styles_dir: Path = Path(get_resource_path("ui/styles"))
@@ -366,7 +462,7 @@ class DataPlotStudio(QMainWindow):
     def reload_styles(self) -> None:
         if not self._current_settings:
             return
-        self.apply_settings(self._current_settings)
+        self.apply_settings(self._current_settings, force_reload=True)
         self.main_widget.apply_autosave_settings(self._current_settings)
         self.status_bar_widget.log("Styles reloaded", "INFO")
 

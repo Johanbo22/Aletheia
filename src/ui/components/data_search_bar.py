@@ -178,6 +178,8 @@ class DataSearchBar(QWidget):
             self._handle_search_results([], current_token)
             return
 
+        self.search_count_label.setText("Searching...")
+
         if self.search_worker is not None:
             try:
                 self.search_worker.finished_search.disconnect()

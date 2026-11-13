@@ -1,4 +1,4 @@
-from typing import Callable
+from PyQt6.QtCore import QTimer
 
 from src.controller.data_controllers.base_data_controller import BaseDataController
 from src.core.global_signals import global_signals
@@ -13,6 +13,14 @@ class FilterController(BaseDataController):
     Manages the quick filter operation and the opening of the
     advanced filter dialog window. Also handles the clearing of active filters
     """
+
+    def __init__(self, data_handler, status_bar, view, subset_manager=None) -> None:
+        super().__init__(data_handler, status_bar, view, subset_manager)
+        self._preview_timer = QTimer(self.view)
+        self._preview_timer.setSingleShot(True)
+        timer_interval: int = 300
+        self._preview_timer.setInterval(timer_interval)
+        self._preview_timer.timeout.connect(self._execute_filter_preview)
 
     def apply_filter(self) -> None:
         """Apply a quick single-condition filter to the data."""
@@ -39,6 +47,7 @@ class FilterController(BaseDataController):
                 except ValueError:
                     pass
 
+            self.update_filter_preview_live()
             before = len(self.data_handler.df)
             self.data_handler.filter_data(column, condition, value)
             after = len(self.data_handler.df)
@@ -67,13 +76,78 @@ class FilterController(BaseDataController):
             self.status_bar.log(f"Failed to execute 'Filter': {str(e)}", LogLevel.ERROR)
             global_signals.request_toast("Filter Error", "Failed to apply filter", ToastLevel.ERROR)
 
-    def clear_filters(self, reset_callback: Callable[[], None]) -> None:
+    def clear_filters(self) -> None:
         """Clear active filters by delegating back to the main reset data routine."""
+        if self.data_handler.df is None:
+            self.no_data_loaded_toast()
+            return
+
+        if not self.data_handler.has_active_filters():
+            self.view.operations_panel.filtering_tab.clear_filter_preview()
+            self.view.operations_panel.filtering_tab.set_filter_active_state(False)
+            global_signals.request_toast("Info", "No active filters to clear", ToastLevel.INFO)
+            self.status_bar.log("No active filters to clear", LogLevel.INFO)
+            return
+
+        try:
+            rows_before: int = len(self.data_handler.df)
+            self.data_handler.clear_filters()
+            rows_after: int = len(self.data_handler.df)
+            rows_restored: int = rows_after - rows_before
+
+            self.view.operations_panel.filtering_tab.clear_filter_preview()
+            self.view.operations_panel.filtering_tab.set_filter_active_state(False)
+            self.view.refresh_data_view()
+
+            self.status_bar.log_action(
+                f"Cleared filters: restored {rows_restored:,} rows",
+                details={
+                    "rows_before"  : rows_before,
+                    "rows_after"   : rows_after,
+                    "rows_restored": rows_restored,
+                    "operation"    : "clear_filters",
+                },
+                level=LogLevel.SUCCESS,
+            )
+            global_signals.request_toast(
+                "Filters Cleared",
+                f"Active filters removed. Restored {rows_restored:,} rows.",
+                ToastLevel.SUCCESS
+            )
+        except Exception as err:
+            self.status_bar.log(f"Failed to clear filters: {str(err)}", LogLevel.ERROR)
+            global_signals.request_toast("Error", "Failed to clear filters", ToastLevel.ERROR)
+
+    def update_filter_preview_live(self) -> None:
         if self.data_handler.df is None:
             return
 
-        reset_callback()
-        self.status_bar.log("Filters cleared and data reset to original state", LogLevel.INFO)
+        self._preview_timer.start()
+
+    def _execute_filter_preview(self) -> None:
+        """Calculate and display the impact of the current filter on the dataset"""
+        if self.data_handler.df is None:
+            return
+
+        try:
+            column, condition, value = self.view.operations_panel.filtering_tab.get_filter_parameters()
+
+            if not column or not condition:
+                self.view.operations_panel.filtering_tab.clear_filter_preview()
+                return
+
+            total_count: int = len(self.data_handler.df)
+            filtered_df = self.data_handler._mutator.filter_data(
+                self.data_handler.df.copy(deep=False),
+                column=column,
+                condition=condition,
+                value=value
+            )
+            filtered_count: int = len(filtered_df)
+
+            self.view.operations_panel.filtering_tab.update_filter_preview(filtered_count, total_count)
+        except (ValueError, TypeError, KeyError):
+            self.view.operations_panel.filtering_tab.clear_filter_preview()
 
     def open_advanced_filter(self) -> None:
         """Open the advanced filter dialog to apply complex/multiple conditions."""
@@ -90,6 +164,14 @@ class FilterController(BaseDataController):
                 return
 
             try:
+                total_count = len(self.data_handler.df)
+                filtered_df = self.data_handler._mutator.filter_data(
+                    self.data_handler.df.copy(deep=False),
+                    advanced_filters=filters
+                )
+                filtered_count = len(filtered_df)
+                self.view.operations_panel.filtering_tab.update_filter_preview(filtered_count, total_count)
+
                 self.data_handler.filter_data(advanced_filters=filters)
 
                 formatted_parts = []

@@ -143,7 +143,7 @@ class DataMutator:
 
     @require_dataframe
     def clean_data(self, df: pd.DataFrame, action: "DataOperation | str", sort_state: Optional[tuple], **kwargs) -> \
-    tuple[pd.DataFrame, Optional[tuple]]:
+            tuple[pd.DataFrame, Optional[tuple]]:
         """
         Caller for the cleaning/transformation action via operaton registry\n
         :param df: The DataFrame to work on
@@ -552,7 +552,7 @@ class DataMutator:
 
     @require_dataframe
     def run_statistical_test(self, df: pd.DataFrame, test_type: "Union[StatisticalTest, str]", col1: str, col2: str) -> \
-    Dict[str, Any]:
+            Dict[str, Any]:
         """
         Run a statistical test on two numerical columns
         Supports T-test, ANOVA and Pearson corr test\n
@@ -1197,7 +1197,6 @@ class DataMutator:
         """
         column: str = kwargs.get("column")
         periods: int = kwargs.get("periods", 1)
-        fill_method: str = kwargs.get("fill_method", "pad")
         new_column: Optional[str] = kwargs.get("new_column")
 
         if not column or column not in df.columns:
@@ -1212,10 +1211,9 @@ class DataMutator:
             raise ValueError(f"Column '{new_column}' already exists")
 
         try:
-            df[new_column] = df[column].pct_change(periods=periods, fill_method=fill_method)
+            df[new_column] = df[column].pct_change(periods=periods)
         except TypeError:
-            temp_col = df[column].ffill() if fill_method in ['pad', 'ffill'] else df[column].bfill() if fill_method in [
-                'backfill', 'bfill'] else df[column]
+            temp_col = df[column]
             df[new_column] = temp_col.pct_change(periods=periods)
 
         return df, sort_state

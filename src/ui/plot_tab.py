@@ -517,12 +517,8 @@ class PlotTab(PlotTabUI):
         """Triggered on tab visibility. Clears selectors from plot"""
         super().showEvent(event)
 
-        if getattr(self, "_is_data_dirty", False):
-            df = self.get_active_dataframe()
-            if df is not None and len(df) <= self.AUTO_UPDATE_THRESHOLD:
-                self.style_update_timer.start()
-            elif hasattr(self, "selection_overlay"):
-                self.selection_overlay.show_update_required(True)
+        if getattr(self, "_is_data_dirty", False) and hasattr(self, "selection_overlay"):
+            self.selection_overlay.show_update_required(True)
 
         if self.canvas_interaction_manager.span_selector is not None:
             if hasattr(self.canvas_interaction_manager.span_selector, "clear"):

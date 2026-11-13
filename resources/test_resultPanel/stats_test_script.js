@@ -52,13 +52,37 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const searchInput = document.getElementById('testSearch');
+
+    const emptyState = document.createElement('div');
+    emptyState.id = 'emptyStateMessage';
+    emptyState.className = 'empty-state';
+    emptyState.textContent = 'No test results match your search';
+    emptyState.style.display = 'none';
+
+    const testListContainer = document.getElementById('test-list');
+    if (testListContainer) {
+        testListContainer.appendChild(emptyState);
+    }
+
     if (searchInput) {
+        let debounceTimer;
         searchInput.addEventListener('input', function (e) {
-            const term = e.target.value.toLowerCase();
-            cards.forEach(card => {
-                const cardText = card.textContent.toLowerCase();
-                card.style.display = cardText.includes(term) ? 'block' : 'none';
-            });
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const term = e.target.value.toLowerCase();
+                let visibleCount = 0;
+
+                cards.forEach(card => {
+                    const cardText = card.textContent.toLowerCase();
+                    const isMatch = cardText.includes(term);
+                    card.style.display = isMatch ? 'block' : 'none';
+                    if (isMatch) {
+                        visibleCount++;
+                    }
+                });
+
+                emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+            }, 250);
         });
     }
 
@@ -135,25 +159,40 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('collapseAllBtn')?.addEventListener('click', () => toggleAll(true));
 
     const sortSelect = document.getElementById('sortSelect');
+    const sortToggle = document.getElementById('sortDirectionToggle');
+    let isAscending = true;
+
+    function applySort() {
+        if (!sortSelect) return;
+        const sortBy = sortSelect.value;
+        const container = document.getElementById('test-list');
+        const cardElements = Array.from(container.querySelectorAll('.test-card'));
+        const directionMultiplier = isAscending ? 1 : -1;
+
+        cardElements.sort((a, b) => {
+            if (sortBy === 'pvalue') {
+                return (parseFloat(a.dataset.pvalue) - parseFloat(b.dataset.pvalue)) * directionMultiplier;
+            } else if (sortBy === 'newest') {
+                return (parseInt(b.dataset.timestamp) - parseInt(a.dataset.timestamp)) * directionMultiplier;
+            } else if (sortBy === 'type') {
+                const typeA = a.querySelector('h3').innerText.trim();
+                const typeB = b.querySelector('h3').innerText.trim();
+                return typeA.localeCompare(typeB) * directionMultiplier;
+            }
+        });
+
+        cardElements.forEach(card => container.appendChild(card));
+    }
+
     if (sortSelect) {
-        sortSelect.addEventListener('change', function (e) {
-            const sortBy = e.target.value;
-            const container = document.getElementById('test-list');
-            const cardElements = Array.from(container.querySelectorAll('.test-card'));
+        sortSelect.addEventListener('change', applySort);
+    }
 
-            cardElements.sort((a, b) => {
-                if (sortBy === 'pvalue') {
-                    return parseFloat(a.dataset.pvalue) - parseFloat(b.dataset.pvalue);
-                } else if (sortBy === 'newest') {
-                    return parseInt(b.dataset.timestamp) - parseInt(b.dataset.timestamp);
-                } else if (sortBy === 'type') {
-                    const typeA = a.querySelector('h3').innerText.trim();
-                    const typeB = b.querySelector('h3').innerText.trim();
-                    return typeA.localeCompare(typeB);
-                }
-            });
-
-            cardElements.forEach(card => container.appendChild(card));
+    if (sortToggle) {
+        sortToggle.addEventListener('click', function () {
+            isAscending = !isAscending;
+            sortToggle.innerHTML = isAscending ? '&#8593; Asc' : '&#8595; Desc';
+            applySort();
         });
     }
 }); 

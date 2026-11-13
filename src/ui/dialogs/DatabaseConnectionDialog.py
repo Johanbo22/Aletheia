@@ -72,7 +72,7 @@ class DatabaseConnectionDialog(QDialog):
         self._setup_query_tab()
 
         self.tab_widget.addTab(self.connection_tab, "1. Connection Settings")
-        self.tab_widget.addTab(self.query_tab, "1. Query && Schema")
+        self.tab_widget.addTab(self.query_tab, "2. Query && Schema")
         main_layout.addWidget(self.tab_widget)
 
         self._setup_dialog_actions(main_layout)
@@ -761,24 +761,24 @@ class DatabaseConnectionDialog(QDialog):
                 "port"   : "5432",
                 "user"   : "postgres",
                 "dbname" : "postgres",
-                "icon": "../icons/database_icons/postgresql-inc.svg"
+                "icon"   : "../icons/database_icons/postgresql-inc.svg"
             },
             "MySQL"     : {
                 "is_file": False,
                 "port"   : "3306",
                 "user"   : "root",
                 "dbname" : "",
-                "icon": "../icons/database_icons/mysql-3.svg"
+                "icon"   : "../icons/database_icons/mysql-3.svg"
             },
             "DuckDB"    : {
                 "is_file"    : True,
                 "placeholder": "Click 'Browse' to select a DuckDB file (.db, .duckdb)",
-                "icon": "../icons/database_icons/duckdb-logo.svg"
+                "icon"       : "../icons/database_icons/duckdb-logo.svg"
             },
             "SQLite"    : {
                 "is_file"    : True,
                 "placeholder": "Click 'Browse' to select a SQLite file (.db, .sqlite, .sqlite3)",
-                "icon": "../icons/database_icons/sqlite.svg"
+                "icon"       : "../icons/database_icons/sqlite.svg"
             }
         }
 

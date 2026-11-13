@@ -25,7 +25,7 @@ class PlotTypeManager:
         self.plot_categories: Dict[str, List[str]] = {
             "Basic and Relational": ["Line", "Scatter", "Bar", "Area", "Pie", "Stem", "Stairs"],
             "Distribution"        : ["Histogram", "Box", "Violin", "KDE", "ECDF", "Count Plot", "Eventplot"],
-            "2D and Gridded": ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)",
+            "2D and Gridded"      : ["Heatmap", "Hexbin", "2D Density", "2D Histogram", "Image Show (imshow)",
                                      "pcolormesh", "Contour", "Contourf", "Stackplot"],
             "Vector Fields"       : ["Barbs", "Quiver", "Streamplot"],
             "Triangulation"       : ["Tricontour", "Tricontourf", "Tripcolor", "Triplot"],
@@ -107,6 +107,10 @@ class PlotTypeManager:
         """Adjusts the UI configurations when switching to a new plot type"""
         if log:
             self.status_bar.log(f"Plot type changed to: {plot_type}")
+
+        selection_manager = getattr(self.plot_tab, "data_selection_manager", None)
+        if selection_manager and hasattr(selection_manager, "adapt_selection_for_plot_type"):
+            selection_manager.adapt_selection_for_plot_type(plot_type)
 
         custom_tabs = self.view.custom_tabs
         for i in range(custom_tabs.count()):

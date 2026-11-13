@@ -5,11 +5,12 @@ from pathlib import Path
 
 from PyQt6.QtCore import QCoreApplication, QEvent, QLocale, QObject, QSharedMemory, QTranslator, Qt
 from PyQt6.QtGui import QGuiApplication, QPixmap
-from PyQt6.QtWidgets import QApplication, QComboBox, QPushButton, QSplashScreen
+from PyQt6.QtWidgets import QApplication, QComboBox, QPushButton
 
 from resources.version import APPLICATION_NAME, APPLICATION_VERSION
 from src.core.resource_loader import get_resource_path
 from src.core.tempfilehandling.cleanup_temp_files import cleanup_forgotten_temp_files
+from src.startup.startup_splash_screen import StartupSplashScreen, StartupStage
 
 # This file handles initialization of application properties
 # The file is imported and used in main.py at init.
@@ -20,6 +21,7 @@ class GlobalCursorFilter(QObject):
     Application wide eventFilter to globally apply UI properties
     This applies the QCursor.PointingHandCursor for cursor
     """
+
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if event.type() in (QEvent.Type.Polish, QEvent.Type.EnabledChange):
             if isinstance(obj, QPushButton):
@@ -61,16 +63,14 @@ def enforce_single_instance() -> QSharedMemory:
     shared_memory_lock.create(1)
     return shared_memory_lock
 
-def display_splash_screen(app: QApplication) -> QSplashScreen:
+def display_splash_screen(app: QApplication) -> StartupSplashScreen:
     """Initializes, displays and returns the application splash screen"""
-    logo_path: str = get_resource_path("../DataPlotStudio.ico")
+    logo_path: str = get_resource_path("..\DataPlotStudio.ico")
     splash_pixmap: QPixmap = QPixmap(logo_path)
 
-    splash_screen = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
-    splash_screen.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+    splash_screen: StartupSplashScreen = StartupSplashScreen(splash_pixmap, app)
     splash_screen.show()
-
-    app.processEvents()
+    splash_screen.update_status(StartupStage.INITIALIZING)
     return splash_screen
 
 def initialize_background_services(app: QApplication) -> None:
@@ -78,7 +78,7 @@ def initialize_background_services(app: QApplication) -> None:
     cleanup_thread = threading.Thread(target=cleanup_forgotten_temp_files, daemon=False)
     cleanup_thread.start()
     app.aboutToQuit.connect(cleanup_forgotten_temp_files)
-    
+
 def setup_translations(app: QApplication) -> None:
     """Loads and applies system local translations if applicable"""
     translator = QTranslator()

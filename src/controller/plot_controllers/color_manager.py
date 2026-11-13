@@ -95,280 +95,160 @@ class ColorManager:
         label.setText(color_hex)
         self.update_button_color_swatch(button, QColor(color_hex))
 
+    def _choose_and_apply_color(
+            self,
+            attribute_name: str,
+            button: QPushButton,
+            label: QLabel,
+            default_hex: str = "#000000",
+            update_bars_live: bool = False
+    ) -> None:
+        """Open a colour picker dialog and store the chosen colour for the attribute and redraw UI"""
+        current_value: str | None = getattr(self.plot_tab, attribute_name, None) or default_hex
+        colour: str | None = self._get_color(current_value)
+        if not colour:
+            return
+
+        setattr(self.plot_tab, attribute_name, colour)
+        self._update_color_button(button, label, colour)
+        if update_bars_live:
+            self.plot_tab.series_customization_manager.update_bar_customization_live()
+        self.plot_tab.on_style_changed()
+
     def choose_global_spine_color(self) -> None:
         """Open color picker for global spine color."""
-        color = self._get_color(self.plot_tab.global_spine_color)
-        if color:
-            self.plot_tab.global_spine_color = color
-            self._update_color_button(
-                self.plot_tab.view.global_spine_color_button,
-                self.plot_tab.view.global_spine_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "global_spine_color", self.plot_tab.view.global_spine_color_button, self.plot_tab.view.global_spine_color_label
+        )
 
     def choose_top_spine_color(self) -> None:
         """Open color picker for top spine color."""
-        color = self._get_color(self.plot_tab.top_spine_color)
-        if color:
-            self.plot_tab.top_spine_color = color
-            self._update_color_button(
-                self.plot_tab.view.top_spine_color_button,
-                self.plot_tab.view.top_spine_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "top_spine_color", self.plot_tab.view.top_spine_color_button, self.plot_tab.view.top_spine_color_label
+        )
 
     def choose_bottom_spine_color(self) -> None:
         """Open color picker for bottom spine color."""
-        color = self._get_color(self.plot_tab.bottom_spine_color)
-        if color:
-            self.plot_tab.bottom_spine_color = color
-            self._update_color_button(
-                self.plot_tab.view.bottom_spine_color_button,
-                self.plot_tab.view.bottom_spine_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "bottom_spine_color", self.plot_tab.view.bottom_spine_color_button, self.plot_tab.view.bottom_spine_color_label
+        )
 
     def choose_left_spine_color(self) -> None:
         """Open color picker for left spine color."""
-        color = self._get_color(self.plot_tab.left_spine_color)
-        if color:
-            self.plot_tab.left_spine_color = color
-            self._update_color_button(
-                self.plot_tab.view.left_spine_color_button,
-                self.plot_tab.view.left_spine_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "left_spine_color", self.plot_tab.view.left_spine_color_button, self.plot_tab.view.left_spine_color_label
+        )
 
     def choose_right_spine_color(self) -> None:
         """Open color picker for right spine color."""
-        color = self._get_color(self.plot_tab.right_spine_color)
-        if color:
-            self.plot_tab.right_spine_color = color
-            self._update_color_button(
-                self.plot_tab.view.right_spine_color_button,
-                self.plot_tab.view.right_spine_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "right_spine_color", self.plot_tab.view.right_spine_color_button, self.plot_tab.view.right_spine_color_label
+        )
 
     def choose_global_grid_color(self) -> None:
         """Open color picker for global gridlines."""
-        color = self._get_color(self.plot_tab.global_grid_color)
-        if color:
-            self.plot_tab.global_grid_color = color
-            self._update_color_button(
-                self.plot_tab.view.global_grid_color_button,
-                self.plot_tab.view.global_grid_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "global_grid_color", self.plot_tab.view.global_grid_color_button, self.plot_tab.view.global_grid_color_label
+        )
 
     def choose_x_major_grid_color(self) -> None:
         """Open color picker for x-axis major gridlines."""
-        color = self._get_color(self.plot_tab.x_major_grid_color)
-        if color:
-            self.plot_tab.x_major_grid_color = color
-            self._update_color_button(
-                self.plot_tab.view.x_major_grid_color_button,
-                self.plot_tab.view.x_major_grid_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "x_major_grid_color", self.plot_tab.view.x_major_grid_color_button, self.plot_tab.view.x_major_grid_color_label
+        )
 
     def choose_x_minor_grid_color(self) -> None:
         """Open color picker for x-axis minor gridlines."""
-        color = self._get_color(self.plot_tab.x_minor_grid_color)
-        if color:
-            self.plot_tab.x_minor_grid_color = color
-            self._update_color_button(
-                self.plot_tab.view.x_minor_grid_color_button,
-                self.plot_tab.view.x_minor_grid_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "x_minor_grid_color", self.plot_tab.view.x_minor_grid_color_button, self.plot_tab.view.x_minor_grid_color_label
+        )
 
     def choose_y_major_grid_color(self) -> None:
         """Open color picker for y-axis major gridlines."""
-        color = self._get_color(self.plot_tab.y_major_grid_color)
-        if color:
-            self.plot_tab.y_major_grid_color = color
-            self._update_color_button(
-                self.plot_tab.view.y_major_grid_color_button,
-                self.plot_tab.view.y_major_grid_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "y_major_grid_color", self.plot_tab.view.y_major_grid_color_button, self.plot_tab.view.y_major_grid_color_label
+        )
 
     def choose_y_minor_grid_color(self) -> None:
         """Open color picker for y-axis minor gridlines."""
-        color = self._get_color(self.plot_tab.y_minor_grid_color)
-        if color:
-            self.plot_tab.y_minor_grid_color = color
-            self._update_color_button(
-                self.plot_tab.view.y_minor_grid_color_button,
-                self.plot_tab.view.y_minor_grid_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "y_minor_grid_color", self.plot_tab.view.y_minor_grid_color_button, self.plot_tab.view.y_minor_grid_color_label
+        )
 
     def choose_line_color(self) -> None:
         """Open color picker for line color."""
-        color = self._get_color(self.plot_tab.line_color or "#000000")
-        if color:
-            self.plot_tab.line_color = color
-            self._update_color_button(
-                self.plot_tab.view.line_color_button,
-                self.plot_tab.view.line_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "line_color", self.plot_tab.view.line_color_button, self.plot_tab.view.line_color_label
+        )
 
     def choose_marker_color(self) -> None:
         """Open color picker for marker color."""
-        color = self._get_color(self.plot_tab.marker_color or "#000000")
-        if color:
-            self.plot_tab.marker_color = color
-            self._update_color_button(
-                self.plot_tab.view.marker_color_button,
-                self.plot_tab.view.marker_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "marker_color", self.plot_tab.view.marker_color_button, self.plot_tab.view.marker_color_label
+        )
 
     def choose_marker_edge_color(self) -> None:
         """Open color picker for marker edge color."""
-        color = self._get_color(self.plot_tab.marker_edge_color or "#000000")
-        if color:
-            self.plot_tab.marker_edge_color = color
-            self._update_color_button(
-                self.plot_tab.view.marker_edge_button,
-                self.plot_tab.view.marker_edge_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "marker_edge_color", self.plot_tab.view.marker_edge_button, self.plot_tab.view.marker_edge_label
+        )
 
     def choose_bar_color(self) -> None:
         """Open color picker for bar color."""
-        color = self._get_color(self.plot_tab.bar_color or "#000000")
-        if color:
-            self.plot_tab.bar_color = color
-            self._update_color_button(
-                self.plot_tab.view.bar_color_button,
-                self.plot_tab.view.bar_color_label,
-                color
-            )
-            self.plot_tab.series_customization_manager.update_bar_customization_live()
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "bar_color", self.plot_tab.view.bar_color_button, self.plot_tab.view.bar_color_label, update_bars_live=True
+        )
 
     def choose_bar_edge_color(self) -> None:
         """Open color picker for bar edge color."""
-        color = self._get_color(self.plot_tab.bar_edge_color or "#000000")
-        if color:
-            self.plot_tab.bar_edge_color = color
-            self._update_color_button(
-                self.plot_tab.view.bar_edge_button,
-                self.plot_tab.view.bar_edge_label,
-                color
-            )
-            self.plot_tab.series_customization_manager.update_bar_customization_live()
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "bar_edge_color", self.plot_tab.view.bar_edge_button, self.plot_tab.view.bar_edge_label, update_bars_live=True
+        )
 
     def choose_error_bar_color(self) -> None:
         """Open color picker for error bar color."""
-        color = self._get_color(self.plot_tab.error_bar_color)
-        if color:
-            self.plot_tab.error_bar_color = color
-            self._update_color_button(
-                self.plot_tab.view.error_bar_color_button,
-                self.plot_tab.view.error_bar_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "error_bar_color", self.plot_tab.view.error_bar_color_button, self.plot_tab.view.error_bar_color_label
+        )
 
     def choose_bg_color(self) -> None:
         """Open color picker for background color."""
-        color = self._get_color(self.plot_tab.bg_color)
-        if color:
-            self.plot_tab.bg_color = color
-            self._update_color_button(
-                self.plot_tab.view.bg_color_button,
-                self.plot_tab.view.bg_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "bg_color", self.plot_tab.view.bg_color_button, self.plot_tab.view.bg_color_label
+        )
 
     def choose_face_color(self) -> None:
         """Open color picker for face color."""
-        color = self._get_color(self.plot_tab.face_color)
-        if color:
-            self.plot_tab.face_color = color
-            self._update_color_button(
-                self.plot_tab.view.face_color_button,
-                self.plot_tab.view.face_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "face_color", self.plot_tab.view.face_color_button, self.plot_tab.view.face_color_label
+        )
 
     def choose_textbox_bg_color(self) -> None:
         """Open color picker for text box background."""
-        color = self._get_color(self.plot_tab.textbox_bg_color)
-        if color:
-            self.plot_tab.textbox_bg_color = color
-            self._update_color_button(
-                self.plot_tab.view.textbox_bg_button,
-                self.plot_tab.view.textbox_bg_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "textbox_bg_color", self.plot_tab.view.textbox_bg_button, self.plot_tab.view.textbox_bg_label
+        )
 
     def choose_legend_bg_color(self) -> None:
         """Open color picker for legend background."""
-        color = self._get_color(self.plot_tab.legend_bg_color)
-        if color:
-            self.plot_tab.legend_bg_color = color
-            self._update_color_button(
-                self.plot_tab.view.legend_bg_button,
-                self.plot_tab.view.legend_bg_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "legend_bg_color", self.plot_tab.view.legend_bg_button, self.plot_tab.view.legend_bg_label
+        )
 
     def choose_legend_edge_color(self) -> None:
         """Open color picker for legend edge color."""
-        color = self._get_color(self.plot_tab.legend_edge_color)
-        if color:
-            self.plot_tab.legend_edge_color = color
-            self._update_color_button(
-                self.plot_tab.view.legend_edge_button,
-                self.plot_tab.view.legend_edge_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "legend_edge_color", self.plot_tab.view.legend_edge_button, self.plot_tab.view.legend_edge_label
+        )
 
     def choose_geo_missing_color(self) -> None:
         """Open color picker for geospatial missing data color."""
-        color = self._get_color(self.plot_tab.geo_missing_color or "#D3D3D3")
-        if color:
-            self.plot_tab.geo_missing_color = color
-            self._update_color_button(
-                self.plot_tab.view.geo_missing_color_btn,
-                self.plot_tab.view.geo_missing_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "geo_missing_color", self.plot_tab.view.geo_missing_color_btn, self.plot_tab.view.geo_missing_color_label, "#D3D3D3"
+        )
 
     def choose_geo_edge_color(self) -> None:
         """Open color picker for geospatial edge color."""
-        color = self._get_color(self.plot_tab.geo_edge_color or "#000000")
-        if color:
-            self.plot_tab.geo_edge_color = color
-            self._update_color_button(
-                self.plot_tab.view.geo_edge_color_btn,
-                self.plot_tab.view.geo_edge_color_label,
-                color
-            )
-            self.plot_tab.on_style_changed()
+        self._choose_and_apply_color(
+            "geo_edge_color", self.plot_tab.view.geo_edge_color_btn, self.plot_tab.view.geo_edge_color_label
+        )

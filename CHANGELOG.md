@@ -4,6 +4,89 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.6.0
+### Added
+- ProjectCards for recent project buttons. These cards show information about the project such as file size, rows and column counts, last modified date, path.
+- A filtering label that displays how much of the data will remain after a filter operation is complete before applying the filter.
+- Syntax highlighting for mathematical, comparison and assignment operators in the script editor
+- Accurate formatting for complex numbers and numbers written with underscore separators in the script editor
+- Better column auto selection when switching plot types
+- Coloured datatypes next to the column names in Comboboxes and lists to easier differentiate the data types of the columns in your dataset.
+- True filter removal functionality instead of dataset change loss.
+- A Git-style colour coding of changes, addition and deletion of lines in the script editor.
+- Word highlighting of all occurrences of a word under the cursor in the script editor
+- Context Menu for commands and keyboard shortcuts in the script editor
+- Formatting commands to strip trailing whitespace and convert tabs to spaces in the script editor
+- A font size reset to the script editor
+- Version check for application version.
+- Set as index tool, to select a column as index and a reset index to reverse this operation
+- Startup message alongside the splash screen to display the current loading process
+- Internet connection check to Google Sheets dialogs.
+- Added colour coding for each subplot block in the Subplot Grid Designer
+- Added automatic saving and loading of custom subplot grid layouts from projects
+- Added a check for updates on launch toggle in the Settings>About & Updates section.
+- Added a confirmation prompt when normalising integer columns to convert them to floats
+- Added a Query-To-Gui filter editor to the Advanced Filter and Subset creation dialogs.
+- **Annotation Locator Widget additions**:
+  - Boxstyle changes based on selected box style
+  - Click to move the annotation alongside dragging
+  - Tooltips when dragging will display the X/Y coordinates
+  - Hover effect on the nodes of the Annotation to make the selectable state more clear
+  - Snapping of the annotation to grid in the Annotation tool widget
+
+### Changed
+- Updated the tooltip colours and styling
+- Changed the shortcut view toolbox to show the description in a column instead of tooltip.
+- The visibility of the Saved Aggregation widget when no aggregations are saved is now set to be hidden.
+- The visibility of the created subsets when no subsets have been created has also been set to be hidden.
+- Better matching of quotes in the CodeEditor when writing strings
+- The visuals of the Annotation tool widget canvas to display X/Y axes better.
+- Improved the startup loading screen to display status messages
+- Updated the tool buttons of the plot canvas navigation toolbar to use a more appropriate cursor shape.
+- Updated the Subplot Grid Designer buttons to enable or disable automatically based on your current grid selection.
+- Improved grid table sizing so subplot labels remain readable when using up to 10 rows.
+- Improved error messages when normalising incompatible columns.
+- Updated the selection behaviour of selected columns in the Columns tab to remain selected after doing a data operation on that column.
+
+### Fixed
+- Fixed a visual issue where hovering on a closing toast would cause it to freeze
+- Fixed a bug where toast notifications did not stack correctly and would overlap
+- Fixed a bug causing the plot to be re-rendered every time the PlotStudio tab was selected
+- Several render errors caused by incorrect column assignments to specific plot types.
+- Fixed a typo of "whitespace" in the Columns tab of the Data Operations Panel
+- Fixed an issue where the (*) remained in the title bar after saving a project
+- Fixed an issue where editing the table would not trigger the unsaved indicator
+- Fixed and issue where import data from Google Sheets or database would not trigger the unsaved project notification
+- The "Clear Filters" button now correctly highlights in red
+- Deleting a viewed aggregation now correctly reverts the data view to the original dataset
+- Fixed a gap and alignment issue between the selected columns and hidden columns labels in the Columns tab
+- Resolved save states of splitter configs when closing application.
+- Fixed an issue with the Annotation tool widget where animations were stuck in a loop
+- Fixed a memory leak with the Annotation tool widget
+- Fixed a few bugs where the status bar widget would not stretch to accommodate correct spacing for labels
+- Fixed an issue where the status bar log terminal had more space than intended
+- Fixed a text error in the database connection dialog where both tabs had a "1." in their name
+- Fixed an issue where the outline of the table container was activated when clicking on the table.
+- Fixed a bug where pressing Ctrl+F in Plot Studio did not open the settings search bar.
+- Fixed a bug where pressing Ctrl+F in Plot studio while the search bar was already visible caused the search bar to collapse and re-expand instead of being set in focus.
+- Fixed a bug where autosave recovery prompt loaded before the main window appeared.
+- Pressing Ctrl+Shift+7 in the Python Script Editor now comments and uncomment single lines and the last line of multi-line selections
+- Corrected a typo in the Python Console window title when unsaved changes are present.
+- Improved responsiveness when updating plot settings while the Python Script Editor is open
+- Fixed a visual issue on the landing page where the top-left corner of the main panel was square instead of rounded.
+- Fixed an issue where removing or merging part of a large subplot accidentally deleted the rest of that subplot.
+- Fixed an issue where adding rows or columns to a subplot filled in empty spaces that you had previously removed.
+- Fixed the "Reset Grid" button for subplots so it properly restores the default 2x2 grid layout.
+- Fixed "Share Y-axis" hiding Y-axis labels on the wrong subplots.
+- Fixed a bug where the Project card would remain expanded even after leaving the card especially after doing other actions.
+- Improved responsiveness of the applying settings changes.
+- Fixed a bug where unchecking autosave option did not remove autosaving without restarting.
+- Fixed an issue where normalising integer columns caused a crash.
+- Fixed an issue in the Advanced Filter dialog where selecting numeric, categorical or date columns did not switch the value input box to match the data type
+- Fixed an animation error when removing filter rows in the Advanced Filter dialog.
+- Fixed an issue where the "Selected Column(s)" banner at the top of the columns tab showed a column as selected after it was dropped or deselected.
+- Fixed an issue in the History graph where tooltips had white text in the light theme.
+
 ## v.0.5.2 [Patch]
 
 ### Fixed

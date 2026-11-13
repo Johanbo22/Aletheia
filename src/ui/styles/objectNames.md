@@ -126,3 +126,12 @@ usage: Used for grouping tools into a more manageable setting;
 limitation: A certain amount of associated tools must be required to use this widget and its styling;
 cssFile: plot_tab_style;
 }
+
+## Tabs
+{
+propertyName: tabBarHidden;
+description: Boolean property indicating that the QTabBar of a QTabWidget is hidden;
+usage: Restores a 6px border-top-left-radius on QTabWidget::pane when the tab bar is not visible or is hidden behind another widget;
+limitation: NULL;
+cssFile: tab;
+}

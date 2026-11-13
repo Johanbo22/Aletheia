@@ -25,7 +25,7 @@ class HelpManager:
     """Manages the connection and fetching of help /tutorials from the help database"""
 
     def __init__(self, db_name: str = "tutorial.db") -> None:
-        self.base_dir: Path = Path(__file__).resolve().parent.parent
+        self.base_dir: Path = Path(__file__).resolve().parent.parent.parent
         self.db_path: Path = self.base_dir / "resources" / db_name
 
     def _get_connection(self) -> Optional[sqlite3.Connection]:

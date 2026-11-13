@@ -1,3 +1,9 @@
+#MainDataTable,
+#MainDataTable:focus{
+    border: 1px solid #bdc3c7;
+    outline: none;
+}
+
 #MainDataHeader::section {
     background-color: #f0f2f5;
     color: #333333;

@@ -1,13 +1,13 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
-    QListWidget, \
-    QListWidgetItem, QPushButton, QScrollArea, \
-    QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QComboBox, QFrame, QGroupBox, QHBoxLayout, QLabel, \
+    QLineEdit, QListWidget, QListWidgetItem, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from icons import IconType
+from src.core.global_signals import ToastLevel, global_signals
 from src.ui.components.data_tabs.base_data_tab import BaseDataTab
+from src.ui.widgets.DatatypeChip import DtypeChipCreator
 
 if TYPE_CHECKING:
     from src.controller.data_tab_controller import DataTabController
@@ -27,13 +27,13 @@ class ColumnsTab(BaseDataTab):
         self.selected_columns_label = QLabel("Selected Column(s): None")
         self.selected_columns_label.setObjectName("selectedColumnsStickyLabel")
         self.selected_columns_label.setWordWrap(True)
-        sticky_header_layout.addWidget(self.selected_columns_label)
+        sticky_header_layout.addWidget(self.selected_columns_label, 0, Qt.AlignmentFlag.AlignTop)
 
         self.hidden_columns_label = QLabel("")
         self.hidden_columns_label.setObjectName("hiddenColumnsStickyLabel")
         self.hidden_columns_label.setVisible(False)
         sticky_header_layout.addWidget(self.hidden_columns_label, 0,
-                                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         main_layout.addLayout(sticky_header_layout)
 
@@ -62,10 +62,13 @@ class ColumnsTab(BaseDataTab):
         column_column_info.setProperty("styleClass", "info_text")
         layout.addWidget(column_column_info)
 
+        selection_group = QGroupBox("Column Selection")
+        selection_layout = QVBoxLayout()
+
         self.column_search_input = QLineEdit()
         self.column_search_input.setPlaceholderText("Search columns...")
         self.column_search_input.textChanged.connect(self._on_column_search_changed)
-        layout.addWidget(self.column_search_input)
+        selection_layout.addWidget(self.column_search_input)
 
         bulk_layout = QHBoxLayout()
         self.show_all_btn = QPushButton("Show All")
@@ -75,7 +78,13 @@ class ColumnsTab(BaseDataTab):
         self.hide_all_btn = QPushButton("Hide All")
         self.hide_all_btn.clicked.connect(self._on_hide_all_clicked)
         bulk_layout.addWidget(self.hide_all_btn)
-        layout.addLayout(bulk_layout)
+
+        self.copy_selected_btn = QPushButton("Copy Selected")
+        self.copy_selected_btn.setToolTip("Copy the names of the selected columns to the system clipboard")
+        self.copy_selected_btn.clicked.connect(self._on_copy_selected_clicked)
+        bulk_layout.addWidget(self.copy_selected_btn)
+
+        selection_layout.addLayout(bulk_layout)
 
         self.column_list = QListWidget()
         self.column_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -83,43 +92,77 @@ class ColumnsTab(BaseDataTab):
         self.column_list.itemSelectionChanged.connect(self._update_selection_label)
         self.column_list.itemDoubleClicked.connect(self._on_column_double_clicked)
         self.column_list.itemChanged.connect(self._on_item_changed)
-        layout.addWidget(self.column_list)
 
-        layout.addLayout(self._create_operation_row(
+        selection_layout.addWidget(self.column_list)
+
+        selection_group.setLayout(selection_layout)
+        layout.addWidget(selection_group)
+
+        layout.addSpacing(10)
+
+        general_group = QGroupBox("General Operation")
+        general_layout = QVBoxLayout()
+
+        general_layout.addLayout(self._create_operation_row(
             title="Column Reorder Tool",
             tooltip="Open an interactive preview of your data to visually drag and drop column headers into a new order",
             callback=self.controller.open_column_reorder_dialog,
             help_id="reorder_columns",
             icon_type=IconType.DataTransform
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Drop Column",
             tooltip="Use this to remove the selected column from the dataset",
             callback=self.controller.drop_column,
             help_id="drop_column",
             icon_type=IconType.DropColumn
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Rename Column",
             tooltip="Use this to rename the selected column",
             callback=self.controller.rename_column,
             help_id="rename_column",
             icon_type=IconType.RenameColumn
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Duplicate Column",
             tooltip="Create an exact copy of the selected column",
             callback=self.controller.duplicate_column,
             help_id="duplicate_column",
             icon_type=IconType.DuplicateColumn
         ))
-        layout.addLayout(self._create_operation_row(
+        general_layout.addLayout(self._create_operation_row(
             title="Compute Column",
             tooltip="Create a new column based on a formula (eg Total = Price * Quantity)",
             callback=self.controller.open_computed_column_dialog,
             help_id="compute_column",
             icon_type=IconType.Calculator
         ))
+
+        general_group.setLayout(general_layout)
+        layout.addWidget(general_group)
+
+        index_group = QGroupBox("Index Operations")
+        index_layout = QVBoxLayout()
+
+        index_layout.addLayout(self._create_operation_row(
+            title="Set as Index",
+            tooltip="Use this to set the selected column as the row index",
+            callback=self.controller.set_index,
+            help_id="set_index",
+            icon_type=IconType.DataTransform
+        ))
+        index_layout.addLayout(self._create_operation_row(
+            title="Reset Index",
+            tooltip="Reset the index back to sequential numbers and keep the current index as a column",
+            callback=self.controller.reset_index,
+            help_id="reset_index",
+            icon_type=IconType.RefreshItem
+        ))
+
+        index_group.setLayout(index_layout)
+        layout.addWidget(index_group)
+
         layout.addSpacing(10)
 
         # Data Type conversion
@@ -159,7 +202,7 @@ class ColumnsTab(BaseDataTab):
 
         self.text_operation_combo = QComboBox()
         self.text_operation_combo.addItems([
-            "Trim Whitespace", "Trim leading whitespace", "Trim trailing whitepsace",
+            "Trim Whitespace", "Trim leading whitespace", "Trim trailing whitespace",
             "Convert to lowercase", "Convert to UPPERCASE", "Convert to Title Case",
             "Capitalize First Letter",
         ])
@@ -240,18 +283,35 @@ class ColumnsTab(BaseDataTab):
 
         self.apply_destructive_styling_tags(["drop_column"])
 
-    def set_columns(self, columns: list[str], hidden_columns: set[str]) -> None:
+    def set_columns(self, columns: list[str], hidden_columns: set[str], df: Optional[Any] = None) -> None:
         """Populates the column list with checkable items"""
+        previously_selected: set[str] = set(self.get_selected_columns())
+        search_term: str = self.column_search_input.text().strip().lower()
+
         self.column_list.blockSignals(True)
         self.column_list.clear()
+        self.column_list.setIconSize(DtypeChipCreator.CHIP_SIZE)
+
         for col in columns:
-            item = QListWidgetItem(col)
+            icon = DtypeChipCreator.get_icon_for_column(df, col)
+            item = QListWidgetItem(icon, col)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             check_state = Qt.CheckState.Unchecked if col in hidden_columns else Qt.CheckState.Checked
             item.setCheckState(check_state)
+
+            spec = DtypeChipCreator.get_spec_for_column(df, col)
+            exact_dtype = str(df[col].dtype) if df is not None and col in df.columns else "Unknown"
+            item.setToolTip(f"Column: {col}\nData type: {exact_dtype} ({spec.tooltip})")
+
             self.column_list.addItem(item)
+            if col in previously_selected:
+                item.setSelected(True)
+            if search_term:
+                item.setHidden(search_term not in col.lower())
+
         self.column_list.blockSignals(False)
         self._update_hidden_label()
+        self._update_selection_label()
 
     def get_hidden_columns(self) -> list[str]:
         """Return list of column names that currently unchecked"""
@@ -312,6 +372,21 @@ class ColumnsTab(BaseDataTab):
         if self.controller:
             self.controller.hide_all_columns()
         self._update_hidden_label()
+
+    def _on_copy_selected_clicked(self) -> None:
+        """Copy the names of the currently selected columns to the system clipboard"""
+        selected_columns: list[str] = self.get_selected_columns()
+        if not selected_columns:
+            global_signals.request_toast(
+                "No Selection", "Please select at least one column to copy", ToastLevel.WARNING
+            )
+            return
+
+        clipboard_text: str = "\n".join(selected_columns)
+        QApplication.clipboard().setText(clipboard_text)
+        global_signals.request_toast(
+            "Copied", f"Copied {len(selected_columns)} column name(s) to clipboard", ToastLevel.SUCCESS
+        )
 
     def get_selected_columns(self) -> list[str]:
         return [item.text() for item in self.column_list.selectedItems()]

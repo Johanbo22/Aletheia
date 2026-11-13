@@ -47,14 +47,22 @@ class PlotConfigManager:
                 self.pt.type_manager.select_plot_in_toolbox(config["plot_type"], log=False)
                 self.pt.plot_type.blockSignals(False)
                 self.pt.type_manager._on_plot_type_changed(config["plot_type"], log=False)
-            if "basic" in config: self._load_basic_config(config["basic"])
-            if "appearance" in config: self._load_appearance_config(config["appearance"])
-            if "axes" in config: self._load_axes_config(config["axes"])
-            if "legend" in config: self._load_legend_config(config["legend"])
-            if "grid" in config: self._load_grid_config(config["grid"])
-            if "advanced" in config: self._load_advanced_config(config["advanced"])
-            if "annotations" in config: self._load_annotations_config(config["annotations"])
-            if "geospatial" in config: self._load_geospatial_config(config["geospatial"])
+            if "basic" in config:
+                self._load_basic_config(config["basic"])
+            if "appearance" in config:
+                self._load_appearance_config(config["appearance"])
+            if "axes" in config:
+                self._load_axes_config(config["axes"])
+            if "legend" in config:
+                self._load_legend_config(config["legend"])
+            if "grid" in config:
+                self._load_grid_config(config["grid"])
+            if "advanced" in config:
+                self._load_advanced_config(config["advanced"])
+            if "annotations" in config:
+                self._load_annotations_config(config["annotations"])
+            if "geospatial" in config:
+                self._load_geospatial_config(config["geospatial"])
 
         except Exception as error:
             import logging
@@ -107,12 +115,15 @@ class PlotConfigManager:
             "secondary_plot_type": self.pt.secondary_plot_type_combo.currentText(),
             "quick_filter"       : self.pt.quick_filter_input.text(),
             "subplots"           : {
-                "enabled"    : self.pt.add_subplots_check.isChecked(),
-                "rows"       : self.pt.view.grid_designer.rows_spin.value(),
-                "cols"       : self.pt.view.grid_designer.cols_spin.value(),
-                "sharex"     : self.pt.subplot_sharex_check.isChecked(),
-                "sharey"     : self.pt.subplot_sharey_check.isChecked(),
-                "freeze_data": self.pt.freeze_data_check.isChecked()
+                "enabled"        : self.pt.add_subplots_check.isChecked(),
+                "rows"           : self.pt.view.grid_designer.rows_spin.value(),
+                "cols"           : self.pt.view.grid_designer.cols_spin.value(),
+                "custom_grid"    : self.pt.view.grid_designer.get_custom_grid(),
+                "active_subplot" : self.pt.view.active_subplot_combo.currentIndex(),
+                "sharex"         : self.pt.subplot_sharex_check.isChecked(),
+                "sharey"         : self.pt.subplot_sharey_check.isChecked(),
+                "freeze_data"    : self.pt.freeze_data_check.isChecked(),
+                "subplot_configs": self.pt.subplot_manager.export_configs(),
             }
         }
 
@@ -374,7 +385,7 @@ class PlotConfigManager:
                 "explode_distance": self.pt.pie_explode_distance_spin.value(),
                 "shadow"          : self.pt.pie_shadow_check.isChecked(),
                 "donut_enabled"   : self.pt.pie_donut_check.isChecked(),
-                "donut_width"   : self.pt.pie_donut_width_spin.value(),
+                "donut_width"     : self.pt.pie_donut_width_spin.value(),
             },
         }
 
@@ -482,10 +493,7 @@ class PlotConfigManager:
         self.pt.use_subset()
 
         sub_conf = config.get("subplots", {})
-        self.pt.add_subplots_check.setChecked(sub_conf.get("enabled", False))
-        self.pt.subplot_sharex_check.setChecked(sub_conf.get("sharex", False))
-        self.pt.subplot_sharey_check.setChecked(sub_conf.get("sharey", False))
-        self.pt.freeze_data_check.setChecked(sub_conf.get("freeze_data", False))
+        self.pt.subplot_manager.restore_from_config(sub_conf)
 
     def _load_appearance_config(self, config: dict):
         # Font
@@ -703,10 +711,14 @@ class PlotConfigManager:
             target_button = getattr(self.pt, f"{prefix}_grid_color_button")
             ColorManager.update_button_color_swatch(target_button, QColor(color))
 
-        if "x_major" in config: load_grid_section("x_major", config["x_major"])
-        if "x_minor" in config: load_grid_section("x_minor", config["x_minor"])
-        if "y_major" in config: load_grid_section("y_major", config["y_major"])
-        if "y_minor" in config: load_grid_section("y_minor", config["y_minor"])
+        if "x_major" in config:
+            load_grid_section("x_major", config["x_major"])
+        if "x_minor" in config:
+            load_grid_section("x_minor", config["x_minor"])
+        if "y_major" in config:
+            load_grid_section("y_major", config["y_major"])
+        if "y_minor" in config:
+            load_grid_section("y_minor", config["y_minor"])
 
         self.pt.on_grid_toggle()
 
