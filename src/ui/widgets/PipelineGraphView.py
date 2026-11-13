@@ -1,3 +1,4 @@
+import html
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import QEasingCurve, QParallelAnimationGroup, QPoint, QPointF, QPropertyAnimation, QRectF, \
@@ -223,19 +224,21 @@ class GraphNode(QGraphicsObject):
         """Constructs the HTML tooltip text"""
         if self.operation:
             items_html: str = "".join(
-                f"<li><b>{k}</b>: {v}</li>" for k, v in self.operation.items() if k != "type"
+                f"<li><b>{html.escape(str(k))}</b>: {html.escape(str(v))}</li>"
+                for k, v in self.operation.items()
+                if k != "type"
             )
             self.setToolTip(
-                f"<div style='padding: 4px; color: #F8FAFC;'>"
-                f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
+                f"<div style='padding: 4px;'>"
+                f"<b style='font-size: 13px;'>{self.label}</b><br><br>"
                 f"<b>Operation Details:</b><br>"
                 f"<ul style='margin-top: 4px; margin-bottom: 0px;'>{items_html}</ul>"
                 f"</div>"
             )
             return
         self.setToolTip(
-            f"<div style='color: #F8FAFC;'>"
-            f"<b style='color: #FFFFFF; font-size: 13px;'>{self.label}</b><br><br>"
+            f"<div>"
+            f"<b style='font-size: 13px;'>{self.label}</b><br><br>"
             f"Original imported data state</div>"
         )
 
