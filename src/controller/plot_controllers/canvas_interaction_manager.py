@@ -286,8 +286,8 @@ class CanvasInteractionManager:
 
         bbox = ax.bbox
         if bbox.width > 0.0 and bbox.height > 0.0:
-            self._pan_scale_x = (self._pan_start_xlim[1] - self._pan_start_xlim[0])
-            self._pan_scale_y = (self._pan_start_ylim[1] - self._pan_start_ylim[0])
+            self._pan_scale_x = (self._pan_start_xlim[1] - self._pan_start_xlim[0]) / bbox.width
+            self._pan_scale_y = (self._pan_start_ylim[1] - self._pan_start_ylim[0]) / bbox.height
         else:
             self._pan_scale_x = 0.0
             self._pan_scale_y = 0.0
@@ -314,7 +314,7 @@ class CanvasInteractionManager:
         bounded_y: float = max(0.0, min(1.0, float(norm_y)))
 
         self.plot_tab.view.annotation_x_spin.setValue(bounded_x)
-        self.plot_tab.view.annotation_x_spin.setValue(bounded_y)
+        self.plot_tab.view.annotation_y_spin.setValue(bounded_y)
 
     def on_mouse_move(self, event: MouseEvent) -> None:
         """Handles middle-click mouse panning and tooltips"""
@@ -338,7 +338,7 @@ class CanvasInteractionManager:
                 self._pan_start_xlim[0] - dx_data, self._pan_start_xlim[1] - dx_data
             )
             self._pan_axes.set_ylim(
-                self._pan_start_ylim[0] - dy_data, self._pan_start_ylim[0] - dy_data
+                self._pan_start_ylim[0] - dy_data, self._pan_start_ylim[1] - dy_data
             )
             self.plot_tab.canvas.draw_idle()
             return

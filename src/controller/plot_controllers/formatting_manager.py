@@ -576,7 +576,6 @@ class PlotFormattingManager:
                         color=color,
                         alpha=alpha
                     )
-                return
         else:
             which_type = self.plot_tab.view.grid_which_type_combo.currentText()
             axis = self.plot_tab.view.grid_axis_combo.currentText()

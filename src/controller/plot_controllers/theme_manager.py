@@ -61,7 +61,7 @@ class ThemeManager:
         """Write theme configuration data to disk and select it in the UI"""
         if filepath is None:
             safe_filename: str = "".join(
-                char for char in theme_name if char.isalnum() or "_-"
+                char for char in theme_name if char.isalnum() or char in ("_", "-")
             ) + ".json"
             filepath = self.theme_dir / safe_filename
 
