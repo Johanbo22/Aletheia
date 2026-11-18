@@ -50,6 +50,7 @@ class StrategyRegistry:
         "ECDF"               : ECDFPlotStrategy,
         "Image Show (imshow)": ImshowPlotStrategy,
         "PColormesh"         : PColormeshPlotStrategy,
+        "pcolormesh"         : PColormeshPlotStrategy,
         "Contour"            : ContourPlotStrategy,
         "Contourf"           : ContourFPlotStrategy,
         "Barbs"              : BarbsPlotStrategy,
