@@ -49,14 +49,20 @@ class Subset:
             "description": self.description,
             "filters": self.filters,
             "logic": self.logic,
-            "created_at": self.created_at,
+            "created_at": self.created_at.isoformat() if isinstance(self.created_at, datetime) else str(self.created_at),
             "row_count": self.row_count
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Subset":
         """Create a subset from dict"""
-        created_at = datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now()
+        raw_created_at = data.get("created_at")
+        if isinstance(raw_created_at, str):
+            created_at = datetime.fromisoformat(raw_created_at)
+        elif isinstance(raw_created_at, datetime):
+            created_at = raw_created_at
+        else:
+            created_at = datetime.now()
         return cls(
             name=data["name"],
             description=data["description"],
