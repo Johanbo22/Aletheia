@@ -1,5 +1,6 @@
 import logging
 import re
+from enum import IntEnum, StrEnum
 from pathlib import Path
 
 import keyring
@@ -17,7 +18,25 @@ from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME
 from src.core.global_signals import ToastLevel, global_signals
 from src.core.resource_loader import get_resource_path
-from src.ui.workers import FetchSchemaWorker, TestConnectionWorker
+from src.ui.workers import ColumnMetadata, FetchColumnWorker, FetchSchemaWorker, SchemaTableGroup, TestConnectionWorker
+
+class SchemaNodeType(StrEnum):
+    SCHEMA = "schema"
+    TABLE = "table"
+    COLUMN = "column"
+    PLACEHOLDER = "placeholder"
+
+class SchemaTreeRole(IntEnum):
+    """Custom Qt.ItemDataRole used to store metadata on schema tree nodes."""
+    NODE_TYPE = int(Qt.ItemDataRole.UserRole)
+    SCHEMA_NAME = int(Qt.ItemDataRole.UserRole) + 1
+    TABLE_NAME = int(Qt.ItemDataRole.UserRole) + 2
+    IS_LOADED = int(Qt.ItemDataRole.UserRole) + 3
+
+LOADING_PLACEHOLDER_TEXT: str = "Loading columns..."
+NO_COLUMNS_TEXT: str = "No columns found"
+NO_TABLES_TEXT: str = "No tables found"
+FAILED_COLUMNS_TEXT: str = "Failed to load columns (collapse and expand to retry)"
 
 class SQLSyntaxHighlighter(QSyntaxHighlighter):
     """Syntax highlighting for SQL syntax"""
@@ -64,6 +83,8 @@ class DatabaseConnectionDialog(QDialog):
         self.details: dict[str, str] = {}
         self.settings = QSettings(f"{APPLICATION_NAME}", "DatabaseProfiles")
         self.threadpool = QThreadPool.globalInstance()
+        self._active_connection_string: str = ""
+        self._pending_column_items: dict[tuple[str, str], QTreeWidgetItem] = {}
 
         main_layout = QVBoxLayout(self)
         self.tab_widget = QTabWidget(self)
@@ -259,10 +280,11 @@ class DatabaseConnectionDialog(QDialog):
         layout.addWidget(self.schema_search_input)
 
         self.schema_tree = QTreeWidget()
-        self.schema_tree.setHeaderLabels(["Table / Column", "Type"])
+        self.schema_tree.setHeaderLabels(["Schema / Table / Column", "Type"])
         self.schema_tree.setAlternatingRowColors(True)
         self.schema_tree.setDragEnabled(True)
-        self.schema_tree.setToolTip("Double-click or drag an item to insert it into the query")
+        self.schema_tree.setToolTip("Expand a table to load columns. Double-click an item to insert it into the query.")
+        self.schema_tree.itemExpanded.connect(self.on_schema_item_expanded)
         self.schema_tree.itemDoubleClicked.connect(self.on_schema_double_clicked)
         layout.addWidget(self.schema_tree)
 
@@ -388,6 +410,8 @@ class DatabaseConnectionDialog(QDialog):
             self.schema_search_input.clear()
             self.schema_search_input.setVisible(False)
             self.load_schema_button.setEnabled(True)
+            self._active_connection_string = ""
+            self._pending_column_items.clear()
 
     def test_connection(self) -> None:
         """
@@ -505,6 +529,8 @@ class DatabaseConnectionDialog(QDialog):
         """
         try:
             connection_string = self._build_connection_string()
+            self._active_connection_string = connection_string
+            self._pending_column_items.clear()
 
             self.setCursor(Qt.CursorShape.WaitCursor)
             self.load_schema_button.setEnabled(False)
@@ -530,43 +556,148 @@ class DatabaseConnectionDialog(QDialog):
                 "ERROR"
             )
 
-    def on_fetch_schema_success(self, schema_data: list[dict]) -> None:
+    def _create_table_tree_item(
+            self,
+            parent: QTreeWidget | QTreeWidgetItem,
+            schema_name: str,
+            table_name: str,
+    ) -> QTreeWidgetItem:
+        table_item: QTreeWidgetItem = QTreeWidgetItem(parent)
+        table_item.setText(0, table_name)
+        table_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
+        table_item.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.TABLE.value)
+        table_item.setData(0, SchemaTreeRole.SCHEMA_NAME, schema_name)
+        table_item.setData(0, SchemaTreeRole.TABLE_NAME, table_name)
+        table_item.setData(0, SchemaTreeRole.IS_LOADED, False)
+
+        placeholder: QTreeWidgetItem = QTreeWidgetItem(table_item)
+        placeholder.setText(0, LOADING_PLACEHOLDER_TEXT)
+        placeholder.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.PLACEHOLDER.value)
+        placeholder.setFlags(Qt.ItemFlag.ItemIsEnabled)
+        return table_item
+
+    def on_fetch_schema_success(self, schema_data: list[SchemaTableGroup]) -> None:
         """Populates the schema tree with fetched data"""
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self.load_schema_button.setEnabled(True)
         self.load_schema_button.setText("Load Tables and Columns")
-
         self.schema_search_input.setVisible(True)
 
-        for table_info in schema_data:
-            table = table_info["table"]
-            columns = table_info["columns"]
+        total_tables: int = 0
+        for group in schema_data:
+            schema_name: str | None = group["schema"]
+            tables: list[str] = group["tables"]
+            total_tables += len(tables)
 
-            table_item = QTreeWidgetItem(self.schema_tree)
-            table_item.setText(0, table)
-            table_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
-
-            if not columns:
-                err_item = QTreeWidgetItem(table_item)
-                err_item.setText(0, "No columns found")
+            if schema_name is None:
+                for table_name in tables:
+                    self._create_table_tree_item(self.schema_tree, "", table_name)
                 continue
 
-            for col in columns:
-                col_item = QTreeWidgetItem(table_item)
-                col_name = col.get("name", "Unknown")
-                col_type = col.get("type", "Unknown")
+            schema_item: QTreeWidgetItem = QTreeWidgetItem(self.schema_tree)
+            schema_item.setText(0, schema_name)
+            schema_item.setText(1, f"{len(tables)} table(s)")
+            schema_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DriveHDIcon))
+            schema_item.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.SCHEMA.value)
+            schema_item.setData(0, SchemaTreeRole.SCHEMA_NAME, schema_name)
 
-                col_item.setText(0, str(col_name))
-                col_item.setText(1, str(col_type))
-                col_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            if not tables:
+                empty_item: QTreeWidgetItem = QTreeWidgetItem(schema_item)
+                empty_item.setText(0, NO_TABLES_TEXT)
+                empty_item.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.PLACEHOLDER.value)
+                empty_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                continue
 
-        if len(schema_data) <= 15:
-            self.schema_tree.expandAll()
+            for table_name in tables:
+                self._create_table_tree_item(schema_item, schema_name, table_name)
 
+            if schema_name.lower() in ("public", "main") or len(schema_data) == 1:
+                schema_item.setExpanded(True)
+
+        self.schema_tree.resizeColumnToContents(0)
         global_signals.request_toast(
             "Schema Loaded",
-            "Schema loaded for database",
-            ToastLevel.SUCCESS
+            f"Loaded {total_tables} table(s). Expand a table to inspect columns.",
+            ToastLevel.SUCCESS,
+        )
+
+    def on_schema_item_expanded(self, item: QTreeWidgetItem) -> None:
+        """Trigger loading of column when unloaded table is expanded"""
+        if item.data(0, SchemaTreeRole.NODE_TYPE) != SchemaNodeType.TABLE.value:
+            return
+        if bool(item.data(0, SchemaTreeRole.IS_LOADED)):
+            return
+        if not self._active_connection_string:
+            return
+
+        schema_name: str = str(item.data(0, SchemaTreeRole.SCHEMA_NAME) or "")
+        table_name: str = str(item.data(0, SchemaTreeRole.TABLE_NAME) or "")
+        request_key: tuple[str, str] = (schema_name, table_name)
+
+        if request_key in self._pending_column_items:
+            return
+
+        self._pending_column_items[request_key] = item
+        worker: FetchColumnWorker = FetchColumnWorker(
+            connection_string=self._active_connection_string,
+            table_name=table_name,
+            schema_name=schema_name or None,
+        )
+        worker.signals.columnsLoaded.connect(self.on_fetch_columns_success)
+        worker.signals.loadFailed.connect(self.on_fetch_columns_error)
+        self.threadpool.start(worker)
+
+    def on_fetch_columns_success(
+            self,
+            schema_name: str,
+            table_name: str,
+            columns: list[ColumnMetadata],
+    ) -> None:
+        table_item: QTreeWidgetItem | None = self._pending_column_items.pop((schema_name, table_name), None)
+        if table_item is None or table_item.treeWidget() is not self.schema_tree:
+            return
+
+        table_item.takeChildren()
+        table_item.setData(0, SchemaTreeRole.IS_LOADED, True)
+
+        if not columns:
+            empty_item: QTreeWidgetItem = QTreeWidgetItem(table_item)
+            empty_item.setText(0, NO_COLUMNS_TEXT)
+            empty_item.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.PLACEHOLDER.value)
+            empty_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            return
+
+        for col in columns:
+            col_item: QTreeWidgetItem = QTreeWidgetItem(table_item)
+            col_item.setText(0, col["name"])
+            col_item.setText(1, col["type"])
+            col_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            col_item.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.COLUMN.value)
+            col_item.setData(0, SchemaTreeRole.SCHEMA_NAME, schema_name)
+            col_item.setData(0, SchemaTreeRole.TABLE_NAME, table_name)
+
+        active_search: str = self.schema_search_input.text().strip().lower()
+        if active_search:
+            self._filter_table_item(table_item, active_search)
+
+    def on_fetch_columns_error(self, schema_name: str, table_name: str, error_message: str) -> None:
+        table_item: QTreeWidgetItem | None = self._pending_column_items.pop((schema_name, table_name), None)
+        if table_item is not None and table_item.treeWidget() is self.schema_tree:
+            table_item.takeChildren()
+            err_item: QTreeWidgetItem = QTreeWidgetItem(table_item)
+            err_item.setText(0, FAILED_COLUMNS_TEXT)
+            err_item.setData(0, SchemaTreeRole.NODE_TYPE, SchemaNodeType.PLACEHOLDER.value)
+            err_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+
+        qualified_name: str = f"{schema_name}.{table_name}" if schema_name else table_name
+        global_signals.request_toast(
+            "Column Load Error",
+            f"Failed to load columns for '{qualified_name}'.",
+            ToastLevel.ERROR,
+        )
+        global_signals.request_log(
+            f"Failed to load columns for '{qualified_name}': {error_message}",
+            "ERROR",
         )
 
     def on_fetch_schema_error(self, error_message: str) -> None:
@@ -585,6 +716,37 @@ class DatabaseConnectionDialog(QDialog):
             "ERROR"
         )
 
+    def _filter_table_item(
+            self,
+            table_item: QTreeWidgetItem,
+            search_term: str,
+            force_visible: bool = False
+    ) -> bool:
+        table_match: bool = force_visible or (search_term in table_item.text(0).lower())
+        is_loaded: bool = bool(table_item.data(0, SchemaTreeRole.IS_LOADED))
+
+        if not is_loaded:
+            table_item.setHidden(not table_match)
+            return table_match
+
+        child_match: bool = False
+        for idx in range(table_item.childCount()):
+            col_item: QTreeWidgetItem = table_item.child(idx)
+            is_col_match: bool = force_visible or (search_term in col_item.text(0).lower())
+            col_item.setHidden(not (is_col_match or (table_match and not search_term)))
+            if is_col_match:
+                child_match = True
+
+        is_visible: bool = table_match or child_match
+        table_item.setHidden(not is_visible)
+
+        if child_match and search_term and not force_visible:
+            table_item.setExpanded(True)
+        elif not search_term:
+            table_item.setExpanded(False)
+
+        return is_visible
+
     def filter_schema_tree(self, text: str) -> None:
         """
         Filters the schema tree widget based on the search query
@@ -592,49 +754,61 @@ class DatabaseConnectionDialog(QDialog):
         Hides tables and columns that do not match the provided query.
         :param text: The search term to filter for.
         """
-        search_term = text.lower().strip()
+        search_term: str = text.lower().strip()
 
         for i in range(self.schema_tree.topLevelItemCount()):
-            table_item = self.schema_tree.topLevelItem(i)
-            table_match = search_term in table_item.text(0).lower()
+            top_item: QTreeWidgetItem | None = self.schema_tree.topLevelItem(i)
+            if top_item is None:
+                continue
 
-            child_match = False
-            for j in range(table_item.childCount()):
-                col_item = table_item.child(j)
-                if search_term in col_item.text(0).lower():
-                    col_item.setHidden(False)
-                    child_match = True
-                else:
-                    col_item.setHidden(True)
+            node_type: str = str(top_item.data(0, SchemaTreeRole.NODE_TYPE) or "")
+            if node_type != SchemaNodeType.SCHEMA.value:
+                self._filter_table_item(top_item, search_term)
+                continue
 
-            table_item.setHidden(not (table_match or child_match))
+            schema_match: bool = bool(search_term) and (search_term in top_item.text(0).lower())
+            any_child_visible: bool = False
 
-            if child_match and search_term:
-                table_item.setExpanded(True)
-            elif not search_term:
-                table_item.setExpanded(False)
+            for j in range(top_item.childCount()):
+                child_item: QTreeWidgetItem = top_item.child(j)
+                if child_item.data(0, SchemaTreeRole.NODE_TYPE) == SchemaNodeType.PLACEHOLDER.value:
+                    child_item.setHidden(bool(search_term) and not schema_match)
+                    continue
+                if self._filter_table_item(child_item, search_term, force_visible=schema_match):
+                    any_child_visible = True
+
+            is_schema_visible: bool = (not search_term) or schema_match or any_child_visible
+            top_item.setHidden(not is_schema_visible)
+            if search_term and is_schema_visible:
+                top_item.setExpanded(True)
+
+    @staticmethod
+    def _format_sql_identifier(name: str) -> str:
+        """Quote SQL identifiers that contain spaces, symbols, or leading digits."""
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+            escaped: str = name.replace('"', '""')
+            return f'"{escaped}"'
+        return name
 
     def on_schema_double_clicked(self, item: QTreeWidgetItem) -> None:
         """Insert the clicked ite text into the query"""
+        node_type: str = str(item.data(0, SchemaTreeRole.NODE_TYPE) or "")
+        if node_type not in (SchemaNodeType.TABLE.value, SchemaNodeType.COLUMN.value):
+            return
 
-        def format_identifier(name: str) -> str:
-            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
-                return f'"{name}"'
-            return name
+        schema_name: str = str(item.data(0, SchemaTreeRole.SCHEMA_NAME) or "")
+        table_name: str = str(item.data(0, SchemaTreeRole.TABLE_NAME) or "")
 
-        parent = item.parent()
+        identifier_parts: list[str] = []
+        if schema_name:
+            identifier_parts.append(self._format_sql_identifier(schema_name))
+        identifier_parts.append(self._format_sql_identifier(table_name))
+        if node_type == SchemaNodeType.COLUMN.value:
+            identifier_parts.append(self._format_sql_identifier(item.text(0)))
 
-        # If the item has a parent, its a column
-        if parent:
-            table_name = format_identifier(parent.text(0))
-            col_name = format_identifier(item.text(0))
-            insert_text = f"{table_name}.{col_name}"
-        else:
-            insert_text = format_identifier(item.text(0))
-
+        insert_text: str = ".".join(identifier_parts)
         cursor = self.query_editor.textCursor()
-
-        text_before_cursor = self.query_editor.toPlainText()[:cursor.position()].rstrip()
+        text_before_cursor: str = self.query_editor.toPlainText()[:cursor.position()].rstrip()
         if text_before_cursor and re.search(r'[\w"\'*]$', text_before_cursor):
             insert_text = f", {insert_text}"
 
