@@ -188,13 +188,14 @@ class GoogleSheetsImportWorker(QRunnable):
 class TestConnectionWorker(QRunnable):
     """Worker to test database connections"""
 
-    def __init__(self, connection_string: str):
+    def __init__(self, connection_string: str) -> None:
         super().__init__()
-        self.connection_string = connection_string
-        self.signals = WorkerSignals()
+        self.connection_string: str = connection_string
+        self.signals: WorkerSignals = WorkerSignals()
 
     @pyqtSlot()
-    def run(self):
+    def run(self) -> None:
+        engine: Engine | None = None
         try:
             self.signals.progress.emit(10, "Connecting...")
             engine = create_engine(self.connection_string)
@@ -203,8 +204,11 @@ class TestConnectionWorker(QRunnable):
 
             self.signals.progress.emit(100, "Connection Successful")
             self.signals.finished.emit(True)
-        except Exception as ConnectionError:
-            self.signals.error.emit(ConnectionError)
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as conn_err:
+            self.signals.error.emit(conn_err)
+        finally:
+            if engine is not None:
+                engine.dispose()
 
 SYSTEM_SCHEMA_NAMES: frozenset[str] = frozenset({
     "information_schema",
@@ -281,7 +285,7 @@ class FetchSchemaWorker(QRunnable):
 
             self.signals.finished.emit(schema_groups)
         except (SQLAlchemyError, ValueError, OSError, RuntimeError) as err:
-            self.signals.error.emit(err)
+            self.signals.error.emit(str(err))
         finally:
             if engine is not None:
                 engine.dispose()
@@ -300,7 +304,7 @@ class FetchColumnWorker(QRunnable):
         super().__init__()
         self.connection_string: str = connection_string
         self.table_name: str = table_name
-        self.schema_name: str = schema_name
+        self.schema_name: str | None = schema_name
         self.signals: FetchColumnWorkerSignals = FetchColumnWorkerSignals()
 
     def _inspect_sqlite_pragma(self, engine: Engine) -> list[ColumnMetadata]:
@@ -333,7 +337,7 @@ class FetchColumnWorker(QRunnable):
                 columns = self._inspect_sqlite_pragma(engine)
 
             self.signals.columnsLoaded.emit(schema_key, self.table_name, columns)
-        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as errr:
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as err:
             logger.error("Failed to fetch columns for '%s.%s': %s", schema_key, self.table_name, err)
             self.signals.loadFailed.emit(schema_key, self.table_name, str(err))
         finally:

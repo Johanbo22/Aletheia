@@ -4,15 +4,16 @@ from enum import IntEnum, StrEnum
 from pathlib import Path
 
 import keyring
-from PyQt6.QtCore import QSettings, QThreadPool, Qt
-from PyQt6.QtGui import QColor, QFont, QFontDatabase, QIntValidator, QKeySequence, QPixmap, QShortcut, \
+from PyQt6.QtCore import QMimeData, QPoint, QSettings, QThreadPool, Qt
+from PyQt6.QtGui import QAction, QColor, QFont, QFontDatabase, QIntValidator, QKeySequence, QPixmap, QShortcut, \
     QSyntaxHighlighter, QTextCharFormat, QTextDocument
-from PyQt6.QtSql import QSqlDatabase
 from PyQt6.QtWidgets import QButtonGroup, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QGroupBox, \
-    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QRadioButton, QSplitter, QStackedWidget, \
+    QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox, QPushButton, QRadioButton, QSplitter, QStackedWidget, \
     QStyle, QTabWidget, QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
-from keyring.errors import PasswordDeleteError
+from keyring.errors import KeyringError, PasswordDeleteError
+from sqlalchemy.engine import URL
 from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import ArgumentError
 
 from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME
@@ -32,11 +33,67 @@ class SchemaTreeRole(IntEnum):
     SCHEMA_NAME = int(Qt.ItemDataRole.UserRole) + 1
     TABLE_NAME = int(Qt.ItemDataRole.UserRole) + 2
     IS_LOADED = int(Qt.ItemDataRole.UserRole) + 3
+    USER_EXPANDED = int(Qt.ItemDataRole.UserRole) + 4
 
 LOADING_PLACEHOLDER_TEXT: str = "Loading columns..."
 NO_COLUMNS_TEXT: str = "No columns found"
 NO_TABLES_TEXT: str = "No tables found"
 FAILED_COLUMNS_TEXT: str = "Failed to load columns (collapse and expand to retry)"
+
+SQL_CLAUSE_PRECEDING_KEYWORDS: frozenset[str] = frozenset({
+    "SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "INNER", "LEFT", "RIGHT",
+    "OUTER", "FULL", "CROSS", "ON", "BY", "HAVING", "LIMIT", "OFFSET", "AS",
+    "WITH", "DISTINCT", "UNION", "ALL", "IN", "IS", "NOT", "CASE", "WHEN",
+    "THEN", "ELSE", "VALUES", "TABLE"
+})
+
+def format_sql_identifier(name: str) -> str:
+    """Quote SQL identifiers that contain spaces symbols or leading digits"""
+    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+        escaped: str = name.replace('"', '""')
+        return f'"{escaped}"'
+    return name
+
+def format_tree_item_identifier(item: QTreeWidgetItem, *, qualified: bool = True) -> str:
+    """Build a quoted SQl identifier string from schema tree"""
+    node_type: str = str(item.data(0, SchemaTreeRole.NODE_TYPE) or "")
+    if node_type not in (SchemaNodeType.TABLE.value, SchemaNodeType.COLUMN.value):
+        return ""
+
+    if not qualified and node_type == SchemaNodeType.COLUMN.value:
+        return format_sql_identifier(item.text(0))
+
+    schema_name: str = str(item.data(0, SchemaTreeRole.SCHEMA_NAME) or "")
+    table_name: str = str(item.data(0, SchemaTreeRole.TABLE_NAME) or "")
+
+    identifier_parts: list[str] = []
+    if schema_name and qualified:
+        identifier_parts.append(format_sql_identifier(schema_name))
+    identifier_parts.append(format_sql_identifier(table_name))
+    if node_type == SchemaNodeType.COLUMN.value:
+        identifier_parts.append(format_sql_identifier(item.text(0)))
+
+    return ".".join(identifier_parts)
+
+class SchemaTreeWidget(QTreeWidget):
+    """QTreeWidget that serialises dragged schema items as plain-text SQL ids"""
+
+    def mimeTypes(self) -> list[str]:
+        types: list[str] = super().mimeTypes()
+        if "text/plain" not in types:
+            types.append("text/plain")
+        return types
+
+    def mimeData(self, items: list[QTreeWidgetItem]) -> QMimeData:
+        mime_data: QMimeData = super().mimeData(items)
+        identifiers: list[str] = [
+            formatted
+            for item in items
+            if (formatted := format_tree_item_identifier(item))
+        ]
+        if identifiers:
+            mime_data.setText(", ".join(identifiers))
+        return mime_data
 
 class SQLSyntaxHighlighter(QSyntaxHighlighter):
     """Syntax highlighting for SQL syntax"""
@@ -50,20 +107,32 @@ class SQLSyntaxHighlighter(QSyntaxHighlighter):
         self.string_format = QTextCharFormat()
         self.string_format.setForeground(QColor("#98c379"))
 
-        keywords = [
+        self.comment_format = QTextCharFormat()
+        self.comment_format.setForeground(QColor("#7f848e"))
+        self.comment_format.setFontItalic(True)
+
+        keywords: list[str] = [
             "SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "INNER", "LEFT", "RIGHT",
             "OUTER", "ON", "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "AS", "WITH", "ASC", "DESC"
+                                                                                           "OUTER", "FULL", "CROSS", "ON", r"GROUP\s+BY", r"ORDER\s+BY", "HAVING",
+            "LIMIT", "OFFSET", "AS", "WITH", "ASC", "DESC", "DISTINCT", "UNION",
+            "ALL", "CASE", "WHEN", "THEN", "ELSE", "END", "IN", "IS", "NOT", "NULL",
+            "VALUES", "TABLE"
         ]
-        self.keyword_patterns = [re.compile(fr'\b{word}\b', re.IGNORECASE) for word in keywords]
+        self.keyword_patterns = [re.compile(fr"\b{word}\b", re.IGNORECASE) for word in keywords]
         self.string_pattern = re.compile(r"'.*?'|\".*?\"")
+        self.comment_pattern = re.compile(r"--[^\n]*|/\*.*?\*/")
 
     def highlightBlock(self, text: str) -> None:
-        for match in self.string_pattern.finditer(text):
-            self.setFormat(match.start(), match.end() - match.start(), self.string_format)
-
         for pattern in self.keyword_patterns:
             for match in pattern.finditer(text):
                 self.setFormat(match.start(), match.end() - match.start(), self.keyword_format)
+
+        for match in self.string_pattern.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), self.string_format)
+
+        for match in self.comment_pattern.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), self.comment_format)
 
 class DatabaseConnectionDialog(QDialog):
     """
@@ -85,6 +154,9 @@ class DatabaseConnectionDialog(QDialog):
         self.threadpool = QThreadPool.globalInstance()
         self._active_connection_string: str = ""
         self._pending_column_items: dict[tuple[str, str], QTreeWidgetItem] = {}
+        self._connection_generation: int = 0
+        self._last_db_type: str = ""
+        self._syncing_expanded_state: bool = False
 
         main_layout = QVBoxLayout(self)
         self.tab_widget = QTabWidget(self)
@@ -117,9 +189,9 @@ class DatabaseConnectionDialog(QDialog):
         group = QGroupBox("Saved Connections", parent=self)
         layout = QHBoxLayout(group)
 
-        layout.addWidget(QLabel("Profile"))
+        layout.addWidget(QLabel("Profile:"))
         self.profiles_combo = QComboBox()
-        self.populate_profiles()
+
         self.profiles_combo.currentIndexChanged.connect(self.load_profile)
         layout.addWidget(self.profiles_combo, 1)
 
@@ -130,14 +202,16 @@ class DatabaseConnectionDialog(QDialog):
 
         self.delete_profile_button = QPushButton("Delete", parent=self)
         self.delete_profile_button.setToolTip("Delete the selected profile")
+        self.delete_profile_button.setEnabled(False)
         self.delete_profile_button.clicked.connect(self.delete_profile)
         layout.addWidget(self.delete_profile_button)
+        self.populate_profiles()
 
         return group
 
     def _create_connection_setup_group(self) -> QGroupBox:
         """Builds the connection mode and database type selection group"""
-        self.setup_group = QGroupBox("Connection Group", parent=self)
+        self.setup_group = QGroupBox("Connection Mode", parent=self)
         layout = QFormLayout(self.setup_group)
 
         self.mode_group = QButtonGroup(self)
@@ -155,7 +229,7 @@ class DatabaseConnectionDialog(QDialog):
         mode_radio_layout.addWidget(self.mode_uri_radio)
         mode_radio_layout.addStretch()
 
-        layout.addRow("Connection Mode:", mode_radio_layout)
+        layout.addRow("Mode:", mode_radio_layout)
 
         self.db_type_label = QLabel("Database Type:")
         self.db_type_combo = QComboBox()
@@ -202,10 +276,21 @@ class DatabaseConnectionDialog(QDialog):
         layout.addStretch()
 
         self.test_connection_button = QPushButton("Test Connection", parent=self)
+        self.test_connection_button.setToolTip("Test connection and load database schema")
         self.test_connection_button.clicked.connect(self.test_connection)
         layout.addWidget(self.test_connection_button)
 
+        self.next_tab_button = QPushButton("Next: Query && Schema", parent=self)
+        self.next_tab_button.setToolTip("Switch to the SQL Query and Schema tab")
+        self.next_tab_button.clicked.connect(self._go_to_query_tab)
+        layout.addWidget(self.next_tab_button)
+
         return self.test_connection_wrapper
+
+    def _go_to_query_tab(self) -> None:
+        """Switches to the qiuery and schema tab and focuses to the SQL editor"""
+        self.tab_widget.setCurrentWidget(self.query_tab)
+        self.query_editor.setFocus()
 
     def _setup_query_tab(self) -> None:
         """Starts the query tab and schema tab"""
@@ -227,8 +312,8 @@ class DatabaseConnectionDialog(QDialog):
         layout = QVBoxLayout(group)
 
         instructions = (
-            "Enter your SQL query below. You can select columns and join tables.\n"
-            "Supports standard SELECT statements and CTEs"
+            "Enter your SQL query below. Double-click or drag tables and columns from the schema tree.\n"
+            "Supports SELECT statements, CTEs, TABLE and VALUES queries."
         )
         self.info_label = QLabel(instructions)
         self.info_label.setWordWrap(True)
@@ -273,19 +358,27 @@ class DatabaseConnectionDialog(QDialog):
         layout.addWidget(self.load_schema_button)
 
         self.schema_search_input = QLineEdit(parent=self)
-        self.schema_search_input.setPlaceholderText("Search tables and columns...")
+        self.schema_search_input.setPlaceholderText("Filter tables and loaded columns...")
+        self.schema_search_input.setToolTip(
+            "Filters table names and already-expanded columns. Expand a table first to search its columns"
+        )
         self.schema_search_input.setClearButtonEnabled(True)
         self.schema_search_input.textChanged.connect(self.filter_schema_tree)
         self.schema_search_input.setVisible(False)
         layout.addWidget(self.schema_search_input)
 
-        self.schema_tree = QTreeWidget()
+        self.schema_tree = SchemaTreeWidget()
         self.schema_tree.setHeaderLabels(["Schema / Table / Column", "Type"])
         self.schema_tree.setAlternatingRowColors(True)
         self.schema_tree.setDragEnabled(True)
-        self.schema_tree.setToolTip("Expand a table to load columns. Double-click an item to insert it into the query.")
+        self.schema_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.schema_tree.setToolTip(
+            "Expand a table to load columns. Double-click, drag or right-click an item to insert it into the query"
+        )
         self.schema_tree.itemExpanded.connect(self.on_schema_item_expanded)
+        self.schema_tree.itemCollapsed.connect(self.on_schema_item_collapsed)
         self.schema_tree.itemDoubleClicked.connect(self.on_schema_double_clicked)
+        self.schema_tree.customContextMenuRequested.connect(self.on_schema_context_menu)
         layout.addWidget(self.schema_tree)
 
         return group
@@ -297,8 +390,9 @@ class DatabaseConnectionDialog(QDialog):
         )
 
         ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
-        ok_button.setObjectName("MainActionButton")
         if ok_button:
+            ok_button.setText("Import")
+            ok_button.setObjectName("MainActionButton")
             ok_button.setToolTip("Accept and Import (Ctrl+Enter)")
 
         self.button_box.accepted.connect(self.on_accept)
@@ -344,8 +438,11 @@ class DatabaseConnectionDialog(QDialog):
         self.password_input.textChanged.connect(self.invalidate_connection_state)
 
         view_icon = IconBuilder.build(IconType.ViewItem)
-        self.toggle_password_action = self.password_input.addAction(view_icon,
-                                                                    QLineEdit.ActionPosition.TrailingPosition)
+        self.toggle_password_action = self.password_input.addAction(
+            view_icon,
+            QLineEdit.ActionPosition.TrailingPosition
+        )
+        self.toggle_password_action.setToolTip("Show or hide password")
         self.toggle_password_action.triggered.connect(self.toggle_password_visibility)
         layout.addRow(self.password_label, self.password_input)
 
@@ -394,35 +491,55 @@ class DatabaseConnectionDialog(QDialog):
         self.uri_input.setObjectName("uriInput")
         self.uri_input.setPlaceholderText("dialect+driver://username:password@host:port/database")
         self.uri_input.textChanged.connect(self.invalidate_connection_state)
+
+        view_icon = IconBuilder.build(IconType.ViewItem)
+        self.toggle_uri_visibility_action = self.uri_input.addAction(
+            view_icon,
+            QLineEdit.ActionPosition.TrailingPosition
+        )
+        self.toggle_uri_visibility_action.setToolTip("Show or hide URI credentials")
+        self.toggle_uri_visibility_action.triggered.connect(self.toggle_uri_visibility)
         layout.addRow(self.uri_label, self.uri_input)
 
         return page
 
     def invalidate_connection_state(self) -> None:
-        """Clears the schema and connecton status if inputs change after a successful test"""
-        if self.connection_status_label.text() == "Connection successful":
-            self.connection_status_label.clear()
-            self.connection_status_label.setProperty("status", "")
-            self.connection_status_label.style().unpolish(self.connection_status_label)
-            self.connection_status_label.style().polish(self.connection_status_label)
+        """Clears the schema and connection status when connection parameters change"""
+        self._connection_generation += 1
+        has_status: bool = bool(self.connection_status_label.text())
+        has_schema: bool = bool(self._active_connection_string) or self.schema_tree.topLevelItemCount() > 0
 
-            self.schema_tree.clear()
-            self.schema_search_input.clear()
-            self.schema_search_input.setVisible(False)
-            self.load_schema_button.setEnabled(True)
-            self._active_connection_string = ""
-            self._pending_column_items.clear()
+        if not has_status and not has_schema:
+            return
+
+        self.connection_status_label.clear()
+        self.connection_status_label.setProperty("status", "")
+        self.connection_status_label.style().unpolish(self.connection_status_label)
+        self.connection_status_label.style().polish(self.connection_status_label)
+
+        self.test_connection_button.setEnabled(True)
+        self.test_connection_button.setText("Test Connection")
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
+        self.schema_tree.clear()
+        self.schema_search_input.clear()
+        self.schema_search_input.setVisible(False)
+        self.load_schema_button.setEnabled(True)
+        self.load_schema_button.setText("Load Tables and Columns")
+        self._active_connection_string = ""
+        self._pending_column_items.clear()
 
     def test_connection(self) -> None:
         """
-        Tests the configured database connection asynchronously
+        Tests the configured database connection asynchronously using SQLAlchemy
 
-        Reads the current connection parameters and attempts to establish
-        a connection using a background worker for URIs and DuckDB or the native
-        QtSQL drivers.
-        :raises ValueError: If the necessary input fields for the selected database are empty
+        Validates the current connection inputs and launches a background worker
         """
         try:
+            connection_string: str = self._build_connection_string()
+            self._connection_generation += 1
+            generation: int = self._connection_generation
+
             self.setCursor(Qt.CursorShape.WaitCursor)
             self.test_connection_button.setEnabled(False)
             self.test_connection_button.setText("Testing...")
@@ -432,57 +549,19 @@ class DatabaseConnectionDialog(QDialog):
             self.connection_status_label.style().unpolish(self.connection_status_label)
             self.connection_status_label.style().polish(self.connection_status_label)
 
-            db_type = self.db_type_combo.currentText()
-            is_uri_mode = self.mode_uri_radio.isChecked()
-
-            if is_uri_mode or db_type == "DuckDB":
-                connection_string = self._build_connection_string()
-                worker = TestConnectionWorker(connection_string)
-                worker.signals.finished.connect(self.on_test_connection_success)
-                worker.signals.error.connect(self.on_test_connection_error)
-                self.threadpool.start(worker)
-                return
-
-            self._test_qtsql_connection(db_type)
-
-        except ValueError as InputError:
+            worker = TestConnectionWorker(connection_string)
+            worker.signals.finished.connect(
+                lambda _ok, gen=generation: self._handle_test_connection_success(gen)
+            )
+            worker.signals.error.connect(
+                lambda err, gen=generation: self._handle_test_connection_error(err, gen)
+            )
+            self.threadpool.start(worker)
+        except ValueError as input_error:
             self._reset_test_ui_state()
-            global_signals.request_toast("Error", f"Connection failed: {str(InputError)}", ToastLevel.ERROR)
-
-    def _test_qtsql_connection(self, db_type: str) -> None:
-        """Handles connection to database using QtSql drivers"""
-        driver_map = {
-            "SQLite"    : "QSQLITE",
-            "PostgreSQL": "QPSQL",
-            "MySQL"     : "QMYSQL"
-        }
-        driver_name = driver_map.get(db_type)
-        connection_name = "test_connection_probe"
-
-        if QSqlDatabase.contains(connection_name):
-            QSqlDatabase.removeDatabase(connection_name)
-
-        db = QSqlDatabase.addDatabase(driver_name, connection_name)
-
-        if db_type == "SQLite":
-            db_path = self.file_db_path_input.text().strip()
-            if not db_path:
-                raise ValueError("Please provide a path to the SQLite database file")
-            db.setDatabaseName(db_path)
-        else:
-            db.setHostName(self.host_input.text().strip())
-            db.setPort(int(self.port_input.text().strip() or 0))
-            db.setDatabaseName(self.dbname_input.text().strip())
-            db.setUserName(self.user_input.text().strip())
-            db.setPassword(self.password_input.text().strip())
-
-        if db.open():
-            self.on_test_connection_success()
-            db.close()
-        else:
-            self.on_test_connection_error(db.lastError().text())
-
-        QSqlDatabase.removeDatabase(connection_name)
+            global_signals.request_toast(
+                "Input Error", f"Connection failed: {str(input_error)}", ToastLevel.ERROR
+            )
 
     def _reset_test_ui_state(self) -> None:
         """Resets the UI elements for the test connection phase"""
@@ -490,6 +569,16 @@ class DatabaseConnectionDialog(QDialog):
         self.test_connection_button.setEnabled(True)
         self.test_connection_button.setText("Test Connection")
         self.connection_status_label.setText("")
+
+    def _handle_test_connection_success(self, generation: int) -> None:
+        if generation != self._connection_generation:
+            return
+        self.on_test_connection_success()
+
+    def _handle_test_connection_error(self, error: Exception | str, generation: int) -> None:
+        if generation != self._connection_generation:
+            return
+        self.on_test_connection_error(error)
 
     def on_test_connection_success(self) -> None:
         self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -504,7 +593,7 @@ class DatabaseConnectionDialog(QDialog):
 
         self.fetch_schema()
 
-    def on_test_connection_error(self, error) -> None:
+    def on_test_connection_error(self, error: Exception | str) -> None:
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self.test_connection_button.setEnabled(True)
         self.test_connection_button.setText("Test Connection")
@@ -528,9 +617,10 @@ class DatabaseConnectionDialog(QDialog):
         fetch tables and columns
         """
         try:
-            connection_string = self._build_connection_string()
+            connection_string: str = self._build_connection_string()
             self._active_connection_string = connection_string
             self._pending_column_items.clear()
+            generation: int = self._connection_generation
 
             self.setCursor(Qt.CursorShape.WaitCursor)
             self.load_schema_button.setEnabled(False)
@@ -540,21 +630,35 @@ class DatabaseConnectionDialog(QDialog):
             self.schema_search_input.setVisible(False)
 
             worker = FetchSchemaWorker(connection_string=connection_string)
-            worker.signals.finished.connect(self.on_fetch_schema_success)
-            worker.signals.error.connect(self.on_fetch_schema_error)
+            worker.signals.finished.connect(
+                lambda data, gen=generation: self._handle_fetch_schema_success(data, gen)
+            )
+            worker.signals.error.connect(
+                lambda err, gen=generation: self._handle_fetch_schema_error(err, gen)
+            )
 
             self.threadpool.start(worker)
         except ValueError as DatabaseValueError:
             self.setCursor(Qt.CursorShape.ArrowCursor)
             global_signals.request_toast(
-                "Error",
-                "Error fetching schema for database",
-                ToastLevel.ERROR
+                "Connection Details Missing",
+                str(DatabaseValueError),
+                ToastLevel.WARNING
             )
             global_signals.request_log(
                 f"Error fetching schema for database: {str(DatabaseValueError)}",
                 "ERROR"
             )
+
+    def _handle_fetch_schema_success(self, schema_data: list[SchemaTableGroup], generation: int) -> None:
+        if generation != self._connection_generation:
+            return
+        self.on_fetch_schema_success(schema_data)
+
+    def _handle_fetch_schema_error(self, error_message: str, generation: int) -> None:
+        if generation != self._connection_generation:
+            return
+        self.on_fetch_schema_error(error_message)
 
     def _create_table_tree_item(
             self,
@@ -569,6 +673,7 @@ class DatabaseConnectionDialog(QDialog):
         table_item.setData(0, SchemaTreeRole.SCHEMA_NAME, schema_name)
         table_item.setData(0, SchemaTreeRole.TABLE_NAME, table_name)
         table_item.setData(0, SchemaTreeRole.IS_LOADED, False)
+        table_item.setData(0, SchemaTreeRole.USER_EXPANDED, False)
 
         placeholder: QTreeWidgetItem = QTreeWidgetItem(table_item)
         placeholder.setText(0, LOADING_PLACEHOLDER_TEXT)
@@ -625,6 +730,8 @@ class DatabaseConnectionDialog(QDialog):
         """Trigger loading of column when unloaded table is expanded"""
         if item.data(0, SchemaTreeRole.NODE_TYPE) != SchemaNodeType.TABLE.value:
             return
+        if not self._syncing_expanded_state:
+            item.setData(0, SchemaTreeRole.USER_EXPANDED, True)
         if bool(item.data(0, SchemaTreeRole.IS_LOADED)):
             return
         if not self._active_connection_string:
@@ -638,14 +745,52 @@ class DatabaseConnectionDialog(QDialog):
             return
 
         self._pending_column_items[request_key] = item
+        generation: int = self._connection_generation
         worker: FetchColumnWorker = FetchColumnWorker(
             connection_string=self._active_connection_string,
             table_name=table_name,
             schema_name=schema_name or None,
         )
-        worker.signals.columnsLoaded.connect(self.on_fetch_columns_success)
-        worker.signals.loadFailed.connect(self.on_fetch_columns_error)
+        worker.signals.columnsLoaded.connect(
+            lambda s_name, t_name, cols, gen=generation: self._handle_fetch_columns_success(
+                s_name, t_name, cols, gen
+            )
+        )
+        worker.signals.loadFailed.connect(
+            lambda s_name, t_name, err, gen=generation: self._handle_fetch_columns_error(
+                s_name, t_name, err, gen
+            )
+        )
         self.threadpool.start(worker)
+
+    def on_schema_item_collapsed(self, item: QTreeWidgetItem) -> None:
+        """Track table collapse so search reset restores correct state"""
+        if item.data(0, SchemaTreeRole.NODE_TYPE) != SchemaNodeType.TABLE.value:
+            return
+        if not self._syncing_expanded_state:
+            item.setData(0, SchemaTreeRole.USER_EXPANDED, False)
+
+    def _handle_fetch_columns_success(
+            self,
+            schema_name: str,
+            table_name: str,
+            columns: list[ColumnMetadata],
+            generation: int
+    ) -> None:
+        if generation != self._connection_generation:
+            return
+        self.on_fetch_columns_success(schema_name, table_name, columns)
+
+    def _handle_fetch_columns_error(
+            self,
+            schema_name: str,
+            table_name: str,
+            error_message: str,
+            generation: int
+    ) -> None:
+        if generation != self._connection_generation:
+            return
+        self.on_fetch_columns_error(schema_name, table_name, error_message)
 
     def on_fetch_columns_success(
             self,
@@ -708,11 +853,11 @@ class DatabaseConnectionDialog(QDialog):
 
         global_signals.request_toast(
             "Error",
-            "Failed to fetch schema for the database",
+            f"Failed to fetch schema for the database:\n{error_message}",
             ToastLevel.ERROR
         )
         global_signals.request_log(
-            f"Failed to fetch schema for the database: {str(error_message)}",
+            f"Failed to fetch schema for the database:{str(error_message)}",
             "ERROR"
         )
 
@@ -733,17 +878,22 @@ class DatabaseConnectionDialog(QDialog):
         for idx in range(table_item.childCount()):
             col_item: QTreeWidgetItem = table_item.child(idx)
             is_col_match: bool = force_visible or (search_term in col_item.text(0).lower())
-            col_item.setHidden(not (is_col_match or (table_match and not search_term)))
+            col_item.setHidden(not (is_col_match or (table_match or not search_term)))
             if is_col_match:
                 child_match = True
 
         is_visible: bool = table_match or child_match
         table_item.setHidden(not is_visible)
 
-        if child_match and search_term and not force_visible:
-            table_item.setExpanded(True)
-        elif not search_term:
-            table_item.setExpanded(False)
+        self._syncing_expanded_state = True
+        try:
+            if child_match and search_term and not force_visible:
+                table_item.setExpanded(True)
+            elif not search_term:
+                user_expanded: bool = bool(table_item.data(0, SchemaTreeRole.USER_EXPANDED))
+                table_item.setExpanded(user_expanded)
+        finally:
+            self._syncing_expanded_state = False
 
         return is_visible
 
@@ -785,86 +935,175 @@ class DatabaseConnectionDialog(QDialog):
     @staticmethod
     def _format_sql_identifier(name: str) -> str:
         """Quote SQL identifiers that contain spaces, symbols, or leading digits."""
-        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
-            escaped: str = name.replace('"', '""')
-            return f'"{escaped}"'
-        return name
+        return format_sql_identifier(name)
+
+    @staticmethod
+    def _should_prepend_command(text_before_cursor: str) -> bool:
+        """Determine whether inserting an identifier at the cursor requires a leading comma"""
+        stripped: str = text_before_cursor.rstrip()
+        if not stripped:
+            return False
+        if not re.search(r'[\w\'*]$', stripped):
+            return False
+
+        last_word_match = re.search(r"([a-zA-Z_][a-zA-Z0-9_]*)$", stripped)
+        if last_word_match:
+            last_word: str = last_word_match.group(1).upper()
+            if last_word in SQL_CLAUSE_PRECEDING_KEYWORDS:
+                return False
+
+        return True
+
+    def _insert_identifier_into_query(self, identifier: str) -> None:
+        """Insert a formatted SQL identifier at the current cursor position"""
+        if not identifier:
+            return
+        cursor = self.query_editor.textCursor()
+        full_text: str = self.query_editor.toPlainText()
+        text_before_cursor: str = full_text[:cursor]
+
+        insert_text: str = identifier
+        if self._should_prepend_command(text_before_cursor):
+            if text_before_cursor.endswith((" ", "\t", "\n")):
+                stripped_len: int = len(text_before_cursor.rstrip(" \t"))
+                cursor.setPosition(stripped_len)
+                cursor.setPosition(len(text_before_cursor), cursor.MoveMode.KeepAnchor)
+                cursor.removeSelectedText()
+                self.query_editor.setTextCursor(cursor)
+            insert_text = f", {identifier}"
+        elif text_before_cursor and not text_before_cursor[-1].isspace() and text_before_cursor[-1] != "(":
+            insert_text = f" {identifier}"
+
+        self.query_editor.insertPlainText(f"{insert_text}")
+        self.query_editor.setFocus()
 
     def on_schema_double_clicked(self, item: QTreeWidgetItem) -> None:
-        """Insert the clicked ite text into the query"""
+        """Insert the clicked item into the SQL query editor, scaffoleded with SELECT * FROM if empty"""
         node_type: str = str(item.data(0, SchemaTreeRole.NODE_TYPE) or "")
         if node_type not in (SchemaNodeType.TABLE.value, SchemaNodeType.COLUMN.value):
             return
 
-        schema_name: str = str(item.data(0, SchemaTreeRole.SCHEMA_NAME) or "")
-        table_name: str = str(item.data(0, SchemaTreeRole.TABLE_NAME) or "")
+        identifier: str = format_tree_item_identifier(item, qualified=True)
+        if not identifier:
+            return
 
-        identifier_parts: list[str] = []
-        if schema_name:
-            identifier_parts.append(self._format_sql_identifier(schema_name))
-        identifier_parts.append(self._format_sql_identifier(table_name))
-        if node_type == SchemaNodeType.COLUMN.value:
-            identifier_parts.append(self._format_sql_identifier(item.text(0)))
+        if node_type == SchemaNodeType.TABLE.value and not self.query_editor.toPlainText().strip():
+            self.query_editor.setPlainText(f"SELECT * FROM {identifier}")
+            cursor = self.query_editor.textCursor()
+            cursor.movePosition(cursor.MoveOperation.End)
+            self.query_editor.setTextCursor(cursor)
+            self.query_editor.setFocus()
+            return
 
-        insert_text: str = ".".join(identifier_parts)
-        cursor = self.query_editor.textCursor()
-        text_before_cursor: str = self.query_editor.toPlainText()[:cursor.position()].rstrip()
-        if text_before_cursor and re.search(r'[\w"\'*]$', text_before_cursor):
-            insert_text = f", {insert_text}"
+        self._insert_identifier_into_query(identifier)
 
-        self.query_editor.insertPlainText(insert_text + " ")
-        self.query_editor.setFocus()
+    def on_schema_context_menu(self, position: QPoint) -> None:
+        """Display a context menu with SQL generation and insertion shortcuts for schemaitems"""
+        item: QTreeWidgetItem | None = self.schema_tree.itemAt(position)
+        if item is None:
+            return
+
+        node_type: str = str(item.data(0, SchemaTreeRole.NODE_TYPE) or "")
+        if node_type not in (SchemaNodeType.TABLE.value, SchemaNodeType.COLUMN.value):
+            return
+
+        qualified_id: str = format_tree_item_identifier(item, qualified=True)
+        menu = QMenu(self)
+
+        if node_type == SchemaNodeType.TABLE.value:
+            select_all_action: QAction = menu.addAction(f"SELECT * FROM {qualified_id}")
+            select_top_action: QAction = menu.addAction(f"SELECT * FROM {qualified_id} LIMIT 100")
+            menu.addSeparator()
+            insert_table_action: QAction = menu.addAction("Insert Table Name")
+
+            chosen: QAction | None = menu.exec(self.schema_tree.viewport().mapToGlobal(position))
+            if chosen == select_all_action:
+                self.query_editor.setPlainText(f"SELECT * FROM {qualified_id}")
+                self.query_editor.setFocus()
+            elif chosen == select_top_action:
+                self.query_editor.setPlainText(f"SELECT * FROM {qualified_id} LIMIT 100")
+                self.query_editor.setFocus()
+            elif chosen == insert_table_action:
+                self._insert_identifier_into_query(qualified_id)
+        else:
+            unqualified_id: str = format_tree_item_identifier(item, qualified=False)
+            insert_col_action: QAction = menu.addAction(f"Insert Column ({unqualified_id})")
+            insert_qualified_action: QAction = menu.addAction(f"Insert Qualified ({unqualified_id})")
+
+            chosen = menu.exec(self.schema_tree.viewport().mapToGlobal(position))
+            if chosen == insert_col_action:
+                self._insert_identifier_into_query(unqualified_id)
+            elif chosen == insert_qualified_action:
+                self._insert_identifier_into_query(qualified_id)
 
     def _build_connection_string(self) -> str:
         """
         Constructs a SQLAlchemy-compatible connection string.
 
         Validates the user input based on database type and connection mode
-        and formats the standard URi required by the database engine
+        and formats the standard URI required by the database engine
 
         :return: The constructed database connection string
-        :raises ValueError: If required details are missing or incomplete
+        :raises ValueError: If required details are missing, invalid or file does not exist
         """
-        # URI mode
         if self.mode_uri_radio.isChecked():
-            uri = self.uri_input.text().strip()
+            uri: str = self.uri_input.text().strip()
             if not uri:
                 raise ValueError("Please provide a valid Connection URI")
+            try:
+                make_url(uri)
+            except ArgumentError as err:
+                raise ValueError(f"Invalid Connection URI format: {err}") from err
             return uri
 
-        db_type = self.db_type_combo.currentText()
+        db_type: str = self.db_type_combo.currentText()
 
-        connection_string = ""
-
-        if db_type in ["SQLite", "DuckDB"]:
-            db_path = self.file_db_path_input.text().strip()
+        if db_type in ("SQLite", "DuckDB"):
+            db_path: str = self.file_db_path_input.text().strip()
             if not db_path:
                 raise ValueError(f"Please provide a path to the {db_type} database file.")
 
-            db_path_abs = Path(db_path).resolve().as_posix()
-            prefix = "sqlite" if db_type == "SQLite" else "duckdb"
-            connection_string = f"{prefix}:///{db_path_abs}"
+            path_obj: Path = Path(db_path).expanduser().resolve()
+            if not path_obj.exists():
+                raise ValueError(f"The {db_type} database file does not exist: '{db_path}'")
+            if not path_obj.is_file():
+                raise ValueError(f"The {db_type} databasefile is not a file: '{db_path}'")
 
-        else:
-            host = self.host_input.text().strip()
-            port = self.port_input.text().strip()
-            user = self.user_input.text().strip()
-            password = self.password_input.text().strip()
-            dbname = self.dbname_input.text().strip()
+            prefix: str = "sqlite" if db_type == "SQLite" else "duckdb"
+            return f"{prefix}:///{path_obj.as_posix()}"
 
-            if not all([host, port, user, dbname]):
-                raise ValueError("Please fill in all connection details (Host, Port, User, DatabaseName)")
+        host = self.host_input.text().strip()
+        port_str = self.port_input.text().strip()
+        user = self.user_input.text().strip()
+        password = self.password_input.text().strip()
+        dbname = self.dbname_input.text().strip()
 
-            if db_type == "PostgreSQL":
-                connection_string = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
-            elif db_type == "MySQL":
-                connection_string = f"mysql+mysqlconnector://{user}:{password}@{host}:{port}/{dbname}"
+        if not all([host, port_str, user, dbname]):
+            raise ValueError("Please fill in all connection details (Host, Port, User, DatabaseName)")
 
-        return connection_string
+        try:
+            port_num: int = int(port_str)
+        except ValueError as err:
+            raise ValueError("Port must be a valid integer between 0 and 65535") from err
+
+        driver_map: dict[str, str] = {
+            "PostgreSQL": "postgresql+psycopg2",
+            "MySQL"     : "mysql+mysqlconnector"
+        }
+        drivername: str = driver_map.get(db_type, "postgresql+psycopg2")
+        url_obj: URL = URL.create(
+            drivername=drivername,
+            username=user,
+            password=password if password else None,
+            host=host,
+            port=port_num,
+            database=dbname
+        )
+        return url_obj.render_as_string(hide_password=False)
 
     def on_query_changed(self) -> None:
         """Validate the query"""
-        query = self.query_editor.toPlainText().strip()
+        query: str = self.query_editor.toPlainText().strip()
 
         if not query:
             self._set_query_status(
@@ -880,24 +1119,37 @@ class DatabaseConnectionDialog(QDialog):
             )
         else:
             self._set_query_status(
-                "Invalid query (Must be a SELECT statement or WITH clause)",
+                "Invalid query (Must be a SELECT, WITH, TABLE, or VALUES query)",
                 valid=False
             )
 
     @staticmethod
     def _is_valid_select_query(query: str) -> bool:
-        """Checks if the query entered matches expression rules
+        """Checks if the query entered is a valid read-only data query
 
-        :param query (str): Takes the query from te query text box
-        :returns bool: Returns True if the query is valid
+        :param query: Raw SQL text from the query editor
+        :returns bool: Returns True if the query is a valid read-only query
         """
-        query = re.sub(r"^\s*(--.*\n|/\*.*?\*/\s*)*", "", query, flags=re.S).strip()
+        cleaned_query: str = re.sub(r"(--[^\n]*|/\*.*?\*/)", " ", query, flags=re.S).strip()
+        if not cleaned_query:
+            return False
 
-        starts_valid = query.lower().startswith("select") or query.lower().startswith("with")
-        has_select = bool(re.search(r"\bselect\b", query, re.IGNORECASE))
-        has_from = bool(re.search(r"\bfrom\b", query, re.IGNORECASE))
+        forbidden_pattern = re.compile(
+            r"^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE)\b",
+            re.IGNORECASE
+        )
+        if forbidden_pattern.match(cleaned_query):
+            return False
 
-        return starts_valid and has_select and has_from
+        lowered_query: str = cleaned_query.lower()
+        if lowered_query.startswith("select"):
+            return bool(re.match(r"^select\s+\S+", cleaned_query, re.IGNORECASE))
+        if lowered_query.startswith("with"):
+            return bool(re.search(r"\b(select|values|table)\b", cleaned_query, re.IGNORECASE))
+        if lowered_query.startswith(("table ", "values ", "values(", "from ")):
+            return True
+
+        return False
 
     def _set_query_status(self, message: str, *, valid: bool) -> None:
         """Sets the status icon and status label based on whether the expression is valid"""
@@ -926,10 +1178,11 @@ class DatabaseConnectionDialog(QDialog):
 
     def on_db_type_changed(self, db_type: str) -> None:
         """Switches the visible page in the stacked widget based on database type."""
+        self.invalidate_connection_state()
         if self.mode_uri_radio.isChecked():
             return
 
-        db_configs = {
+        db_configs: dict[str, dict[str, str | bool]] = {
             "PostgreSQL": {
                 "is_file": False,
                 "port"   : "5432",
@@ -956,19 +1209,34 @@ class DatabaseConnectionDialog(QDialog):
             }
         }
 
-        config = db_configs.get(db_type, {})
+        config: dict[str, str | bool] = db_configs.get(db_type, {})
+        prev_config: dict[str, str | bool] = db_configs.get(self._last_db_type, {})
+        self._last_db_type = db_type
 
-        if config.get("is_file", False):
+        if bool(config.get("is_file", False)):
             self.connection_stack.setCurrentWidget(self.file_page)
-            self.file_db_path_input.setPlaceholderText(config.get("placeholder", ""))
+            self.file_db_path_input.setPlaceholderText(str(config.get("placeholder", "")))
         else:
             self.connection_stack.setCurrentWidget(self.server_page)
-            self.port_input.setText(config.get("port", ""))
-            self.user_input.setText(config.get("user", ""))
-            self.dbname_input.setText(config.get("dbname", ""))
+            prev_port: str = str(prev_config.get("port", ""))
+            prev_user: str = str(prev_config.get("user", ""))
+            prev_dbname: str = str(prev_config.get("dbname", ""))
 
-        icon_path = config.get("icon", "")
-        if not Path(icon_path).exists():
+            current_port: str = self.port_input.text().strip()
+            if not current_port or current_port == prev_port:
+                self.port_input.setText(str(config.get("port", "")))
+
+            current_user: str = self.user_input.text().strip()
+            if not current_user or current_user == prev_user:
+                self.user_input.setText(str(config.get("user", "")))
+
+            current_dbname: str = self.dbname_input.text().strip()
+            if not current_dbname or current_dbname == prev_dbname:
+                self.dbname_input.setText(str(config.get("dbname", "")))
+
+        raw_icon: str = str(config.get("icon", ""))
+        icon_path: str = get_resource_path(raw_icon) if raw_icon else ""
+        if not icon_path or not Path(icon_path).exists():
             icon_path = get_resource_path("../icons/menu_bar/database.svg")
 
         if Path(icon_path).exists():
@@ -980,7 +1248,7 @@ class DatabaseConnectionDialog(QDialog):
             self.db_icon_label.clear()
 
     def browse_file_db(self) -> None:
-        """Open a file dialog to find a local SQLite database file"""
+        """Open a file dialog to find a local SQLite or DuckDB database file"""
         current_database_type = self.db_type_combo.currentText()
 
         filters = "All Files (*)"
@@ -1000,27 +1268,29 @@ class DatabaseConnectionDialog(QDialog):
 
     def on_accept(self) -> None:
         """Validate the input and build connection string before acception"""
-        db_type = self.db_type_combo.currentText()
-        query = self.query_editor.toPlainText().strip()
+        db_type: str = "URI" if self.mode_uri_radio.isChecked() else self.db_type_combo.currentText()
+        query: str = self.query_editor.toPlainText().strip()
 
         if not query:
+            self._go_to_query_tab()
             global_signals.request_toast(
                 "Query Empty",
-                "Please enter a SQL Query",
+                "Please enter a SQL query in the Query & Schema tab",
                 ToastLevel.WARNING
             )
             return
 
-        if not (query.lower().startswith("select") or query.lower().startswith("with")):
+        if not self._is_valid_select_query(query):
+            self._go_to_query_tab()
             global_signals.request_toast(
                 "Invalid Query",
-                "The SQL query must be a 'SELECT' statement or start with 'WITH'",
+                "The SQL query must be a valid SELECT, WITH, TABLE or VALUES query",
                 ToastLevel.WARNING
             )
             return
 
         try:
-            connection_string = self._build_connection_string()
+            connection_string: str = self._build_connection_string()
 
             self.details = {
                 "db_type"          : db_type,
@@ -1029,13 +1299,19 @@ class DatabaseConnectionDialog(QDialog):
             }
             self.accept()
 
-        except ValueError as InputError:
-            global_signals.request_toast("Input Error", f"{str(InputError)}", ToastLevel.ERROR)
-            global_signals.request_log(f"Input Error: {str(InputError)}", "ERROR")
-        except Exception as AcceptDatabaseConnectionError:
-            global_signals.request_toast("Connection Error", "Failed to establish connection", ToastLevel.ERROR)
-            global_signals.request_log(f"Failed to establish connection string: {str(AcceptDatabaseConnectionError)}",
-                                       "ERROR")
+        except ValueError as input_error:
+            self.tab_widget.setCurrentWidget(self.connection_tab)
+            global_signals.request_toast(
+                "Input Error", f"{str(input_error)}", ToastLevel.ERROR
+            )
+            global_signals.request_log(f"Input Error: {str(input_error)}", "ERROR")
+        except (OSError, RuntimeError) as conn_err:
+            global_signals.request_toast(
+                "Connection Error", "Failed to establish connection", ToastLevel.ERROR
+            )
+            global_signals.request_log(
+                f"Failed to establish connection string: {str(conn_err)}", "ERROR"
+            )
 
     def get_details(self) -> tuple[str, str, str]:
         """
@@ -1043,11 +1319,16 @@ class DatabaseConnectionDialog(QDialog):
 
         :return: A tuple containing the database type, connection string and SQL query
         """
-        return self.details.get("db_type"), self.details.get("connection_string"), self.details.get("query")
+        return (
+            self.details.get("db_type"),
+            self.details.get("connection_string"),
+            self.details.get("query")
+        )
 
     def toggle_connection_mode(self) -> None:
         """Switches the UI states"""
-        is_uri_mode = self.mode_uri_radio.isChecked()
+        self.invalidate_connection_state()
+        is_uri_mode: bool = self.mode_uri_radio.isChecked()
 
         self.db_type_combo.setVisible(not is_uri_mode)
         self.db_type_label.setVisible(not is_uri_mode)
@@ -1063,46 +1344,56 @@ class DatabaseConnectionDialog(QDialog):
         self.profiles_combo.addItem("Select a profile...", None)
 
         self.settings.beginGroup("DatabaseProfiles")
-        profiles = self.settings.childGroups()
+        profiles: list[str] = self.settings.childGroups()
         self.settings.endGroup()
 
         for profile in profiles:
             self.profiles_combo.addItem(profile, profile)
         self.profiles_combo.blockSignals(False)
 
+        if hasattr(self, "delete_profile_button"):
+            self.delete_profile_button.setEnabled(False)
+
     def save_profile(self) -> None:
         """Save the current connection details to a profile"""
-        name, ok = QInputDialog.getText(self, "Save Profile", "Enter profile name")
-        if not ok or not name:
+        current_profile: str = str(self.profiles_combo.currentData() or "")
+        name, ok = QInputDialog.getText(
+            self,
+            "Save Profile",
+            "Enter profile name",
+            QLineEdit.EchoMode.Normal,
+            current_profile
+        )
+        if not ok:
             return
 
         name = name.strip()
         if not name:
-            global_signals.request_toast("Warning", "Profile name cannot be empty", ToastLevel.INFO)
+            global_signals.request_toast("Warning", "Profile name cannot be empty", ToastLevel.WARNING)
             return
 
-        is_uri = self.mode_uri_radio.isChecked()
-        safe_uri = ""
-        db_password = ""
+        is_uri: bool = self.mode_uri_radio.isChecked()
+        safe_uri: str = ""
+        db_password: str = ""
 
         if is_uri:
-            raw_uri = self.uri_input.text().strip()
+            raw_uri: str = self.uri_input.text().strip()
             if raw_uri:
                 try:
                     parsed_url = make_url(raw_uri)
                     db_password = parsed_url.password or ""
                     safe_url = parsed_url.set(password=None)
                     safe_uri = safe_url.render_as_string(hide_password=False)
-                except Exception as uri_err:
-                    logging.getLogger(__name__).warning(f"URI Parse Error: {uri_err}")
+                except ArgumentError as uri_err:
+                    logging.getLogger(__name__).warning("URI Parse Error: %s", uri_err)
                     global_signals.request_toast(
-                        "Could Not parse URI", "Unable to parse the URI given", ToastLevel.WARNING
+                        "Could Not Parse URI", "Unable to parse the URI given", ToastLevel.WARNING
                     )
                     safe_uri = raw_uri
         else:
             db_password = self.password_input.text()
 
-        data = {
+        data: dict[str, str] = {
             "mode"     : "uri" if is_uri else "builder",
             "uri"      : safe_uri,
             "db_type"  : self.db_type_combo.currentText(),
@@ -1121,23 +1412,31 @@ class DatabaseConnectionDialog(QDialog):
         self.settings.endGroup()
 
         if db_password:
-            keyring.set_password(
-                f"{APPLICATION_NAME}_DB_Profiles", name, db_password
-            )
+            try:
+                keyring.set_password(
+                    f"{APPLICATION_NAME}_DB_Profiles", name, db_password
+                )
+            except KeyringError as keyring_err:
+                logging.getLogger(__name__).warning(
+                    "Could not store password in system keyring for profile '%s': %s", name, keyring_err
+                )
         else:
             try:
                 keyring.delete_password(
                     f"{APPLICATION_NAME}_DB_Profiles", name
                 )
-            except PasswordDeleteError as delete_err:
+            except (PasswordDeleteError, KeyringError) as delete_err:
                 logging.getLogger(__name__).debug(
-                    f"Password for profile '{name}' not found during deletion: {delete_err}"
+                    f"Password for profile '%s' not found during deletion: %s", name, delete_err
                 )
 
         self.populate_profiles()
-        index = self.profiles_combo.findText(name)
+        index: int = self.profiles_combo.findText(name)
         if index >= 0:
+            self.profiles_combo.blockSignals(True)
             self.profiles_combo.setCurrentIndex(index)
+            self.profiles_combo.blockSignals(False)
+            self.delete_profile_button.setEnabled(True)
 
         global_signals.request_toast(
             "Profile Saved",
@@ -1148,21 +1447,34 @@ class DatabaseConnectionDialog(QDialog):
     def load_profile(self) -> None:
         """Load the selected profile"""
         name = self.profiles_combo.currentData()
+        has_profile: bool = bool(name)
+        if hasattr(self, "delete_profile_button"):
+            self.delete_profile_button.setEnabled(has_profile)
         if not name:
             return
 
         self.settings.beginGroup("DatabaseProfiles")
-        self.settings.beginGroup(name)
+        self.settings.beginGroup(str(name))
 
-        mode = self.settings.value("mode", "builder")
+        mode: str = str(self.settings.value("mode", "builder"))
+        safe_uri: str = str(self.settings.value("uri", ""))
+        db_type: str = str(self.settings.value("db_type", "SQLite"))
+        host: str = str(self.settings.value("host", ""))
+        port: str = str(self.settings.value("port", ""))
+        user: str = str(self.settings.value("user", ""))
+        dbname: str = str(self.settings.value("dbname", ""))
+        file_path: str = str(self.settings.value("file_path", ""))
+
+        self.settings.endGroup()
+        self.settings.endGroup()
 
         try:
-            db_password = keyring.get_password(
-                f"{APPLICATION_NAME}_DB_Profiles", name
+            db_password: str = keyring.get_password(
+                f"{APPLICATION_NAME}_DB_Profiles", str(name)
             ) or ""
-        except Exception as keyring_err:
+        except KeyringError as keyring_err:
             logging.getLogger(__name__).warning(
-                f"Failed to retrieve password for profile '{name}': {keyring_err}"
+                f"Failed to retrieve password for profile '%s': %s", name, keyring_err
             )
             db_password = ""
 
@@ -1173,31 +1485,29 @@ class DatabaseConnectionDialog(QDialog):
                 try:
                     parsed_url = make_url(safe_uri)
                     parsed_url = parsed_url.set(password=db_password)
-                    final_uri = parsed_url.render_as_string(hide_password=False)
+                    final_uri: str = parsed_url.render_as_string(hide_password=False)
+                    self.uri_input.setEchoMode(QLineEdit.EchoMode.Password)
                     self.uri_input.setText(final_uri)
-                except Exception:
+                except ArgumentError:
+                    self.uri_input.setEchoMode(QLineEdit.EchoMode.Normal)
                     self.uri_input.setText(safe_uri)
             else:
+                self.uri_input.setEchoMode(QLineEdit.EchoMode.Normal)
                 self.uri_input.setText(safe_uri)
         else:
             self.mode_builder_radio.setChecked(True)
-            db_type = self.settings.value("db_type", "SQLite")
-            index = self.db_type_combo.findText(db_type)
+            index: int = self.db_type_combo.findText(db_type)
+
             if index >= 0:
                 self.db_type_combo.setCurrentIndex(index)
-
-            self.host_input.setText(self.settings.value("host", ""))
-            self.port_input.setText(self.settings.value("port", ""))
-            self.user_input.setText(self.settings.value("user", ""))
-            self.password_input.setText(db_password)
-            self.dbname_input.setText(self.settings.value("dbname", ""))
-            self.file_db_path_input.setText(
-                self.settings.value("file_path", "")
-            )
             self.on_db_type_changed(db_type)
 
-        self.settings.endGroup()
-        self.settings.endGroup()
+            self.host_input.setText(host)
+            self.port_input.setText(port)
+            self.user_input.setText(user)
+            self.password_input.setText(db_password)
+            self.dbname_input.setText(dbname)
+            self.file_db_path_input.setText(file_path)
 
     def delete_profile(self) -> None:
         """Delete current profile"""
@@ -1213,21 +1523,21 @@ class DatabaseConnectionDialog(QDialog):
         )
         if confirm == QMessageBox.StandardButton.Yes:
             self.settings.beginGroup("DatabaseProfiles")
-            self.settings.beginGroup(name)
+            self.settings.remove(str(name))
             self.settings.endGroup()
 
             try:
                 keyring.delete_password(
-                    f"{APPLICATION_NAME}_DB_Profiles", name
+                    f"{APPLICATION_NAME}_DB_Profiles", str(name)
                 )
-            except PasswordDeleteError as delete_err:
+            except (PasswordDeleteError, KeyringError) as delete_err:
                 logging.getLogger(__name__).debug(
-                    f"No keyring password to delete for profile '{name}': {delete_err}"
+                    f"No keyring password to delete for profile '%s': %s", name, delete_err
                 )
 
             self.populate_profiles()
             global_signals.request_toast(
-                "Profil Deleted",
+                "Profile Deleted",
                 f"Profile '{name}' has been deleted",
                 ToastLevel.SUCCESS
             )
@@ -1238,3 +1548,10 @@ class DatabaseConnectionDialog(QDialog):
             self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
         else:
             self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+
+    def toggle_uri_visibility(self) -> None:
+        """Swaps echo mode for uri field"""
+        if self.uri_input.echoMode() == QLineEdit.EchoMode.Password:
+            self.uri_input.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.uri_input.setEchoMode(QLineEdit.EchoMode.Password)
