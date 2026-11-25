@@ -17,8 +17,11 @@ from sqlalchemy.exc import ArgumentError
 
 from icons import IconBuilder, IconType
 from resources.version import APPLICATION_NAME
-from src.core.global_signals import ToastLevel, global_signals
+from src.controller.database_preview_controller import DatabasePreviewController
+from src.core.database_query_preview import PREVIEW_ROW_LIMIT, is_valid_readonly_query
+from src.core.global_signals import LogLevel, ToastLevel, global_signals
 from src.core.resource_loader import get_resource_path
+from src.ui.components.query_preview_panel import QueryPreviewPanel
 from src.ui.workers import ColumnMetadata, FetchColumnWorker, FetchSchemaWorker, SchemaTableGroup, TestConnectionWorker
 
 class SchemaNodeType(StrEnum):
@@ -293,18 +296,38 @@ class DatabaseConnectionDialog(QDialog):
         self.query_editor.setFocus()
 
     def _setup_query_tab(self) -> None:
-        """Starts the query tab and schema tab"""
+        """Initialises the SQL query editor, 5 roow query preview and the schema tree tab"""
         self.query_tab = QWidget()
         layout = QVBoxLayout(self.query_tab)
 
+        self.query_preview_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.query_preview_splitter.setChildrenCollapsible(False)
+        self.query_preview_splitter.addWidget(self._create_query_editor_group())
+        self.query_preview_splitter.addWidget(self._create_query_preview_panel())
+        self.query_preview_splitter.setStretchFactor(0, 1)
+        self.query_preview_splitter.setStretchFactor(1, 1)
+        self.query_preview_splitter.setSizes([250, 310])
+
         self.editors_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.editors_splitter.addWidget(self._create_query_editor_group())
+        self.editors_splitter.setChildrenCollapsible(False)
+        self.editors_splitter.addWidget(self.query_preview_splitter)
         self.editors_splitter.addWidget(self._create_schema_viewer_group())
 
         self.editors_splitter.setStretchFactor(0, 3)
         self.editors_splitter.setStretchFactor(1, 2)
 
         layout.addWidget(self.editors_splitter, stretch=1)
+
+    def _create_query_preview_panel(self) -> QueryPreviewPanel:
+        """Build the 5 record preview and attach the controller"""
+        self.query_preview_panel = QueryPreviewPanel(parent=self)
+        self.preview_controller = DatabasePreviewController(
+            preview_panel=self.query_preview_panel,
+            threadpool=self.threadpool,
+            parent=self
+        )
+        self.query_preview_panel.previewRequested.connect(self.preview_current_query)
+        return self.query_preview_panel
 
     def _create_query_editor_group(self) -> QGroupBox:
         """Builds the SQL query text editor group"""
@@ -320,6 +343,7 @@ class DatabaseConnectionDialog(QDialog):
         layout.addWidget(self.info_label)
 
         self.query_editor = QTextEdit()
+        self.query_editor.setObjectName("sqlQueryEditor")
         self.query_editor.setPlaceholderText("SELECT * FROM table_name...")
         self.sql_highlighter = SQLSyntaxHighlighter(self.query_editor.document())
 
@@ -329,7 +353,7 @@ class DatabaseConnectionDialog(QDialog):
         self.query_editor.setFont(fixed_font)
         font_metrics = self.query_editor.fontMetrics()
         self.query_editor.setTabStopDistance(float(font_metrics.horizontalAdvance(' ') * 4))
-        self.query_editor.setMinimumHeight(150)
+        self.query_editor.setMinimumHeight(110)
         self.query_editor.textChanged.connect(self.on_query_changed)
         layout.addWidget(self.query_editor)
 
@@ -368,6 +392,7 @@ class DatabaseConnectionDialog(QDialog):
         layout.addWidget(self.schema_search_input)
 
         self.schema_tree = SchemaTreeWidget()
+        self.schema_tree.setObjectName("databaseSchemaTree")
         self.schema_tree.setHeaderLabels(["Schema / Table / Column", "Type"])
         self.schema_tree.setAlternatingRowColors(True)
         self.schema_tree.setDragEnabled(True)
@@ -404,6 +429,15 @@ class DatabaseConnectionDialog(QDialog):
 
         self.accept_shortcut_enter = QShortcut(QKeySequence("Ctrl+Enter"), self)
         self.accept_shortcut_enter.activated.connect(self.on_accept)
+
+        self.preview_shortcut_f5 = QShortcut(QKeySequence("F5"), self)
+        self.preview_shortcut_f5.activated.connect(self.preview_current_query)
+
+        self.preview_shortcut_return = QShortcut(QKeySequence("Ctrl+Shift+Return"), self)
+        self.preview_shortcut_return.activated.connect(self.preview_current_query)
+
+        self.preview_shortcut_enter = QShortcut(QKeySequence("Ctrl+Shift+Enter"), self)
+        self.preview_shortcut_enter.activated.connect(self.preview_current_query)
 
     def _create_server_page(self) -> QWidget:
         """Creates the form layout for server-based databases (PostgreSQL, MySQL)."""
@@ -504,8 +538,11 @@ class DatabaseConnectionDialog(QDialog):
         return page
 
     def invalidate_connection_state(self) -> None:
-        """Clears the schema and connection status when connection parameters change"""
+        """Clears the schema, preview and connection status when connection parameters change"""
         self._connection_generation += 1
+        if hasattr(self, "preview_controller"):
+            self.preview_controller.reset()
+
         has_status: bool = bool(self.connection_status_label.text())
         has_schema: bool = bool(self._active_connection_string) or self.schema_tree.topLevelItemCount() > 0
 
@@ -960,7 +997,7 @@ class DatabaseConnectionDialog(QDialog):
             return
         cursor = self.query_editor.textCursor()
         full_text: str = self.query_editor.toPlainText()
-        text_before_cursor: str = full_text[:cursor]
+        text_before_cursor: str = full_text[:cursor.position()]
 
         insert_text: str = identifier
         if self._should_prepend_command(text_before_cursor):
@@ -1011,13 +1048,22 @@ class DatabaseConnectionDialog(QDialog):
         menu = QMenu(self)
 
         if node_type == SchemaNodeType.TABLE.value:
+            preview_top_action: QAction = menu.addAction(f"Preview Top {PREVIEW_ROW_LIMIT} Rows")
+            menu.addSeparator()
             select_all_action: QAction = menu.addAction(f"SELECT * FROM {qualified_id}")
             select_top_action: QAction = menu.addAction(f"SELECT * FROM {qualified_id} LIMIT 100")
             menu.addSeparator()
             insert_table_action: QAction = menu.addAction("Insert Table Name")
 
             chosen: QAction | None = menu.exec(self.schema_tree.viewport().mapToGlobal(position))
-            if chosen == select_all_action:
+            if chosen == preview_top_action:
+                table_select_sql: str = f"SELECT * FROM {qualified_id}"
+                if not self.query_editor.toPlainText().strip():
+                    self.query_editor.setPlainText(table_select_sql)
+                    self._preview_sql_query(table_select_sql)
+                else:
+                    self._preview_sql_query(table_select_sql, source_label=qualified_id)
+            elif chosen == select_all_action:
                 self.query_editor.setPlainText(f"SELECT * FROM {qualified_id}")
                 self.query_editor.setFocus()
             elif chosen == select_top_action:
@@ -1101,8 +1147,63 @@ class DatabaseConnectionDialog(QDialog):
         )
         return url_obj.render_as_string(hide_password=False)
 
+    def preview_current_query(self) -> None:
+        """Validate current input and execute the SQL of the query editor to populate the preview"""
+        if self.preview_controller.is_loading:
+            return
+
+        query: str = self.query_editor.toPlainText().strip()
+        if not query:
+            self._go_to_query_tab()
+            global_signals.request_toast(
+                "Query Empty",
+                f"Please enter a SQL query to preview the first {PREVIEW_ROW_LIMIT} records",
+                ToastLevel.WARNING
+            )
+            return
+
+        if not self._is_valid_select_query(query):
+            self._go_to_query_tab()
+            global_signals.request_toast(
+                "Invalid Query",
+                "The SQL query must be a single read-only SELECT, WITH, TABLE or VALUES query",
+                ToastLevel.WARNING
+            )
+            return
+
+        if self.tab_widget.currentWidget() is not self.query_tab:
+            self._go_to_query_tab()
+
+        self._preview_sql_query(query)
+
+    def _preview_sql_query(self, query: str, source_label: str = "") -> None:
+        """Build the SQLAlchemy URI and dispatch an asynchronous bounded query preview."""
+        try:
+            connection_string: str = self._build_connection_string()
+        except ValueError as input_err:
+            self.tab_widget.setCurrentWidget(self.connection_tab)
+            global_signals.request_toast(
+                "Connection Details Missing",
+                str(input_err),
+                ToastLevel.WARNING
+            )
+            global_signals.request_log(
+                f"Query preview blocked due to connection error: {input_err}",
+                LogLevel.ERROR
+            )
+            return
+
+        self.preview_controller.execute_preview(
+            connection_string=connection_string,
+            query=query,
+            source_label=source_label
+        )
+
     def on_query_changed(self) -> None:
-        """Validate the query"""
+        """Validate the query and synch preview availability and state"""
+        if hasattr(self, "query_preview_panel"):
+            self.query_preview_panel.mark_state_if_populated()
+
         query: str = self.query_editor.toPlainText().strip()
 
         if not query:
@@ -1110,9 +1211,13 @@ class DatabaseConnectionDialog(QDialog):
                 "Query cannot be empty",
                 valid=False
             )
+            self.preview_controller.set_query_valid(False)
             return
 
-        if self._is_valid_select_query(query):
+        is_valid: bool = self._is_valid_select_query(query)
+        self.preview_controller.set_query_valid(is_valid)
+
+        if is_valid:
             self._set_query_status(
                 "Valid query",
                 valid=True
@@ -1130,26 +1235,7 @@ class DatabaseConnectionDialog(QDialog):
         :param query: Raw SQL text from the query editor
         :returns bool: Returns True if the query is a valid read-only query
         """
-        cleaned_query: str = re.sub(r"(--[^\n]*|/\*.*?\*/)", " ", query, flags=re.S).strip()
-        if not cleaned_query:
-            return False
-
-        forbidden_pattern = re.compile(
-            r"^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE)\b",
-            re.IGNORECASE
-        )
-        if forbidden_pattern.match(cleaned_query):
-            return False
-
-        lowered_query: str = cleaned_query.lower()
-        if lowered_query.startswith("select"):
-            return bool(re.match(r"^select\s+\S+", cleaned_query, re.IGNORECASE))
-        if lowered_query.startswith("with"):
-            return bool(re.search(r"\b(select|values|table)\b", cleaned_query, re.IGNORECASE))
-        if lowered_query.startswith(("table ", "values ", "values(", "from ")):
-            return True
-
-        return False
+        return is_valid_readonly_query(query)
 
     def _set_query_status(self, message: str, *, valid: bool) -> None:
         """Sets the status icon and status label based on whether the expression is valid"""

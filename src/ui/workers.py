@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from icons import IconType
 from src.core.data_handler import DataHandler
+from src.core.database_query_preview import QueryPreviewRequest, QueryPreviewResult, execute_query_preview
 from src.core.project_file_info import ProjectFileMetadata, gather_project_file_metadata
 
 if TYPE_CHECKING:
@@ -343,6 +344,30 @@ class FetchColumnWorker(QRunnable):
         finally:
             if engine is not None:
                 engine.dispose()
+
+class QueryPreviewWorkerSignals(QObject):
+    finished = pyqtSignal(QueryPreviewResult)
+    error = pyqtSignal(str)
+
+class QueryPreviewWorker(QRunnable):
+    """Background worker that executes SQL queries for preview"""
+
+    def __init__(self, request: QueryPreviewRequest) -> None:
+        super().__init__()
+        self.request: QueryPreviewRequest = request
+        self.signals: QueryPreviewWorkerSignals = QueryPreviewWorkerSignals()
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            result: QueryPreviewResult = execute_query_preview(self.request)
+            self.signals.finished.emit(result)
+        except ImportError as driver_err:
+            logger.error("Database driver missing during query preview: %s", driver_err)
+            self.signals.error.emit(f"Database driver is not installed: {driver_err}")
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as preview_err:
+            logger.error("Query preview failed: %s", preview_err)
+            self.signals.error.emit(str(preview_err))
 
 class AutoCreateSubsetsWorker(QRunnable):
     """Worker thread for auto-creating and applying subsets"""
