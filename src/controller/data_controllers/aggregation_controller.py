@@ -220,7 +220,7 @@ class AggregationController(BaseDataController):
             return
 
         try:
-            if not hasattr(self.data_handler, "pre_agg_view_df") and self.data_handler.pre_agg_view_df is None:
+            if not hasattr(self.data_handler, "pre_agg_view_df") or self.data_handler.pre_agg_view_df is None:
                 global_signals.request_toast(
                     "Error", "No previous ata state to reset to", ToastLevel.ERROR
                 )

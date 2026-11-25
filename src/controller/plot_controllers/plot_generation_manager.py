@@ -39,11 +39,25 @@ class PlotGenerationManager:
         self.plot_tab = plot_tab
         self.view = plot_tab.view
         self.thread_pool = plot_tab.thread_pool
+        self._is_generating: bool = False
+        self._pending_regeneration: bool = False
+        self._pending_data_signature: Optional[str] = None
+        self._active_worker: Optional[PlotDataPrepWorker] = None
 
     def generate_plot(self, animate: bool = True) -> None:
-        """Trigger the plot execution based on current settings"""
-        if getattr(self, "_is_generating", False):
-            self.plot_tab.status_bar.log(f"Plot generation already in progress. Please wait", LogLevel.WARNING)
+        """
+        Trigger plot execution based on the current UI settings
+
+        If a generation cycle is already in progress, queue a follow up
+        generation so plot_type parameter switches are not dropped
+
+        :param animate: Whether to emit a completion toast notification
+        """
+        if self._is_generating:
+            self._pending_regeneration = True
+            self.plot_tab.status_bar.log(
+                "Plot generation already in progress. Queuing update", LogLevel.INFO
+            )
             return
 
         if self.plot_tab._is_clearing:
@@ -53,6 +67,9 @@ class PlotGenerationManager:
             return
         if not self._validate_data_loaded():
             return
+
+        if self.plot_tab.style_update_timer.isActive():
+            self.plot_tab.style_update_timer.stop()
 
         self._is_generating = True
 
@@ -83,20 +100,22 @@ class PlotGenerationManager:
     def _execute_or_cache_plot(
             self, active_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any], animate: bool = True
     ) -> None:
-        """Checks cache before initiating the background thread"""
-        data_sig = self._build_data_signature(active_df, config)
+        """Checks data signature and rendered plot type before reusing cached data"""
+        data_sig = self._build_data_signature(active_df, config, subplot_index)
 
         has_cached_df = getattr(self.plot_tab, "_cached_active_df", None) is not None
         has_last_sig = getattr(self.plot_tab, "_last_data_signature", None) == data_sig
+        rendered_plot_type = self.plot_tab.plot_engine.get_rendered_plot_type(subplot_index)
+        has_matching_plot_type = rendered_plot_type == config.get("plot_type")
 
-        if has_last_sig and has_cached_df:
+        if has_last_sig and has_cached_df and has_matching_plot_type:
             self.plot_tab.status_bar.log("Using cached data for plotting", LogLevel.INFO)
             self.generate_main_plot(
                 self.plot_tab._cached_active_df, subplot_index, config, keep_data=True, animate=animate
             )
             return
 
-        self.plot_tab._last_data_signature = data_sig
+        self._pending_data_signature = data_sig
         self._start_prep_worker(active_df, subplot_index, config, animate)
 
     def _start_prep_worker(
@@ -114,6 +133,8 @@ class PlotGenerationManager:
             active_df.copy(), config["plot_type"], config["x_col"],
             config["y_cols"], config["quick_filter"]
         )
+        worker.setAutoDelete(False)
+        self._active_worker = worker
         worker.signals.progress.connect(self.plot_tab._prep_progress_dialog.update_progress)
         worker.signals.log.connect(lambda msg: self.plot_tab.status_bar.log(msg, LogLevel.INFO))
         worker.signals.error.connect(self._on_prep_error)
@@ -122,24 +143,30 @@ class PlotGenerationManager:
         )
         self.thread_pool.start(worker)
 
-    def _build_data_signature(self, active_df: pd.DataFrame, config: Dict[str, Any]) -> str:
-        """Constructs a signature tuple to identify unchanged data states"""
+    def _build_data_signature(
+            self,
+            active_df: pd.DataFrame,
+            config: Dict[str, Any],
+            subplot_index: int = 0
+    ) -> str:
+        """Constructs a signature hash to identify unchanged plot data states"""
         view = self.view
-        axes_flipped = view.flip_axes_check.isChecked()
-        x_scale = view.x_scale_combo.currentText()
-        y_scale = view.y_scale_combo.currentText()
-
         x_dt_fmt = view.x_datetime_format_combo.currentText() if view.custom_datetime_check.isChecked() else None
         y_dt_fmt = view.y_datetime_format_combo.currentText() if view.custom_datetime_check.isChecked() else None
         x_dt_custom = view.x_custom_datetime_input.text() if x_dt_fmt == "Custom" else None
         y_dt_custom = view.y_custom_datetime_format_input.text() if y_dt_fmt == "Custom" else None
+        z_col = view.z_column.currentText() if hasattr(view, "z_column") else None
+        stacked_bars = view.basic_tab.stacked_bars_check.isChecked()
 
         signature_components = (
             id(self.plot_tab.data_handler.df),
             active_df.shape,
+            subplot_index,
             config.get("plot_type"),
             config.get("x_col"),
             tuple(config.get("y_cols", [])) if config.get("y_cols") else None,
+            z_col,
+            stacked_bars,
             config.get("subset_name"),
             config.get("quick_filter"),
             view.flip_axes_check.isChecked(),
@@ -181,8 +208,17 @@ class PlotGenerationManager:
         signature_string = f"{signature_components}".encode('utf-8')
         return hashlib.sha256(signature_string).hexdigest()
 
+    def _trigger_pending_regeneration(self) -> None:
+        """Schedule a regeneration if another request is given during a generation"""
+        if not self._pending_regeneration:
+            return
+        self._pending_regeneration = False
+        QTimer.singleShot(0, lambda: self.generate_plot(animate=False))
+
     def _on_prep_error(self, error: Exception) -> None:
         """Handles errors from the background data preparation thread"""
+        self._active_worker = None
+        self._pending_data_signature = None
         self._is_generating = False
         dialog = getattr(self.plot_tab, "_prep_progress_dialog", None)
         if dialog:
@@ -191,10 +227,12 @@ class PlotGenerationManager:
         global_signals.request_toast(
             "Data Preparation Error", "An error occurred during data processing", ToastLevel.ERROR
         )
+        self._trigger_pending_regeneration()
 
     def _on_prep_finished(self, processed_df: pd.DataFrame, subplot_index: int, config: Dict[str, Any],
                           animate: bool = True) -> None:
         """Called when the background data preparation completes successfully"""
+        self._active_worker = None
         dialog = getattr(self.plot_tab, "_prep_progress_dialog", None)
         if dialog:
             dialog.accept()
@@ -278,6 +316,10 @@ class PlotGenerationManager:
         """Orchestrates the synchronous Matplotlib rendering generation cycle."""
         dialog = None
         try:
+            rendered_plot_type = self.plot_tab.plot_engine.get_rendered_plot_type(subplot_index)
+            if keep_data and rendered_plot_type != config.get("plot_type"):
+                keep_data = False
+
             data_size = len(self.plot_tab.data_handler.df)
             show_prog = (data_size > 1000 and not keep_data)
             dialog = self._init_progress_dialog(show_prog, data_size)
@@ -314,13 +356,17 @@ class PlotGenerationManager:
             self._finalize_plot(subplot_index, config, is_fast_render=keep_data)
 
             if not keep_data:
+                self.plot_tab._last_data_signature = (
+                        self._pending_data_signature or self._build_data_signature(active_df, config, subplot_index)
+                )
                 self._log_plot_message(active_df, config)
             self._update_progress(dialog, 100, "Complete")
 
             if dialog:
                 QTimer.singleShot(300, dialog.accept)
-            self.plot_tab._is_data_dirty = False
-            if hasattr(self.plot_tab, "selection_overlay"):
+            is_current_type = config.get("plot_type") == self.plot_tab.current_plot_type_name
+            if not self._pending_regeneration and is_current_type:
+                self.plot_tab._is_data_dirty = False
                 self.plot_tab.selection_overlay.show_update_required(False)
 
             if animate:
@@ -338,6 +384,8 @@ class PlotGenerationManager:
             self._handle_generation_error(e)
         finally:
             self._is_generating = False
+            self._pending_data_signature = None
+            self._trigger_pending_regeneration()
 
     def _prepare_kwargs(self, config: Dict[str, Any]) -> Tuple[dict, dict]:
         fmt_mgr = self.plot_tab.formatting_manager

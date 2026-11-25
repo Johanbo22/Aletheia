@@ -395,9 +395,18 @@ class DiffHistoryManager:
         old_cols = set(old_df.columns)
         new_cols = set(new_df.columns)
 
-        record.dropped_columns = list(old_cols - new_cols)
-        record.added_columns = list(new_cols - old_cols)
-        common_cols = old_cols & new_cols
+        if operation_type == OperationType.RENAME_COLUMN:
+            old_name = params.get("old_name")
+            new_name = params.get("new_name")
+            if isinstance(old_name, str) and isinstance(new_name, str):
+                record.renamed_columns[old_name] = new_name
+            record.dropped_columns = []
+            record.added_columns = []
+            common_cols = (old_cols & new_cols) - {old_name, new_name}
+        else:
+            record.dropped_columns = list(old_cols - new_cols)
+            record.added_columns = list(new_cols - old_cols)
+            common_cols = old_cols & new_cols
 
         record.column_diffs.extend(self._get_dropped_column_diffs(old_df, set(record.dropped_columns)))
         record.column_diffs.extend(self._get_added_columns_diffs(new_df, set(record.added_columns)))
@@ -651,6 +660,10 @@ class DiffHistoryManager:
                     df[col_diff.column_name] = old_data
             else:
                 df[col_diff.column_name] = old_data
+
+        for old_name, new_name in diff_record.renamed_columns.items():
+            if new_name in df.columns and old_name not in df.columns:
+                df = df.rename(columns={new_name: old_name})
 
         old_columns = diff_record.metadata.get("old_columns")
         if old_columns is not None:

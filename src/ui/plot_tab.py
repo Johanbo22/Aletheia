@@ -814,6 +814,10 @@ class PlotTab(PlotTabUI):
             return
 
         current_subplot_index, _ = self.generation_manager._get_subplot_config()
+        if self.plot_engine.get_rendered_plot_type(current_subplot_index) != self.current_plot_type_name:
+            self.generation_manager.generate_plot(animate=False)
+            return
+
         x_col = self.view.x_column.currentText()
         y_cols = self.get_selected_y_columns()
         hue = self.view.hue_column.currentText() if self.view.hue_column.currentText() != "None" else None

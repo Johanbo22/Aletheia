@@ -14,3 +14,30 @@ QLabel#query_status_label[status="valid"] {
 QLabel#query_status_label[status="invalid"] {
     color: #d32f2f;
 }
+
+QLabel#query_preview_status_label {
+    font-size: 9pt;
+}
+QLabel#query_preview_status_label[status="muted"] {
+    color: #6b7280;
+    font-style: italic;
+}
+QLabel#query_preview_status_label[status="valid"] {
+    color: #388e3c;
+    font-weight: bold;
+}
+QLabel#query_preview_status_label[status="stale"] {
+    color: #d97706;
+    font-style: italic;
+}
+QLabel#query_preview_status_label[status="invalid"] {
+    color: #d32f2f;
+    font-weight: bold;
+}
+QTableView#queryPreviewTable {
+    gridline-color: #e5e7eb;
+    alternate-background-color: #f8fafc;
+}
+QTableView#queryPreviewTable QHeaderView {
+    background-color: #f8f9fa;
+}

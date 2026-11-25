@@ -1,20 +1,24 @@
+import logging
 import socket
 import time
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, TypedDict
 
 import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, QRunnable, QThread, pyqtSignal, pyqtSlot
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Engine, Inspector, create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from icons import IconType
 from src.core.data_handler import DataHandler
+from src.core.database_query_preview import QueryPreviewRequest, QueryPreviewResult, execute_query_preview
 from src.core.project_file_info import ProjectFileMetadata, gather_project_file_metadata
 
 if TYPE_CHECKING:
     from src.core.project_manager import ProjectManager
     from src.core.subset_manager import SubsetManager
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 class AutosaveWorker(QRunnable):
     """
@@ -185,13 +189,14 @@ class GoogleSheetsImportWorker(QRunnable):
 class TestConnectionWorker(QRunnable):
     """Worker to test database connections"""
 
-    def __init__(self, connection_string: str):
+    def __init__(self, connection_string: str) -> None:
         super().__init__()
-        self.connection_string = connection_string
-        self.signals = WorkerSignals()
+        self.connection_string: str = connection_string
+        self.signals: WorkerSignals = WorkerSignals()
 
     @pyqtSlot()
-    def run(self):
+    def run(self) -> None:
+        engine: Engine | None = None
         try:
             self.signals.progress.emit(10, "Connecting...")
             engine = create_engine(self.connection_string)
@@ -200,8 +205,31 @@ class TestConnectionWorker(QRunnable):
 
             self.signals.progress.emit(100, "Connection Successful")
             self.signals.finished.emit(True)
-        except Exception as ConnectionError:
-            self.signals.error.emit(ConnectionError)
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as conn_err:
+            self.signals.error.emit(conn_err)
+        finally:
+            if engine is not None:
+                engine.dispose()
+
+SYSTEM_SCHEMA_NAMES: frozenset[str] = frozenset({
+    "information_schema",
+    "pg_catalog",
+    "pg_toast",
+    "mysql",
+    "performance_schema",
+    "sys",
+    "temp"
+})
+SYSTEM_SCHEMA_PREFIXES: tuple[str, ...] = ("pg_toast", "pg_temp_")
+MULTI_SCHEMA_DIALECTS: frozenset[str] = frozenset({"postgresql", "duckdb"})
+
+class SchemaTableGroup(TypedDict):
+    schema: str | None
+    tables: list[str]
+
+class ColumnMetadata(TypedDict):
+    name: str
+    type: str
 
 class FetchSchemaWorkerSignals(QObject):
     """Signals for the FetchSchemaWorker"""
@@ -216,34 +244,130 @@ class FetchSchemaWorker(QRunnable):
         self.connection_string = connection_string
         self.signals = FetchSchemaWorkerSignals()
 
+    @staticmethod
+    def is_user_schema(schema_name: str) -> bool:
+        lowered: str = schema_name.lower()
+        if lowered in SYSTEM_SCHEMA_NAMES:
+            return False
+        return not lowered.startswith(SYSTEM_SCHEMA_PREFIXES)
+
+    @staticmethod
+    def _sort_schemas(schemas: list[str]) -> list[str]:
+        priority: dict[str, int] = {"public": 0, "main": 1}
+        return sorted(schemas, key=lambda name: (priority.get(name.lower(), 2), name.lower()))
+
+    def _collect_multi_schema_tables(self, inspector: Inspector) -> list[SchemaTableGroup]:
+        raw_schemas: list[str] = inspector.get_schema_names()
+        user_schemas: list[str] = self._sort_schemas(
+            [name for name in raw_schemas if self.is_user_schema(name)]
+        )
+        schema_groups: list[SchemaTableGroup] = []
+
+        for schema_name in user_schemas:
+            try:
+                tables: list[str] = sorted(inspector.get_table_names(schema=schema_name))
+                schema_groups.append({"schema": schema_name, "tables": tables})
+            except SQLAlchemyError as err:
+                logger.warning("Skipping inaccessible schema '%s': %s", schema_name, err)
+
+        return schema_groups
+
     def run(self) -> None:
-        engine = None
+        engine: Engine | None = None
         try:
             engine = create_engine(self.connection_string)
-            inspector = inspect(engine)
-            table_names = inspector.get_table_names()
-            schema_data = []
+            inspector: Inspector = inspect(engine)
 
-            for table in table_names:
-                columns = []
-                try:
-                    columns = inspector.get_columns(table)
-                except SQLAlchemyError as InspectorError:
-                    if "sqlite" in self.connection_string.lower():
-                        try:
-                            with engine.connect() as conn:
-                                result = conn.execute(text(f'PRAGMA table_info("{table}")'))
-                                columns = [{"name": row[1], "type": row[2]} for row in result]
-                        except SQLAlchemyError as FallbackError:
-                            print(f"Fallback inspection failed for {table}: {FallbackError}")
-                schema_data.append({"table": table, "columns": columns})
+            if engine.dialect.name in MULTI_SCHEMA_DIALECTS:
+                schema_groups: list[SchemaTableGroup] = self._collect_multi_schema_tables(inspector)
+            else:
+                tables: list[str] = sorted(inspector.get_table_names())
+                schema_groups = [{"schema": None, "tables": tables}]
 
-            self.signals.finished.emit(schema_data)
+            self.signals.finished.emit(schema_groups)
         except (SQLAlchemyError, ValueError, OSError, RuntimeError) as err:
-            self.signals.error.emit(err)
+            self.signals.error.emit(str(err))
         finally:
             if engine is not None:
                 engine.dispose()
+
+class FetchColumnWorkerSignals(QObject):
+    """Signals emitted by FetchColumnWorker during loading"""
+    columnsLoaded = pyqtSignal(str, str, list)
+    loadFailed = pyqtSignal(str, str, str)
+
+class FetchColumnWorker(QRunnable):
+    """
+    Worker thread to fetch column metadata for a single table on demand
+    """
+
+    def __init__(self, connection_string: str, table_name: str, schema_name: str | None) -> None:
+        super().__init__()
+        self.connection_string: str = connection_string
+        self.table_name: str = table_name
+        self.schema_name: str | None = schema_name
+        self.signals: FetchColumnWorkerSignals = FetchColumnWorkerSignals()
+
+    def _inspect_sqlite_pragma(self, engine: Engine) -> list[ColumnMetadata]:
+        escaped_table: str = self.table_name.replace('"', '""')
+        with engine.connect() as conn:
+            result = conn.execute(text(f'PRAGMA table_info("{escaped_table}")'))
+            return [{"name": str(row[1]), "type": str(row[2])} for row in result]
+
+    @pyqtSlot()
+    def run(self) -> None:
+        engine: Engine | None = None
+        schema_key: str = self.schema_name or ""
+        try:
+            engine = create_engine(self.connection_string)
+            inspector: Inspector = inspect(engine)
+            columns: list[ColumnMetadata] = []
+
+            try:
+                raw_columns = inspector.get_columns(self.table_name, schema=self.schema_name)
+                columns = [
+                    {"name": str(col.get("name", "Unknown")), "type": str(col.get("type", "Unknown"))}
+                    for col in raw_columns
+                ]
+            except SQLAlchemyError as inspect_err:
+                if engine.dialect.name != "sqlite":
+                    raise
+                logger.warning(
+                    "SQLAlchemy reflection failed for '%s', using PRAGMA fallback: %s",
+                    self.table_name, inspect_err)
+                columns = self._inspect_sqlite_pragma(engine)
+
+            self.signals.columnsLoaded.emit(schema_key, self.table_name, columns)
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as err:
+            logger.error("Failed to fetch columns for '%s.%s': %s", schema_key, self.table_name, err)
+            self.signals.loadFailed.emit(schema_key, self.table_name, str(err))
+        finally:
+            if engine is not None:
+                engine.dispose()
+
+class QueryPreviewWorkerSignals(QObject):
+    finished = pyqtSignal(QueryPreviewResult)
+    error = pyqtSignal(str)
+
+class QueryPreviewWorker(QRunnable):
+    """Background worker that executes SQL queries for preview"""
+
+    def __init__(self, request: QueryPreviewRequest) -> None:
+        super().__init__()
+        self.request: QueryPreviewRequest = request
+        self.signals: QueryPreviewWorkerSignals = QueryPreviewWorkerSignals()
+
+    @pyqtSlot()
+    def run(self) -> None:
+        try:
+            result: QueryPreviewResult = execute_query_preview(self.request)
+            self.signals.finished.emit(result)
+        except ImportError as driver_err:
+            logger.error("Database driver missing during query preview: %s", driver_err)
+            self.signals.error.emit(f"Database driver is not installed: {driver_err}")
+        except (SQLAlchemyError, ValueError, OSError, RuntimeError) as preview_err:
+            logger.error("Query preview failed: %s", preview_err)
+            self.signals.error.emit(str(preview_err))
 
 class AutoCreateSubsetsWorker(QRunnable):
     """Worker thread for auto-creating and applying subsets"""

@@ -4,6 +4,33 @@ All notable changes to Aletheia will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Semantic Versioning.
 
+## v.0.6.1
+### Added
+- Context menus for schema and table view to insert SQL statements
+- SQL syntax inclusion when double-clicking on an item in the schema and table view
+- A button to go from database connection settings to the Query & Schema tab next to "Test Connection"
+- A SQL preview table to run a query that shows the first 5 records of that query before importing the data
+### Changed
+- Updated the connection settings for databases to load more efficiently
+- Renamed database connection dialog "OK" button to "Import"
+- Improved SQL syntax highlighting
+- Expanded SQL query support
+### Fixes
+- Fixed an issue where clicking "Apply Regex" did not apply the replacement or close the dialog
+- Fixed an error that prevented Moving Average, Moving Sum and other rolling window operations from running
+- Fixed a crash when syncing plot labels and axis limits back to the interface after running a script
+- Fixed middle-click panning where panning caused the y-axis to collapse
+- Fixed a bug where left-clicking on an annotation near the Y-axis would fail to load the context bar
+- Fixed a crash when generating a correlation matrix for heatmaps and pcolormesh plots
+- Fixed a bug where only the X-axis major gridlines were drawn when customising individual gridlines
+- Fixed a crash that prevented saving projects containing data subsets
+- Fixed an issue where undoing a column rename did not restore the previous column name
+- Fixed the "Check for updates on launch" preference to correctly apply when restarting
+- Fixed an issue where the schemas of loaded databases to import did not show up in the schema and column viewer
+- Fixed an issue with duplicate commas in SQL queries
+- Fixed an issue with deleting database profiles
+- Fixed an issue where switching a plot type would not re-render the canvas and fail to update the plot.
+
 ## v.0.6.0
 ### Added
 - ProjectCards for recent project buttons. These cards show information about the project such as file size, rows and column counts, last modified date, path.

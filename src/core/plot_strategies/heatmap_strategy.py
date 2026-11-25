@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 
 from src.core.plot_engine import PlotEngine
@@ -11,7 +12,8 @@ if TYPE_CHECKING:
     from src.ui.plot_tab import PlotTab
 
 class HeatmapPlotStrategy(BasePlotStrategy):
-    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any], general_kwargs: Dict[str, Any]) -> str | None:
+    def execute(self, engine: PlotEngine, plot_tab: PlotTab, x_col: str, y_cols: List[str], axes_flipped: bool, font_family: str, plot_kwargs: Dict[str, Any],
+                general_kwargs: Dict[str, Any]) -> str | None:
         df = plot_tab.data_handler.df
         engine._clear_axes()
 

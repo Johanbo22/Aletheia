@@ -213,14 +213,23 @@ class ScriptManager:
             self.plot_tab.status_bar.log(f"Failed to sync GUI from script: {str(sync_error)}", LogLevel.WARNING)
 
     @staticmethod
-    def _sync_label(self, config: dict, section: str, key: str, value: str) -> None:
+    def _sync_label(
+            config: dict[str, dict[str, dict[str, str | bool]]],
+            section: str,
+            key: str,
+            value: str
+    ) -> None:
         """Sync text labels and enabled them if populated"""
         if value and str(value).strip():
             config[section][key]["text"] = str(value)
             config[section][key]["enabled"] = True
 
     @staticmethod
-    def _sync_axis_limits(self, config: dict, axis_key: str, limits: tuple) -> None:
+    def _sync_axis_limits(
+            config: dict[str, dict[str, dict[str, float | bool]]],
+            axis_key: str,
+            limits: tuple[float, float]
+    ) -> None:
         """Sync axis limits and disable auto-limits"""
         axis_cfg = config["axes"][axis_key]
         try:

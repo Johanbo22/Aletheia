@@ -196,6 +196,7 @@ class RegexReplaceDialog(QDialog):
                 "Validation Error", "The provided Regular Expression is invalid", ToastLevel.ERROR
             )
             return
+        self.accept()
 
     def get_parameters(self) -> tuple[str, str, str]:
         """

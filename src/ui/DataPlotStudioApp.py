@@ -137,7 +137,7 @@ class DataPlotStudio(QMainWindow):
         """
         Performs a version check against the latest release on GitHub
         """
-        if not bool(self.settings.get("check updates_on_launch", True)):
+        if not bool(self.settings.get("check_updates_on_launch", True)):
             return
 
         worker = VersionCheckWorker(APPLICATION_VERSION)
