@@ -36,6 +36,8 @@ class PlotLayoutManager:
             return
 
         self.engine.current_figure.clear()
+        self.engine.current_plot_type = None
+        self.engine.rendered_plot_types.clear()
         self.engine._sharex = sharex
         self.engine._sharey = sharey
 
@@ -91,6 +93,10 @@ class PlotLayoutManager:
 
         self.engine.current_ax.set_axes_locator = None
         self.engine.current_ax.clear()
+        self.engine.current_plot_type = None
+        if self.engine.current_ax in self.engine.axes_flat:
+            active_index = self.engine.axes_flat.index(self.engine.current_ax)
+            self.engine.rendered_plot_types.pop(active_index, None)
 
     def _remove_axis_colorbars(self, ax: Any) -> None:
         """

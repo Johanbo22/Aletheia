@@ -40,6 +40,7 @@ class PlotEngine:
         self.current_ax = None
         self.axes_flat = []
         self.current_plot_type: Optional[str] = None
+        self.rendered_plot_types: Dict[int, str] = {}
         self.plot_config: Dict[str, Any] = {}
         self.secondary_ax = None
         self._cached_processed_data: Optional[pd.DataFrame] = None
@@ -51,6 +52,17 @@ class PlotEngine:
         self._table_renderer = PlotTableRenderer(self)
         self._formatter = PlotFormatter(self)
         self._analytics = PlotAnalyticsRenderer(self)
+
+    def get_rendered_plot_type(self, subplot_index: int) -> Optional[str]:
+        """Return the plot type currently rendered on the subplot idx"""
+        return self.rendered_plot_types.get(subplot_index)
+
+    def _record_rendered_plot_type(self, plot_type: str) -> None:
+        """Record the plot type that was rendered onto the active subplot canvas"""
+        self.current_plot_type = plot_type
+        if self.current_ax in self.axes_flat:
+            active_index = self.axes_flat.index(self.current_ax)
+            self.rendered_plot_types[active_index] = plot_type
 
     def cache_data(self, df: pd.DataFrame) -> None:
         self._cached_processed_data = df.copy() if df is not None else None
@@ -186,7 +198,7 @@ class PlotEngine:
             self._ensure_projection(is_3d_plot)
 
             strategy = StrategyRegistry.get_strategy(plot_type)
-            return strategy.execute(
+            error_msg = strategy.execute(
                 engine=self,
                 plot_tab=plot_tab,
                 x_col=x_col,
@@ -196,6 +208,9 @@ class PlotEngine:
                 plot_kwargs=plot_kwargs,
                 general_kwargs=general_kwargs
             )
+            if error_msg is None:
+                self._record_rendered_plot_type(plot_type)
+            return error_msg
         except ValueError as error:
             return str(error)
         except Exception as error:

@@ -51,6 +51,7 @@ class PlotTypeManager:
             list_widget.setIconSize(QSize(48, 48))
 
             list_widget.itemClicked.connect(self.on_plot_list_item_clicked)
+            list_widget.currentItemChanged.connect(self.on_plot_current_item_changed)
 
             for plot_name in plot_names:
                 if plot_name in self.plot_engine.AVAILABLE_PLOTS:
@@ -65,13 +66,32 @@ class PlotTypeManager:
             self.view.plot_type.addItem(list_widget, category)
             self.category_lists.append(list_widget)
 
+    def on_plot_current_item_changed(
+            self,
+            current: QListWidgetItem | None,
+            _previous: QListWidgetItem | None
+    ) -> None:
+        """Handle plot type changes triggered by keyboard navigation or mouse selection"""
+        if current is None:
+            return
+        if current.text() == self.plot_tab.current_plot_type_name:
+            return
+        self._apply_plot_type_selection(current)
+
     def on_plot_list_item_clicked(self, item: QListWidgetItem) -> None:
         """Slot to handle plot type selection from the toolbox list"""
         if not item:
             return
+        if item.text() == self.plot_tab.current_plot_type_name and self.plot_tab._is_data_dirty:
+            return
+        self._apply_plot_type_selection(item)
 
+    def _apply_plot_type_selection(self, item: QListWidgetItem) -> None:
+        """Apply a selected plot type item, destroy cache and trigger repaint"""
         plot_type = item.text()
         self.plot_tab.current_plot_type_name = plot_type
+        self.plot_tab._last_data_signature = None
+        self.plot_tab._is_data_dirty = True
         self.view.current_plot_label.setText(f"Selected Plot: {plot_type}")
 
         for list_w in self.category_lists:
@@ -85,6 +105,8 @@ class PlotTypeManager:
     def select_plot_in_toolbox(self, plot_type_name: str, log: bool = True) -> None:
         """Select a plot type in the toolbox"""
         self.plot_tab.current_plot_type_name = plot_type_name
+        self.plot_tab._last_data_signature = None
+        self.plot_tab._is_data_dirty = True
         self.view.current_plot_label.setText(f"Selected Plot: {plot_type_name}")
 
         for i, (category, names) in enumerate(self.plot_categories.items()):
