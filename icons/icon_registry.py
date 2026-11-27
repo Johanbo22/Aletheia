@@ -61,6 +61,7 @@ class IconType(Enum):
     PlotCustomization = auto()
     PlotAnnotations = auto()
     PlotGeospatial = auto()
+    DrawingOrder = auto()
 
     # Main UI icons
     PlotTabIcon = auto()

@@ -3,10 +3,11 @@ from typing import Sequence
 
 from PyQt6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QPoint, QPropertyAnimation, QSortFilterProxyModel, \
     Qt, pyqtSignal
-from PyQt6.QtGui import QDropEvent, QEnterEvent, QIcon, QKeyEvent, QStandardItem, QStandardItemModel
+from PyQt6.QtGui import QDropEvent, QEnterEvent, QKeyEvent, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QAbstractItemView, QFrame, QGraphicsDropShadowEffect, QLineEdit, QListView, QPushButton, \
     QVBoxLayout, QWidget
 
+from icons import IconBuilder, IconType
 from src.controller.plot_controllers.drawing_order_manager import PlotLayerItem
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class DrawingOrderFloatingActionButton(QPushButton):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip("Open drawing order list")
 
-        self.setIcon(QIcon("../icons/data_operations/arrow-down-up.svg"))
+        self.setIcon(IconBuilder.build(IconType.DrawingOrder))
 
         self._collapsed_width = 45
         self._expanded_width = 170

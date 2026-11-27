@@ -76,5 +76,6 @@
     "InternetLow": "icons/internet/wifi-low.svg",
     "InternetNone": "icons/internet/wifi-none.svg",
     "InternetOff": "icons/internet/wifi-off.svg",
-    "InternetProblem": "icons/internet/wifi-problem.svg"
+    "InternetProblem": "icons/internet/wifi-problem.svg",
+    "DrawingOrder": "<path d=\"M280-800v526l-98-98-42 42 170 170 170-170-42-42-98 98v-526h-60Zm340 640v-526l-98 98-42-42 170-170 170 170-42 42-98-98v526h-60Z\"/>"
 }
