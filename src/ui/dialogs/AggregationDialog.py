@@ -4,7 +4,7 @@ from enum import Enum
 import pandas as pd
 from PyQt6.QtCore import QModelIndex, QObject, QPoint, QRunnable, QSortFilterProxyModel, QThreadPool, QTimer, Qt, \
     pyqtSignal
-from PyQt6.QtGui import QFont, QIcon, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QAbstractItemView, QComboBox, QDialog, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, \
     QLabel, QLineEdit, QListView, QMenu, QMessageBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, \
     QVBoxLayout, QWidget
@@ -74,20 +74,20 @@ class AggregationFunctions(str, Enum):
 
 # A dict to assign for tooltip role
 AGGREGATION_TOOLTIPS: dict[AggregationFunctions, str] = {
-    AggregationFunctions.MEAN  : "Average of all values",
-    AggregationFunctions.SUM   : "Total sum of all values",
-    AggregationFunctions.MEDIAN: "Middle value separating the higher half from the lower half",
-    AggregationFunctions.MIN   : "Smallest value",
-    AggregationFunctions.MAX   : "Largest value",
-    AggregationFunctions.COUNT : "Number of non-null values",
-    AggregationFunctions.STD   : "Standard deviation (measure of data variation)",
-    AggregationFunctions.VAR   : "Variance (squared standard deviation)",
-    AggregationFunctions.FIRST : "First value encountered",
-    AggregationFunctions.LAST  : "Last value encountered",
+    AggregationFunctions.MEAN   : "Average of all values",
+    AggregationFunctions.SUM    : "Total sum of all values",
+    AggregationFunctions.MEDIAN : "Middle value separating the higher half from the lower half",
+    AggregationFunctions.MIN    : "Smallest value",
+    AggregationFunctions.MAX    : "Largest value",
+    AggregationFunctions.COUNT  : "Number of non-null values",
+    AggregationFunctions.STD    : "Standard deviation (measure of data variation)",
+    AggregationFunctions.VAR    : "Variance (squared standard deviation)",
+    AggregationFunctions.FIRST  : "First value encountered",
+    AggregationFunctions.LAST   : "Last value encountered",
     AggregationFunctions.NUNIQUE: "Number of distinct, unique values",
-    AggregationFunctions.Q25   : "25th Percentile (First Quartile)",
-    AggregationFunctions.Q75   : "75th Percentile (Third Quartile)",
-    AggregationFunctions.Q90   : "90th Percentile",
+    AggregationFunctions.Q25    : "25th Percentile (First Quartile)",
+    AggregationFunctions.Q75    : "75th Percentile (Third Quartile)",
+    AggregationFunctions.Q90    : "90th Percentile",
 }
 
 # Aggregation functions that require numeric dataa
@@ -315,12 +315,12 @@ class AggregationDialog(QDialog):
 
         reorder_layout = QVBoxLayout()
         self.btn_move_up = QPushButton("", parent=self)
-        self.btn_move_up.setIcon(QIcon("../icons/ui_styling/arrow-big-up.svg"))
+        self.btn_move_up.setIcon(IconBuilder.build(IconType.UpArrow))
         self.btn_move_up.setToolTip("Move selected column up")
         self.btn_move_up.clicked.connect(self.move_agg_row_up)
 
         self.btn_move_down = QPushButton("", parent=self)
-        self.btn_move_down.setIcon(QIcon("../icons/ui_styling/arrow-big-down.svg"))
+        self.btn_move_down.setIcon(IconBuilder.build(IconType.DownArrow))
         self.btn_move_down.setToolTip("Move selected column down")
         self.btn_move_down.clicked.connect(self.move_agg_row_down)
 
@@ -841,13 +841,13 @@ class AggregationDialog(QDialog):
         group_cols, agg_config, date_grouping, rename_mapping = self.get_current_config()
 
         config = {
-            "group_by"      : group_cols,
-            "agg_config"    : agg_config,
-            "date_grouping" : date_grouping,
+            "group_by"        : group_cols,
+            "agg_config"      : agg_config,
+            "date_grouping"   : date_grouping,
             "aggregation_name": self.save_name_input.text().strip()
             if self.save_agg_group.isChecked()
             else "",
-            "rename_mapping": rename_mapping
+            "rename_mapping"  : rename_mapping
         }
 
         return config
